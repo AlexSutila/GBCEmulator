@@ -4,19 +4,6 @@
 #include <emu_types.hpp>
 
 /*
- * LR35902 Register Set is as follows, where each register is
- * sixteen bits. Registers can be used as either full sixteen
- * bit registers, or two eight bit registers.
- *
- * 16-bit | Hi | Lo | Name / Function
- * -------+----+----+-------------------------
- * AF     | A  | -  | Accumulator & Flags
- * BC     | B  | C  | BC
- * DE     | D  | E  | DE
- * HL     | H  | L  | HL
- * SP     | -  | -  | Stack Pointer
- * PC     | -  | -  | Program Counter / Pointer
- *
  * This class is used for registers BC, DE, and HL
  */
 class CpuRegister {
