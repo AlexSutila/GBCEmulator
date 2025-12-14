@@ -7,7 +7,8 @@ LR35902::LR35902(AddressBus *bus_ptr) : bus(bus_ptr) {
   reg_file.reg_bc = CpuRegister();
   reg_file.reg_de = CpuRegister();
   reg_file.reg_hl = CpuRegister();
-  reg_file.reg_pc = reg_file.reg_sp = 0x0000;
+  reg_file.reg_sp = CpuRegister();
+  reg_file.reg_pc = 0x0000;
 }
 
 void LR35902::step() {

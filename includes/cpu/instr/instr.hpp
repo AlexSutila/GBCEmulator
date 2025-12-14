@@ -7,44 +7,25 @@
 #include <memory/bus.hpp>
 #include <tuple>
 
-/*
- * This emulator aims to achieve accuracy with it's memory access timing down
- * to the exact clock cycle. In order to achieve this, individual instructions
- * will be `stepped` multiple times.
- *
- * However, stepping through instructions makes accurate memory access timing
- * difficult. Instead, multiple steps to a `step()` method will be taken, and
- * the emulator will dynamically decide if it should step through the entire
- * instruction, or just a portion of it first. Remaining components will then
- * be updated based on how many clock cycles have elapsed.
- *
- * The only time we can really just get away with casually executing the whole
- * instruction in a single burst is if it doesn't interact with MMIO registers.
- */
 class Instruction {
 public:
   Instruction(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : reg_file(reg_file_ptr), bus(bus_ptr) {}
 
   /**
-   * Executes one step of the instruction. Recall that this may emulate more
-   * than one clock cycle based on certain conditions.
+   * Executes one step of the instruction. One call to step executes one whole
+   * instruction, but may or may not synchronize the remaining components.
    *
    * @return A tuple containing:
-   *  - bool:   true if the instruction has completed
-   *  - size_t: number of clock cycles elapsed
+   *  - size_t: total number of clock cycles for this instruction
+   *  - size_t: how many cycles are required if the bus was synced
    */
-  virtual std::tuple<bool, std::size_t> step() = 0;
+  virtual std::tuple<std::size_t, std::size_t> step() = 0;
 
   /**
    * Parses the instruction in it's entirety, reading intermediate fields
    */
   virtual void parse() {}
-
-  /**
-   * Gets the total clock cycles required for the instruction
-   */
-  virtual addr_t cycles() const = 0;
 
 protected:
 

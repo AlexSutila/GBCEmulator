@@ -2,6 +2,14 @@
 #include <endianness.hpp>
 #include <emu_types.hpp>
 
+void CpuFlagsRegister::write(const addr_t value) {
+  hi = static_cast<byte_t>((value >> 8) & 0x00FF);
+  lo = static_cast<byte_t>(value & 0x00FF);
+
+  // Hardware quirk, these bits always read zero so don't set them
+  lo = lo & ~0x0F;
+}
+
 bool CpuFlagsRegister::get_flag(const StatusFlagMask mask) const {
   return (lo & static_cast<byte_t>(mask)) != 0;
 }

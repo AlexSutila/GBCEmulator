@@ -21,9 +21,9 @@
  * PC     | -  | -  | Program Counter / Pointer
  */
 struct RegisterFile {
-  CpuRegister reg_bc, reg_de, reg_hl;
+  CpuRegister reg_bc, reg_de, reg_hl, reg_sp;
   CpuFlagsRegister reg_af;
-  addr_t reg_pc, reg_sp;
+  addr_t reg_pc; // Instruction pointer
 };
 
 // Used for compile time register decoding

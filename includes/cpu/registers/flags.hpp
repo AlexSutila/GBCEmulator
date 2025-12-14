@@ -30,6 +30,7 @@ enum class StatusFlagMask : byte_t {
 class CpuFlagsRegister : public CpuRegister {
 public:
   CpuFlagsRegister() : CpuRegister() {}
+  void write(const addr_t value) override;
 
   /* For status flag specific operations */
   bool get_flag(const StatusFlagMask mask) const;

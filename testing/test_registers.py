@@ -85,3 +85,10 @@ def test_cpuflags_set_flag_and_read(flag_mask):
 
     # High is accumulator, not impacted by flags
     assert r.hi == 0
+
+
+def test_cpuflags_unused_bits():
+    '''CpuRegisterFlags: Set flags, ensure unused bits always read zero'''
+    r = CpuFlagsRegister()
+    r.full = 0xFF
+    assert r.full == 0xF0
