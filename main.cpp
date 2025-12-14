@@ -1,8 +1,6 @@
-#include <cpu/lr35902.hpp>
-#include <memory/bus.hpp>
-#include <iostream>
+#include <gbc.hpp>
 
 int main() {
-    std::cout << "Hello World" << std::endl;
+    GameBoyColor emulator;
     return 0;
 }

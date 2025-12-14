@@ -15,14 +15,20 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # Main emulator executable
 add_executable(gbc
     main.cpp
+    src/gbc.cpp
     src/cpu/lr35902.cpp
     src/cpu/registers/register.cpp
     src/cpu/registers/flags.cpp
+    src/memory/mmio.cpp
     src/memory/bus.cpp
 )
 target_include_directories(gbc
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/includes
+)
+target_compile_options(gbc
+    PRIVATE
+        -Wall
 )
 
 # Emulator python bindings

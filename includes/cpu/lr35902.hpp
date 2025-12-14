@@ -8,11 +8,11 @@
 
 class LR35902 {
 public:
+  LR35902(AddressBus *bus_ptr);
   void step();
-  LR35902();
 
 private:
-  AddressBus *bus;
+  AddressBus *const bus;
 
   /* LR35902 Register File */
   struct {
