@@ -29,16 +29,12 @@ enum class StatusFlagMask : byte_t {
  */
 class CpuFlagsRegister : public CpuRegister {
 public:
-  CpuFlagsRegister() : full(0), lo(0), hi(0) {}
+  CpuFlagsRegister() : CpuRegister() {}
 
   /* For status flag specific operations */
   bool get_flag(const StatusFlagMask mask) const;
   void clr_flag(const StatusFlagMask mask);
   void set_flag(const StatusFlagMask mask);
-
-private:
-  byte_t lo, hi;
-  addr_t full;
 };
 
 #endif // __FLAGS_H

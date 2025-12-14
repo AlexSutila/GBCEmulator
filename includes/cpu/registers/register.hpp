@@ -21,7 +21,7 @@
  */
 class CpuRegister {
 public:
-  CpuRegister() : full(0), lo(0), hi(0) {}
+  CpuRegister() : lo(0), hi(0) {}
   virtual void write_lo(const byte_t value);
   virtual void write_hi(const byte_t value);
   virtual void write(const addr_t value);
@@ -29,9 +29,8 @@ public:
   virtual byte_t read_hi() const;
   virtual addr_t read() const;
 
-private:
+protected:
   byte_t lo, hi;
-  addr_t full;
 };
 
 #endif // __REGISTER_H
