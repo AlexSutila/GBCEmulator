@@ -6,14 +6,19 @@
 #include <memory>
 #include <vector>
 
-AddressBus::AddressBus() { mem = std::make_unique<byte_t[]>(0xFFFF); }
+AddressBus::AddressBus() {
+  mem = std::make_unique<byte_t[]>(0xFFFF);
+
+  // Initialize general IO registers
+  mmio.boot_rom_ctrl = std::make_unique<BootROMCtrl>();
+}
 
 void AddressBus::init_io_registers() {
   io_registers[0xFF50] = mmio.boot_rom_ctrl.get();
 }
 
 const byte_t AddressBus::read_byte(const addr_t addr) {
-  constexpr const std::vector<byte_t> &boot_rom = cgb_boot;
+  const std::vector<byte_t> &boot_rom = get_boot_rom();
 
   /* Read from boot ROM if it is mapped */
   if (boot_rom_enabled() && addr >= 0x0000 && addr < boot_rom.size()) {

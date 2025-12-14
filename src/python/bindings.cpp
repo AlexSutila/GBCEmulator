@@ -1,7 +1,10 @@
-#include <cpu/registers/flags.hpp>
-#include <cpu/registers/register.hpp>
 #include <pybind11/functional.h>
 #include <pybind11/pybind11.h>
+
+#include <cpu/registers/flags.hpp>
+#include <cpu/registers/register.hpp>
+#include <memory/boot.hpp>
+#include <memory/bus.hpp>
 
 namespace py = pybind11;
 
@@ -56,8 +59,21 @@ PYBIND11_MODULE(gbc_py, m) {
   // Already inherits CpuRegister methods, so no need for trampoline class
   py::class_<CpuFlagsRegister, CpuRegister>(m, "CpuFlagsRegister")
       .def(py::init<>())
-
       .def("get_flag", &CpuFlagsRegister::get_flag)
       .def("set_flag", &CpuFlagsRegister::set_flag)
       .def("clr_flag", &CpuFlagsRegister::clr_flag);
+
+  // Expose boot ROM for memory testing
+  m.def("get_boot_rom", []() {
+    const auto &rom = get_boot_rom();
+    return py::bytes(reinterpret_cast<const char *>(rom.data()), rom.size());
+  });
+
+  // Expose main Address Bus class
+  py::class_<AddressBus>(m, "AddressBus")
+      .def(py::init<>())
+      .def("write_byte", &AddressBus::write_byte, py::arg("addr"),
+           py::arg("value"))
+      .def("read_byte", &AddressBus::read_byte, py::arg("addr"))
+      .def("init_io_registers", &AddressBus::init_io_registers);
 }

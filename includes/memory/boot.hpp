@@ -394,4 +394,9 @@ static const std::vector<byte_t> cgb0_boot = {
     0x16, 0xad, 0x07, 0x17, 0x05, 0xba, 0x13, 0x7c, 0x00, 0x00, 0x00, 0x00,
 };
 
+/* Modify to use to another boot ROM for boot sequence */
+static const std::vector<byte_t> &get_boot_rom() {
+  return cgb_boot;
+}
+
 #endif // __BIOS_H

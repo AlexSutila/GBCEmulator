@@ -28,6 +28,8 @@ target_include_directories(gbc
 )
 target_compile_options(gbc
     PRIVATE
+        $<$<CONFIG:Debug>:-g -O0>
+        $<$<CONFIG:Release>:-O3>
         -Wall
 )
 
@@ -36,6 +38,8 @@ pybind11_add_module(gbc_py
     src/python/bindings.cpp
     src/cpu/registers/register.cpp
     src/cpu/registers/flags.cpp
+    src/memory/mmio.cpp
+    src/memory/bus.cpp
 )
 target_include_directories(gbc_py
     PRIVATE
