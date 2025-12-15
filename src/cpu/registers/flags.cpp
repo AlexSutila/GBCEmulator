@@ -1,6 +1,6 @@
 #include <cpu/registers/flags.hpp>
-#include <endianness.hpp>
 #include <emu_types.hpp>
+#include <endianness.hpp>
 
 void CpuFlagsRegister::write(const addr_t value) {
   hi = static_cast<byte_t>((value >> 8) & 0x00FF);
@@ -8,6 +8,12 @@ void CpuFlagsRegister::write(const addr_t value) {
 
   // Hardware quirk, these bits always read zero so don't set them
   lo = lo & ~0x0F;
+}
+
+void CpuFlagsRegister::put_flag(const StatusFlagMask mask, bool value) {
+  clr_flag(mask);
+  if (value)
+    set_flag(mask);
 }
 
 bool CpuFlagsRegister::get_flag(const StatusFlagMask mask) const {

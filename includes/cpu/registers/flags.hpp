@@ -33,6 +33,7 @@ public:
   void write(const addr_t value) override;
 
   /* For status flag specific operations */
+  void put_flag(const StatusFlagMask mask, bool value);
   bool get_flag(const StatusFlagMask mask) const;
   void clr_flag(const StatusFlagMask mask);
   void set_flag(const StatusFlagMask mask);

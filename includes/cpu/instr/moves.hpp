@@ -49,7 +49,7 @@ public:
   LD_X_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::tuple<std::size_t, std::size_t> step() override {
-    const addr_t addr = reg_file->reg_hl.read();
+    const addr_t addr = read_reg<Register16Bit::REG_HL>();
     const byte_t mem_byte = bus->read_byte(addr);
     write_reg<dst>(mem_byte);
     return {8, 8};
@@ -64,7 +64,7 @@ public:
   LD_HL_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::tuple<std::size_t, std::size_t> step() override {
-    const addr_t addr = reg_file->reg_hl.read();
+    const addr_t addr = read_reg<Register16Bit::REG_HL>();
     const byte_t reg_byte = read_reg<src>();
     bus->write_byte(addr, reg_byte);
     return {8, 8};
@@ -79,7 +79,7 @@ public:
   LD_HL_imm8(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::tuple<std::size_t, std::size_t> step() override {
-    const addr_t addr = reg_file->reg_hl.read();
+    const addr_t addr = read_reg<Register16Bit::REG_HL>();
     bus->write_byte(addr, imm);
     return {12, 8};
   }
@@ -137,7 +137,7 @@ public:
   LD_XX_A(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::tuple<std::size_t, std::size_t> step() override {
-    const byte_t reg_byte = reg_file->reg_af.read_hi();
+    const byte_t reg_byte = read_reg<Register8Bit::REG_A>();
     const addr_t addr = read_reg<dst>();
     bus->write_byte(addr, reg_byte);
     return {8, 8};
@@ -152,7 +152,7 @@ public:
   LD_imm16_A(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::tuple<std::size_t, std::size_t> step() override {
-    const byte_t reg_byte = reg_file->reg_af.read_hi();
+    const byte_t reg_byte = read_reg<Register8Bit::REG_A>();
     bus->write_byte(addr, reg_byte);
     return {16, 8};
   }
@@ -192,7 +192,7 @@ public:
   LDH_imm8_A(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::tuple<std::size_t, std::size_t> step() override {
-    const byte_t reg_byte = reg_file->reg_af.read_hi();
+    const byte_t reg_byte = read_reg<Register8Bit::REG_A>();
     bus->write_byte(addr, reg_byte);
     return {12, 8};
   }
@@ -210,8 +210,8 @@ public:
   LDH_C_A(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::tuple<std::size_t, std::size_t> step() override {
-    const byte_t reg_byte = reg_file->reg_af.read_hi();
-    bus->write_byte(0xFF00 | reg_file->reg_bc.read_lo(), reg_byte);
+    const byte_t reg_byte = read_reg<Register8Bit::REG_A>();
+    bus->write_byte(0xFF00 | read_reg<Register8Bit::REG_C>(), reg_byte);
     return {8, 8};
   }
 };
@@ -224,7 +224,7 @@ public:
   LDH_A_C(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::tuple<std::size_t, std::size_t> step() override {
-    const byte_t mem_byte = bus->read_byte(0xFF00 | reg_file->reg_bc.read_lo());
+    const byte_t mem_byte = bus->read_byte(0xFF00 | read_reg<Register8Bit::REG_C>());
     reg_file->reg_af.write_hi(mem_byte);
     return {8, 8};
   }
@@ -238,12 +238,12 @@ public:
   LDI_HL_A(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::tuple<std::size_t, std::size_t> step() override {
-    const byte_t reg_byte = reg_file->reg_af.read_hi();
-    const addr_t addr = reg_file->reg_hl.read();
+    const byte_t reg_byte = read_reg<Register8Bit::REG_A>();
+    const addr_t addr = read_reg<Register16Bit::REG_HL>();
     bus->write_byte(addr, reg_byte);
 
     /* Increments address stored in HL */
-    reg_file->reg_hl.write(addr + 1);
+    write_reg<Register16Bit::REG_HL>(addr + 1);
     return {8, 8};
   }
 };
@@ -256,12 +256,12 @@ public:
   LDI_A_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::tuple<std::size_t, std::size_t> step() override {
-    const addr_t addr = reg_file->reg_hl.read();
+    const addr_t addr = read_reg<Register16Bit::REG_HL>();
     const byte_t mem_byte = bus->read_byte(addr);
     reg_file->reg_af.write_hi(mem_byte);
 
     /* Increments address stored in HL */
-    reg_file->reg_hl.write(addr + 1);
+    write_reg<Register16Bit::REG_HL>(addr + 1);
     return {8, 8};
   }
 };
@@ -274,12 +274,12 @@ public:
   LDD_HL_A(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::tuple<std::size_t, std::size_t> step() override {
-    const byte_t reg_byte = reg_file->reg_af.read_hi();
-    const addr_t addr = reg_file->reg_hl.read();
+    const byte_t reg_byte = read_reg<Register8Bit::REG_A>();
+    const addr_t addr = read_reg<Register16Bit::REG_HL>();
     bus->write_byte(addr, reg_byte);
 
     /* Increments address stored in HL */
-    reg_file->reg_hl.write(addr - 1);
+    write_reg<Register16Bit::REG_HL>(addr - 1);
     return {8, 8};
   }
 };
@@ -292,12 +292,12 @@ public:
   LDD_A_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::tuple<std::size_t, std::size_t> step() override {
-    const addr_t addr = reg_file->reg_hl.read();
+    const addr_t addr = read_reg<Register16Bit::REG_HL>();
     const byte_t mem_byte = bus->read_byte(addr);
     reg_file->reg_af.write_hi(mem_byte);
 
     /* Increments address stored in HL */
-    reg_file->reg_hl.write(addr - 1);
+    write_reg<Register16Bit::REG_HL>(addr - 1);
     return {8, 8};
   }
 };
@@ -350,7 +350,7 @@ public:
   LD_SP_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::tuple<std::size_t, std::size_t> step() override {
-    const addr_t addr = reg_file->reg_hl.read();
+    const addr_t addr = read_reg<Register16Bit::REG_HL>();
     reg_file->reg_sp.write(addr);
     return {8, 8};
   }
