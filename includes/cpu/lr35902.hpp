@@ -1,50 +1,12 @@
 #ifndef __LR35902_H
 #define __LR35902_H
 
-#include <cpu/registers/flags.hpp>
-#include <cpu/registers/register.hpp>
+#include <array>
+#include <cpu/instr/instr.hpp>
+#include <cpu/registers/regfile.hpp>
 #include <emu_types.hpp>
 #include <memory/bus.hpp>
-
-/*
- * LR35902 Register Set is as follows, where each register is
- * sixteen bits. Registers can be used as either full sixteen
- * bit registers, or two eight bit registers.
- *
- * 16-bit | Hi | Lo | Name / Function
- * -------+----+----+-------------------------
- * AF     | A  | -  | Accumulator & Flags
- * BC     | B  | C  | BC
- * DE     | D  | E  | DE
- * HL     | H  | L  | HL
- * SP     | -  | -  | Stack Pointer
- * PC     | -  | -  | Program Counter / Pointer
- */
-struct RegisterFile {
-  CpuRegister reg_bc, reg_de, reg_hl, reg_sp;
-  CpuFlagsRegister reg_af;
-  addr_t reg_pc; // Instruction pointer
-};
-
-// Used for compile time register decoding
-enum class Register8Bit {
-  REG_A,
-  REG_F,
-  REG_B,
-  REG_C,
-  REG_D,
-  REG_E,
-  REG_H,
-  REG_L,
-};
-
-// Used for compile time register decoding
-enum class Register16Bit {
-  REG_AF,
-  REG_BC,
-  REG_DE,
-  REG_HL,
-};
+#include <memory>
 
 /*
  * 8-bit 8080-like Sharp CPU (speculated to be a SM83 core), running
@@ -58,6 +20,11 @@ public:
 private:
   AddressBus *const bus;
   RegisterFile reg_file;
+
+  /* Opcode decoding configuration */
+  using lookup_table_t = std::array<std::unique_ptr<Instruction>, 256>;
+  void init_moves(lookup_table_t &lookup);
+  lookup_table_t lookup;
 };
 
 #endif // __LR35902_H

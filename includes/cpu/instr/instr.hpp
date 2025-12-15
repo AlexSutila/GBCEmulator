@@ -1,7 +1,7 @@
 #ifndef __INSTR_H
 #define __INSTR_H
 
-#include <cpu/lr35902.hpp>
+#include <cpu/registers/regfile.hpp>
 #include <cstddef>
 #include <emu_types.hpp>
 #include <memory/bus.hpp>
@@ -28,15 +28,13 @@ public:
   virtual void parse() {}
 
 protected:
-
   /*
    * All just compile time stuff to reduce having to go through unnecessry
    * decode logic during runtime. A lot of it can be done during compile time
    * unless an instruction deals with immediate values.
    */
 
-  template <Register16Bit reg>
-  inline void write_reg(addr_t addr) const {
+  template <Register16Bit reg> inline void write_reg(addr_t addr) const {
     if constexpr (reg == Register16Bit::REG_AF)
       reg_file->reg_af.write(addr);
     else if constexpr (reg == Register16Bit::REG_BC)
@@ -62,8 +60,7 @@ protected:
       static_assert("Invalid 16-bit register");
   }
 
-  template <Register8Bit reg>
-  inline void write_reg(byte_t byte) const {
+  template <Register8Bit reg> inline void write_reg(byte_t byte) const {
     if constexpr (reg == Register8Bit::REG_A)
       reg_file->reg_af.write_hi(byte);
     else if constexpr (reg == Register8Bit::REG_F)

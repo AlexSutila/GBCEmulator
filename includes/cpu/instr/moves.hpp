@@ -2,7 +2,7 @@
 #define __MOVES_H
 
 #include <cpu/instr/instr.hpp>
-#include <cpu/lr35902.hpp>
+#include <cpu/registers/regfile.hpp>
 #include <emu_types.hpp>
 #include <memory/bus.hpp>
 
@@ -51,7 +51,7 @@ public:
   std::tuple<std::size_t, std::size_t> step() override {
     const addr_t addr = reg_file->reg_hl.read();
     const byte_t mem_byte = bus->read_byte(addr);
-    write_ret<dst>(mem_byte);
+    write_reg<dst>(mem_byte);
     return {8, 8};
   }
 };
@@ -111,6 +111,7 @@ public:
  * Copies 8-bit value from immediate address value into A
  */
 class LD_A_imm16 : public Instruction {
+public:
   LD_A_imm16(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::tuple<std::size_t, std::size_t> step() override {
@@ -132,6 +133,7 @@ private:
  * Copies A into address specified by 16-bit register XX
  */
 template <Register16Bit dst> class LD_XX_A : public Instruction {
+public:
   LD_XX_A(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::tuple<std::size_t, std::size_t> step() override {
@@ -146,6 +148,7 @@ template <Register16Bit dst> class LD_XX_A : public Instruction {
  * Copies A into address specified by 16-bit immediate value
  */
 class LD_imm16_A : public Instruction {
+public:
   LD_imm16_A(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::tuple<std::size_t, std::size_t> step() override {
@@ -167,6 +170,7 @@ private:
  * Copy IO-register specified by 8-bit immediate into A
  */
 class LDH_A_imm8 : public Instruction {
+public:
   LDH_A_imm8(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::tuple<std::size_t, std::size_t> step() override {
@@ -184,6 +188,7 @@ private:
  * Copy A into IO-register specified by 8-bit immediate
  */
 class LDH_imm8_A : public Instruction {
+public:
   LDH_imm8_A(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::tuple<std::size_t, std::size_t> step() override {
@@ -201,6 +206,7 @@ private:
  * Copy A into IO-register specified by register C
  */
 class LDH_C_A : public Instruction {
+public:
   LDH_C_A(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::tuple<std::size_t, std::size_t> step() override {
@@ -214,6 +220,7 @@ class LDH_C_A : public Instruction {
  * Copy IO-register specified by register C into A
  */
 class LDH_A_C : public Instruction {
+public:
   LDH_A_C(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::tuple<std::size_t, std::size_t> step() override {
@@ -227,6 +234,7 @@ class LDH_A_C : public Instruction {
  * Copy A into address specified by HL, increment HL
  */
 class LDI_HL_A : public Instruction {
+public:
   LDI_HL_A(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::tuple<std::size_t, std::size_t> step() override {
@@ -244,6 +252,7 @@ class LDI_HL_A : public Instruction {
  * Copy from address specified by HL into A, increment HL
  */
 class LDI_A_HL : public Instruction {
+public:
   LDI_A_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::tuple<std::size_t, std::size_t> step() override {
@@ -261,6 +270,7 @@ class LDI_A_HL : public Instruction {
  * Copy A into address specified by HL, decrement HL
  */
 class LDD_HL_A : public Instruction {
+public:
   LDD_HL_A(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::tuple<std::size_t, std::size_t> step() override {
@@ -278,6 +288,7 @@ class LDD_HL_A : public Instruction {
  * Copy from address specified by HL into A, decrement HL
  */
 class LDD_A_HL : public Instruction {
+public:
   LDD_A_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::tuple<std::size_t, std::size_t> step() override {
@@ -295,6 +306,7 @@ class LDD_A_HL : public Instruction {
  * Read 16-bit immediate into 16-bit register XX
  */
 template <Register16Bit src> class LD_XX_imm16 : public Instruction {
+public:
   LD_XX_imm16(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::tuple<std::size_t, std::size_t> step() override {
@@ -334,6 +346,7 @@ private:
  * Copies HL register value into SP
  */
 class LD_SP_HL : public Instruction {
+public:
   LD_SP_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::tuple<std::size_t, std::size_t> step() override {
@@ -347,6 +360,7 @@ class LD_SP_HL : public Instruction {
  * Push 16-bit register value
  */
 template <Register16Bit src> class Push_XX : public Instruction {
+public:
   Push_XX(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::tuple<std::size_t, std::size_t> step() override {
@@ -363,6 +377,7 @@ template <Register16Bit src> class Push_XX : public Instruction {
  * Pop 16-bit registe value
  */
 template <Register16Bit dst> class Pop_XX : public Instruction {
+public:
   Pop_XX(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::tuple<std::size_t, std::size_t> step() override {
