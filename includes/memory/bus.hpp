@@ -3,6 +3,7 @@
 
 #include <emu_types.hpp>
 #include <map>
+#include <memory/boot.hpp>
 #include <memory/mmio.hpp>
 #include <memory>
 

@@ -45,18 +45,4 @@ private:
   byte_t state; // Internal state
 };
 
-/* 0xFF50 - Boot ROM mapping control */
-class BootROMCtrl : public MMIORegister {
-public:
-  void write(const byte_t value) override;
-  byte_t read() override;
-
-  /* Determine if the boot ROM is currently mapped */
-  bool boot_rom_enabled() const;
-  BootROMCtrl();
-
-private:
-  bool map_boot_rom;
-};
-
 #endif // __MMIO_H
