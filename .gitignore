@@ -1,5 +1,3 @@
 build/
-*build/
 __pycache__/
 .cache/
-roms/
