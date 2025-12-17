@@ -64,7 +64,7 @@ public:
 };
 
 /*
- * TODO
+ * TODO: Disable interrupt scheduler
  */
 class DI : public Instruction {
 public:
@@ -74,7 +74,7 @@ public:
 };
 
 /*
- * TODO
+ * TODO: Enable interrupt scheduler
  */
 class EI : public Instruction {
 public:
@@ -84,7 +84,7 @@ public:
 };
 
 /*
- * TODO
+ * TODO: Halt processor
  */
 class HALT : public Instruction {
 public:
@@ -94,7 +94,7 @@ public:
 };
 
 /*
- * TODO
+ * TODO: Who knows honestly lmao. Need to research this instruction
  */
 class STOP : public Instruction {
 public:

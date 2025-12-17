@@ -19,9 +19,10 @@ add_executable(gbc
     src/cpu/lr35902.cpp
     src/cpu/registers/register.cpp
     src/cpu/registers/flags.cpp
-    src/cpu/instr/moves.cpp
     src/cpu/instr/alu.cpp
+    src/cpu/instr/branch.cpp
     src/cpu/instr/control.cpp
+    src/cpu/instr/moves.cpp
     src/memory/mmio.cpp
     src/memory/bus.cpp
 )
