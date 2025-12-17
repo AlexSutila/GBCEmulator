@@ -4,6 +4,7 @@
 #include "cpu/registers/flags.hpp"
 #include <cpu/instr/instr.hpp>
 #include <cpu/registers/regfile.hpp>
+#include <cstdint>
 #include <emu_types.hpp>
 #include <memory/bus.hpp>
 
@@ -776,6 +777,121 @@ public:
     write_reg<Register8Bit::REG_A>(a);
     return {4, 4};
   }
+};
+
+/*
+ * Increment HL register by contents of 16-bit XX register
+ */
+template <Register16Bit src> class ADD_HL_XX : public Instruction {
+public:
+  ADD_HL_XX(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
+      : Instruction(reg_file_ptr, bus_ptr) {}
+  std::tuple<std::size_t, std::size_t> step() override {
+    const addr_t hl = read_reg<Register16Bit::REG_HL>();
+    const addr_t xx = read_reg<src>();
+    const std::uint32_t sum = static_cast<std::uint32_t>(hl) + xx;
+
+    // Update flags
+    const bool half_carry = ((hl & 0x0FFF) + (xx & 0x0FFF)) > 0x0FFF;
+    reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_N_MASK);
+    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_H_MASK, half_carry);
+    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_C_MASK, sum > 0xFFFF);
+
+    // Write back
+    write_reg()<Register16Bit::REG_HL>(static_cast<addr_t>(sum));
+    return {8, 8};
+  }
+};
+
+/*
+ * Increment contents of 16-bit XX register
+ */
+template <Register16Bit dst> class INC_XX : public Instruction {
+public:
+  INC_XX(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
+      : Instruction(reg_file_ptr, bus_ptr) {}
+  std::tuple<std::size_t, std::size_t> step() override {
+    const addr_t xx = read_reg<dst>();
+    write_reg<dst>(xx + 1);
+    return {8, 8};
+  }
+};
+
+/*
+ * Decrement contents of 16-bit XX register
+ */
+template <Register16Bit dst> class DEC_XX : public Instruction {
+public:
+  DEC_XX(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
+      : Instruction(reg_file_ptr, bus_ptr) {}
+  std::tuple<std::size_t, std::size_t> step() override {
+    const addr_t xx = read_reg<dst>();
+    write_reg<dst>(xx - 1);
+    return {8, 8};
+  }
+};
+
+/*
+ * Add 8-bit immediate value to stack pointer - NOTE: imm is signed
+ */
+class ADD_SP_imm8 : public Instruction {
+public:
+  ADD_SP_imm8(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
+      : Instruction(reg_file_ptr, bus_ptr) {}
+  std::tuple<std::size_t, std::size_t> step() override {
+    const addr_t nn = static_cast<addr_t>(imm);
+    const addr_t sp = reg_file->reg_sp.read();
+
+    // Update flags
+    const bool half_carry = ((sp & 0x0F) + (nn & 0x0F)) > 0x0F;
+    const bool carry = ((sp & 0xFF) + (nn & 0xFF)) > 0xFF;
+    reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_Z_MASK);
+    reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_N_MASK);
+    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_H_MASK, half_carry);
+    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_C_MASK, carry);
+
+    // Write back
+    reg_file->reg_sp.write(sp + nn);
+    return {16, 16};
+  }
+  void parse() override {
+    imm = static_cast<int8_t>(bus->read_byte(reg_file->reg_pc++));
+  }
+
+private:
+  std::int8_t imm; // Signed intentionally
+};
+
+/*
+ * Add 8-bit immediate value to stack pointer, store result in HL
+ * - NOTE: imm is signed
+ */
+class LD_HL_SP_E8 : public Instruction {
+public:
+  LD_HL_SP_E8(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
+      : Instruction(reg_file_ptr, bus_ptr) {}
+  std::tuple<std::size_t, std::size_t> step() override {
+    const addr_t nn = static_cast<addr_t>(imm);
+    const addr_t sp = reg_file->reg_sp.read();
+
+    // Update flags
+    const bool half_carry = ((sp & 0x0F) + (nn & 0x0F)) > 0x0F;
+    const bool carry = ((sp & 0xFF) + (nn & 0xFF)) > 0xFF;
+    reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_Z_MASK);
+    reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_N_MASK);
+    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_H_MASK, half_carry);
+    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_C_MASK, carry);
+
+    // Write back
+    write_reg<Register16Bit::REG_HL>(sp + nn);
+    return {12, 12};
+  }
+  void parse() override {
+    imm = static_cast<int8_t>(bus->read_byte(reg_file->reg_pc++));
+  }
+
+private:
+  std::int8_t imm; // Signed intentionally
 };
 
 #endif // __ALU_H
