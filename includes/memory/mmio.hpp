@@ -27,7 +27,9 @@
  *  FF70            CGB              WRAM bank select
  */
 enum class IORegisterMapping : addr_t {
-  BOOT_ROM_CTRL = 0xFF50,
+  MMIO_INT_FLAGS = 0xFF0F,
+  MMIO_BOOT_ROM_CTRL = 0xFF50,
+  MMIO_INT_ENABLE = 0xFFFF,
 };
 
 /*

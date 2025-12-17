@@ -1,20 +1,28 @@
+#include <cpu/interrupts.hpp>
+#include <emu_types.hpp>
 #include <memory/boot.hpp>
 #include <memory/bus.hpp>
 #include <memory/mmio.hpp>
 
 #include <cassert>
 #include <memory>
+#include <stdexcept>
 #include <vector>
 
 AddressBus::AddressBus() {
   mem = std::make_unique<byte_t[]>(0xFFFF);
+  init_io_registers();
 
-  // Initialize general IO registers
-  mmio.boot_rom_ctrl = std::make_unique<BootROMCtrl>();
+  /* Maintain this for convenience during memory access */
+  auto *reg = get_mmio(IORegisterMapping::MMIO_BOOT_ROM_CTRL);
+  if (!(boot_rom_ctrl = dynamic_cast<BootROMCtrl *>(reg)))
+    throw std::logic_error("Failed to connect MMIO_BOOT_ROM_CTRL");
 }
 
 void AddressBus::init_io_registers() {
-  io_registers[0xFF50] = mmio.boot_rom_ctrl.get();
+  io_registers[0xFF0F] = std::make_unique<InterruptBits>(true);
+  io_registers[0xFF50] = std::make_unique<BootROMCtrl>();
+  io_registers[0xFFFF] = std::make_unique<InterruptBits>(false);
 }
 
 const byte_t AddressBus::read_byte(const addr_t addr) {
@@ -46,5 +54,12 @@ void AddressBus::write_byte(const addr_t addr, const byte_t value) {
 }
 
 bool AddressBus::boot_rom_enabled() {
-  return mmio.boot_rom_ctrl->boot_rom_enabled();
+  return boot_rom_ctrl->boot_rom_enabled();
+}
+
+MMIORegister *AddressBus::get_mmio(IORegisterMapping mapping) const {
+  const addr_t addr = static_cast<addr_t>(mapping);
+  assert(io_registers.contains(addr));
+  /* The address bus maintains ownership, so raw pointers are fine. */
+  return io_registers.at(addr).get();
 }

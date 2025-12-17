@@ -74,6 +74,5 @@ PYBIND11_MODULE(gbc_py, m) {
       .def(py::init<>())
       .def("write_byte", &AddressBus::write_byte, py::arg("addr"),
            py::arg("value"))
-      .def("read_byte", &AddressBus::read_byte, py::arg("addr"))
-      .def("init_io_registers", &AddressBus::init_io_registers);
+      .def("read_byte", &AddressBus::read_byte, py::arg("addr"));
 }

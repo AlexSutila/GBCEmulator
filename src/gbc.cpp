@@ -9,7 +9,4 @@ GameBoyColor::GameBoyColor() {
 
   /* GBC Central Processing Unit */
   cpu = std::make_unique<LR35902>(bus.get());
-
-  /* Connect components to bus via IO register mappings */
-  bus->init_io_registers();
 }

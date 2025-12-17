@@ -3,6 +3,7 @@
 
 #include <array>
 #include <cpu/instr/instr.hpp>
+#include <cpu/interrupts.hpp>
 #include <cpu/registers/regfile.hpp>
 #include <emu_types.hpp>
 #include <memory/bus.hpp>
@@ -18,8 +19,13 @@ public:
   void step();
 
 private:
-  AddressBus *const bus;
   RegisterFile reg_file;
+  AddressBus *const bus;
+
+  /* Interrupt handling */
+  InterruptMasterEnable ime;
+  InterruptBits *ie_reg;
+  InterruptBits *if_reg;
 
   /* Opcode decoding configuration */
   using lookup_table_t = std::array<std::unique_ptr<Instruction>, 256>;

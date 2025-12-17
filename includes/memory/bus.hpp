@@ -1,6 +1,7 @@
 #ifndef __BUS_H
 #define __BUS_H
 
+#include <cpu/interrupts.hpp>
 #include <emu_types.hpp>
 #include <map>
 #include <memory/boot.hpp>
@@ -30,25 +31,21 @@ class AddressBus {
 public:
   void write_byte(const addr_t addr, const byte_t value);
   const byte_t read_byte(const addr_t addr);
-
-  /* Maps IO registers to addresses, via `io_registers` map */
-  void init_io_registers();
+  MMIORegister *get_mmio(IORegisterMapping mapping) const;
   AddressBus();
 
 private:
   std::unique_ptr<byte_t[]> mem;
+  void init_io_registers();
 
-  /*
-   * Maps memory mapped IO registers to their respective addresses in memory.
-   * Usage of raw pointers is waranted because this map is not responsible for
-   * ownership of any of the resources pointed to.
-   */
-  std::map<addr_t, MMIORegister *> io_registers;
+  /* Maintain a pointer to the boot rom control register for convenience. */
+  BootROMCtrl *boot_rom_ctrl;
   bool boot_rom_enabled();
 
-  struct {
-    std::unique_ptr<BootROMCtrl> boot_rom_ctrl;
-  } mmio;
+  /* Maps memory mapped IO registers to their respective addresses in memory.
+   * Usage of raw pointers is waranted because this map is not responsible for
+   * ownership of any of the resources pointed to. */
+  std::map<addr_t, std::unique_ptr<MMIORegister>> io_registers;
 };
 
 #endif // __BUS_H

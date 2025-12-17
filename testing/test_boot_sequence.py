@@ -23,7 +23,6 @@ def test_boot_rom_first_byte():
 def test_boot_rom_banking():
     '''Validate the writing the control register to bank out of boot ROM'''
     bus = AddressBus()
-    bus.init_io_registers()
 
     # Take the first byte of the ROM, and validate content
     first_byte = get_boot_rom()[0]

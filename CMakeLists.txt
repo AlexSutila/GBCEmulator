@@ -19,6 +19,7 @@ add_executable(gbc
     src/cpu/lr35902.cpp
     src/cpu/registers/register.cpp
     src/cpu/registers/flags.cpp
+    src/cpu/interrupts.cpp
     src/cpu/instr/alu.cpp
     src/cpu/instr/branch.cpp
     src/cpu/instr/control.cpp
@@ -43,6 +44,7 @@ pybind11_add_module(gbc_py
     src/python/bindings.cpp
     src/cpu/registers/register.cpp
     src/cpu/registers/flags.cpp
+    src/cpu/interrupts.cpp
     src/memory/boot.cpp
     src/memory/bus.cpp
     src/memory/mmio.cpp
