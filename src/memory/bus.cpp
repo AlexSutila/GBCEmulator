@@ -35,7 +35,7 @@ const byte_t AddressBus::read_byte(const addr_t addr) {
 
   /* Read from memory mapped IO register */
   else if (io_registers.contains(addr)) {
-    assert(addr >= 0xFF00 && addr <= 0xFF7F);
+    assert((addr >= 0xFF00 && addr <= 0xFF7F) || addr == 0xFFFF);
     return io_registers.at(addr)->read();
   }
 
@@ -46,7 +46,7 @@ void AddressBus::write_byte(const addr_t addr, const byte_t value) {
 
   /* Write to memory mapped IO register */
   if (io_registers.contains(addr)) {
-    assert(addr >= 0xFF00 && addr <= 0xFF7F);
+    assert((addr >= 0xFF00 && addr <= 0xFF7F) || addr == 0xFFFF);
     io_registers.at(addr)->write(value);
   }
 
