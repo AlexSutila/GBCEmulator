@@ -4,7 +4,7 @@
 #include <emu_types.hpp>
 
 /*
- * This class is used for registers BC, DE, and HL
+ * This class is used for registers BC, DE, HL, and SP
  */
 class CpuRegister {
 public:

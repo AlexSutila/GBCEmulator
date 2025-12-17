@@ -8,7 +8,7 @@ enum class interruptFlagMask : byte_t {
   INT_FLAG_SERIAL = 1u << 3,
   INT_FLAG_TIMER = 1u << 2,
   INT_FLAG_LCD = 1u << 1,
-  VBLANK = 1u << 0,
+  INT_FLAG_VBLANK = 1u << 0,
 };
 
 /*

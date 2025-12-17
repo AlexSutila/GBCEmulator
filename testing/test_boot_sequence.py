@@ -6,7 +6,7 @@ from gbc_py import (
 import hashlib
 
 
-def test_boot_rom_first_byte():
+def test_boot_rom_bus_dump():
     '''Validate bus dump of boot ROM against ground truth'''
     bus = AddressBus()
     rom = get_boot_rom()

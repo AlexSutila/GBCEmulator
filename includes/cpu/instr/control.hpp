@@ -65,7 +65,7 @@ public:
 };
 
 /*
- * TODO: Disable interrupt scheduler
+ * Disable interrupts
  */
 class DI : public Instruction {
 public:
@@ -82,7 +82,7 @@ private:
 };
 
 /*
- * Enable interrupt scheduler
+ * Enable interrupts
  */
 class EI : public Instruction {
 public:

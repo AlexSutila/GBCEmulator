@@ -4,7 +4,7 @@ from gbc_py import (
 )
 
 
-def test_ie_unused_registers():
+def test_ie_register_unused_bits():
     '''Validate the behavior of the unused bits for the IE register'''
     bus = AddressBus()
     assert bus.read_byte(0xFFFF) == 0x00
@@ -12,7 +12,7 @@ def test_ie_unused_registers():
     assert bus.read_byte(0xFFFF) == 0xFF
 
 
-def test_if_unused_registers():
+def test_if_register_unused_bits():
     '''Validate the behavior of the unused bits for the IF register'''
     bus = AddressBus()
     assert bus.read_byte(0xFF0F) == 0xE0
