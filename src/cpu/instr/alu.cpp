@@ -1,3 +1,4 @@
+#include "cpu/instr/moves.hpp"
 #include <array>
 #include <cpu/instr/alu.hpp>
 #include <cpu/lr35902.hpp>
@@ -9,24 +10,36 @@ using r8 = Register8Bit;
 using std::make_unique;
 
 void LR35902::init_alu(lookup_table_t &lookup) {
+  lookup.at(0x03) = make_unique<INC_XX<r16::REG_BC>>(&reg_file, bus);
   lookup.at(0x04) = make_unique<INC_X<r8::REG_B>>(&reg_file, bus);
   lookup.at(0x05) = make_unique<DEC_X<r8::REG_B>>(&reg_file, bus);
+  lookup.at(0x09) = make_unique<ADD_HL_XX<r16::REG_BC>>(&reg_file, bus);
+  lookup.at(0x0B) = make_unique<DEC_XX<r16::REG_BC>>(&reg_file, bus);
   lookup.at(0x0C) = make_unique<INC_X<r8::REG_C>>(&reg_file, bus);
   lookup.at(0x0D) = make_unique<DEC_X<r8::REG_C>>(&reg_file, bus);
 
+  lookup.at(0x13) = make_unique<INC_XX<r16::REG_DE>>(&reg_file, bus);
   lookup.at(0x14) = make_unique<INC_X<r8::REG_D>>(&reg_file, bus);
   lookup.at(0x15) = make_unique<DEC_X<r8::REG_D>>(&reg_file, bus);
+  lookup.at(0x19) = make_unique<ADD_HL_XX<r16::REG_DE>>(&reg_file, bus);
+  lookup.at(0x1B) = make_unique<DEC_XX<r16::REG_DE>>(&reg_file, bus);
   lookup.at(0x1C) = make_unique<INC_X<r8::REG_E>>(&reg_file, bus);
   lookup.at(0x1D) = make_unique<DEC_X<r8::REG_E>>(&reg_file, bus);
 
+  lookup.at(0x23) = make_unique<INC_XX<r16::REG_HL>>(&reg_file, bus);
   lookup.at(0x24) = make_unique<INC_X<r8::REG_H>>(&reg_file, bus);
   lookup.at(0x25) = make_unique<DEC_X<r8::REG_H>>(&reg_file, bus);
   lookup.at(0x27) = make_unique<DAA>(&reg_file, bus);
+  lookup.at(0x29) = make_unique<ADD_HL_XX<r16::REG_HL>>(&reg_file, bus);
+  lookup.at(0x2B) = make_unique<DEC_XX<r16::REG_HL>>(&reg_file, bus);
   lookup.at(0x2C) = make_unique<INC_X<r8::REG_L>>(&reg_file, bus);
   lookup.at(0x2D) = make_unique<DEC_X<r8::REG_L>>(&reg_file, bus);
 
+  lookup.at(0x33) = make_unique<INC_XX<r16::REG_SP>>(&reg_file, bus);
   lookup.at(0x34) = make_unique<INC_HL>(&reg_file, bus);
   lookup.at(0x35) = make_unique<DEC_HL>(&reg_file, bus);
+  lookup.at(0x39) = make_unique<ADD_HL_XX<r16::REG_SP>>(&reg_file, bus);
+  lookup.at(0x3B) = make_unique<DEC_XX<r16::REG_SP>>(&reg_file, bus);
   lookup.at(0x3C) = make_unique<INC_X<r8::REG_A>>(&reg_file, bus);
   lookup.at(0x3D) = make_unique<DEC_X<r8::REG_A>>(&reg_file, bus);
 
@@ -105,8 +118,10 @@ void LR35902::init_alu(lookup_table_t &lookup) {
   lookup.at(0xDE) = make_unique<SBC_A_imm8>(&reg_file, bus);
 
   lookup.at(0xE6) = make_unique<AND_A_imm8>(&reg_file, bus);
+  lookup.at(0xE8) = make_unique<ADD_SP_imm8>(&reg_file, bus);
   lookup.at(0xEE) = make_unique<XOR_A_imm8>(&reg_file, bus);
 
   lookup.at(0xF6) = make_unique<OR_A_imm8>(&reg_file, bus);
+  lookup.at(0xF8) = make_unique<LD_HL_imm8>(&reg_file, bus);
   lookup.at(0xFE) = make_unique<CP_A_imm8>(&reg_file, bus);
 }

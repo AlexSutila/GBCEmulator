@@ -43,6 +43,8 @@ protected:
       reg_file->reg_de.write(addr);
     else if constexpr (reg == Register16Bit::REG_HL)
       reg_file->reg_hl.write(addr);
+    else if constexpr (reg == Register16Bit::REG_SP)
+      reg_file->reg_sp.write(addr);
     else
       static_assert("Invalid 16-bit register");
   }
@@ -56,6 +58,8 @@ protected:
       return reg_file->reg_de.read();
     else if constexpr (reg == Register16Bit::REG_HL)
       return reg_file->reg_hl.read();
+    else if constexpr (reg == Register16Bit::REG_SP)
+      return reg_file->reg_sp.read();
     else
       static_assert("Invalid 16-bit register");
   }

@@ -42,6 +42,7 @@ enum class Register16Bit {
   REG_BC,
   REG_DE,
   REG_HL,
+  REG_SP,
 };
 
 #endif // __REGISTER_FILE_H
