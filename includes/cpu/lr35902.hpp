@@ -24,6 +24,7 @@ private:
   /* Opcode decoding configuration */
   using lookup_table_t = std::array<std::unique_ptr<Instruction>, 256>;
   void init_moves(lookup_table_t &lookup);
+  void init_alu(lookup_table_t &lookup);
   lookup_table_t lookup;
 };
 

@@ -798,7 +798,7 @@ public:
     reg_file->reg_af.put_flag(StatusFlagMask::FLAG_C_MASK, sum > 0xFFFF);
 
     // Write back
-    write_reg()<Register16Bit::REG_HL>(static_cast<addr_t>(sum));
+    write_reg<Register16Bit::REG_HL>(static_cast<addr_t>(sum));
     return {8, 8};
   }
 };

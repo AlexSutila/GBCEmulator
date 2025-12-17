@@ -13,6 +13,7 @@ LR35902::LR35902(AddressBus *bus_ptr) : bus(bus_ptr) {
 
   /* Configure opcode lookup tables */
   init_moves(lookup);
+  init_alu(lookup);
 }
 
 void LR35902::step() {
