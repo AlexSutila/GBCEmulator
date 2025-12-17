@@ -15,6 +15,6 @@ void LR35902::init_control(lookup_table_t &lookup) {
   lookup.at(0x37) = make_unique<SCF>(&reg_file, bus);
   lookup.at(0x3F) = make_unique<CCF>(&reg_file, bus);
   lookup.at(0x76) = make_unique<HALT>(&reg_file, bus);
-  lookup.at(0xF3) = make_unique<DI>(&reg_file, bus);
-  lookup.at(0xFB) = make_unique<EI>(&reg_file, bus);
+  lookup.at(0xF3) = make_unique<DI>(&reg_file, bus, &ime);
+  lookup.at(0xFB) = make_unique<EI>(&reg_file, bus, &ime);
 }

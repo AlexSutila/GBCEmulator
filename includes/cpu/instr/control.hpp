@@ -2,6 +2,7 @@
 #define __CONTROL_H
 
 #include <cpu/instr/instr.hpp>
+#include <cpu/interrupts.hpp>
 #include <cpu/registers/regfile.hpp>
 #include <emu_types.hpp>
 #include <memory/bus.hpp>
@@ -68,19 +69,33 @@ public:
  */
 class DI : public Instruction {
 public:
-  DI(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
-  std::tuple<std::size_t, std::size_t> step() override { return {4, 4}; }
+  DI(RegisterFile *reg_file_ptr, AddressBus *bus_ptr,
+     InterruptMasterEnable *ime_ptr)
+      : Instruction(reg_file_ptr, bus_ptr), ime(ime_ptr) {}
+  std::tuple<std::size_t, std::size_t> step() override {
+    ime->disable();
+    return {4, 4};
+  }
+
+private:
+  InterruptMasterEnable *const ime;
 };
 
 /*
- * TODO: Enable interrupt scheduler
+ * Enable interrupt scheduler
  */
 class EI : public Instruction {
 public:
-  EI(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
-  std::tuple<std::size_t, std::size_t> step() override { return {4, 4}; }
+  EI(RegisterFile *reg_file_ptr, AddressBus *bus_ptr,
+     InterruptMasterEnable *ime_ptr)
+      : Instruction(reg_file_ptr, bus_ptr), ime(ime_ptr) {}
+  std::tuple<std::size_t, std::size_t> step() override {
+    ime->enable(true);
+    return {4, 4};
+  }
+
+private:
+  InterruptMasterEnable *const ime;
 };
 
 /*

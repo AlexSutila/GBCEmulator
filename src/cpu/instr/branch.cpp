@@ -35,7 +35,7 @@ void LR35902::init_branch(lookup_table_t &lookup) {
   lookup.at(0xD4) = make_unique<CALL_cond_imm16<flags::FLAG_C_MASK, false>>(&reg_file, bus);
   lookup.at(0xD7) = make_unique<RST_vec<0x10>>(&reg_file, bus);
   lookup.at(0xD8) = make_unique<RET_cond<flags::FLAG_C_MASK, true>>(&reg_file, bus);
-  lookup.at(0xD9) = make_unique<RETI>(&reg_file, bus);
+  lookup.at(0xD9) = make_unique<RETI>(&reg_file, bus, &ime);
   lookup.at(0xDA) = make_unique<JP_cond_imm16<flags::FLAG_C_MASK, true>>(&reg_file, bus);
   lookup.at(0xDC) = make_unique<CALL_cond_imm16<flags::FLAG_C_MASK, true>>(&reg_file, bus);
   lookup.at(0xDF) = make_unique<RST_vec<0x18>>(&reg_file, bus);

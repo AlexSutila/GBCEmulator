@@ -2,6 +2,7 @@
 #define __BRANCH_H
 
 #include <cpu/instr/instr.hpp>
+#include <cpu/interrupts.hpp>
 #include <cpu/registers/regfile.hpp>
 #include <cstdint>
 #include <emu_types.hpp>
@@ -215,30 +216,35 @@ public:
 };
 
 /*
- * TODO: Unconditional return, enable interrupts
- * - IME is missing
+ * Unconditional return, enable interrupts
  */
 class RETI : public Instruction {
 public:
-  RETI(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  RETI(RegisterFile *reg_file_ptr, AddressBus *bus_ptr,
+       InterruptMasterEnable *ime_ptr)
+      : Instruction(reg_file_ptr, bus_ptr), ime(ime_ptr) {}
   std::tuple<std::size_t, std::size_t> step() override {
     addr_t sp = reg_file->reg_sp.read();
     const addr_t lo = bus->read_byte(sp++);
     const addr_t hi = bus->read_byte(sp++);
+
+    // Enable IME, but effects are instant bc of hardware quirk
+    ime->enable(false);
 
     // Write back for updated stack pointer
     reg_file->reg_sp.write(sp);
     reg_file->reg_pc = lo | (hi << 8);
     return {16, 16};
   }
+
+private:
+  InterruptMasterEnable *const ime;
 };
 
 /*
  * Unconditional jump to reset vector
  */
-template <addr_t vec>
-class RST_vec : public Instruction {
+template <addr_t vec> class RST_vec : public Instruction {
 public:
   RST_vec(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
