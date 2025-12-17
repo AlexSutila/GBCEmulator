@@ -579,6 +579,7 @@ public:
  * but it throws away the result and only updates the flags.
  */
 template <Register8Bit src> class CP_A_X : public Instruction {
+public:
   CP_A_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::tuple<std::size_t, std::size_t> step() override {
@@ -600,6 +601,7 @@ template <Register8Bit src> class CP_A_X : public Instruction {
  * but it throws away the result and only updates the flags.
  */
 class CP_A_imm8 : public Instruction {
+public:
   CP_A_imm8(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::tuple<std::size_t, std::size_t> step() override {
@@ -624,6 +626,7 @@ private:
  * operation, but it throws away the result and only updates the flags.
  */
 class CP_A_HL : public Instruction {
+public:
   CP_A_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::tuple<std::size_t, std::size_t> step() override {
@@ -637,6 +640,141 @@ class CP_A_HL : public Instruction {
     reg_file->reg_af.put_flag(StatusFlagMask::FLAG_H_MASK, half_carry);
     reg_file->reg_af.put_flag(StatusFlagMask::FLAG_C_MASK, a < n);
     return {8, 8};
+  }
+};
+
+/*
+ * Increment contents of 8-bit register X
+ */
+template <Register8Bit src> class INC_X : public Instruction {
+public:
+  INC_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
+      : Instruction(reg_file_ptr, bus_ptr) {}
+  std::tuple<std::size_t, std::size_t> step() override {
+    const byte_t x = read_reg<src>();
+    const byte_t result = x + 1;
+
+    // Update flags - C is left alone for this instruction
+    const bool half_carry = (x & 0x0F) == 0x0F;
+    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_Z_MASK, result == 0);
+    reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_N_MASK);
+    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_H_MASK, half_carry);
+
+    // Write back
+    write_reg<src>(result);
+    return {4, 4};
+  }
+};
+
+/*
+ * Increment contents pointed to by register HL
+ */
+class INC_HL : public Instruction {
+public:
+  INC_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
+      : Instruction(reg_file_ptr, bus_ptr) {}
+  std::tuple<std::size_t, std::size_t> step() override {
+    const byte_t n = bus->read_byte(read_reg<Register16Bit::REG_HL>());
+    const byte_t result = n + 1;
+
+    // Update flags - C is left alone for this instruction
+    const bool half_carry = (n & 0x0F) == 0x0F;
+    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_Z_MASK, result == 0);
+    reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_N_MASK);
+    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_H_MASK, half_carry);
+
+    // Write back
+    bus->write_byte(read_reg<Register16Bit::REG_HL>(), result);
+    return {12, 8};
+  }
+};
+
+/*
+ * Decrement contents of 8-bit register X
+ */
+template <Register8Bit src> class DEC_X : public Instruction {
+public:
+  DEC_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
+      : Instruction(reg_file_ptr, bus_ptr) {}
+  std::tuple<std::size_t, std::size_t> step() override {
+    const byte_t x = read_reg<src>();
+    const byte_t result = x - 1;
+
+    // Update flags
+    const bool half_carry = (x & 0x0F) == 0x00;
+    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_Z_MASK, result == 0);
+    reg_file->reg_af.set_flag(StatusFlagMask::FLAG_N_MASK);
+    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_H_MASK, half_carry);
+
+    // Write back
+    write_reg<src>(result);
+    return {4, 4};
+  }
+};
+
+/*
+ * Decrement contents pointed to by register HL
+ */
+class DEC_HL : public Instruction {
+public:
+  DEC_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
+      : Instruction(reg_file_ptr, bus_ptr) {}
+  std::tuple<std::size_t, std::size_t> step() override {
+    const byte_t n = bus->read_byte(read_reg<Register16Bit::REG_HL>());
+    const byte_t result = n - 1;
+
+    // Update flags
+    const bool half_carry = (n & 0x0F) == 0x00;
+    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_Z_MASK, result == 0);
+    reg_file->reg_af.set_flag(StatusFlagMask::FLAG_N_MASK);
+    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_H_MASK, half_carry);
+
+    // Write back
+    bus->write_byte(read_reg<Register16Bit::REG_HL>(), result);
+    return {12, 8};
+  }
+};
+
+/*
+ * I will never understand what this shit does ngl lol. Decimal adjust?
+ */
+class DAA : public Instruction {
+public:
+  DAA(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
+      : Instruction(reg_file_ptr, bus_ptr) {}
+  std::tuple<std::size_t, std::size_t> step() override {
+    byte_t a = read_reg<Register8Bit::REG_A>();
+
+    const bool n = reg_file->reg_af.get_flag(StatusFlagMask::FLAG_N_MASK);
+    const bool c = reg_file->reg_af.get_flag(StatusFlagMask::FLAG_C_MASK);
+    const bool h = reg_file->reg_af.get_flag(StatusFlagMask::FLAG_H_MASK);
+
+    // Post ADD/ADC instruction
+    if (!n) {
+      if (c || a > 0x99) {
+        a += 0x60;
+        reg_file->reg_af.set_flag(StatusFlagMask::FLAG_C_MASK);
+      }
+      if (h || (a & 0x0F) > 0x09) {
+        a += 0x06;
+      }
+    }
+
+    // Post SUB/SBC instruction
+    else {
+      if (c)
+        a -= 0x60;
+      if (h)
+        a -= 0x06;
+    }
+
+    // Update flags - N is untouched and C is already handled above
+    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_Z_MASK, a == 0);
+    reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_H_MASK);
+
+    // Write back
+    write_reg<Register8Bit::REG_A>(a);
+    return {4, 4};
   }
 };
 
