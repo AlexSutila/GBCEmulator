@@ -35,17 +35,17 @@ public:
   AddressBus();
 
 private:
-  std::unique_ptr<byte_t[]> mem;
+  std::unique_ptr<byte_t[]> mem{};
   void init_io_registers();
 
   /* Maintain a pointer to the boot rom control register for convenience. */
-  BootROMCtrl *boot_rom_ctrl;
+  BootROMCtrl *boot_rom_ctrl{};
   bool boot_rom_enabled();
 
   /* Maps memory mapped IO registers to their respective addresses in memory.
    * Usage of raw pointers is waranted because this map is not responsible for
    * ownership of any of the resources pointed to. */
-  std::map<addr_t, std::unique_ptr<MMIORegister>> io_registers;
+  std::map<addr_t, std::unique_ptr<MMIORegister>> io_registers{};
 };
 
 #endif // __BUS_H

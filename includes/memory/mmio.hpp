@@ -44,7 +44,7 @@ public:
   MMIORegister() : state(0) {}
 
 private:
-  byte_t state; // Internal state
+  byte_t state{}; // Internal state
 };
 
 #endif // __MMIO_H

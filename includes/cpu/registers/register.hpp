@@ -17,7 +17,7 @@ public:
   virtual addr_t read() const;
 
 protected:
-  byte_t lo, hi;
+  byte_t lo{}, hi{};
 };
 
 #endif // __REGISTER_H

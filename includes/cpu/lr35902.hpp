@@ -19,13 +19,13 @@ public:
   void step();
 
 private:
-  RegisterFile reg_file;
-  AddressBus *const bus;
+  RegisterFile reg_file{};
+  AddressBus *const bus{};
 
   /* Interrupt handling */
-  InterruptMasterEnable ime;
-  InterruptBits *ie_reg;
-  InterruptBits *if_reg;
+  InterruptMasterEnable ime{};
+  InterruptBits *ie_reg{};
+  InterruptBits *if_reg{};
 
   /* Opcode decoding configuration */
   using lookup_table_t = std::array<std::unique_ptr<Instruction>, 256>;
@@ -33,7 +33,7 @@ private:
   void init_branch(lookup_table_t &lookup);
   void init_control(lookup_table_t &lookup);
   void init_moves(lookup_table_t &lookup);
-  lookup_table_t lookup;
+  lookup_table_t lookup{};
 };
 
 #endif // __LR35902_H

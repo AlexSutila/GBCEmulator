@@ -11,8 +11,8 @@ public:
   void run();
 
 private:
-  std::unique_ptr<AddressBus> bus;
-  std::unique_ptr<LR35902> cpu;
+  std::unique_ptr<AddressBus> bus{};
+  std::unique_ptr<LR35902> cpu{};
 };
 
 #endif // __GBC_H

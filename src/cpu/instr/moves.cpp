@@ -1,3 +1,4 @@
+#include "cpu/instr/alu.hpp"
 #include <array>
 #include <cpu/instr/moves.hpp>
 #include <cpu/lr35902.hpp>
@@ -9,21 +10,26 @@ using r8 = Register8Bit;
 using std::make_unique;
 
 void LR35902::init_moves(lookup_table_t &lookup) {
+  lookup.at(0x01) = make_unique<LD_XX_imm16<r16::REG_BC>>(&reg_file, bus);
   lookup.at(0x02) = make_unique<LD_XX_A<r16::REG_BC>>(&reg_file, bus);
   lookup.at(0x06) = make_unique<LD_X_imm8<r8::REG_B>>(&reg_file, bus);
+  lookup.at(0x08) = make_unique<LD_imm16_SP>(&reg_file, bus);
   lookup.at(0x0A) = make_unique<LD_A_XX<r16::REG_BC>>(&reg_file, bus);
   lookup.at(0x0E) = make_unique<LD_X_imm8<r8::REG_C>>(&reg_file, bus);
 
+  lookup.at(0x11) = make_unique<LD_XX_imm16<r16::REG_DE>>(&reg_file, bus);
   lookup.at(0x12) = make_unique<LD_XX_A<r16::REG_DE>>(&reg_file, bus);
   lookup.at(0x16) = make_unique<LD_X_imm8<r8::REG_D>>(&reg_file, bus);
   lookup.at(0x1A) = make_unique<LD_A_XX<r16::REG_DE>>(&reg_file, bus);
   lookup.at(0x1E) = make_unique<LD_X_imm8<r8::REG_E>>(&reg_file, bus);
 
+  lookup.at(0x21) = make_unique<LD_XX_imm16<r16::REG_HL>>(&reg_file, bus);
   lookup.at(0x22) = make_unique<LDI_HL_A>(&reg_file, bus);
   lookup.at(0x26) = make_unique<LD_X_imm8<r8::REG_H>>(&reg_file, bus);
   lookup.at(0x2A) = make_unique<LDI_A_HL>(&reg_file, bus);
   lookup.at(0x2E) = make_unique<LD_X_imm8<r8::REG_L>>(&reg_file, bus);
 
+  lookup.at(0x31) = make_unique<LD_XX_imm16<r16::REG_SP>>(&reg_file, bus);
   lookup.at(0x32) = make_unique<LDD_HL_A>(&reg_file, bus);
   lookup.at(0x36) = make_unique<LD_HL_imm8>(&reg_file, bus);
   lookup.at(0x3A) = make_unique<LDD_A_HL>(&reg_file, bus);
@@ -96,11 +102,21 @@ void LR35902::init_moves(lookup_table_t &lookup) {
   lookup.at(0x7E) = make_unique<LD_X_HL<r8::REG_A>>(&reg_file, bus);
   lookup.at(0x7F) = make_unique<LD_X_Y<r8::REG_A, r8::REG_A>>(&reg_file, bus);
 
+  lookup.at(0xC1) = make_unique<POP_XX<r16::REG_BC>>(&reg_file, bus);
+  lookup.at(0xC5) = make_unique<PUSH_XX<r16::REG_BC>>(&reg_file, bus);
+
+  lookup.at(0xD1) = make_unique<POP_XX<r16::REG_DE>>(&reg_file, bus);
+  lookup.at(0xD5) = make_unique<PUSH_XX<r16::REG_DE>>(&reg_file, bus);
+
   lookup.at(0xE0) = make_unique<LDH_imm8_A>(&reg_file, bus);
+  lookup.at(0xE1) = make_unique<POP_XX<r16::REG_HL>>(&reg_file, bus);
   lookup.at(0xE2) = make_unique<LDH_C_A>(&reg_file, bus);
+  lookup.at(0xE5) = make_unique<PUSH_XX<r16::REG_HL>>(&reg_file, bus);
   lookup.at(0xEA) = make_unique<LD_imm16_A>(&reg_file, bus);
 
   lookup.at(0xF0) = make_unique<LDH_A_imm8>(&reg_file, bus);
+  lookup.at(0xF1) = make_unique<POP_XX<r16::REG_AF>>(&reg_file, bus);
   lookup.at(0xF2) = make_unique<LDH_A_C>(&reg_file, bus);
+  lookup.at(0xF5) = make_unique<PUSH_XX<r16::REG_AF>>(&reg_file, bus);
   lookup.at(0xFA) = make_unique<LD_A_imm16>(&reg_file, bus);
 }

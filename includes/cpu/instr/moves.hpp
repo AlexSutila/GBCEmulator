@@ -325,7 +325,8 @@ private:
 /*
  * Stores SP to address to 16-bit immediate address
  */
-template <Register16Bit src> class LD_imm16_SP : public Instruction {
+class LD_imm16_SP : public Instruction {
+public:
   LD_imm16_SP(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::tuple<std::size_t, std::size_t> step() override {
@@ -359,9 +360,9 @@ public:
 /*
  * Push 16-bit register value
  */
-template <Register16Bit src> class Push_XX : public Instruction {
+template <Register16Bit src> class PUSH_XX : public Instruction {
 public:
-  Push_XX(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
+  PUSH_XX(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::tuple<std::size_t, std::size_t> step() override {
     addr_t sp = reg_file->reg_sp.read();
@@ -376,9 +377,9 @@ public:
 /*
  * Pop 16-bit registe value
  */
-template <Register16Bit dst> class Pop_XX : public Instruction {
+template <Register16Bit dst> class POP_XX : public Instruction {
 public:
-  Pop_XX(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
+  POP_XX(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::tuple<std::size_t, std::size_t> step() override {
     addr_t sp = reg_file->reg_sp.read();
