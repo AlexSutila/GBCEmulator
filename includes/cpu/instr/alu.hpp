@@ -27,7 +27,7 @@ public:
     reg_file->reg_af.put_flag(StatusFlagMask::FLAG_Z_MASK, result == 0);
     reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_N_MASK);
     reg_file->reg_af.put_flag(StatusFlagMask::FLAG_H_MASK, h);
-    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_Z_MASK, c);
+    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_C_MASK, c);
 
     // Write back
     write_reg<Register8Bit::REG_A>(result);
@@ -52,7 +52,7 @@ public:
     reg_file->reg_af.put_flag(StatusFlagMask::FLAG_Z_MASK, result == 0);
     reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_N_MASK);
     reg_file->reg_af.put_flag(StatusFlagMask::FLAG_H_MASK, half_carry);
-    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_Z_MASK, carry);
+    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_C_MASK, carry);
 
     // Write back
     write_reg<Register8Bit::REG_A>(result);
@@ -82,7 +82,7 @@ public:
     reg_file->reg_af.put_flag(StatusFlagMask::FLAG_Z_MASK, result == 0);
     reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_N_MASK);
     reg_file->reg_af.put_flag(StatusFlagMask::FLAG_H_MASK, half_carry);
-    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_Z_MASK, carry);
+    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_C_MASK, carry);
 
     // Write back
     write_reg<Register8Bit::REG_A>(result);
@@ -114,6 +114,9 @@ public:
     reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_N_MASK);
     reg_file->reg_af.put_flag(StatusFlagMask::FLAG_H_MASK, half_carry);
     reg_file->reg_af.put_flag(StatusFlagMask::FLAG_C_MASK, sum > 0xFF);
+
+    // Write back
+    write_reg<Register8Bit::REG_A>(result);
     return {4, 4};
   }
 };
@@ -141,6 +144,9 @@ public:
     reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_N_MASK);
     reg_file->reg_af.put_flag(StatusFlagMask::FLAG_H_MASK, half_carry);
     reg_file->reg_af.put_flag(StatusFlagMask::FLAG_C_MASK, sum > 0xFF);
+
+    // Write back
+    write_reg<Register8Bit::REG_A>(result);
     return {8, 8};
   }
   void parse() override { imm = bus->read_byte(reg_file->reg_pc++); }
@@ -173,6 +179,9 @@ public:
     reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_N_MASK);
     reg_file->reg_af.put_flag(StatusFlagMask::FLAG_H_MASK, half_carry);
     reg_file->reg_af.put_flag(StatusFlagMask::FLAG_C_MASK, sum > 0xFF);
+
+    // Write back
+    write_reg<Register8Bit::REG_A>(result);
     return {8, 8};
   }
 };
@@ -274,11 +283,12 @@ public:
     const byte_t result = static_cast<byte_t>(diff);
 
     // Update flags
-    const bool half_carry = (a & 0x0F) < (x & 0x0F);
+    const bool c = static_cast<addr_t>(a) < static_cast<addr_t>(x + carry);
+    const bool h = (a & 0x0F) < (x & 0x0F) + carry;
     reg_file->reg_af.put_flag(StatusFlagMask::FLAG_Z_MASK, result == 0);
     reg_file->reg_af.set_flag(StatusFlagMask::FLAG_N_MASK);
-    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_H_MASK, half_carry);
-    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_C_MASK, a < x);
+    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_H_MASK, h);
+    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_C_MASK, c);
 
     // Write back
     write_reg<Register8Bit::REG_A>(result);
@@ -304,11 +314,12 @@ public:
     const byte_t result = static_cast<byte_t>(diff);
 
     // Update flags
-    const bool half_carry = (a & 0x0F) < (imm & 0x0F);
+    const bool c = static_cast<addr_t>(a) < static_cast<addr_t>(imm + carry);
+    const bool h = (a & 0x0F) < (imm & 0x0F) + carry;
     reg_file->reg_af.put_flag(StatusFlagMask::FLAG_Z_MASK, result == 0);
     reg_file->reg_af.set_flag(StatusFlagMask::FLAG_N_MASK);
-    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_H_MASK, half_carry);
-    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_C_MASK, a < imm);
+    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_H_MASK, h);
+    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_C_MASK, c);
 
     // Write back
     write_reg<Register8Bit::REG_A>(result);
@@ -339,11 +350,12 @@ public:
     const byte_t result = static_cast<byte_t>(diff);
 
     // Update flags
-    const bool half_carry = (a & 0x0F) < (n & 0x0F);
+    const bool c = static_cast<addr_t>(a) < static_cast<addr_t>(n + carry);
+    const bool h = (a & 0x0F) < (n & 0x0F) + carry;
     reg_file->reg_af.put_flag(StatusFlagMask::FLAG_Z_MASK, result == 0);
     reg_file->reg_af.set_flag(StatusFlagMask::FLAG_N_MASK);
-    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_H_MASK, half_carry);
-    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_C_MASK, a < n);
+    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_H_MASK, h);
+    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_C_MASK, c);
 
     // Write back
     write_reg<Register8Bit::REG_A>(result);

@@ -123,6 +123,6 @@ void LR35902::init_alu(lookup_table_t &lookup) {
   lookup.at(0xEE) = make_unique<XOR_A_imm8>(&reg_file, bus);
 
   lookup.at(0xF6) = make_unique<OR_A_imm8>(&reg_file, bus);
-  lookup.at(0xF8) = make_unique<LD_HL_imm8>(&reg_file, bus);
+  lookup.at(0xF8) = make_unique<LD_HL_SP_E8>(&reg_file, bus);
   lookup.at(0xFE) = make_unique<CP_A_imm8>(&reg_file, bus);
 }

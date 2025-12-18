@@ -122,7 +122,7 @@ def test_instr_vectors(opcode):
             no_steps = no_steps + 1
             cpu.step()
             # Prevent infinite looping during branch tests
-            assert no_steps < 1000, 'Took too long'
+            assert no_steps < 1000, f'{test_vec.name}: Took too long'
 
         # Validate final state
         final_state = cpu.get_state()
