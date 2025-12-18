@@ -36,16 +36,10 @@ class CpuTestVector(BaseModel):
 
 
 def load_test_vectors(url: str) -> List[CpuTestVector]:
-    """
-    Fetches a JSON array of CpuTestVector objects from a URL
-    and validates them with Pydantic.
-    """
     try:
         resp = requests.get(url, timeout=10)
         resp.raise_for_status()
         data = resp.json()
-
-        # Validate each item in the array
         return [CpuTestVector.model_validate(item) for item in data]
 
     except requests.RequestException as e:

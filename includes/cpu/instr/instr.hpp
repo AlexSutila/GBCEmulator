@@ -50,7 +50,7 @@ protected:
       static_assert("Invalid 16-bit register");
   }
 
-  template <Register16Bit reg> byte_t inline read_reg() const {
+  template <Register16Bit reg> addr_t inline read_reg() const {
     if constexpr (reg == Register16Bit::REG_AF)
       return reg_file->reg_af.read();
     else if constexpr (reg == Register16Bit::REG_BC)
