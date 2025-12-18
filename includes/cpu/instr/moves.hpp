@@ -9,7 +9,7 @@
 /*
  * Copies value from Y into X, operates only on 8-bit registers
  */
-template <Register8Bit src, Register8Bit dst>
+template <Register8Bit dst, Register8Bit src>
 class LD_X_Y : public Instruction {
 public:
   LD_X_Y(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)

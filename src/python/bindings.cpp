@@ -2,8 +2,10 @@
 #include <pybind11/pybind11.h>
 
 #include "cpu/interrupts.hpp"
+#include "cpu/lr35902.hpp"
 #include "cpu/registers/flags.hpp"
 #include "cpu/registers/register.hpp"
+#include "gbc.hpp"
 #include "memory/boot.hpp"
 #include "memory/bus.hpp"
 
@@ -84,4 +86,35 @@ PYBIND11_MODULE(gbc_py, m) {
       .def("disable", &InterruptMasterEnable::disable)
       .def("step", &InterruptMasterEnable::step)
       .def_property_readonly("enabled", &InterruptMasterEnable::is_enabled);
+
+  // Processor state and class
+  py::class_<LR35902::ProcessorState>(m, "ProcessorState")
+      .def(py::init<>())
+      .def_readwrite("pc", &LR35902::ProcessorState::pc)
+      .def_readwrite("sp", &LR35902::ProcessorState::sp)
+      .def_readwrite("a", &LR35902::ProcessorState::a)
+      .def_readwrite("b", &LR35902::ProcessorState::b)
+      .def_readwrite("c", &LR35902::ProcessorState::c)
+      .def_readwrite("d", &LR35902::ProcessorState::d)
+      .def_readwrite("e", &LR35902::ProcessorState::e)
+      .def_readwrite("f", &LR35902::ProcessorState::f)
+      .def_readwrite("h", &LR35902::ProcessorState::h)
+      .def_readwrite("l", &LR35902::ProcessorState::l)
+      .def_readwrite("ime_enabled", &LR35902::ProcessorState::ime_enabled);
+  py::class_<LR35902>(m, "LR35902")
+      .def(py::init<AddressBus *>(), py::arg("bus"),
+           py::keep_alive<1, 2>() // LR35902 keeps AddressBus alive
+           )
+      .def("step", &LR35902::step)
+      .def("get_state", &LR35902::get_state)
+      .def("load_state", &LR35902::load_state, py::arg("state"));
+
+  // Master Emulator class
+  py::class_<GameBoyColor>(m, "GameBoyColor")
+      .def(py::init<>())
+      .def("run", &GameBoyColor::run)
+      .def("get_bus", &GameBoyColor::get_bus,
+           py::return_value_policy::reference_internal)
+      .def("get_cpu", &GameBoyColor::get_cpu,
+           py::return_value_policy::reference_internal);
 }

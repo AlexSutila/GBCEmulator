@@ -18,6 +18,22 @@ public:
   LR35902(AddressBus *bus_ptr);
   void step();
 
+  struct ProcessorState {
+    addr_t pc;
+    addr_t sp;
+    byte_t a;
+    byte_t b;
+    byte_t c;
+    byte_t d;
+    byte_t e;
+    byte_t f;
+    byte_t h;
+    byte_t l;
+    bool ime_enabled;
+  };
+  void load_state(ProcessorState state);
+  ProcessorState get_state() const;
+
 private:
   RegisterFile reg_file{};
   AddressBus *const bus{};

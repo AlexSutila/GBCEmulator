@@ -118,5 +118,6 @@ void LR35902::init_moves(lookup_table_t &lookup) {
   lookup.at(0xF1) = make_unique<POP_XX<r16::REG_AF>>(&reg_file, bus);
   lookup.at(0xF2) = make_unique<LDH_A_C>(&reg_file, bus);
   lookup.at(0xF5) = make_unique<PUSH_XX<r16::REG_AF>>(&reg_file, bus);
+  lookup.at(0xF9) = make_unique<LD_SP_HL>(&reg_file, bus);
   lookup.at(0xFA) = make_unique<LD_A_imm16>(&reg_file, bus);
 }
