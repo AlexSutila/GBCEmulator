@@ -18,10 +18,10 @@
  */
 
 enum class StatusFlagMask : byte_t {
-  FLAG_Z_MASK = 1u << 4,
-  FLAG_N_MASK = 1u << 5,
-  FLAG_H_MASK = 1u << 6,
-  FLAG_C_MASK = 1u << 7,
+  FLAG_Z_MASK = 1u << 7,
+  FLAG_N_MASK = 1u << 6,
+  FLAG_H_MASK = 1u << 5,
+  FLAG_C_MASK = 1u << 4,
 };
 
 /*
