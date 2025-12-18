@@ -75,4 +75,12 @@ PYBIND11_MODULE(gbc_py, m) {
       .def("write_byte", &AddressBus::write_byte, py::arg("addr"),
            py::arg("value"))
       .def("read_byte", &AddressBus::read_byte, py::arg("addr"));
+
+  // Interrupt Master Enable class
+  py::class_<InterruptMasterEnable>(m, "InterruptMasterEnable")
+      .def(py::init<>())
+      .def("enable", &InterruptMasterEnable::enable, py::arg("delayed") = false)
+      .def("disable", &InterruptMasterEnable::disable)
+      .def("step", &InterruptMasterEnable::step)
+      .def_property_readonly("enabled", &InterruptMasterEnable::is_enabled);
 }

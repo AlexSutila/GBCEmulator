@@ -84,8 +84,12 @@ public:
   void step();
 
 private:
-  bool ime_pending;
-  bool ime_true;
+  enum ImeStates {
+    IME_PENDING,  /* IME is about to enter one instruction delay state */
+    IME_DELAYED,  /* EI was invoked, delay for one instruction */
+    IME_ENABLED,  /* IME is enabled */
+    IME_DISABLED, /* IME is disabled */
+  } ime_state;
 };
 
 #endif // __INTERRUPTS_H

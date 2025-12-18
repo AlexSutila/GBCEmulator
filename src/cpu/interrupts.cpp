@@ -20,32 +20,32 @@ byte_t InterruptBits::read() {
 }
 
 InterruptMasterEnable::InterruptMasterEnable()
-    : ime_pending(false), ime_true(false) {}
+    : ime_state(IME_DISABLED) {}
 
 /* If enabled via `ei`, the IME is not actually enabled until one instruction
  * later. If enabled via `reti`, the effects of enabling the IME occur
  * instantly. */
 void InterruptMasterEnable::enable(bool delayed) {
-  if (delayed)
-    ime_pending = true;
-  else
-    ime_true = true;
+  if (delayed && ime_state != IME_ENABLED)
+    ime_state = IME_PENDING;
+  else ime_state = IME_ENABLED;
 }
 
 /* Under no circumstance are IME disables delayed. The effects of the `di`
  * instruction always occur immediately. */
 void InterruptMasterEnable::disable() {
-  ime_pending = false;
-  ime_true = false;
+  ime_state = IME_DISABLED;
 }
 
-bool InterruptMasterEnable::is_enabled() const { return ime_true; }
+bool InterruptMasterEnable::is_enabled() const {
+  return ime_state == IME_ENABLED;
+}
 
 /* Responsible for handling the delayed enable of the IME through `ei`. As a
  * result, this must be invoked once per instruction. */
 void InterruptMasterEnable::step() {
-  if (!ime_pending)
-    return;
-  ime_pending = false;
-  ime_true = true;
+  if (ime_state == IME_PENDING)
+    ime_state = IME_DELAYED;
+  else if (ime_state == IME_DELAYED)
+    ime_state = IME_ENABLED;
 }
