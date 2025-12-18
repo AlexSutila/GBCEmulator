@@ -1,8 +1,8 @@
 #ifndef __REGISTER_FILE_H
 #define __REGISTER_FILE_H
 
-#include <cpu/registers/flags.hpp>
-#include <cpu/registers/register.hpp>
+#include "cpu/registers/flags.hpp"
+#include "cpu/registers/register.hpp"
 
 /*
  * LR35902 Register Set is as follows, where each register is

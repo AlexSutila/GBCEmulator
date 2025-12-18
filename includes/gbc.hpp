@@ -1,8 +1,8 @@
 #ifndef __GBC_H
 #define __GBC_H
 
-#include <cpu/lr35902.hpp>
-#include <memory/bus.hpp>
+#include "cpu/lr35902.hpp"
+#include "memory/bus.hpp"
 #include <memory>
 
 class GameBoyColor {

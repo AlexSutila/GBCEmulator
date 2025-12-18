@@ -1,9 +1,13 @@
+#include "cpu/lr35902.hpp"
+#include "cpu/interrupts.hpp"
+#include "cpu/registers/flags.hpp"
+#include "cpu/registers/register.hpp"
+#include "memory/mmio.hpp"
+
 #include <cassert>
-#include <cpu/interrupts.hpp>
-#include <cpu/lr35902.hpp>
-#include <cpu/registers/flags.hpp>
-#include <cpu/registers/register.hpp>
-#include <memory/mmio.hpp>
+#include <iomanip>
+#include <ios>
+#include <sstream>
 #include <stdexcept>
 
 LR35902::LR35902(AddressBus *bus_ptr) : bus(bus_ptr) {
@@ -40,6 +44,14 @@ void LR35902::step() {
   // Decode instruction
   const byte_t op = bus->read_byte(reg_file.reg_pc++);
   std::unique_ptr<Instruction> &ins = lookup.at(op);
+
+  // Handle un-implemented opcodes
+  if (!ins) {
+    std::ostringstream oss;
+    oss << "Unimplemented opcode: 0x" << std::uppercase << std::hex
+        << std::setw(2) << std::setfill('0') << static_cast<int>(op);
+    throw std::logic_error(oss.str());
+  }
 
   // Parse instruction operands
   ins->parse();

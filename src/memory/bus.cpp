@@ -1,8 +1,8 @@
-#include <cpu/interrupts.hpp>
-#include <emu_types.hpp>
-#include <memory/boot.hpp>
-#include <memory/bus.hpp>
-#include <memory/mmio.hpp>
+#include "memory/bus.hpp"
+#include "cpu/interrupts.hpp"
+#include "emu_types.hpp"
+#include "memory/boot.hpp"
+#include "memory/mmio.hpp"
 
 #include <cassert>
 #include <memory>

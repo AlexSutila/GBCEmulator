@@ -1,11 +1,11 @@
 #ifndef __CONTROL_H
 #define __CONTROL_H
 
-#include <cpu/instr/instr.hpp>
-#include <cpu/interrupts.hpp>
-#include <cpu/registers/regfile.hpp>
-#include <emu_types.hpp>
-#include <memory/bus.hpp>
+#include "cpu/instr/instr.hpp"
+#include "cpu/interrupts.hpp"
+#include "cpu/registers/regfile.hpp"
+#include "emu_types.hpp"
+#include "memory/bus.hpp"
 
 /*
  * Complement Accumulator

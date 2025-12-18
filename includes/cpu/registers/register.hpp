@@ -1,7 +1,7 @@
 #ifndef __REGISTER_H
 #define __REGISTER_H
 
-#include <emu_types.hpp>
+#include "emu_types.hpp"
 
 /*
  * This class is used for registers BC, DE, HL, and SP

@@ -1,12 +1,13 @@
 #ifndef __BRANCH_H
 #define __BRANCH_H
 
-#include <cpu/instr/instr.hpp>
-#include <cpu/interrupts.hpp>
-#include <cpu/registers/regfile.hpp>
+#include "cpu/instr/instr.hpp"
+#include "cpu/interrupts.hpp"
+#include "cpu/registers/regfile.hpp"
+#include "emu_types.hpp"
+#include "memory/bus.hpp"
+
 #include <cstdint>
-#include <emu_types.hpp>
-#include <memory/bus.hpp>
 
 /*
  * Absolute jump

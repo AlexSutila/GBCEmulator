@@ -1,6 +1,5 @@
-#include <cpu/registers/flags.hpp>
-#include <emu_types.hpp>
-#include <endianness.hpp>
+#include "cpu/registers/flags.hpp"
+#include "emu_types.hpp"
 
 void CpuFlagsRegister::write(const addr_t value) {
   hi = static_cast<byte_t>((value >> 8) & 0x00FF);

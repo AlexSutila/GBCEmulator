@@ -1,10 +1,11 @@
 #ifndef __INSTR_H
 #define __INSTR_H
 
-#include <cpu/registers/regfile.hpp>
+#include "cpu/registers/regfile.hpp"
+#include "emu_types.hpp"
+#include "memory/bus.hpp"
+
 #include <cstddef>
-#include <emu_types.hpp>
-#include <memory/bus.hpp>
 #include <tuple>
 
 class Instruction {

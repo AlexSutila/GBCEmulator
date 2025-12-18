@@ -1,5 +1,5 @@
-#include <emu_types.hpp>
-#include <memory/boot.hpp>
+#include "memory/boot.hpp"
+#include "emu_types.hpp"
 
 /* Always start with boot ROM mapped */
 BootROMCtrl::BootROMCtrl() : MMIORegister() { map_boot_rom = true; }

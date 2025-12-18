@@ -1,12 +1,12 @@
 #ifndef __LR35902_H
 #define __LR35902_H
 
+#include "cpu/instr/instr.hpp"
+#include "cpu/interrupts.hpp"
+#include "cpu/registers/regfile.hpp"
+#include "memory/bus.hpp"
+
 #include <array>
-#include <cpu/instr/instr.hpp>
-#include <cpu/interrupts.hpp>
-#include <cpu/registers/regfile.hpp>
-#include <emu_types.hpp>
-#include <memory/bus.hpp>
 #include <memory>
 
 /*

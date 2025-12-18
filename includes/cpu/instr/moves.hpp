@@ -1,10 +1,10 @@
 #ifndef __MOVES_H
 #define __MOVES_H
 
-#include <cpu/instr/instr.hpp>
-#include <cpu/registers/regfile.hpp>
-#include <emu_types.hpp>
-#include <memory/bus.hpp>
+#include "cpu/instr/instr.hpp"
+#include "cpu/registers/regfile.hpp"
+#include "emu_types.hpp"
+#include "memory/bus.hpp"
 
 /*
  * Copies value from Y into X, operates only on 8-bit registers
@@ -224,7 +224,8 @@ public:
   LDH_A_C(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::tuple<std::size_t, std::size_t> step() override {
-    const byte_t mem_byte = bus->read_byte(0xFF00 | read_reg<Register8Bit::REG_C>());
+    const byte_t mem_byte =
+        bus->read_byte(0xFF00 | read_reg<Register8Bit::REG_C>());
     reg_file->reg_af.write_hi(mem_byte);
     return {8, 8};
   }

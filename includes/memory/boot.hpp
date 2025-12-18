@@ -1,8 +1,9 @@
 #ifndef __BIOS_H
 #define __BIOS_H
 
-#include <emu_types.hpp>
-#include <memory/mmio.hpp>
+#include "emu_types.hpp"
+#include "memory/mmio.hpp"
+
 #include <vector>
 
 /*

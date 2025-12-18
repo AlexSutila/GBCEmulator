@@ -1,8 +1,8 @@
 #ifndef __FLAGS_H
 #define __FLAGS_H
 
-#include <cpu/registers/register.hpp>
-#include <emu_types.hpp>
+#include "cpu/registers/register.hpp"
+#include "emu_types.hpp"
 
 /*
  * The F register allocates it's four most siginificant bits

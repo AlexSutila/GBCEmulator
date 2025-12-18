@@ -1,11 +1,11 @@
 #ifndef __BUS_H
 #define __BUS_H
 
-#include <cpu/interrupts.hpp>
-#include <emu_types.hpp>
+#include "emu_types.hpp"
+#include "memory/boot.hpp"
+#include "memory/mmio.hpp"
+
 #include <map>
-#include <memory/boot.hpp>
-#include <memory/mmio.hpp>
 #include <memory>
 
 /*

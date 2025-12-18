@@ -1,4 +1,4 @@
-#include <cpu/interrupts.hpp>
+#include "cpu/interrupts.hpp"
 
 /* Most unused bits read one because there is no physical hardware attached to
  * them. However, for IE, there is an exception, hence allow pulling the unused

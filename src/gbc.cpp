@@ -1,6 +1,6 @@
-#include <gbc.hpp>
-#include <memory/bus.hpp>
-#include <memory>
+#include "gbc.hpp"
+#include "memory/bus.hpp"
+#include "memory"
 
 GameBoyColor::GameBoyColor() {
 

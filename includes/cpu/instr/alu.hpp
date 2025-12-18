@@ -1,12 +1,13 @@
 #ifndef __ALU_H
 #define __ALU_H
 
+#include "cpu/instr/instr.hpp"
 #include "cpu/registers/flags.hpp"
-#include <cpu/instr/instr.hpp>
-#include <cpu/registers/regfile.hpp>
+#include "cpu/registers/regfile.hpp"
+#include "emu_types.hpp"
+#include "memory/bus.hpp"
+
 #include <cstdint>
-#include <emu_types.hpp>
-#include <memory/bus.hpp>
 
 /*
  * Add value in 8-bit register X to A

@@ -1,4 +1,4 @@
-#include <gbc.hpp>
+#include "gbc.hpp"
 
 int main() {
     GameBoyColor emulator;

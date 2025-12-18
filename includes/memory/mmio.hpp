@@ -1,7 +1,7 @@
 #ifndef __MMIO_H
 #define __MMIO_H
 
-#include <emu_types.hpp>
+#include "emu_types.hpp"
 
 /*
  * Game Boy I/O Register Map (FF00–FF7F)

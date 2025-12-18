@@ -1,7 +1,7 @@
 #ifndef __INTERRUPTS_H
 #define __INTERRUPTS_H
 
-#include <memory/mmio.hpp>
+#include "memory/mmio.hpp"
 
 enum class interruptFlagMask : byte_t {
   INT_FLAG_JOYPAD = 1u << 4,

@@ -1,10 +1,11 @@
 #include <pybind11/functional.h>
 #include <pybind11/pybind11.h>
 
-#include <cpu/registers/flags.hpp>
-#include <cpu/registers/register.hpp>
-#include <memory/boot.hpp>
-#include <memory/bus.hpp>
+#include "cpu/interrupts.hpp"
+#include "cpu/registers/flags.hpp"
+#include "cpu/registers/register.hpp"
+#include "memory/boot.hpp"
+#include "memory/bus.hpp"
 
 namespace py = pybind11;
 

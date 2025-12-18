@@ -1,6 +1,7 @@
+#include "cpu/instr/control.hpp"
+#include "cpu/lr35902.hpp"
+
 #include <array>
-#include <cpu/instr/control.hpp>
-#include <cpu/lr35902.hpp>
 #include <memory>
 
 using lookup_table_t = std::array<std::unique_ptr<Instruction>, 256>;
