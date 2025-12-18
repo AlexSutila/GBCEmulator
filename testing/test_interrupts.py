@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 from gbc_py import (
+    InterruptMasterEnable,
     AddressBus,
 )
 
@@ -18,3 +19,63 @@ def test_if_register_unused_bits():
     assert bus.read_byte(0xFF0F) == 0xE0
     bus.write_byte(0xFF0F, 0xFF)
     assert bus.read_byte(0xFF0F) == 0xFF
+
+
+def test_ime_state_boot():
+    '''Validate initial state of IME'''
+    ime = InterruptMasterEnable()
+    for _ in range(100):
+        ime.step()
+    assert not ime.enabled
+
+
+def test_ime_enable_ei_timing():
+    '''Validate ime enable timing behavior with ei'''
+    ime = InterruptMasterEnable()
+    assert not ime.enabled
+
+    # Step before instruction execution, emulate EI
+    ime.step()
+    ime.enable(True)
+
+    # Step before instruction execution, IME is disabled
+    ime.step()
+    assert not ime.enabled
+
+    # Step before instruction execution, IME is enabled
+    ime.step()
+    assert ime.enabled
+
+
+def test_ime_enable_reti_timing():
+    '''Validate ime enable timing behavior with ei'''
+    ime = InterruptMasterEnable()
+    assert not ime.enabled
+
+    # Step before instruction execution, emulate EI
+    ime.step()
+    ime.enable(False)
+
+    # Step before instruction execution, IME is enabled
+    ime.step()
+    assert ime.enabled
+
+
+def test_ime_ei_di_quirk():
+    '''EI followed by DI never enables interrupts'''
+    ime = InterruptMasterEnable()
+    assert not ime.enabled
+
+    # Step before instruction, emulate EI
+    ime.step()
+    ime.enable(True)
+
+    # Disabled due to one instruction delay
+    assert not ime.enabled
+
+    # Step before instruction, emulate DI
+    ime.step()
+    ime.disable()
+
+    # Interrupts never turn on
+    assert not ime.enabled

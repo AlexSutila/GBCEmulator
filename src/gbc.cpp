@@ -10,3 +10,8 @@ GameBoyColor::GameBoyColor() {
   /* GBC Central Processing Unit */
   cpu = std::make_unique<LR35902>(bus.get());
 }
+
+void GameBoyColor::run() {
+  while (true)
+    cpu->step();
+}

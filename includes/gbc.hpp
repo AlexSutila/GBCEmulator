@@ -8,6 +8,7 @@
 class GameBoyColor {
 public:
   GameBoyColor();
+  void run();
 
 private:
   std::unique_ptr<AddressBus> bus;

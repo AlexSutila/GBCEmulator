@@ -35,5 +35,15 @@ LR35902::LR35902(AddressBus *bus_ptr) : bus(bus_ptr) {
 }
 
 void LR35902::step() {
-  // TODO
+  ime.step();
+
+  // Decode instruction
+  const byte_t op = bus->read_byte(reg_file.reg_pc++);
+  std::unique_ptr<Instruction> &ins = lookup.at(op);
+
+  // Parse instruction operands
+  ins->parse();
+
+  // Execute instruction
+  ins->step();
 }

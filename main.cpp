@@ -2,5 +2,6 @@
 
 int main() {
     GameBoyColor emulator;
+    emulator.run();
     return 0;
 }
