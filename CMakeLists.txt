@@ -27,6 +27,8 @@ add_executable(gbc
     src/memory/boot.cpp
     src/memory/bus.cpp
     src/memory/mmio.cpp
+    src/cart/cart.cpp
+    src/cart/cart_display.cpp
 )
 target_include_directories(gbc
     PRIVATE

@@ -1,0 +1,63 @@
+#ifndef __CART_HPP
+#define __CART_HPP
+
+#include "../emu_types.hpp"
+#include <array>
+#include <filesystem>
+#include <span>
+#include <string>
+#include <vector>
+
+namespace fs = std::filesystem;
+
+constexpr std::size_t kHeaderStart = 0x0100;
+constexpr std::size_t kHeaderEnd   = 0x014F;
+constexpr std::size_t kMinRomSize  = 0x0150; // first opcode after header is typically at 0x0150
+
+struct rom_header {
+    std::array<byte_t, 4>    entry_point{};        // 0100-0103
+    std::array<byte_t, 0x30> nintendo_logo{};      // 0104-0133
+    std::array<byte_t, 16>   title_area{};         // 0134-0143 (optionally title / manufacturer / cgb_flag)
+    std::array<byte_t, 2>    new_licensee_code{};  // 0144-0145
+    byte_t                   sgb_flag{};           // 0146
+    byte_t                   cartridge_type{};     // 0147
+    byte_t                   rom_size_code{};      // 0148
+    byte_t                   ram_size_code{};      // 0149
+    byte_t                   destination_code{};   // 014A
+    byte_t                   old_licensee_code{};  // 014B
+    byte_t                   mask_rom_version{};   // 014C
+    byte_t                   header_checksum{};    // 014D
+    std::uint16_t            global_checksum{};    // 014E-014F (big-endian)
+
+    byte_t cgb_flag() const noexcept { return title_area[15]; } // 0x0143
+    // Best-effort: extract a title string
+    std::string title() const;
+    // Best-effort: manufacturer code if it looks like 4 ASCII chars in 013F-0142 on CGB carts
+    std::string manufacturer_code() const;
+};
+
+struct cart {
+    fs::path file_path{};
+    std::vector<byte_t> rom{};
+    rom_header header{};
+
+    std::size_t declared_rom_bytes{}; // from header 0148
+    std::size_t declared_ram_bytes{}; // from header 0149
+
+    bool logo_ok{};
+    bool header_checksum_ok{};
+    bool global_checksum_ok{};
+
+    std::span<const byte_t> rom_span() const noexcept { return rom; }
+    const byte_t* rom_data() const noexcept { return rom.data(); }
+    std::size_t rom_size() const noexcept { return rom.size(); }
+};
+
+[[nodiscard]] cart load_cart(const fs::path& rom_path);
+
+// helpers
+[[nodiscard]] std::size_t rom_bytes_from_code(byte_t code);
+[[nodiscard]] std::size_t ram_bytes_from_code(byte_t code);
+
+
+#endif // __CART_HPP
