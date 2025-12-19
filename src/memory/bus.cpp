@@ -39,7 +39,8 @@ const byte_t AddressBus::read_byte(const addr_t addr) {
     return io_registers.at(addr)->read();
   }
 
-  return mem[addr];
+  else
+    return mem[addr];
 }
 
 void AddressBus::write_byte(const addr_t addr, const byte_t value) {
@@ -50,7 +51,8 @@ void AddressBus::write_byte(const addr_t addr, const byte_t value) {
     io_registers.at(addr)->write(value);
   }
 
-  mem[addr] = value;
+  else
+    mem[addr] = value;
 }
 
 bool AddressBus::boot_rom_enabled() {

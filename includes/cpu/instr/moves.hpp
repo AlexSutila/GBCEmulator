@@ -370,6 +370,8 @@ public:
     const addr_t addr = read_reg<src>();
     bus->write_byte(--sp, addr >> 8);
     bus->write_byte(--sp, addr & 0xFF);
+
+    // Write back
     reg_file->reg_sp.write(sp);
     return {16, 16};
   }
@@ -386,6 +388,9 @@ public:
     addr_t sp = reg_file->reg_sp.read();
     addr_t addr = bus->read_byte(sp++);
     addr |= (addr_t)bus->read_byte(sp++) << 8;
+
+    // Write back
+    reg_file->reg_sp.write(sp);
     write_reg<dst>(addr);
     return {12, 12};
   }
