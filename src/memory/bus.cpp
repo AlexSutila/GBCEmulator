@@ -29,15 +29,19 @@ static constexpr bool is_cart_range(const addr_t a) noexcept {
   return (a <= 0x7FFF) || (a >= 0xA000 && a <= 0xBFFF);
 }
 
+static constexpr bool is_bootrom_range(const addr_t a) noexcept {
+  return (a <= 0x00FF) || (a >= 0x0200 && a <= 0x0900);
+}
+
 const byte_t AddressBus::read_byte(const addr_t addr) {
   const std::vector<byte_t> &boot_rom = get_boot_rom();
 
   /* Read from boot ROM if it is mapped (boot ROM overrides READs only) */
-  if (boot_rom_enabled() && addr < boot_rom.size()) {
+  if (boot_rom_enabled() && is_bootrom_range(addr)) {
     return boot_rom.at(addr);
   }
 
-  // Cartridge
+  /* Cartridge memory */
   if (cart_ && is_cart_range(addr)) {
     return cart_->read(addr);
   }
@@ -48,11 +52,13 @@ const byte_t AddressBus::read_byte(const addr_t addr) {
     return io_registers.at(addr)->read();
   }
 
+  /* Fallback memory */
   return mem[addr];
 }
 
 void AddressBus::write_byte(const addr_t addr, const byte_t value) {
-  // Cartridge sees writes too (bank switching etc.)
+
+  /* Cartridge sees writes too (bank switching etc.) */
   if (cart_ && is_cart_range(addr)) {
     cart_->write(addr, value);
     return;
@@ -64,6 +70,7 @@ void AddressBus::write_byte(const addr_t addr, const byte_t value) {
     io_registers.at(addr)->write(value);
   }
 
+  /* Fallback memory */
   else
     mem[addr] = value;
 }
