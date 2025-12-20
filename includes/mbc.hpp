@@ -2,16 +2,15 @@
 #define __GBC_MBC_HPP
 
 #pragma once
-#include "cart/cart.hpp"
 
+#include "emu_types.hpp"
 #include <algorithm>
 #include <array>
 #include <chrono>
 #include <memory>
 #include <span>
-#include <stdexcept>
-#include <vector>
 
+struct cart;
 
 class Mbc {
 public:

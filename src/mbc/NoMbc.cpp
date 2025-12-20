@@ -1,4 +1,5 @@
 #include "mbc.hpp"
+#include "cart/cart.hpp"
 
 
 // ---------------------------
@@ -38,3 +39,9 @@ private:
     std::vector<byte_t>     ram_;
     bool battery_{};
 };
+
+std::unique_ptr<Mbc> make_mbc(const cart& c) {
+    const bool battery = type_has_battery(c.header.cartridge_type);
+
+    return std::make_unique<NoMbc>(c.rom_span(), c.declared_ram_bytes, battery);
+}

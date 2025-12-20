@@ -2,6 +2,9 @@
 #define __CART_HPP
 
 #include "../emu_types.hpp"
+#include "mbc.hpp"
+
+#include <memory>
 #include <array>
 #include <filesystem>
 #include <span>
@@ -31,12 +34,12 @@ struct rom_header {
   byte_t header_checksum{};                  // 014D
   std::uint16_t global_checksum{};           // 014E-014F (big-endian)
 
-  byte_t cgb_flag() const noexcept { return title_area[15]; } // 0x0143
+  [[nodiscard]] byte_t cgb_flag() const noexcept { return title_area[15]; } // 0x0143
   // Best-effort: extract a title string
-  std::string title() const;
+  [[nodiscard]] std::string title() const;
   // Best-effort: manufacturer code if it looks like 4 ASCII chars in 013F-0142
   // on CGB carts
-  std::string manufacturer_code() const;
+  [[nodiscard]] std::string manufacturer_code() const;
 };
 
 struct cart {
@@ -51,9 +54,29 @@ struct cart {
   bool header_checksum_ok{};
   bool global_checksum_ok{};
 
-  std::span<const byte_t> rom_span() const noexcept { return rom; }
-  const byte_t *rom_data() const noexcept { return rom.data(); }
-  std::size_t rom_size() const noexcept { return rom.size(); }
+  [[nodiscard]] std::span<const byte_t> rom_span() const noexcept { return rom; }
+  [[nodiscard]] const byte_t *rom_data() const noexcept { return rom.data(); }
+  [[nodiscard]] std::size_t rom_size() const noexcept { return rom.size(); }
+};
+
+class Cartridge {
+public:
+    explicit Cartridge(cart image)
+        : image_(std::move(image))
+        , mbc_(make_mbc(image_)) {}
+
+    [[nodiscard]] byte_t read(addr_t addr) { return mbc_->read(addr); }
+    void write(addr_t addr, byte_t v) { mbc_->write(addr, v); }
+
+    [[nodiscard]] const cart& image() const noexcept { return image_; }
+
+    [[nodiscard]] bool has_battery() const noexcept { return mbc_->has_battery(); }
+    [[nodiscard]] std::span<const byte_t> ram() const noexcept { return mbc_->ram(); }
+    [[nodiscard]] std::span<byte_t>       ram() noexcept { return mbc_->ram(); }
+
+private:
+    cart image_;
+    std::unique_ptr<Mbc> mbc_;
 };
 
 [[nodiscard]] cart load_cart(const fs::path &rom_path);

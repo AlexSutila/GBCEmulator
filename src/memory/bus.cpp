@@ -10,7 +10,7 @@
 #include <vector>
 
 AddressBus::AddressBus() {
-  mem = std::make_unique<byte_t[]>(0xFFFF);
+  mem = std::make_unique<byte_t[]>(0x10000);
   init_io_registers();
 
   /* Maintain this for convenience during memory access */
@@ -25,25 +25,38 @@ void AddressBus::init_io_registers() {
   io_registers[0xFFFF] = std::make_unique<InterruptBits>(false);
 }
 
+static constexpr bool is_cart_range(const addr_t a) noexcept {
+  return (a <= 0x7FFF) || (a >= 0xA000 && a <= 0xBFFF);
+}
+
 const byte_t AddressBus::read_byte(const addr_t addr) {
   const std::vector<byte_t> &boot_rom = get_boot_rom();
 
-  /* Read from boot ROM if it is mapped */
-  if (boot_rom_enabled() && addr >= 0x0000 && addr < boot_rom.size()) {
+  /* Read from boot ROM if it is mapped (boot ROM overrides READs only) */
+  if (boot_rom_enabled() && addr < boot_rom.size()) {
     return boot_rom.at(addr);
   }
 
+  // Cartridge
+  if (cart_ && is_cart_range(addr)) {
+    return cart_->read(addr);
+  }
+
   /* Read from memory mapped IO register */
-  else if (io_registers.contains(addr)) {
+  if (io_registers.contains(addr)) {
     assert((addr >= 0xFF00 && addr <= 0xFF7F) || addr == 0xFFFF);
     return io_registers.at(addr)->read();
   }
 
-  else
-    return mem[addr];
+  return mem[addr];
 }
 
 void AddressBus::write_byte(const addr_t addr, const byte_t value) {
+  // Cartridge sees writes too (bank switching etc.)
+  if (cart_ && is_cart_range(addr)) {
+    cart_->write(addr, value);
+    return;
+  }
 
   /* Write to memory mapped IO register */
   if (io_registers.contains(addr)) {
