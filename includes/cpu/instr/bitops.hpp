@@ -487,4 +487,93 @@ public:
   }
 };
 
+template <byte_t bit, Register8Bit dst>
+class BIT_N_X : public Instruction {
+public:
+  BIT_N_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
+      : Instruction(reg_file_ptr, bus_ptr) {}
+  std::tuple<std::size_t, std::size_t> step() override {
+    const byte_t x = read_reg<dst>();
+    const bool bit_is_zero = ((x >> bit) & 0x01) == 0;
+
+    // Update flags
+    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_Z_MASK, bit_is_zero);
+    reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_N_MASK);
+    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_H_MASK, true);
+    return {8, 8};
+  }
+};
+
+template <byte_t bit>
+class BIT_N_HL : public Instruction {
+public:
+  BIT_N_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
+      : Instruction(reg_file_ptr, bus_ptr) {}
+  std::tuple<std::size_t, std::size_t> step() override {
+    const addr_t addr = read_reg<Register16Bit::REG_HL>();
+    const byte_t n = bus->read_byte(addr);
+    const bool bit_is_zero = ((n >> bit) & 0x01) == 0;
+
+    // Update flags
+    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_Z_MASK, bit_is_zero);
+    reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_N_MASK);
+    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_H_MASK, true);
+    return {12, 12};
+  }
+};
+
+template <byte_t bit, Register8Bit dst>
+class RES_N_X : public Instruction {
+public:
+  RES_N_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
+      : Instruction(reg_file_ptr, bus_ptr) {}
+  std::tuple<std::size_t, std::size_t> step() override {
+    byte_t x = read_reg<dst>();
+    x &= ~(1 << bit);
+    write_reg<dst>(x);
+    return {8, 8};
+  }
+};
+
+template <byte_t bit>
+class RES_N_HL : public Instruction {
+public:
+  RES_N_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
+      : Instruction(reg_file_ptr, bus_ptr) {}
+  std::tuple<std::size_t, std::size_t> step() override {
+    const addr_t hl = read_reg<Register16Bit::REG_HL>();
+    byte_t n = bus->read_byte(hl);
+    n &= ~(1 << bit);
+    bus->write_byte(hl, n);
+    return {16, 8};
+  }
+};
+
+template <byte_t bit, Register8Bit dst>
+class SET_N_X : public Instruction {
+public:
+  SET_N_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
+      : Instruction(reg_file_ptr, bus_ptr) {}
+  std::tuple<std::size_t, std::size_t> step() override {
+    byte_t x = read_reg<dst>();
+    x |= (1 << bit);
+    write_reg<dst>(x);
+    return {8, 8};
+  }
+};
+
+template <byte_t bit>
+class SET_N_HL : public Instruction {
+public:
+  SET_N_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
+      : Instruction(reg_file_ptr, bus_ptr) {}
+  std::tuple<std::size_t, std::size_t> step() override {
+    const addr_t hl = read_reg<Register16Bit::REG_HL>();
+    byte_t n = bus->read_byte(hl);
+    n |= (1 << bit);
+    bus->write_byte(hl, n);
+    return {16, 8};
+  }
+};
+
 #endif // __BITOPS_H
