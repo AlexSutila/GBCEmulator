@@ -1,5 +1,5 @@
 #include "cart/cart.hpp"
-#include "mbc.hpp"
+#include "cart/mbc.hpp"
 
 // ---------------------------
 // No MBC (32 KiB ROM only) + optional 8 KiB RAM

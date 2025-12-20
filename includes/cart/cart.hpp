@@ -1,8 +1,8 @@
 #ifndef __CART_HPP
 #define __CART_HPP
 
-#include "../emu_types.hpp"
-#include "mbc.hpp"
+#include "cart/mbc.hpp"
+#include "emu_types.hpp"
 
 #include <array>
 #include <filesystem>
