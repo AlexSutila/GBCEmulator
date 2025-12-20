@@ -30,14 +30,17 @@
  */
 
 class AddressBus {
-    std::unique_ptr<Cartridge> cart_;
+  std::unique_ptr<Cartridge> cart_;
+
 public:
   void write_byte(const addr_t addr, const byte_t value);
   const byte_t read_byte(const addr_t addr);
   MMIORegister *get_mmio(IORegisterMapping mapping) const;
   AddressBus();
-    void insert_cartridge(cart c) { cart_ = std::make_unique<Cartridge>(std::move(c)); }
-    void eject_cartridge() { cart_.reset(); }
+  void insert_cartridge(cart c) {
+    cart_ = std::make_unique<Cartridge>(std::move(c));
+  }
+  void eject_cartridge() { cart_.reset(); }
 
 private:
   std::unique_ptr<byte_t[]> mem{};

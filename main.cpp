@@ -1,7 +1,17 @@
+#include "cart/cart.hpp"
 #include "gbc.hpp"
+#include <stdexcept>
 
-int main() {
-    GameBoyColor emulator;
-    emulator.run();
-    return 0;
+const char *usage = "Usage: ./gbc <rom_path>";
+
+int main(const int argc, const char **argv) {
+  if (argc < 2)
+    throw std::logic_error(usage);
+
+  GameBoyColor emulator;
+  cart cart = load_cart(argv[1]);
+
+  emulator.insert_cartridge(cart);
+  emulator.run();
+  return 0;
 }
