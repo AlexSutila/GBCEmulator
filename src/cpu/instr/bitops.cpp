@@ -19,7 +19,7 @@ CB_PREFIX::CB_PREFIX(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
   init_cb_prefix(lookup);
 }
 
-std::tuple<std::size_t, std::size_t> CB_PREFIX::step() {
+std::size_t CB_PREFIX::step() {
   unique_ptr<Instruction> &ins = lookup.at(op);
 
   // Handle un-implemented opcodes - unlikely because CB doesn't have illegal

@@ -33,6 +33,7 @@ public:
   };
   void load_state(ProcessorState state);
   ProcessorState get_state() const;
+  std::size_t get_clocks() const { return clocks_elapsed; };
 
 private:
   RegisterFile reg_file{};
@@ -51,6 +52,9 @@ private:
   void init_control(lookup_table_t &lookup);
   void init_moves(lookup_table_t &lookup);
   lookup_table_t lookup{};
+
+  /* Timing metadata */
+  std::size_t clocks_elapsed{};
 };
 
 #endif // __LR35902_H

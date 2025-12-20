@@ -12,6 +12,7 @@
 
 LR35902::LR35902(AddressBus *bus_ptr) : bus(bus_ptr) {
   using ioregs = IORegisterMapping;
+  clocks_elapsed = 0;
 
   reg_file.reg_af = CpuFlagsRegister();
   reg_file.reg_bc = CpuRegister();
@@ -95,5 +96,5 @@ void LR35902::step() {
   ins->parse();
 
   // Execute instruction
-  ins->step();
+  const auto clocks = ins->step();
 }

@@ -16,9 +16,9 @@ class JP_imm16 : public Instruction {
 public:
   JP_imm16(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::tuple<std::size_t, std::size_t> step() override {
+  std::size_t step() override {
     reg_file->reg_pc = imm;
-    return {16, 16};
+    return 16;
   }
   void parse() override {
     const byte_t lo = bus->read_byte(reg_file->reg_pc++);
@@ -37,9 +37,9 @@ class JP_HL : public Instruction {
 public:
   JP_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::tuple<std::size_t, std::size_t> step() override {
+  std::size_t step() override {
     reg_file->reg_pc = read_reg<Register16Bit::REG_HL>();
-    return {4, 4};
+    return 4;
   }
 };
 
@@ -51,12 +51,12 @@ class JP_cond_imm16 : public Instruction {
 public:
   JP_cond_imm16(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::tuple<std::size_t, std::size_t> step() override {
+  std::size_t step() override {
     const bool cond = reg_file->reg_af.get_flag(flag);
     if (cond != expect)
-      return {12, 12};
+      return 12;
     reg_file->reg_pc = imm;
-    return {16, 16};
+    return 16;
   }
   void parse() override {
     const byte_t lo = bus->read_byte(reg_file->reg_pc++);
@@ -75,9 +75,9 @@ class JR_imm8 : public Instruction {
 public:
   JR_imm8(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::tuple<std::size_t, std::size_t> step() override {
+  std::size_t step() override {
     reg_file->reg_pc += static_cast<addr_t>(imm);
-    return {12, 12};
+    return 12;
   }
   void parse() override {
     imm = static_cast<int8_t>(bus->read_byte(reg_file->reg_pc++));
@@ -95,12 +95,12 @@ class JR_cond_imm8 : public Instruction {
 public:
   JR_cond_imm8(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::tuple<std::size_t, std::size_t> step() override {
+  std::size_t step() override {
     const bool cond = reg_file->reg_af.get_flag(flag);
     if (cond != expect)
-      return {8, 8};
+      return 8;
     reg_file->reg_pc += static_cast<addr_t>(imm);
-    return {12, 12};
+    return 12;
   }
   void parse() override {
     imm = static_cast<int8_t>(bus->read_byte(reg_file->reg_pc++));
@@ -117,7 +117,7 @@ class CALL_imm16 : public Instruction {
 public:
   CALL_imm16(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::tuple<std::size_t, std::size_t> step() override {
+  std::size_t step() override {
     addr_t sp = reg_file->reg_sp.read();
     addr_t pc = reg_file->reg_pc;
 
@@ -128,7 +128,7 @@ public:
     // Write back for updated stack pointer
     reg_file->reg_sp.write(sp);
     reg_file->reg_pc = imm;
-    return {24, 24};
+    return 24;
   }
   void parse() override {
     const byte_t lo = bus->read_byte(reg_file->reg_pc++);
@@ -148,10 +148,10 @@ class CALL_cond_imm16 : public Instruction {
 public:
   CALL_cond_imm16(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::tuple<std::size_t, std::size_t> step() override {
+  std::size_t step() override {
     const bool cond = reg_file->reg_af.get_flag(flag);
     if (cond != expect)
-      return {12, 12};
+      return 12;
     addr_t sp = reg_file->reg_sp.read();
     addr_t pc = reg_file->reg_pc;
 
@@ -162,7 +162,7 @@ public:
     // Write back for updated stack pointer
     reg_file->reg_sp.write(sp);
     reg_file->reg_pc = imm;
-    return {24, 24};
+    return 24;
   }
   void parse() override {
     const byte_t lo = bus->read_byte(reg_file->reg_pc++);
@@ -181,7 +181,7 @@ class RET : public Instruction {
 public:
   RET(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::tuple<std::size_t, std::size_t> step() override {
+  std::size_t step() override {
     addr_t sp = reg_file->reg_sp.read();
     const addr_t lo = bus->read_byte(sp++);
     const addr_t hi = bus->read_byte(sp++);
@@ -189,7 +189,7 @@ public:
     // Write back for updated stack pointer
     reg_file->reg_sp.write(sp);
     reg_file->reg_pc = lo | (hi << 8);
-    return {16, 16};
+    return 16;
   }
 };
 
@@ -201,10 +201,10 @@ class RET_cond : public Instruction {
 public:
   RET_cond(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::tuple<std::size_t, std::size_t> step() override {
+  std::size_t step() override {
     const bool cond = reg_file->reg_af.get_flag(flag);
     if (cond != expect)
-      return {8, 8};
+      return 8;
     addr_t sp = reg_file->reg_sp.read();
     const addr_t lo = bus->read_byte(sp++);
     const addr_t hi = bus->read_byte(sp++);
@@ -212,7 +212,7 @@ public:
     // Write back for updated stack pointer
     reg_file->reg_sp.write(sp);
     reg_file->reg_pc = lo | (hi << 8);
-    return {20, 20};
+    return 20;
   }
 };
 
@@ -224,7 +224,7 @@ public:
   RETI(RegisterFile *reg_file_ptr, AddressBus *bus_ptr,
        InterruptMasterEnable *ime_ptr)
       : Instruction(reg_file_ptr, bus_ptr), ime(ime_ptr) {}
-  std::tuple<std::size_t, std::size_t> step() override {
+  std::size_t step() override {
     addr_t sp = reg_file->reg_sp.read();
     const addr_t lo = bus->read_byte(sp++);
     const addr_t hi = bus->read_byte(sp++);
@@ -235,7 +235,7 @@ public:
     // Write back for updated stack pointer
     reg_file->reg_sp.write(sp);
     reg_file->reg_pc = lo | (hi << 8);
-    return {16, 16};
+    return 16;
   }
 
 private:
@@ -250,7 +250,7 @@ public:
   RST_vec(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
 
-  std::tuple<std::size_t, std::size_t> step() override {
+  std::size_t step() override {
     const addr_t ret = reg_file->reg_pc;
     addr_t sp = reg_file->reg_sp.read();
     bus->write_byte(--sp, static_cast<uint8_t>(ret >> 8));
@@ -259,7 +259,7 @@ public:
     // Write back for updated stack pointer
     reg_file->reg_sp.write(sp);
     reg_file->reg_pc = vec;
-    return {16, 16};
+    return 16;
   }
 };
 

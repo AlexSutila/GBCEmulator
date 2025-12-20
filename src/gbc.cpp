@@ -12,6 +12,9 @@ GameBoyColor::GameBoyColor() {
 }
 
 void GameBoyColor::run() {
-  while (true)
+  bool running = true;
+
+  while (running) [[likely]] {
     cpu->step();
+  }
 }

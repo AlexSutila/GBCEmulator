@@ -4,9 +4,7 @@
 #include "cpu/registers/regfile.hpp"
 #include "emu_types.hpp"
 #include "memory/bus.hpp"
-
 #include <cstddef>
-#include <tuple>
 
 class Instruction {
 public:
@@ -21,7 +19,7 @@ public:
    *  - size_t: total number of clock cycles for this instruction
    *  - size_t: how many cycles are required if the bus was synced
    */
-  virtual std::tuple<std::size_t, std::size_t> step() = 0;
+  virtual std::size_t step() = 0;
 
   /**
    * Parses the instruction in it's entirety, reading intermediate fields

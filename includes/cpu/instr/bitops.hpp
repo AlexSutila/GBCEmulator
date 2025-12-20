@@ -17,7 +17,7 @@ class RLCA : public Instruction {
 public:
   RLCA(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::tuple<std::size_t, std::size_t> step() override {
+  std::size_t step() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
 
     // Update flags
@@ -33,7 +33,7 @@ public:
 
     // Write back
     write_reg<Register8Bit::REG_A>(result);
-    return {4, 4};
+    return 4;
   }
 };
 
@@ -44,7 +44,7 @@ class RRCA : public Instruction {
 public:
   RRCA(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::tuple<std::size_t, std::size_t> step() override {
+  std::size_t step() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
 
     // Update flags
@@ -60,7 +60,7 @@ public:
 
     // Write back
     write_reg<Register8Bit::REG_A>(result);
-    return {4, 4};
+    return 4;
   }
 };
 
@@ -71,7 +71,7 @@ class RLA : public Instruction {
 public:
   RLA(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::tuple<std::size_t, std::size_t> step() override {
+  std::size_t step() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
     const bool old_c = reg_file->reg_af.get_flag(StatusFlagMask::FLAG_C_MASK);
     const bool new_c = (a & 0x80) != 0x00;
@@ -88,7 +88,7 @@ public:
 
     // Write back
     write_reg<Register8Bit::REG_A>(result);
-    return {4, 4};
+    return 4;
   }
 };
 
@@ -99,7 +99,7 @@ class RRA : public Instruction {
 public:
   RRA(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::tuple<std::size_t, std::size_t> step() override {
+  std::size_t step() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
     const bool old_c = reg_file->reg_af.get_flag(StatusFlagMask::FLAG_C_MASK);
     const bool new_c = (a & 0x01) != 0x00;
@@ -116,7 +116,7 @@ public:
 
     // Write back
     write_reg<Register8Bit::REG_A>(result);
-    return {4, 4};
+    return 4;
   }
 };
 
@@ -127,7 +127,7 @@ public:
 class CB_PREFIX : public Instruction {
 public:
   CB_PREFIX(RegisterFile *reg_file_ptr, AddressBus *bus_ptr);
-  std::tuple<std::size_t, std::size_t> step() override;
+  std::size_t step() override;
   void parse() override;
 
 private:
@@ -143,7 +143,7 @@ template <Register8Bit dst> class RLC_X : public Instruction {
 public:
   RLC_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::tuple<std::size_t, std::size_t> step() override {
+  std::size_t step() override {
     const byte_t x = read_reg<dst>();
 
     const bool carry = (x & 0x80) != 0x00;
@@ -157,7 +157,7 @@ public:
 
     // Write back
     write_reg<dst>(result);
-    return {8, 8};
+    return 8;
   }
 };
 
@@ -165,7 +165,7 @@ class RLC_HL : public Instruction {
 public:
   RLC_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::tuple<std::size_t, std::size_t> step() override {
+  std::size_t step() override {
     const addr_t addr = read_reg<Register16Bit::REG_HL>();
     const byte_t n = bus->read_byte(addr);
     const bool carry = (n & 0x80) != 0x00;
@@ -179,7 +179,7 @@ public:
 
     // Write back
     bus->write_byte(addr, result);
-    return {16, 8};
+    return 16;
   }
 };
 
@@ -187,7 +187,7 @@ template <Register8Bit dst> class RL_X : public Instruction {
 public:
   RL_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::tuple<std::size_t, std::size_t> step() override {
+  std::size_t step() override {
     const byte_t x = read_reg<dst>();
     const bool old_c = reg_file->reg_af.get_flag(StatusFlagMask::FLAG_C_MASK);
     const bool new_c = (x & 0x80) != 0x00;
@@ -201,7 +201,7 @@ public:
 
     // Write back
     write_reg<dst>(result);
-    return {8, 8};
+    return 8;
   }
 };
 
@@ -209,7 +209,7 @@ class RL_HL : public Instruction {
 public:
   RL_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::tuple<std::size_t, std::size_t> step() override {
+  std::size_t step() override {
     const addr_t hl = read_reg<Register16Bit::REG_HL>();
     const byte_t n = bus->read_byte(hl);
     const bool old_c = reg_file->reg_af.get_flag(StatusFlagMask::FLAG_C_MASK);
@@ -224,7 +224,7 @@ public:
 
     // Write back
     bus->write_byte(hl, result);
-    return {16, 8};
+    return 16;
   }
 };
 
@@ -232,7 +232,7 @@ template <Register8Bit dst> class RRC_X : public Instruction {
 public:
   RRC_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::tuple<std::size_t, std::size_t> step() override {
+  std::size_t step() override {
     const byte_t x = read_reg<dst>();
     const bool carry = (x & 0x01) != 0x00;
     const byte_t result = (x >> 1) | (carry ? 0x80 : 0x00);
@@ -245,7 +245,7 @@ public:
 
     // Write back
     write_reg<dst>(result);
-    return {8, 8};
+    return 8;
   }
 };
 
@@ -253,7 +253,7 @@ class RRC_HL : public Instruction {
 public:
   RRC_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::tuple<std::size_t, std::size_t> step() override {
+  std::size_t step() override {
     const addr_t addr = read_reg<Register16Bit::REG_HL>();
     const byte_t n = bus->read_byte(addr);
 
@@ -268,7 +268,7 @@ public:
 
     // Write back
     bus->write_byte(addr, result);
-    return {16, 8};
+    return 16;
   }
 };
 
@@ -276,7 +276,7 @@ template <Register8Bit dst> class RR_X : public Instruction {
 public:
   RR_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::tuple<std::size_t, std::size_t> step() override {
+  std::size_t step() override {
     const byte_t x = read_reg<dst>();
     const bool old_c = reg_file->reg_af.get_flag(StatusFlagMask::FLAG_C_MASK);
     const bool new_c = (x & 0x01) != 0x00;
@@ -290,7 +290,7 @@ public:
 
     // Write back
     write_reg<dst>(result);
-    return {8, 8};
+    return 8;
   }
 };
 
@@ -298,7 +298,7 @@ class RR_HL : public Instruction {
 public:
   RR_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::tuple<std::size_t, std::size_t> step() override {
+  std::size_t step() override {
     const addr_t addr = read_reg<Register16Bit::REG_HL>();
     const byte_t n = bus->read_byte(addr);
     const bool old_c = reg_file->reg_af.get_flag(StatusFlagMask::FLAG_C_MASK);
@@ -313,7 +313,7 @@ public:
 
     // Write back
     bus->write_byte(addr, result);
-    return {16, 8};
+    return 16;
   }
 };
 
@@ -321,7 +321,7 @@ template <Register8Bit dst> class SLA_X : public Instruction {
 public:
   SLA_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::tuple<std::size_t, std::size_t> step() override {
+  std::size_t step() override {
     const byte_t x = read_reg<dst>();
     const bool carry = (x & 0x80) != 0x00;
     const byte_t result = x << 1;
@@ -334,7 +334,7 @@ public:
 
     // Write back
     write_reg<dst>(result);
-    return {8, 8};
+    return 8;
   }
 };
 
@@ -342,7 +342,7 @@ class SLA_HL : public Instruction {
 public:
   SLA_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::tuple<std::size_t, std::size_t> step() override {
+  std::size_t step() override {
     const addr_t addr = read_reg<Register16Bit::REG_HL>();
     const byte_t n = bus->read_byte(addr);
     const bool carry = (n & 0x80) != 0x00;
@@ -356,7 +356,7 @@ public:
 
     // Write back
     bus->write_byte(addr, result);
-    return {16, 8};
+    return 16;
   }
 };
 
@@ -364,7 +364,7 @@ template <Register8Bit dst> class SRA_X : public Instruction {
 public:
   SRA_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::tuple<std::size_t, std::size_t> step() override {
+  std::size_t step() override {
     const byte_t x = read_reg<dst>();
     const bool carry = (x & 0x01) != 0x00;
     const byte_t result = (x & 0x80) | (x >> 1);
@@ -377,7 +377,7 @@ public:
 
     // Write back
     write_reg<dst>(result);
-    return {8, 8};
+    return 8;
   }
 };
 
@@ -385,7 +385,7 @@ class SRA_HL : public Instruction {
 public:
   SRA_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::tuple<std::size_t, std::size_t> step() override {
+  std::size_t step() override {
     const addr_t addr = read_reg<Register16Bit::REG_HL>();
     const byte_t n = bus->read_byte(addr);
     const bool carry = (n & 0x01) != 0x00;
@@ -399,7 +399,7 @@ public:
 
     // Write back
     bus->write_byte(addr, result);
-    return {16, 8};
+    return 16;
   }
 };
 
@@ -407,7 +407,7 @@ template <Register8Bit dst> class SWAP_X : public Instruction {
 public:
   SWAP_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::tuple<std::size_t, std::size_t> step() override {
+  std::size_t step() override {
     const byte_t x = read_reg<dst>();
     const byte_t result = ((x & 0xF0) >> 4) | ((x & 0x0F) << 4);
 
@@ -419,7 +419,7 @@ public:
 
     // Write back
     write_reg<dst>(result);
-    return {8, 8};
+    return 8;
   }
 };
 
@@ -427,7 +427,7 @@ class SWAP_HL : public Instruction {
 public:
   SWAP_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::tuple<std::size_t, std::size_t> step() override {
+  std::size_t step() override {
     const addr_t addr = read_reg<Register16Bit::REG_HL>();
     const byte_t n = bus->read_byte(addr);
     const byte_t result = ((n & 0xF0) >> 4) | ((n & 0x0F) << 4);
@@ -440,7 +440,7 @@ public:
 
     // Write back
     bus->write_byte(addr, result);
-    return {16, 8};
+    return 16;
   }
 };
 
@@ -448,7 +448,7 @@ template <Register8Bit dst> class SRL_X : public Instruction {
 public:
   SRL_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::tuple<std::size_t, std::size_t> step() override {
+  std::size_t step() override {
     const byte_t x = read_reg<dst>();
     const bool carry = (x & 0x01) != 0x00;
     const byte_t result = x >> 1;
@@ -461,7 +461,7 @@ public:
 
     // Write back
     write_reg<dst>(result);
-    return {8, 8};
+    return 8;
   }
 };
 
@@ -469,7 +469,7 @@ class SRL_HL : public Instruction {
 public:
   SRL_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::tuple<std::size_t, std::size_t> step() override {
+  std::size_t step() override {
     const addr_t addr = read_reg<Register16Bit::REG_HL>();
     const byte_t n = bus->read_byte(addr);
     const bool carry = (n & 0x01) != 0x00;
@@ -483,7 +483,7 @@ public:
 
     // Write back
     bus->write_byte(addr, result);
-    return {16, 8};
+    return 16;
   }
 };
 
@@ -492,7 +492,7 @@ class BIT_N_X : public Instruction {
 public:
   BIT_N_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::tuple<std::size_t, std::size_t> step() override {
+  std::size_t step() override {
     const byte_t x = read_reg<dst>();
     const bool bit_is_zero = ((x >> bit) & 0x01) == 0;
 
@@ -500,7 +500,7 @@ public:
     reg_file->reg_af.put_flag(StatusFlagMask::FLAG_Z_MASK, bit_is_zero);
     reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_N_MASK);
     reg_file->reg_af.put_flag(StatusFlagMask::FLAG_H_MASK, true);
-    return {8, 8};
+    return 8;
   }
 };
 
@@ -509,7 +509,7 @@ class BIT_N_HL : public Instruction {
 public:
   BIT_N_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::tuple<std::size_t, std::size_t> step() override {
+  std::size_t step() override {
     const addr_t addr = read_reg<Register16Bit::REG_HL>();
     const byte_t n = bus->read_byte(addr);
     const bool bit_is_zero = ((n >> bit) & 0x01) == 0;
@@ -518,7 +518,7 @@ public:
     reg_file->reg_af.put_flag(StatusFlagMask::FLAG_Z_MASK, bit_is_zero);
     reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_N_MASK);
     reg_file->reg_af.put_flag(StatusFlagMask::FLAG_H_MASK, true);
-    return {12, 12};
+    return 12;
   }
 };
 
@@ -527,11 +527,11 @@ class RES_N_X : public Instruction {
 public:
   RES_N_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::tuple<std::size_t, std::size_t> step() override {
+  std::size_t step() override {
     byte_t x = read_reg<dst>();
     x &= ~(1 << bit);
     write_reg<dst>(x);
-    return {8, 8};
+    return 8;
   }
 };
 
@@ -540,12 +540,12 @@ class RES_N_HL : public Instruction {
 public:
   RES_N_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::tuple<std::size_t, std::size_t> step() override {
+  std::size_t step() override {
     const addr_t hl = read_reg<Register16Bit::REG_HL>();
     byte_t n = bus->read_byte(hl);
     n &= ~(1 << bit);
     bus->write_byte(hl, n);
-    return {16, 8};
+    return 16;
   }
 };
 
@@ -554,11 +554,11 @@ class SET_N_X : public Instruction {
 public:
   SET_N_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::tuple<std::size_t, std::size_t> step() override {
+  std::size_t step() override {
     byte_t x = read_reg<dst>();
     x |= (1 << bit);
     write_reg<dst>(x);
-    return {8, 8};
+    return 8;
   }
 };
 
@@ -567,12 +567,12 @@ class SET_N_HL : public Instruction {
 public:
   SET_N_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::tuple<std::size_t, std::size_t> step() override {
+  std::size_t step() override {
     const addr_t hl = read_reg<Register16Bit::REG_HL>();
     byte_t n = bus->read_byte(hl);
     n |= (1 << bit);
     bus->write_byte(hl, n);
-    return {16, 8};
+    return 16;
   }
 };
 
