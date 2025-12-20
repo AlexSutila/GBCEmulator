@@ -7,6 +7,9 @@
 #include "emu_types.hpp"
 #include "memory/bus.hpp"
 
+#include <array>
+#include <memory>
+
 /*
  * Rotate left with carry
  */
@@ -115,6 +118,24 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return {4, 4};
   }
+};
+
+/*
+ * The CB-prefix ISA extension
+ */
+class CB_PREFIX : public Instruction {
+public:
+  CB_PREFIX(RegisterFile *reg_file_ptr, AddressBus *bus_ptr);
+  std::tuple<std::size_t, std::size_t> step() override;
+  void parse() override;
+
+private:
+  using lookup_table_t = std::array<std::unique_ptr<Instruction>, 256>;
+  byte_t op{};
+
+  /* This is identical in behavior to the lookup table in lr35902.hpp */
+  void init_cb_prefix(lookup_table_t &lookup);
+  lookup_table_t lookup{};
 };
 
 #endif // __BITOPS_H

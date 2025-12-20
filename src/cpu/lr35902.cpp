@@ -84,7 +84,7 @@ void LR35902::step() {
   std::unique_ptr<Instruction> &ins = lookup.at(op);
 
   // Handle un-implemented opcodes
-  if (!ins) {
+  if (!ins) [[unlikely]] {
     std::ostringstream oss;
     oss << "Unimplemented opcode: 0x" << std::uppercase << std::hex
         << std::setw(2) << std::setfill('0') << static_cast<int>(op);
