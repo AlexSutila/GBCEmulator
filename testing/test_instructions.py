@@ -48,29 +48,31 @@ def load_test_vectors(url: str) -> List[CpuTestVector]:
         raise RuntimeError(f"Invalid test vector schema: {e}") from e
 
 
-exclude = [
-    "10",  # Stop
-    "76",  # Halt
-    "cb",  # CB prefix instructions
-    "d3",  # Illegal
-    "db",  # Illegal
-    "dd",  # Illegal
-    "e3",  # Illegal
-    "e4",  # Illegal
-    "eb",  # Illegal
-    "ec",  # Illegal
-    "ed",  # Illegal
-    "f4",  # Illegal
-    "fc",  # Illegal
-    "fd",  # Illegal
-]
-opcodes = [f"{i:02x}" for i in range(0x100) if f"{i:02x}" not in exclude]
+def __get_opcodes() -> List[str]:
+    exclude = [
+        "10",  # Stop
+        "76",  # Halt
+        "cb",  # CB prefix instructions
+        "d3",  # Illegal
+        "db",  # Illegal
+        "dd",  # Illegal
+        "e3",  # Illegal
+        "e4",  # Illegal
+        "eb",  # Illegal
+        "ec",  # Illegal
+        "ed",  # Illegal
+        "f4",  # Illegal
+        "fc",  # Illegal
+        "fd",  # Illegal
+    ]
+    return [f"{i:02x}" for i in range(0x100) if f"{i:02x}" not in exclude]
 
 
-@pytest.mark.parametrize("opcode", opcodes)
-def test_instr_vectors_rudimentary(opcode):
-    test_vecs = load_test_vectors(
-        f'{BASEURL}/refs/heads/main/v1/{opcode}.json')
+def __get_cb_opcodes() -> List[str]:
+    return [f"{i:02x}" for i in range(0x100)]
+
+
+def __evaluate_test_vectors(test_vecs: List[CpuTestVector]):
     for test_vec in test_vecs:
         skip, no_steps = False, 0
 
@@ -141,3 +143,17 @@ def test_instr_vectors_rudimentary(opcode):
         assert final_state.h == test_vec.final.h, test_vec.name
         assert final_state.l == test_vec.final.l, test_vec.name
         assert final_state.f == test_vec.final.f, test_vec.name
+
+
+@pytest.mark.parametrize("op", __get_opcodes())
+def test_instr_accuracy(op):
+    test_vecs = load_test_vectors(
+        f'{BASEURL}/refs/heads/main/v1/{op}.json')
+    __evaluate_test_vectors(test_vecs)
+
+
+@pytest.mark.parametrize("op", __get_opcodes())
+def test_cb_instr_accuracy(op):
+    test_vecs = load_test_vectors(
+        f'{BASEURL}/refs/heads/main/v1/cb%20{op}.json')
+    __evaluate_test_vectors(test_vecs)
