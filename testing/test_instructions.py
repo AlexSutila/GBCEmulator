@@ -49,11 +49,7 @@ def load_test_vectors(url: str) -> List[CpuTestVector]:
 
 
 exclude = [
-    "07",  # RCLA
-    "0f",  # RRCA
     "10",  # Stop
-    "17",  # RLA
-    "1f",  # RRA
     "76",  # Halt
     "cb",  # CB prefix instructions
     "d3",  # Illegal

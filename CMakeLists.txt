@@ -22,6 +22,7 @@ set(GBC_CORE_SOURCES
     src/cpu/lr35902.cpp
     src/cpu/interrupts.cpp
     src/cpu/instr/alu.cpp
+    src/cpu/instr/bitops.cpp
     src/cpu/instr/branch.cpp
     src/cpu/instr/control.cpp
     src/cpu/instr/moves.cpp
