@@ -4,6 +4,7 @@
 #include "cart/cart.hpp"
 #include "cpu/lr35902.hpp"
 #include "memory/bus.hpp"
+#include "ppu/ppu.hpp"
 
 #include <memory>
 #include <stdexcept>
@@ -25,6 +26,7 @@ public:
 private:
   std::unique_ptr<AddressBus> bus{};
   std::unique_ptr<LR35902> cpu{};
+  std::unique_ptr<PixelProcessor> ppu{};
 };
 
 #endif // __GBC_H

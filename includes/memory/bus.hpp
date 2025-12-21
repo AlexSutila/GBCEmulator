@@ -1,14 +1,13 @@
 #ifndef __BUS_H
 #define __BUS_H
 
+#include "cart/cart.hpp"
 #include "emu_types.hpp"
 #include "memory/boot.hpp"
 #include "memory/mmio.hpp"
 
 #include <map>
 #include <memory>
-
-#include "cart/cart.hpp"
 
 /*
  * Game Boy Memory Map

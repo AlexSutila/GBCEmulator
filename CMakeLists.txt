@@ -33,6 +33,9 @@ set(GBC_CORE_SOURCES
     src/memory/bus.cpp
     src/memory/mmio.cpp
 
+    src/ppu/ppu.cpp
+    src/ppu/status.cpp
+
     src/cart/cart.cpp
     src/cart/cart_display.cpp
     src/cart/mbc/NoMbc.cpp

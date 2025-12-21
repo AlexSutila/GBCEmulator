@@ -1,14 +1,13 @@
 #include "gbc.hpp"
-#include "memory/bus.hpp"
+#include "cpu/lr35902.hpp"
 #include "memory"
+#include "memory/bus.hpp"
+#include "ppu/ppu.hpp"
 
 GameBoyColor::GameBoyColor() {
-
-  /* Main Address Bus */
   bus = std::make_unique<AddressBus>();
-
-  /* GBC Central Processing Unit */
   cpu = std::make_unique<LR35902>(bus.get());
+  ppu = std::make_unique<PixelProcessor>(bus.get());
 }
 
 void GameBoyColor::run() {
@@ -16,5 +15,6 @@ void GameBoyColor::run() {
 
   while (running) [[likely]] {
     cpu->step();
+    ppu->step();
   }
 }

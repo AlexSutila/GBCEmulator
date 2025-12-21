@@ -3,6 +3,7 @@
 #include "emu_types.hpp"
 #include "memory/boot.hpp"
 #include "memory/mmio.hpp"
+#include "ppu/status.hpp"
 
 #include <cassert>
 #include <memory>
@@ -21,6 +22,7 @@ AddressBus::AddressBus() {
 
 void AddressBus::init_io_registers() {
   io_registers[0xFF0F] = std::make_unique<InterruptBits>(true);
+  io_registers[0xFF44] = std::make_unique<LY>();
   io_registers[0xFF50] = std::make_unique<BootROMCtrl>();
   io_registers[0xFFFF] = std::make_unique<InterruptBits>(false);
 }
