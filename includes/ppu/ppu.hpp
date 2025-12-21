@@ -6,6 +6,9 @@
 #include "memory/mmio.hpp"
 #include "ppu/status.hpp"
 
+#include <cstddef>
+#include <optional>
+
 class PixelProcessor {
 public:
   PixelProcessor(AddressBus *bus_ptr);
@@ -20,6 +23,20 @@ private:
   PPU::STAT *stat_reg{};
   PPU::LY *ly_reg{};
   MMIORegister *lyc_reg{};
+
+  /* Pixel Processor operation modes */
+  void do_oam_scan();
+  void do_draw();
+
+  /* Blanking periods */
+  void do_hblank();
+  void do_vblank();
+  void blank();
+
+  /* Timing and FSM metadata */
+  std::optional<std::size_t> total_mode_clks{};
+  std::size_t cur_scanline_clks{};
+  std::size_t cur_mode_clks{};
 };
 
 #endif // __PPU_H
