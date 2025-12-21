@@ -120,10 +120,14 @@ void PixelProcessor::do_vblank() {
 void PixelProcessor::blank() {
   constexpr std::size_t total_scanline_cycles = 456;
   using modes = PPU::StatModes;
+
+  // Use end of scanline to dictate completion of blanking
+  if (!total_mode_clks.has_value())
+    total_mode_clks = total_scanline_cycles;
   ++cur_scanline_clks;
 
   // Blanking incomplete
-  if (cur_scanline_clks < total_scanline_cycles)
+  if (cur_scanline_clks < total_mode_clks.value())
     return;
   ly_reg->inc();
 
@@ -131,6 +135,7 @@ void PixelProcessor::blank() {
   stat_reg->set_mode(ly_reg->is_visible() ? modes::MODE_OAM_SCAN
                                           : modes::MODE_VBLANK);
   total_mode_clks.reset();
+  cur_scanline_clks = 0;
 }
 
 void PixelProcessor::step() {

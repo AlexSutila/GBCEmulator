@@ -22,6 +22,7 @@ public:
   /* Getters mainly for python bindings */
   AddressBus *get_bus() { return bus.get(); };
   LR35902 *get_cpu() { return cpu.get(); };
+  PixelProcessor *get_ppu() { return ppu.get(); }
 
 private:
   std::unique_ptr<AddressBus> bus{};

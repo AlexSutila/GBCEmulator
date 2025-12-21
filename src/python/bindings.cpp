@@ -172,5 +172,7 @@ PYBIND11_MODULE(gbc_py, m) {
       .def("get_bus", &GameBoyColor::get_bus,
            py::return_value_policy::reference_internal)
       .def("get_cpu", &GameBoyColor::get_cpu,
-           py::return_value_policy::reference_internal);
+           py::return_value_policy::reference_internal)
+      .def("get_ppu", &GameBoyColor::get_ppu,
+           py::return_value_policy::reference_internal) ;
 }
