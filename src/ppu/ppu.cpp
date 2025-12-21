@@ -2,6 +2,7 @@
 #include "cpu/interrupts.hpp"
 #include "memory/bus.hpp"
 #include "memory/mmio.hpp"
+#include "ppu/status.hpp"
 
 #include <cassert>
 #include <stdexcept>
@@ -21,11 +22,16 @@ PixelProcessor::PixelProcessor(AddressBus *bus_ptr) : bus(bus_ptr) {
   ie_reg = init_mmio<InterruptBits>(bus, mmio::MMIO_INT_ENABLE);
   if_reg = init_mmio<InterruptBits>(bus, mmio::MMIO_INT_FLAGS);
 
-  /* Configure status MMIO registers */
+  /* Initialize status MMIO registers */
   stat_reg = init_mmio<STAT>(bus, mmio::MMIO_LCD_STATUS);
   ly_reg = init_mmio<LY>(bus, mmio::MMIO_LCD_Y_COOR);
   /* LYC is just a typical R/W register, so use MMIORegister */
   lyc_reg = init_mmio<MMIORegister>(bus, mmio::MMIO_LCD_Y_COMP);
+
+  /* Configure status MMIO registers initial state */
+  stat_reg->set_mode(StatModes::MODE_OAM_SCAN);
+  ly_reg->reset(); // Scanline zero
+  lyc_reg->write(0x00);
 }
 
 void PixelProcessor::step() { if_reg->put_vblank(true); }

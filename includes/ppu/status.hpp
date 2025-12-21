@@ -43,6 +43,13 @@ enum class StatIntFlags : byte_t {
   LYC_SEL = 1 << 6,
 };
 
+enum class StatModes : byte_t {
+  MODE_HBLANK = 0,
+  MODE_VBLANK = 1,
+  MODE_OAM_SCAN = 2,
+  MODE_DRAWING = 3,
+};
+
 class STAT : public MMIORegister {
 public:
   void write(byte_t value) override;
@@ -54,7 +61,8 @@ public:
   const bool int_enabled(StatIntFlags flag) const {
     return (state & static_cast<byte_t>(flag)) != 0;
   }
-  const byte_t get_mode() const { return state & 0x03; }
+  const StatModes get_mode() const;
+  void set_mode(StatModes mode);
 
 private:
   byte_t state{};
@@ -81,7 +89,11 @@ public:
   const bool is_visible() const { return state <= 143; }
   const bool is_vblank() const { return state >= 144; }
 
+  void reset() { state = 0; };
+  bool inc(); // Returns true during LY wrap around
+
 private:
+  constexpr byte_t max_ly() { return 153; }
   byte_t state{};
 };
 

@@ -8,6 +8,7 @@
 #include "gbc.hpp"
 #include "memory/boot.hpp"
 #include "memory/bus.hpp"
+#include "ppu/status.hpp"
 
 namespace py = pybind11;
 
@@ -50,6 +51,14 @@ PYBIND11_MODULE(gbc_py, m) {
       .def_property("lo", &CpuRegister::read_lo, &CpuRegister::write_lo)
       .def_property("hi", &CpuRegister::read_hi, &CpuRegister::write_hi)
       .def_property("full", &CpuRegister::read, &CpuRegister::write);
+
+  // Generic MMIO register
+  py::class_<MMIORegister>(m, "MMIORegister")
+      .def(py::init<>())
+      .def(py::init<byte_t>(), py::arg("init_state"))
+      .def("write", &MMIORegister::write, py::arg("value"),
+           "Write a byte to the MMIO register")
+      .def("read", &MMIORegister::read, "Read a byte from the MMIO register");
 
   // Status flag masks for CpuFlagsRegister class
   py::enum_<StatusFlagMask>(m, "StatusFlagMask")
@@ -108,6 +117,46 @@ PYBIND11_MODULE(gbc_py, m) {
       .def("step", &LR35902::step)
       .def("get_state", &LR35902::get_state)
       .def("load_state", &LR35902::load_state, py::arg("state"));
+
+  // Pixel Processor STAT interrupt flags
+  py::enum_<PPU::StatIntFlags>(m, "StatIntFlags", py::arithmetic())
+      .value("LYC_EQ_LY", PPU::StatIntFlags::LYC_EQ_LY)
+      .value("MODE_0_SEL", PPU::StatIntFlags::MODE_0_SEL)
+      .value("MODE_1_SEL", PPU::StatIntFlags::MODE_1_SEL)
+      .value("MODE_2_SEL", PPU::StatIntFlags::MODE_2_SEL)
+      .value("LYC_SEL", PPU::StatIntFlags::LYC_SEL)
+      .export_values();
+
+  // Pixel Processor STAT modes
+  py::enum_<PPU::StatModes>(m, "StatModes")
+      .value("MODE_HBLANK", PPU::StatModes::MODE_HBLANK)
+      .value("MODE_VBLANK", PPU::StatModes::MODE_VBLANK)
+      .value("MODE_OAM_SCAN", PPU::StatModes::MODE_OAM_SCAN)
+      .value("MODE_DRAWING", PPU::StatModes::MODE_DRAWING)
+      .export_values();
+
+  // Pixel Processor Status register
+  py::class_<PPU::STAT, MMIORegister>(m, "STAT")
+      .def(py::init<>())
+      .def("write", &PPU::STAT::write, py::arg("value"))
+      .def("read", &PPU::STAT::read)
+      .def("int_enabled", &PPU::STAT::int_enabled, py::arg("flag"),
+           "Check if a STAT interrupt source is enabled")
+      .def_property("mode", &PPU::STAT::get_mode, &PPU::STAT::set_mode,
+                    "Current PPU STAT mode");
+
+  // Pixel Processor Scanline register
+  py::class_<PPU::LY>(m, "LY")
+      .def(py::init<>())
+      .def("write", &PPU::LY::write, py::arg("value"))
+      .def("read", &PPU::LY::read)
+      .def("reset", &PPU::LY::reset)
+      .def("inc", &PPU::LY::inc,
+           "Increment LY; returns True on wraparound (153 -> 0)")
+      .def_property_readonly("is_visible", &PPU::LY::is_visible,
+                             "True when LY is in visible scanlines (0–143)")
+      .def_property_readonly("is_vblank", &PPU::LY::is_vblank,
+                             "True when LY is in VBlank (144–153)");
 
   // Master Emulator class
   py::class_<GameBoyColor>(m, "GameBoyColor")
