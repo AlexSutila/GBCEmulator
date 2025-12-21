@@ -12,14 +12,20 @@ public:
       : reg_file(reg_file_ptr), bus(bus_ptr) {}
 
   /**
-   * Executes one step of the instruction. One call to step executes one whole
-   * instruction, but may or may not synchronize the remaining components.
+   * Executes the instruction in full, to be called on the memory access
+   * clock cycle when appropriate.
    *
    * @return A tuple containing:
    *  - size_t: total number of clock cycles for this instruction
-   *  - size_t: how many cycles are required if the bus was synced
    */
-  virtual std::size_t step() = 0;
+  virtual std::size_t exec() = 0;
+
+  /**
+   * @return A tuple containing:
+   *  - size_t: the memory access clock cycle of the instruction, when
+   *    applicable. If memory access timing does not matter, use zero.
+   */
+  virtual std::size_t mem_access_t_cycle() { return 0; };
 
   /**
    * Parses the instruction in it's entirety, reading intermediate fields

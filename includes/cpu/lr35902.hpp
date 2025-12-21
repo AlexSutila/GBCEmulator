@@ -7,7 +7,9 @@
 #include "memory/bus.hpp"
 
 #include <array>
+#include <cstddef>
 #include <memory>
+#include <optional>
 
 /*
  * 8-bit 8080-like Sharp CPU (speculated to be a SM83 core), running
@@ -33,7 +35,6 @@ public:
   };
   void load_state(ProcessorState state);
   ProcessorState get_state() const;
-  std::size_t get_clocks() const { return clocks_elapsed; };
 
 private:
   RegisterFile reg_file{};
@@ -53,8 +54,18 @@ private:
   void init_moves(lookup_table_t &lookup);
   lookup_table_t lookup{};
 
-  /* Timing metadata */
-  std::size_t clocks_elapsed{};
+  enum CpuStates {
+    STATE_FETCH,
+    STATE_DECODE,
+    STATE_EXECUTE,
+  } state;
+  void fetch();
+  void decode();
+  void execute();
+
+  Instruction *ins_{}; // Reference to current ins
+  std::optional<std::size_t> total_ins_clks{};
+  std::size_t cur_ins_clks{};
 };
 
 #endif // __LR35902_H

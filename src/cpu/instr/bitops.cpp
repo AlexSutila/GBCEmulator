@@ -19,7 +19,7 @@ CB_PREFIX::CB_PREFIX(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
   init_cb_prefix(lookup);
 }
 
-std::size_t CB_PREFIX::step() {
+std::size_t CB_PREFIX::exec() {
   unique_ptr<Instruction> &ins = lookup.at(op);
 
   // Handle un-implemented opcodes - unlikely because CB doesn't have illegal
@@ -33,7 +33,7 @@ std::size_t CB_PREFIX::step() {
 
   // Parse instruction operands and execute just like in CPU code
   ins->parse();
-  return ins->step();
+  return ins->exec();
 }
 
 void CB_PREFIX::parse() { op = bus->read_byte(reg_file->reg_pc++); }

@@ -16,7 +16,7 @@ template <Register8Bit src> class ADD_A_X : public Instruction {
 public:
   ADD_A_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::size_t step() override {
+  std::size_t exec() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
     const byte_t x = read_reg<src>();
     const byte_t result = a + x;
@@ -42,7 +42,7 @@ class ADD_A_imm8 : public Instruction {
 public:
   ADD_A_imm8(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::size_t step() override {
+  std::size_t exec() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
     const byte_t result = a + imm;
 
@@ -71,7 +71,7 @@ class ADD_A_HL : public Instruction {
 public:
   ADD_A_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::size_t step() override {
+  std::size_t exec() override {
     const byte_t n = bus->read_byte(read_reg<Register16Bit::REG_HL>());
     const byte_t a = read_reg<Register8Bit::REG_A>();
     const byte_t result = a + n;
@@ -97,7 +97,7 @@ template <Register8Bit src> class ADC_A_X : public Instruction {
 public:
   ADC_A_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::size_t step() override {
+  std::size_t exec() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
     const byte_t x = read_reg<src>();
     const byte_t carry =
@@ -128,7 +128,7 @@ class ADC_A_imm8 : public Instruction {
 public:
   ADC_A_imm8(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::size_t step() override {
+  std::size_t exec() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
     const byte_t carry =
         reg_file->reg_af.get_flag(StatusFlagMask::FLAG_C_MASK) ? 1 : 0;
@@ -162,7 +162,7 @@ class ADC_A_HL : public Instruction {
 public:
   ADC_A_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::size_t step() override {
+  std::size_t exec() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
     const byte_t n = bus->read_byte(read_reg<Register16Bit::REG_HL>());
     const byte_t carry =
@@ -193,7 +193,7 @@ template <Register8Bit src> class SUB_A_X : public Instruction {
 public:
   SUB_A_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::size_t step() override {
+  std::size_t exec() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
     const byte_t x = read_reg<src>();
     const byte_t result = a - x;
@@ -218,7 +218,7 @@ class SUB_A_imm8 : public Instruction {
 public:
   SUB_A_imm8(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::size_t step() override {
+  std::size_t exec() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
     const byte_t result = a - imm;
 
@@ -246,7 +246,7 @@ class SUB_A_HL : public Instruction {
 public:
   SUB_A_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::size_t step() override {
+  std::size_t exec() override {
     const byte_t n = bus->read_byte(read_reg<Register16Bit::REG_HL>());
     const byte_t a = read_reg<Register8Bit::REG_A>();
     const byte_t result = a - n;
@@ -271,7 +271,7 @@ template <Register8Bit src> class SBC_A_X : public Instruction {
 public:
   SBC_A_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::size_t step() override {
+  std::size_t exec() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
     const byte_t x = read_reg<src>();
     const byte_t carry =
@@ -303,7 +303,7 @@ class SBC_A_imm8 : public Instruction {
 public:
   SBC_A_imm8(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::size_t step() override {
+  std::size_t exec() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
     const byte_t carry =
         reg_file->reg_af.get_flag(StatusFlagMask::FLAG_C_MASK) ? 1 : 0;
@@ -338,7 +338,7 @@ class SBC_A_HL : public Instruction {
 public:
   SBC_A_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::size_t step() override {
+  std::size_t exec() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
     const byte_t n = bus->read_byte(read_reg<Register16Bit::REG_HL>());
     const byte_t carry =
@@ -370,7 +370,7 @@ template <Register8Bit src> class AND_A_X : public Instruction {
 public:
   AND_A_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::size_t step() override {
+  std::size_t exec() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
     const byte_t x = read_reg<src>();
     const byte_t result = a & x;
@@ -394,7 +394,7 @@ class AND_A_imm8 : public Instruction {
 public:
   AND_A_imm8(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::size_t step() override {
+  std::size_t exec() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
     const byte_t result = a & imm;
 
@@ -421,7 +421,7 @@ class AND_A_HL : public Instruction {
 public:
   AND_A_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::size_t step() override {
+  std::size_t exec() override {
     const byte_t n = bus->read_byte(read_reg<Register16Bit::REG_HL>());
     const byte_t a = read_reg<Register8Bit::REG_A>();
     const byte_t result = a & n;
@@ -445,7 +445,7 @@ template <Register8Bit src> class XOR_A_X : public Instruction {
 public:
   XOR_A_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::size_t step() override {
+  std::size_t exec() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
     const byte_t x = read_reg<src>();
     const byte_t result = a ^ x;
@@ -469,7 +469,7 @@ class XOR_A_imm8 : public Instruction {
 public:
   XOR_A_imm8(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::size_t step() override {
+  std::size_t exec() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
     const byte_t result = a ^ imm;
 
@@ -496,7 +496,7 @@ class XOR_A_HL : public Instruction {
 public:
   XOR_A_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::size_t step() override {
+  std::size_t exec() override {
     const byte_t n = bus->read_byte(read_reg<Register16Bit::REG_HL>());
     const byte_t a = read_reg<Register8Bit::REG_A>();
     const byte_t result = a ^ n;
@@ -520,7 +520,7 @@ template <Register8Bit src> class OR_A_X : public Instruction {
 public:
   OR_A_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::size_t step() override {
+  std::size_t exec() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
     const byte_t x = read_reg<src>();
     const byte_t result = a | x;
@@ -544,7 +544,7 @@ class OR_A_imm8 : public Instruction {
 public:
   OR_A_imm8(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::size_t step() override {
+  std::size_t exec() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
     const byte_t result = a | imm;
 
@@ -571,7 +571,7 @@ class OR_A_HL : public Instruction {
 public:
   OR_A_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::size_t step() override {
+  std::size_t exec() override {
     const byte_t n = bus->read_byte(read_reg<Register16Bit::REG_HL>());
     const byte_t a = read_reg<Register8Bit::REG_A>();
     const byte_t result = a | n;
@@ -596,7 +596,7 @@ template <Register8Bit src> class CP_A_X : public Instruction {
 public:
   CP_A_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::size_t step() override {
+  std::size_t exec() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
     const byte_t x = read_reg<src>();
 
@@ -618,7 +618,7 @@ class CP_A_imm8 : public Instruction {
 public:
   CP_A_imm8(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::size_t step() override {
+  std::size_t exec() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
 
     // Update flags
@@ -643,7 +643,7 @@ class CP_A_HL : public Instruction {
 public:
   CP_A_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::size_t step() override {
+  std::size_t exec() override {
     const byte_t n = bus->read_byte(read_reg<Register16Bit::REG_HL>());
     const byte_t a = read_reg<Register8Bit::REG_A>();
 
@@ -664,7 +664,7 @@ template <Register8Bit src> class INC_X : public Instruction {
 public:
   INC_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::size_t step() override {
+  std::size_t exec() override {
     const byte_t x = read_reg<src>();
     const byte_t result = x + 1;
 
@@ -687,7 +687,7 @@ class INC_HL : public Instruction {
 public:
   INC_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::size_t step() override {
+  std::size_t exec() override {
     const byte_t n = bus->read_byte(read_reg<Register16Bit::REG_HL>());
     const byte_t result = n + 1;
 
@@ -710,7 +710,7 @@ template <Register8Bit src> class DEC_X : public Instruction {
 public:
   DEC_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::size_t step() override {
+  std::size_t exec() override {
     const byte_t x = read_reg<src>();
     const byte_t result = x - 1;
 
@@ -733,7 +733,7 @@ class DEC_HL : public Instruction {
 public:
   DEC_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::size_t step() override {
+  std::size_t exec() override {
     const byte_t n = bus->read_byte(read_reg<Register16Bit::REG_HL>());
     const byte_t result = n - 1;
 
@@ -756,7 +756,7 @@ class DAA : public Instruction {
 public:
   DAA(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::size_t step() override {
+  std::size_t exec() override {
     byte_t a = read_reg<Register8Bit::REG_A>();
 
     const bool n = reg_file->reg_af.get_flag(StatusFlagMask::FLAG_N_MASK);
@@ -799,7 +799,7 @@ template <Register16Bit src> class ADD_HL_XX : public Instruction {
 public:
   ADD_HL_XX(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::size_t step() override {
+  std::size_t exec() override {
     const addr_t hl = read_reg<Register16Bit::REG_HL>();
     const addr_t xx = read_reg<src>();
     const std::uint32_t sum = static_cast<std::uint32_t>(hl) + xx;
@@ -823,7 +823,7 @@ template <Register16Bit dst> class INC_XX : public Instruction {
 public:
   INC_XX(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::size_t step() override {
+  std::size_t exec() override {
     const addr_t xx = read_reg<dst>();
     write_reg<dst>(xx + 1);
     return 8;
@@ -837,7 +837,7 @@ template <Register16Bit dst> class DEC_XX : public Instruction {
 public:
   DEC_XX(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::size_t step() override {
+  std::size_t exec() override {
     const addr_t xx = read_reg<dst>();
     write_reg<dst>(xx - 1);
     return 8;
@@ -851,7 +851,7 @@ class ADD_SP_imm8 : public Instruction {
 public:
   ADD_SP_imm8(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::size_t step() override {
+  std::size_t exec() override {
     const addr_t nn = static_cast<addr_t>(imm);
     const addr_t sp = reg_file->reg_sp.read();
 
@@ -883,7 +883,7 @@ class LD_HL_SP_E8 : public Instruction {
 public:
   LD_HL_SP_E8(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
-  std::size_t step() override {
+  std::size_t exec() override {
     const addr_t nn = static_cast<addr_t>(imm);
     const addr_t sp = reg_file->reg_sp.read();
 

@@ -112,18 +112,6 @@ def __evaluate_test_vectors(test_vecs: List[CpuTestVector]):
         state.ime_enabled = test_vec.initial.ime
         cpu.load_state(state)
 
-        # Validate initial state
-        assert state.pc == test_vec.initial.pc, test_vec.name
-        assert state.sp == test_vec.initial.sp, test_vec.name
-        assert state.a == test_vec.initial.a, test_vec.name
-        assert state.b == test_vec.initial.b, test_vec.name
-        assert state.c == test_vec.initial.c, test_vec.name
-        assert state.d == test_vec.initial.d, test_vec.name
-        assert state.e == test_vec.initial.e, test_vec.name
-        assert state.h == test_vec.initial.h, test_vec.name
-        assert state.l == test_vec.initial.l, test_vec.name
-        assert state.f == test_vec.initial.f, test_vec.name
-
         # Execute instructions
         while cpu.get_state().pc != test_vec.final.pc:
             no_steps = no_steps + 1
@@ -143,6 +131,7 @@ def __evaluate_test_vectors(test_vecs: List[CpuTestVector]):
         assert final_state.h == test_vec.final.h, test_vec.name
         assert final_state.l == test_vec.final.l, test_vec.name
         assert final_state.f == test_vec.final.f, test_vec.name
+        assert final_state.ime_enabled == test_vec.final.ime, test_vec.name
 
 
 @pytest.mark.parametrize("op", __get_opcodes())

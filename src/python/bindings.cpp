@@ -107,7 +107,6 @@ PYBIND11_MODULE(gbc_py, m) {
            )
       .def("step", &LR35902::step)
       .def("get_state", &LR35902::get_state)
-      .def("get_clocks", &LR35902::get_clocks)
       .def("load_state", &LR35902::load_state, py::arg("state"));
 
   // Master Emulator class

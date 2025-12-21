@@ -1,4 +1,5 @@
 #include "cpu/lr35902.hpp"
+#include "cpu/instr/instr.hpp"
 #include "cpu/interrupts.hpp"
 #include "cpu/registers/flags.hpp"
 #include "cpu/registers/register.hpp"
@@ -7,13 +8,18 @@
 #include <cassert>
 #include <iomanip>
 #include <ios>
+#include <optional>
 #include <sstream>
 #include <stdexcept>
 
 LR35902::LR35902(AddressBus *bus_ptr) : bus(bus_ptr) {
   using ioregs = IORegisterMapping;
-  clocks_elapsed = 0;
 
+  /* Init fetch decode execute fsm */
+  state = CpuStates::STATE_FETCH;
+  total_ins_clks = std::nullopt;
+
+  /* Register initialization */
   reg_file.reg_af = CpuFlagsRegister();
   reg_file.reg_bc = CpuRegister();
   reg_file.reg_de = CpuRegister();
@@ -77,24 +83,51 @@ LR35902::ProcessorState LR35902::get_state() const {
   return state;
 }
 
-void LR35902::step() {
+/* Read opcode from PC, populate `ins_` instruction reference */
+void LR35902::fetch() {
+  state = CpuStates::STATE_DECODE;
   ime.step();
 
-  // Decode instruction
   const byte_t op = bus->read_byte(reg_file.reg_pc++);
-  std::unique_ptr<Instruction> &ins = lookup.at(op);
+  std::unique_ptr<Instruction> &i = lookup.at(op);
 
-  // Handle un-implemented opcodes
-  if (!ins) [[unlikely]] {
+  /* Handle un-implemented opcodes */
+  if (!i) [[unlikely]] {
     std::ostringstream oss;
     oss << "Unimplemented opcode: 0x" << std::uppercase << std::hex
         << std::setw(2) << std::setfill('0') << static_cast<int>(op);
     throw std::logic_error(oss.str());
+  } else
+    ins_ = i.get();
+}
+
+/* Parse operands, prepare for execution */
+void LR35902::decode() {
+  state = CpuStates::STATE_EXECUTE;
+  total_ins_clks.reset();
+  cur_ins_clks = 0;
+  ins_->parse();
+}
+
+/* Execute instruction on critical mem-access clock cycle */
+void LR35902::execute() {
+  if (cur_ins_clks == ins_->mem_access_t_cycle())
+    total_ins_clks = ins_->exec();
+  ++cur_ins_clks;
+
+  /* Complete instruction based on execution time */
+  if (total_ins_clks.has_value() && cur_ins_clks == total_ins_clks.value())
+    state = CpuStates::STATE_FETCH;
+}
+
+void LR35902::step() {
+  switch (state) {
+  case STATE_FETCH: // Break omitted intentionally
+    fetch();
+  case STATE_DECODE: // Break omitted intentionally
+    decode();
+  case STATE_EXECUTE:
+    execute();
+    break;
   }
-
-  // Parse instruction operands
-  ins->parse();
-
-  // Execute instruction
-  const auto clocks = ins->step();
 }
