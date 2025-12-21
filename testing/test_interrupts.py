@@ -2,6 +2,7 @@
 from gbc_py import (
     InterruptMasterEnable,
     AddressBus,
+    GameBoyColor
 )
 
 
@@ -79,3 +80,46 @@ def test_ime_ei_di_quirk():
 
     # Interrupts never turn on
     assert not ime.enabled
+
+
+def test_ime_enable_ei_timing_full():
+    '''Test EI instruction timing with actual bytecode'''
+    bytecode = [
+        0xFB,   # EI  - delay begins
+        0x00,   # NOP - delay in progress
+        0x00,   # NOP - ime enabled
+    ]
+    gbc = GameBoyColor()
+    cpu = gbc.get_cpu()
+    bus = gbc.get_bus()
+
+    # Disable boot ROM and write bytecode
+    bus.write_byte(0xFF50, 0)
+    for addr, byte in enumerate(bytecode):
+        bus.write_byte(addr, byte)
+
+    for _ in range(8): cpu.step()
+    assert not cpu.get_state().ime_enabled
+    for _ in range(4): cpu.step()
+    assert cpu.get_state().ime_enabled
+
+
+
+def test_ime_ei_di_quirk():
+    '''Test EI followed by DI with actual bytecode'''
+    bytecode = [
+        0xFB,   # EI  - delay begins
+        0xF3,   # NOP - delay in progress
+        0x00,   # NOP - ime enabled
+    ]
+    gbc = GameBoyColor()
+    cpu = gbc.get_cpu()
+    bus = gbc.get_bus()
+
+    # Disable boot ROM and write bytecode
+    bus.write_byte(0xFF50, 0)
+    for addr, byte in enumerate(bytecode):
+        bus.write_byte(addr, byte)
+
+    for _ in range(12): cpu.step()
+    assert not cpu.get_state().ime_enabled
