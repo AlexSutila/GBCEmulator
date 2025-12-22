@@ -10,6 +10,7 @@
 #include <cstddef>
 #include <memory>
 #include <optional>
+#include <tuple>
 
 /*
  * 8-bit 8080-like Sharp CPU (speculated to be a SM83 core), running
@@ -41,6 +42,10 @@ private:
   AddressBus *const bus{};
 
   /* Interrupt handling */
+  std::tuple<bool, Instruction *> should_interrupt();
+  template <InterruptFlagMask mask, InterruptVector vec>
+  std::unique_ptr<Instruction> mk_isr(); // Helper
+  std::array<std::unique_ptr<Instruction>, 5> isr_lookup{};
   InterruptMasterEnable ime{};
   InterruptBits *ie_reg{};
   InterruptBits *if_reg{};

@@ -19,8 +19,19 @@ byte_t InterruptBits::read() {
   return raw;
 }
 
-InterruptMasterEnable::InterruptMasterEnable()
-    : ime_state(IME_DISABLED) {}
+void InterruptBits::put_flag(InterruptFlagMask flag, bool value) {
+  const byte_t mask = static_cast<byte_t>(flag);
+  raw = raw & ~mask;
+  if (value)
+    raw = raw | mask;
+}
+
+bool InterruptBits::get_flag(InterruptFlagMask flag) {
+  const byte_t mask = static_cast<byte_t>(flag);
+  return (raw & mask) != 0;
+}
+
+InterruptMasterEnable::InterruptMasterEnable() : ime_state(IME_DISABLED) {}
 
 /* If enabled via `ei`, the IME is not actually enabled until one instruction
  * later. If enabled via `reti`, the effects of enabling the IME occur
@@ -28,14 +39,13 @@ InterruptMasterEnable::InterruptMasterEnable()
 void InterruptMasterEnable::enable(bool delayed) {
   if (delayed && ime_state != IME_ENABLED)
     ime_state = IME_PENDING;
-  else ime_state = IME_ENABLED;
+  else
+    ime_state = IME_ENABLED;
 }
 
 /* Under no circumstance are IME disables delayed. The effects of the `di`
  * instruction always occur immediately. */
-void InterruptMasterEnable::disable() {
-  ime_state = IME_DISABLED;
-}
+void InterruptMasterEnable::disable() { ime_state = IME_DISABLED; }
 
 bool InterruptMasterEnable::is_enabled() const {
   return ime_state == IME_ENABLED;

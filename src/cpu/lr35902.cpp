@@ -8,12 +8,15 @@
 #include <cassert>
 #include <iomanip>
 #include <ios>
+#include <memory>
 #include <optional>
 #include <sstream>
 #include <stdexcept>
 
 LR35902::LR35902(AddressBus *bus_ptr) : bus(bus_ptr) {
   using ioregs = IORegisterMapping;
+  using flags = InterruptFlagMask;
+  using vecs = InterruptVector;
 
   /* Init fetch decode execute fsm */
   state = CpuStates::STATE_FETCH;
@@ -44,6 +47,20 @@ LR35902::LR35902(AddressBus *bus_ptr) : bus(bus_ptr) {
   if (!(if_reg = dynamic_cast<InterruptBits *>(reg)))
     throw std::logic_error("Failed to connect MMIO_INT_FLAGS");
   assert(ie_reg != nullptr && if_reg != nullptr);
+
+  /* Lastly, configure interrupt service routines */
+  isr_lookup = {
+      mk_isr<flags::INT_FLAG_VBLANK, vecs::INT_VECTOR_VBLANK>(),
+      mk_isr<flags::INT_FLAG_LCD, vecs::INT_VECTOR_LCD>(),
+      mk_isr<flags::INT_FLAG_TIMER, vecs::INT_VECTOR_TIMER>(),
+      mk_isr<flags::INT_FLAG_SERIAL, vecs::INT_VECTOR_SERIAL>(),
+      mk_isr<flags::INT_FLAG_JOYPAD, vecs::INT_VECTOR_JOYPAD>(),
+  };
+}
+
+template <InterruptFlagMask mask, InterruptVector vec>
+std::unique_ptr<Instruction> LR35902::mk_isr() {
+  return std::make_unique<ISR<mask, vec>>(&reg_file, bus, &ime, if_reg);
 }
 
 void LR35902::load_state(LR35902::ProcessorState state) {
@@ -83,22 +100,43 @@ LR35902::ProcessorState LR35902::get_state() const {
   return state;
 }
 
+std::tuple<bool, Instruction *> LR35902::should_interrupt() {
+  if (!ime.is_enabled())
+    return {false, nullptr};
+
+  // Lower bits get higher priority, return the corresponding ISR
+  for (byte_t shift{0}; shift < 5; shift++) {
+    const auto flag = static_cast<InterruptFlagMask>(1 << shift);
+    if (ie_reg->get_flag(flag) && if_reg->get_flag(flag))
+      return {true, isr_lookup.at(shift).get()};
+  }
+  return {false, nullptr};
+}
+
 /* Read opcode from PC, populate `ins_` instruction reference */
 void LR35902::fetch() {
-  state = CpuStates::STATE_DECODE;
   ime.step();
 
-  const byte_t op = bus->read_byte(reg_file.reg_pc++);
-  std::unique_ptr<Instruction> &i = lookup.at(op);
+  // Check for interrupts, delay fetch until after ISR
+  auto [interrupted, isr] = should_interrupt();
+  if (interrupted)
+    ins_ = isr;
 
-  /* Handle un-implemented opcodes */
-  if (!i) [[unlikely]] {
-    std::ostringstream oss;
-    oss << "Unimplemented opcode: 0x" << std::uppercase << std::hex
-        << std::setw(2) << std::setfill('0') << static_cast<int>(op);
-    throw std::logic_error(oss.str());
-  } else
-    ins_ = i.get();
+  // Else continue with fetch/decode/exec as usual
+  else {
+    const byte_t op = bus->read_byte(reg_file.reg_pc++);
+    std::unique_ptr<Instruction> &i = lookup.at(op);
+
+    // Handle un-implemented opcodes
+    if (!i) [[unlikely]] {
+      std::ostringstream oss;
+      oss << "Unimplemented opcode: 0x" << std::uppercase << std::hex
+          << std::setw(2) << std::setfill('0') << static_cast<int>(op);
+      throw std::logic_error(oss.str());
+    } else
+      ins_ = i.get();
+  }
+  state = CpuStates::STATE_DECODE;
 }
 
 /* Parse operands, prepare for execution */

@@ -1,14 +1,26 @@
 #ifndef __INTERRUPTS_H
 #define __INTERRUPTS_H
 
+#include "cpu/registers/regfile.hpp"
+#include "emu_types.hpp"
+#include "instr/instr.hpp"
 #include "memory/mmio.hpp"
+#include <cassert>
 
-enum class interruptFlagMask : byte_t {
+enum class InterruptFlagMask : byte_t {
   INT_FLAG_JOYPAD = 1u << 4,
   INT_FLAG_SERIAL = 1u << 3,
   INT_FLAG_TIMER = 1u << 2,
   INT_FLAG_LCD = 1u << 1,
   INT_FLAG_VBLANK = 1u << 0,
+};
+
+enum class InterruptVector : addr_t {
+  INT_VECTOR_JOYPAD = 0x0060,
+  INT_VECTOR_SERIAL = 0x0058,
+  INT_VECTOR_TIMER = 0x0050,
+  INT_VECTOR_LCD = 0x0048,
+  INT_VECTOR_VBLANK = 0x0040,
 };
 
 /*
@@ -31,19 +43,8 @@ public:
   byte_t read() override;
   InterruptBits(const bool pull_unused_high);
 
-  // Flag readers
-  bool get_lcd() const { return lcd; }
-  bool get_timer() const { return timer; }
-  bool get_serial() const { return serial; }
-  bool get_joypad() const { return joypad; }
-  bool get_vblank() const { return vblank; }
-
-  // Flag setters
-  void put_vblank(bool enable) { vblank = enable; }
-  void put_lcd(bool enable) { lcd = enable; }
-  void put_timer(bool enable) { timer = enable; }
-  void put_serial(bool enable) { serial = enable; }
-  void put_joypad(bool enable) { joypad = enable; }
+  void put_flag(InterruptFlagMask flag, bool value);
+  bool get_flag(InterruptFlagMask flag);
 
 private:
   union {
@@ -90,6 +91,49 @@ private:
     IME_ENABLED,  /* IME is enabled */
     IME_DISABLED, /* IME is disabled */
   } ime_state;
+};
+
+/*
+ * Finally, this class implements the acutal operation that handles interrupts.
+ * By using the inheriting from `Instruction`, we are able to tie the handling
+ * of interrupts with accurate timing into the LR35902's fetch/decode/execute
+ * FSM seamlessly.
+ *
+ * The following interrupt service routine is executed when control is being
+ * transfered to an interrupt handler:
+ *
+ * 1. Two wait steps are executed (8 clock cycles) pass, nothing happens
+ * 2. The current value of the PC register is pushed onto the stack
+ * 3. The PC register is set to the address of the handler
+ *
+ * The whole process consumes a fixed 20 clock cycles total
+ */
+template <InterruptFlagMask flag, InterruptVector vec>
+class ISR : public Instruction {
+public:
+  ISR(RegisterFile *reg_file_ptr, AddressBus *bus_ptr,
+      InterruptMasterEnable *ime_ptr, InterruptBits *if_ptr)
+      : Instruction(reg_file_ptr, bus_ptr), ime(ime_ptr), if_reg(if_ptr) {}
+  std::size_t exec() override {
+    addr_t sp = read_reg<Register16Bit::REG_SP>();
+    ime->disable();
+
+    // Push old program counter onto the stack
+    bus->write_byte(--sp, reg_file->reg_pc >> 8);
+    bus->write_byte(--sp, reg_file->reg_pc & 0xFF);
+
+    // Need to clear the corresponding IF bit
+    if_reg->put_flag(flag, false);
+
+    // Write back
+    reg_file->reg_pc = static_cast<addr_t>(vec);
+    write_reg<Register16Bit::REG_SP>(sp);
+    return 20;
+  }
+
+private:
+  InterruptMasterEnable *ime{};
+  InterruptBits *if_reg{};
 };
 
 #endif // __INTERRUPTS_H
