@@ -40,6 +40,7 @@ set(GBC_CORE_SOURCES
     src/cart/cart_display.cpp
     src/cart/mbc/NoMbc.cpp
         src/cart/mbc/mbc1.cpp
+        src/cart/mbc/mbc2.cpp
 )
 set(GBC_INCLUDE_DIR
     ${CMAKE_CURRENT_SOURCE_DIR}/includes
