@@ -6,6 +6,7 @@
 #include "memory/bus.hpp"
 #include "ppu/ppu.hpp"
 
+#include <cstddef>
 #include <memory>
 #include <stdexcept>
 
@@ -28,6 +29,7 @@ private:
   std::unique_ptr<AddressBus> bus{};
   std::unique_ptr<LR35902> cpu{};
   std::unique_ptr<PixelProcessor> ppu{};
+  std::size_t elapsed_clocks_{};
 };
 
 #endif // __GBC_H

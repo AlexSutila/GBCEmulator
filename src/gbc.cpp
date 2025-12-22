@@ -8,6 +8,7 @@ GameBoyColor::GameBoyColor() {
   bus = std::make_unique<AddressBus>();
   cpu = std::make_unique<LR35902>(bus.get());
   ppu = std::make_unique<PixelProcessor>(bus.get());
+  elapsed_clocks_ = 0;
 }
 
 void GameBoyColor::run() {
@@ -16,5 +17,6 @@ void GameBoyColor::run() {
   while (running) [[likely]] {
     cpu->step();
     ppu->step();
+    ++elapsed_clocks_;
   }
 }

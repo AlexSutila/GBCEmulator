@@ -42,7 +42,10 @@ PixelProcessor::PixelProcessor(AddressBus *bus_ptr) : bus(bus_ptr) {
 void PixelProcessor::do_oam_scan() {
   constexpr std::size_t oam_t_cycles = 80; // Fixed
   using modes = PPU::StatModes;
+
+  // OAM scan always happens on visible scanlines
   assert(stat_reg->get_mode() == modes::MODE_OAM_SCAN);
+  assert(ly_reg->is_visible());
 
   // State entry
   if (!total_mode_clks.has_value()) {
@@ -69,7 +72,10 @@ void PixelProcessor::do_oam_scan() {
 void PixelProcessor::do_draw() {
   constexpr std::size_t min_drawing_cycles = 172; // Variable
   using modes = PPU::StatModes;
+
+  // Rendering always happens on visible scanlines
   assert(stat_reg->get_mode() == modes::MODE_DRAWING);
+  assert(ly_reg->is_visible());
 
   /* By default, the PPU outputs one pixel to the screen per dot, however some
    * features cause the rendering process to stall. This additional stalling

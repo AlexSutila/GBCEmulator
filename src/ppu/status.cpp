@@ -5,8 +5,8 @@
 namespace PPU {
 
 void STAT::write(byte_t value) {
-  // Most significant bit is un-mapped
-  state = value | 0x80;
+  // Most significant bit is un-mapped, preserve mode bits
+  state = (state & 0x03) | (value & 0x7C) | 0x80;
 }
 
 byte_t STAT::read() {
