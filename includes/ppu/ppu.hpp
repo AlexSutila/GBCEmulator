@@ -37,6 +37,14 @@ private:
   std::optional<std::size_t> total_mode_clks{};
   std::size_t cur_scanline_clks{};
   std::size_t cur_mode_clks{};
+
+  /* Interrupt helpers */
+  void request_vblank() {
+    if_reg->put_flag(InterruptFlagMask::INT_FLAG_VBLANK, true);
+  }
+  void request_lcd() {
+    if_reg->put_flag(InterruptFlagMask::INT_FLAG_LCD, true);
+  }
 };
 
 #endif // __PPU_H

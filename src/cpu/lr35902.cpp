@@ -125,16 +125,16 @@ void LR35902::fetch() {
   // Else continue with fetch/decode/exec as usual
   else {
     const byte_t op = bus->read_byte(reg_file.reg_pc++);
-    std::unique_ptr<Instruction> &i = lookup.at(op);
+    std::unique_ptr<Instruction> &ins = lookup.at(op);
 
     // Handle un-implemented opcodes
-    if (!i) [[unlikely]] {
+    if (!ins) [[unlikely]] {
       std::ostringstream oss;
       oss << "Unimplemented opcode: 0x" << std::uppercase << std::hex
           << std::setw(2) << std::setfill('0') << static_cast<int>(op);
       throw std::logic_error(oss.str());
     } else
-      ins_ = i.get();
+      ins_ = ins.get();
   }
   state = CpuStates::STATE_DECODE;
 }

@@ -131,6 +131,10 @@ void PixelProcessor::blank() {
     return;
   ly_reg->inc();
 
+  // Request VBlank interrupt
+  if (ly_reg->read() == 144)
+    request_vblank();
+
   // End of scanline logic
   stat_reg->set_mode(ly_reg->is_visible() ? modes::MODE_OAM_SCAN
                                           : modes::MODE_VBLANK);
