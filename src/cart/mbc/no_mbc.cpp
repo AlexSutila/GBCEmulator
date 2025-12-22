@@ -47,6 +47,6 @@ private:
 
 std::unique_ptr<Mbc> make_mbc(const cart &c) {
   const bool battery = type_has_battery(c.header.cartridge_type);
-
+  // TODO: use other MBC types
   return std::make_unique<NoMbc>(c.rom_span(), c.declared_ram_bytes, battery);
 }
