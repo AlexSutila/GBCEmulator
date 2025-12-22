@@ -72,7 +72,7 @@ static std::uint16_t compute_global_checksum(std::span<const byte_t> rom) {
 }
 
 std::size_t rom_bytes_from_code(byte_t code) {
-  // Usually 32 KiB * (1 << value) for 00-08; plus some “unofficial” 52-54
+  // Usually 32 KiB * (1 << value) for 00-08; plus some "unofficial" 52-54
   if (code <= 0x08) {
     return (32ull * 1024ull) << code;
   }
