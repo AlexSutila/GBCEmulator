@@ -3,8 +3,9 @@
 // ---------------------------
 // MBC2
 // ---------------------------
-// Internal 512 x 4-bit RAM at A000–A1FF with echoes; writes in 0000–3FFF use
-// addr bit 8 to pick RAM-enable vs ROM-bank
+// Internal 512 x 4-bit RAM at A000–A1FF with echoes
+// Writes in 0000–3FFF use addr bit 8 to pick RAM-enable vs ROM-bank
+
 class Mbc2 final : public Mbc {
 public:
   Mbc2(std::span<const byte_t> const rom, bool const battery)
