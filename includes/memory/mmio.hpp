@@ -47,6 +47,9 @@ public:
   MMIORegister(const byte_t init_state) : state(init_state) {}
   MMIORegister() : state(0) {}
 
+  /* Override and return true if used only in CGB mode */
+  constexpr bool cgb() { return false; }
+
 private:
   byte_t state{}; // Internal state
 };

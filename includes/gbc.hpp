@@ -8,16 +8,11 @@
 
 #include <cstddef>
 #include <memory>
-#include <stdexcept>
 
 class GameBoyColor {
 public:
   GameBoyColor();
-  void insert_cartridge(cart c) {
-    if (!bus)
-      throw std::logic_error("Bus not initialized");
-    bus->insert_cartridge(c);
-  }
+  void insert_cartridge(cart c);
   void run();
 
   /* Getters mainly for python bindings */

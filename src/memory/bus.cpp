@@ -1,4 +1,5 @@
 #include "memory/bus.hpp"
+#include "cart/cart.hpp"
 #include "cpu/interrupts.hpp"
 #include "emu_types.hpp"
 #include "memory/boot.hpp"
@@ -28,6 +29,15 @@ void AddressBus::init_io_registers() {
   io_registers[0xFF50] = std::make_unique<BootROMCtrl>();
   io_registers[0xFFFF] = std::make_unique<InterruptBits>(false);
 }
+
+void AddressBus::insert_cartridge(cart c) {
+  cart_ = std::make_unique<Cartridge>(std::move(c));
+  const byte_t cgb_flag = c.header.cgb_flag();
+
+  /* May limit interaction with specific MMIO if disabled */
+  is_cgb = cgb_enabled(cgb_flag);
+}
+void AddressBus::eject_cartridge() { cart_.reset(); }
 
 static constexpr bool is_cart_range(const addr_t a) noexcept {
   return (a <= 0x7FFF) || (a >= 0xA000 && a <= 0xBFFF);

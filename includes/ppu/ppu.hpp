@@ -12,6 +12,7 @@
 class PixelProcessor {
 public:
   PixelProcessor(AddressBus *bus_ptr);
+  void set_cgb(const byte_t cgb_flag);
   void step();
 
 private:
@@ -45,6 +46,9 @@ private:
   void request_lcd() {
     if_reg->put_flag(InterruptFlagMask::INT_FLAG_LCD, true);
   }
+
+  /* Determined by cartridge header, dictates usable PPU features */
+  bool is_cgb{};
 };
 
 #endif // __PPU_H

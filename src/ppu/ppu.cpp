@@ -1,4 +1,5 @@
 #include "ppu/ppu.hpp"
+#include "cart/cart.hpp"
 #include "cpu/interrupts.hpp"
 #include "memory/bus.hpp"
 #include "memory/mmio.hpp"
@@ -37,6 +38,10 @@ PixelProcessor::PixelProcessor(AddressBus *bus_ptr) : bus(bus_ptr) {
   stat_reg->set_mode(StatModes::MODE_OAM_SCAN);
   ly_reg->reset(); // Scanline zero
   lyc_reg->write(0x00);
+}
+
+void PixelProcessor::set_cgb(const byte_t cgb_flag) {
+  is_cgb = cgb_enabled(cgb_flag);
 }
 
 void PixelProcessor::do_oam_scan() {

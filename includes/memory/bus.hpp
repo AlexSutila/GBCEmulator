@@ -29,17 +29,14 @@
  */
 
 class AddressBus {
-  std::unique_ptr<Cartridge> cart_;
 
 public:
   void write_byte(const addr_t addr, const byte_t value);
   const byte_t read_byte(const addr_t addr);
   MMIORegister *get_mmio(IORegisterMapping mapping) const;
   AddressBus();
-  void insert_cartridge(cart c) {
-    cart_ = std::make_unique<Cartridge>(std::move(c));
-  }
-  void eject_cartridge() { cart_.reset(); }
+  void insert_cartridge(cart c);
+  void eject_cartridge();
 
 private:
   std::unique_ptr<byte_t[]> mem{};
@@ -53,6 +50,10 @@ private:
    * Usage of raw pointers is waranted because this map is not responsible for
    * ownership of any of the resources pointed to. */
   std::map<addr_t, std::unique_ptr<MMIORegister>> io_registers{};
+
+  /* Usable hardware features are determined by the cartridge header. */
+  std::unique_ptr<Cartridge> cart_;
+  bool is_cgb{};
 };
 
 #endif // __BUS_H

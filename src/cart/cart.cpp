@@ -105,6 +105,14 @@ std::size_t ram_bytes_from_code(byte_t code) {
   }
 }
 
+// As per pandocs:
+// - 0x80: Is used for games which support both CGB and monochrome systems
+// - 0xC0: Is used for systems which only work on CGBs
+// Any other values will result with monochrome backwards compatability
+bool cgb_enabled(byte_t cgb_flag) {
+  return (cgb_flag == 0x80 || cgb_flag == 0xC0);
+}
+
 std::string rom_header::manufacturer_code() const {
   // Manufacturer code uses bytes 013F-0142 on "newer" carts
   const byte_t *m = &title_area[0x013F - 0x0134]; // offset within title_area

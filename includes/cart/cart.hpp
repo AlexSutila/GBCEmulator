@@ -91,5 +91,6 @@ private:
 // helpers
 [[nodiscard]] std::size_t rom_bytes_from_code(byte_t code);
 [[nodiscard]] std::size_t ram_bytes_from_code(byte_t code);
+[[nodiscard]] bool cgb_enabled(byte_t cgb_flag);
 
 #endif // __CART_HPP
