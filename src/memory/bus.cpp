@@ -5,6 +5,7 @@
 #include "memory/boot.hpp"
 #include "memory/mmio.hpp"
 #include "ppu/status.hpp"
+#include "ppu/vram.hpp"
 
 #include <cassert>
 #include <memory>
@@ -26,6 +27,7 @@ void AddressBus::init_io_registers() {
   io_registers[0xFF41] = std::make_unique<PPU::STAT>();
   io_registers[0xFF44] = std::make_unique<PPU::LY>();
   io_registers[0xFF45] = std::make_unique<MMIORegister>(); // LYC
+  io_registers[0xFF4F] = std::make_unique<VramBank>();
   io_registers[0xFF50] = std::make_unique<BootROMCtrl>();
   io_registers[0xFFFF] = std::make_unique<InterruptBits>(false);
 }
@@ -63,7 +65,10 @@ const byte_t AddressBus::read_byte(const addr_t addr) {
   /* Read from memory mapped IO register */
   if (io_registers.contains(addr)) {
     assert((addr >= 0xFF00 && addr <= 0xFF7F) || addr == 0xFFFF);
-    return io_registers.at(addr)->read();
+    auto const &mmio = io_registers.at(addr);
+
+    // Only write CGB registers if in CGB mode, fallback to 0xFF otherwise
+    return (!mmio->cgb() || is_cgb) ? mmio->read() : 0xFF;
   }
 
   /* Fallback memory */
@@ -81,7 +86,11 @@ void AddressBus::write_byte(const addr_t addr, const byte_t value) {
   /* Write to memory mapped IO register */
   if (io_registers.contains(addr)) {
     assert((addr >= 0xFF00 && addr <= 0xFF7F) || addr == 0xFFFF);
-    io_registers.at(addr)->write(value);
+    auto const &mmio = io_registers.at(addr);
+
+    // Only write CGB registers if in CGB mode
+    if (!mmio->cgb() || is_cgb)
+      mmio->write(value);
   }
 
   /* Fallback memory */

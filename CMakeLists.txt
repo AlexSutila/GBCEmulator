@@ -35,6 +35,7 @@ set(GBC_CORE_SOURCES
 
     src/ppu/ppu.cpp
     src/ppu/status.cpp
+    src/ppu/vram.cpp
 
     src/cart/cart.cpp
     src/cart/cart_display.cpp
