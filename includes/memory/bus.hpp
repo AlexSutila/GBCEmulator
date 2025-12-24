@@ -3,9 +3,11 @@
 
 #include "cart/cart.hpp"
 #include "emu_types.hpp"
+#include "memory/mmio/cgb.hpp"
 #include "memory/mmio/dmg.hpp"
 #include "memory/mmio/mmio.hpp"
 
+#include <array>
 #include <map>
 #include <memory>
 
@@ -42,7 +44,12 @@ private:
   std::unique_ptr<byte_t[]> mem{};
   void init_io_registers();
 
-  /* Maintain a pointer to the boot rom control register for convenience. */
+  /* VRAM is banked in CGB, second bank remains unused for DMG */
+  std::array<std::unique_ptr<byte_t[]>, 2> vram;
+  PPU::VramBank *vram_bank_ctrl{};
+  const byte_t get_vram_bank() const;
+
+  /* Unmaps boot rom after execution of BIOS has completed */
   BootROMCtrl *boot_rom_ctrl{};
   bool boot_rom_enabled();
 

@@ -3,33 +3,55 @@
 #include "cpu/interrupts.hpp"
 #include "emu_types.hpp"
 #include "memory/boot.hpp"
-#include "memory/mmio/dmg.hpp"
 #include "memory/mmio/cgb.hpp"
+#include "memory/mmio/dmg.hpp"
 #include "memory/mmio/mmio.hpp"
 
 #include <cassert>
+#include <cstddef>
 #include <memory>
 #include <stdexcept>
 #include <vector>
 
 AddressBus::AddressBus() {
-  mem = std::make_unique<byte_t[]>(0x10000);
+  constexpr std::size_t vram_bank_size = 0x2000;
+  using ioregs = IORegisterMapping;
+
+  /* Initialize VRAM, two banks in CGB mode, second bank unused for DMG */
+  for (auto &bank : vram) {
+    bank = std::make_unique<byte_t[]>(vram_bank_size);
+    std::fill_n(bank.get(), vram_bank_size, 0);
+  }
+
+  /* We maintain access to various mmio registers via a raw pointer
+   * for access convenience during memory reads and writes. */
   init_io_registers();
 
-  /* Maintain this for convenience during memory access */
-  auto *reg = get_mmio(IORegisterMapping::MMIO_BOOT_ROM_CTRL);
+  auto *reg = get_mmio(ioregs::MMIO_BOOT_ROM_CTRL);
   if (!(boot_rom_ctrl = dynamic_cast<BootROMCtrl *>(reg)))
     throw std::logic_error("Failed to connect MMIO_BOOT_ROM_CTRL");
+  reg = get_mmio(ioregs::MMIO_VRAM_BANK);
+  if (!(vram_bank_ctrl = dynamic_cast<PPU::VramBank *>(reg)))
+    throw std::logic_error("Failed to connect MMIO_VRAM_BANK");
+
+  /* TODO: Remove fallback memory */
+  mem = std::make_unique<byte_t[]>(0x10000);
 }
 
 void AddressBus::init_io_registers() {
-  io_registers[0xFF0F] = std::make_unique<InterruptBits>(true);
+  io_registers[0xFF0F] = std::make_unique<::InterruptBits>(true);
   io_registers[0xFF41] = std::make_unique<PPU::STAT>();
   io_registers[0xFF44] = std::make_unique<PPU::LY>();
-  io_registers[0xFF45] = std::make_unique<MMIORegister>(); // LYC
-  io_registers[0xFF4F] = std::make_unique<VramBank>();
-  io_registers[0xFF50] = std::make_unique<BootROMCtrl>();
-  io_registers[0xFFFF] = std::make_unique<InterruptBits>(false);
+  io_registers[0xFF45] = std::make_unique<::MMIORegister>(); // LYC
+  io_registers[0xFF4F] = std::make_unique<PPU::VramBank>();
+  io_registers[0xFF50] = std::make_unique<::BootROMCtrl>();
+  io_registers[0xFFFF] = std::make_unique<::InterruptBits>(false);
+}
+
+const byte_t AddressBus::get_vram_bank() const {
+  if (!is_cgb) // Unbanked for DMG
+    return 0;
+  return vram_bank_ctrl->get_bank();
 }
 
 void AddressBus::insert_cartridge(cart c) {
@@ -41,12 +63,16 @@ void AddressBus::insert_cartridge(cart c) {
 }
 void AddressBus::eject_cartridge() { cart_.reset(); }
 
+static constexpr bool is_bootrom_range(const addr_t a) noexcept {
+  return (a <= 0x00FF) || (a >= 0x0200 && a <= 0x0900);
+}
+
 static constexpr bool is_cart_range(const addr_t a) noexcept {
   return (a <= 0x7FFF) || (a >= 0xA000 && a <= 0xBFFF);
 }
 
-static constexpr bool is_bootrom_range(const addr_t a) noexcept {
-  return (a <= 0x00FF) || (a >= 0x0200 && a <= 0x0900);
+static constexpr bool is_vram_range(const addr_t a) noexcept {
+  return (a >= 0x8000 && a <= 0x9FFF);
 }
 
 const byte_t AddressBus::read_byte(const addr_t addr) {
@@ -58,12 +84,19 @@ const byte_t AddressBus::read_byte(const addr_t addr) {
   }
 
   /* Cartridge memory */
-  if (cart_ && is_cart_range(addr)) {
+  else if (cart_ && is_cart_range(addr)) {
     return cart_->read(addr);
   }
 
+  /* Read from VRAM, only banked in CGB mode */
+  else if (is_vram_range(addr)) {
+    constexpr addr_t vram_base_addr = 0x8000;
+    const auto bank = get_vram_bank();
+    return vram.at(bank)[addr - vram_base_addr];
+  }
+
   /* Read from memory mapped IO register */
-  if (io_registers.contains(addr)) {
+  else if (io_registers.contains(addr)) {
     assert((addr >= 0xFF00 && addr <= 0xFF7F) || addr == 0xFFFF);
     auto const &mmio = io_registers.at(addr);
 
@@ -72,7 +105,8 @@ const byte_t AddressBus::read_byte(const addr_t addr) {
   }
 
   /* Fallback memory */
-  return mem[addr];
+  else
+    return mem[addr];
 }
 
 void AddressBus::write_byte(const addr_t addr, const byte_t value) {
@@ -80,11 +114,17 @@ void AddressBus::write_byte(const addr_t addr, const byte_t value) {
   /* Cartridge sees writes too (bank switching etc.) */
   if (cart_ && is_cart_range(addr)) {
     cart_->write(addr, value);
-    return;
+  }
+
+  /* Write from VRAM, only banked in CGB mode */
+  else if (is_vram_range(addr)) {
+    constexpr addr_t vram_base_addr = 0x8000;
+    const auto bank = get_vram_bank();
+    vram.at(bank)[addr - vram_base_addr] = value;
   }
 
   /* Write to memory mapped IO register */
-  if (io_registers.contains(addr)) {
+  else if (io_registers.contains(addr)) {
     assert((addr >= 0xFF00 && addr <= 0xFF7F) || addr == 0xFFFF);
     auto const &mmio = io_registers.at(addr);
 

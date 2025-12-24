@@ -4,6 +4,8 @@
 #include "emu_types.hpp"
 #include "memory/mmio/mmio.hpp"
 
+namespace PPU {
+
 class VramBank : public MMIORegister {
 public:
   void write(const byte_t value);
@@ -17,5 +19,7 @@ public:
 private:
   byte_t state;
 };
+
+} // namespace PPU
 
 #endif // __MMIO_CGB_H
