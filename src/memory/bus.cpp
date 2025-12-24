@@ -3,9 +3,9 @@
 #include "cpu/interrupts.hpp"
 #include "emu_types.hpp"
 #include "memory/boot.hpp"
+#include "memory/mmio/dmg.hpp"
+#include "memory/mmio/cgb.hpp"
 #include "memory/mmio/mmio.hpp"
-#include "ppu/status.hpp"
-#include "ppu/vram.hpp"
 
 #include <cassert>
 #include <memory>

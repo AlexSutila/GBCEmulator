@@ -29,15 +29,12 @@ set(GBC_CORE_SOURCES
     src/cpu/registers/register.cpp
     src/cpu/registers/flags.cpp
 
-    src/memory/boot.cpp
     src/memory/bus.cpp
-    src/memory/mmio/mmio.cpp
     src/memory/mmio/dmg.cpp
     src/memory/mmio/cgb.cpp
+    src/memory/mmio/mmio.cpp
 
     src/ppu/ppu.cpp
-    src/ppu/status.cpp
-    src/ppu/vram.cpp
 
     src/cart/cart.cpp
     src/cart/cart_display.cpp

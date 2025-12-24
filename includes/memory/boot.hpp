@@ -2,25 +2,7 @@
 #define __BIOS_H
 
 #include "emu_types.hpp"
-#include "memory/mmio/mmio.hpp"
-
 #include <vector>
-
-/*
- * 0xFF50 - Boot ROM mapping control register
- */
-class BootROMCtrl : public MMIORegister {
-public:
-  void write(const byte_t value) override;
-  byte_t read() override;
-
-  /* Determine if the boot ROM is currently mapped */
-  bool boot_rom_enabled() const;
-  BootROMCtrl();
-
-private:
-  bool map_boot_rom;
-};
 
 static const std::vector<byte_t> cgb_boot = {
     0x31, 0xfe, 0xff, 0x3e, 0x02, 0xc3, 0x7c, 0x00, 0xd3, 0x00, 0x98, 0xa0,

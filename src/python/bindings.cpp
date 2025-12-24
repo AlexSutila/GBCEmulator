@@ -8,7 +8,8 @@
 #include "gbc.hpp"
 #include "memory/boot.hpp"
 #include "memory/bus.hpp"
-#include "ppu/status.hpp"
+#include "memory/mmio/dmg.hpp"
+#include "memory/mmio/mmio.hpp"
 
 namespace py = pybind11;
 
@@ -160,8 +161,7 @@ PYBIND11_MODULE(gbc_py, m) {
 
   // Pixel Processor class
   py::class_<PixelProcessor>(m, "PixelProcessor")
-      .def(py::init<AddressBus *>(),
-           py::arg("bus"),
+      .def(py::init<AddressBus *>(), py::arg("bus"),
            py::keep_alive<1, 2>()) // PixelProcessor keeps AddressBus alive
       .def("step", &PixelProcessor::step);
 
@@ -174,5 +174,5 @@ PYBIND11_MODULE(gbc_py, m) {
       .def("get_cpu", &GameBoyColor::get_cpu,
            py::return_value_policy::reference_internal)
       .def("get_ppu", &GameBoyColor::get_ppu,
-           py::return_value_policy::reference_internal) ;
+           py::return_value_policy::reference_internal);
 }

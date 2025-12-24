@@ -3,8 +3,8 @@
 
 #include "cpu/interrupts.hpp"
 #include "memory/bus.hpp"
+#include "memory/mmio/dmg.hpp"
 #include "memory/mmio/mmio.hpp"
-#include "ppu/status.hpp"
 
 #include <cstddef>
 #include <optional>

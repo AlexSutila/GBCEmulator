@@ -3,7 +3,7 @@
 
 #include "cart/cart.hpp"
 #include "emu_types.hpp"
-#include "memory/boot.hpp"
+#include "memory/mmio/dmg.hpp"
 #include "memory/mmio/mmio.hpp"
 
 #include <map>
