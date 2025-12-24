@@ -16,7 +16,7 @@ template <typename T> T *init_mmio(AddressBus *bus, IORegisterMapping reg_id) {
   throw std::logic_error(std::string("Failed to configure MMIO (PPU)"));
 }
 
-PixelProcessor::PixelProcessor(AddressBus *bus_ptr) : bus(bus_ptr) {
+PixelProcessor::PixelProcessor(AddressBus *bus_ptr) : bus(bus_ptr), bg_fifo(this) {
   using mmio = IORegisterMapping;
   using namespace PPU;
 
@@ -35,10 +35,6 @@ PixelProcessor::PixelProcessor(AddressBus *bus_ptr) : bus(bus_ptr) {
   stat_reg->set_mode(StatModes::MODE_OAM_SCAN);
   ly_reg->reset(); // Scanline zero
   lyc_reg->write(0x00);
-
-  /* Configure pixel FIFOs */
-  obj_fifo = PixelFifo();
-  bg_fifo = PixelFifo();
 }
 
 void PixelProcessor::set_cgb(const byte_t cgb_flag) {

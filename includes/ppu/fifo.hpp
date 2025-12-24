@@ -10,6 +10,7 @@
 struct pixel {
   byte_t color; // A value between 0 and 3
 };
+class PixelProcessor;
 
 /*
  * Custom FIFO implemented via circular buffer to prevent repeated heap
@@ -71,7 +72,7 @@ private:
 
 class PixelFifo {
 public:
-  PixelFifo();
+  PixelFifo(PixelProcessor *ppu_ptr);
   void step();
 
 private:
@@ -80,19 +81,20 @@ private:
     STATE_GET_TILE_DATA_LOW,
     STATE_GET_TILE_DATA_HIGH,
     STATE_SLEEP,
-    // Tried every dot until it succeeds
-    STATE_PUSH,
   };
   CircularFifo<pixel, 16> fifo;
 
   void get_tile();
-  void get_tile_data();
+  void get_tile_data_lo();
+  void get_tile_data_hi();
   void sleep();
 
   // For state transition logic
-  std::optional<std::size_t> cur_clks;
-  std::size_t max_clks;
+  std::optional<std::size_t> total_clks;
+  std::size_t cur_clks;
   PixelFifoState state;
+
+  PixelProcessor *const ppu;
 };
 
 #endif // __FIFO_H

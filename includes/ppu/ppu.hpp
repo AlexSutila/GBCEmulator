@@ -49,8 +49,7 @@ private:
   }
 
   /* Pixel FIFO renderers */
-  PixelFifo obj_fifo{};
-  PixelFifo bg_fifo{};
+  PixelFifo bg_fifo;
 
   /* Determined by cartridge header, dictates usable PPU features */
   bool is_cgb{};
