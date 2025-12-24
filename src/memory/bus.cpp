@@ -15,6 +15,7 @@
 
 AddressBus::AddressBus() {
   constexpr std::size_t vram_bank_size = 0x2000;
+  constexpr std::size_t wram_bank_size = 0x1000;
   using ioregs = IORegisterMapping;
 
   /* Initialize VRAM, two banks in CGB mode, second bank unused for DMG */
@@ -23,16 +24,26 @@ AddressBus::AddressBus() {
     std::fill_n(bank.get(), vram_bank_size, 0);
   }
 
-  /* We maintain access to various mmio registers via a raw pointer
-   * for access convenience during memory reads and writes. */
+  /* Initialize WRAM, eight banks in CGB mode, two for DMG */
+  for (auto &bank : wram) {
+    bank = std::make_unique<byte_t[]>(wram_bank_size);
+    std::fill_n(bank.get(), wram_bank_size, 0);
+  }
+
+  /* Populates io-registers lookup table */
   init_io_registers();
 
+  /* We maintain access to various mmio registers via a raw pointer
+   * for access convenience during memory reads and writes. */
   auto *reg = get_mmio(ioregs::MMIO_BOOT_ROM_CTRL);
   if (!(boot_rom_ctrl = dynamic_cast<BootROMCtrl *>(reg)))
     throw std::logic_error("Failed to connect MMIO_BOOT_ROM_CTRL");
   reg = get_mmio(ioregs::MMIO_VRAM_BANK);
   if (!(vram_bank_ctrl = dynamic_cast<PPU::VramBank *>(reg)))
     throw std::logic_error("Failed to connect MMIO_VRAM_BANK");
+  reg = get_mmio(ioregs::MMIO_WRAM_BANK);
+  if (!(wram_bank_ctrl = dynamic_cast<WramBank *>(reg)))
+    throw std::logic_error("Failed to connect MMIO_WRAM_BANK");
 
   /* TODO: Remove fallback memory */
   mem = std::make_unique<byte_t[]>(0x10000);
@@ -45,6 +56,7 @@ void AddressBus::init_io_registers() {
   io_registers[0xFF45] = std::make_unique<::MMIORegister>(); // LYC
   io_registers[0xFF4F] = std::make_unique<PPU::VramBank>();
   io_registers[0xFF50] = std::make_unique<::BootROMCtrl>();
+  io_registers[0xFF70] = std::make_unique<::WramBank>();
   io_registers[0xFFFF] = std::make_unique<::InterruptBits>(false);
 }
 
@@ -52,6 +64,16 @@ const byte_t AddressBus::get_vram_bank() const {
   if (!is_cgb) // Unbanked for DMG
     return 0;
   return vram_bank_ctrl->get_bank();
+}
+
+const byte_t AddressBus::get_wram_bank() const {
+  /* Only call for upper address range. Lower address (0xC000-0xDFFF) is always
+   * mapped to bank zero, regardless of either CGB/DMG operating mode. */
+  if (!is_cgb)
+    return 1;
+  /* Maps to banks 1-7. Zero also maps to bank one, but that logic is handled in
+   * the MMIORegister itself. This is garunteed to be between 1 and 7. */
+  return wram_bank_ctrl->get_bank();
 }
 
 void AddressBus::insert_cartridge(cart c) {
@@ -75,6 +97,10 @@ static constexpr bool is_vram_range(const addr_t a) noexcept {
   return (a >= 0x8000 && a <= 0x9FFF);
 }
 
+static constexpr bool is_wram_range(const addr_t a, bool high) noexcept {
+  return high ? (a >= 0xD000 && a <= 0xDFFF) : (a >= 0xC000 & a <= 0xCFFF);
+}
+
 const byte_t AddressBus::read_byte(const addr_t addr) {
   const std::vector<byte_t> &boot_rom = get_boot_rom();
 
@@ -90,9 +116,19 @@ const byte_t AddressBus::read_byte(const addr_t addr) {
 
   /* Read from VRAM, only banked in CGB mode */
   else if (is_vram_range(addr)) {
-    constexpr addr_t vram_base_addr = 0x8000;
     const auto bank = get_vram_bank();
-    return vram.at(bank)[addr - vram_base_addr];
+    return vram.at(bank)[addr - 0x8000];
+  }
+
+  /* Read from WRAM, low bank is always mapped to zero */
+  else if (is_wram_range(addr, false)) {
+    return wram.at(0)[addr - 0xC000];
+  }
+
+  /* Read from WRAM, high bank mapped 1-7 for CGB */
+  else if (is_wram_range(addr, true)) {
+    const auto bank = get_wram_bank();
+    return wram.at(bank)[addr - 0xD000];
   }
 
   /* Read from memory mapped IO register */
@@ -116,11 +152,21 @@ void AddressBus::write_byte(const addr_t addr, const byte_t value) {
     cart_->write(addr, value);
   }
 
-  /* Write from VRAM, only banked in CGB mode */
+  /* Write to VRAM, only banked in CGB mode */
   else if (is_vram_range(addr)) {
-    constexpr addr_t vram_base_addr = 0x8000;
     const auto bank = get_vram_bank();
-    vram.at(bank)[addr - vram_base_addr] = value;
+    vram.at(bank)[addr - 0x8000] = value;
+  }
+
+  /* Write to WRAM, low bank is always mapped to zero */
+  else if (is_wram_range(addr, false)) {
+    wram.at(0)[addr - 0xC000] = value;
+  }
+
+  /* Write to WRAM, high bank mapped 1-7 for CGB */
+  else if (is_wram_range(addr, true)) {
+    const auto bank = get_wram_bank();
+    wram.at(bank)[addr - 0xD000] = value;
   }
 
   /* Write to memory mapped IO register */

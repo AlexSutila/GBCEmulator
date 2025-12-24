@@ -31,7 +31,6 @@
  */
 
 class AddressBus {
-
 public:
   void write_byte(const addr_t addr, const byte_t value);
   const byte_t read_byte(const addr_t addr);
@@ -45,9 +44,14 @@ private:
   void init_io_registers();
 
   /* VRAM is banked in CGB, second bank remains unused for DMG */
-  std::array<std::unique_ptr<byte_t[]>, 2> vram;
+  std::array<std::unique_ptr<byte_t[]>, 2> vram{};
   PPU::VramBank *vram_bank_ctrl{};
   const byte_t get_vram_bank() const;
+
+  /* Upper half of WRAM is banked in CGB, contiguous in DMG */
+  std::array<std::unique_ptr<byte_t[]>, 8> wram{};
+  WramBank *wram_bank_ctrl{};
+  const byte_t get_wram_bank() const;
 
   /* Unmaps boot rom after execution of BIOS has completed */
   BootROMCtrl *boot_rom_ctrl{};
