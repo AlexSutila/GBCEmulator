@@ -1,10 +1,14 @@
+#include "cart/cart.hpp"
 #include "cart/mbc.hpp"
+#include "cart/mbc_creator.hpp"
 
 // ---------------------------
 // MBC1
 // ---------------------------
-// RAM enable (0000-1FFF), ROM bank (2000-3FFF), upper bits/RAM bank
-// (4000-5FFF), mode (6000-7FFF)
+// RAM enable (0000-1FFF)
+// ROM bank (2000-3FFF)
+// Upper bits/RAM bank (4000-5FFF)
+// mode (6000-7FFF)
 
 class Mbc1 final : public Mbc {
 public:
@@ -114,3 +118,8 @@ private:
     ram_[idx] = v;
   }
 };
+
+std::unique_ptr<Mbc> make_mbc1(const cart& c) {
+  const bool battery = type_has_battery(c.header.cartridge_type);
+  return std::make_unique<Mbc1>(c.rom_span(), c.declared_ram_bytes, battery);
+}

@@ -1,5 +1,6 @@
 #include "cart/cart.hpp"
 #include "cart/mbc.hpp"
+#include "cart/mbc_creator.hpp"
 
 // ---------------------------
 // No MBC (32 KiB ROM only) + optional 8 KiB RAM
@@ -45,8 +46,7 @@ private:
   bool battery_{};
 };
 
-std::unique_ptr<Mbc> make_mbc(const cart &c) {
+std::unique_ptr<Mbc> make_no_mbc(const cart &c) {
   const bool battery = type_has_battery(c.header.cartridge_type);
-  // TODO: use other MBC types
   return std::make_unique<NoMbc>(c.rom_span(), c.declared_ram_bytes, battery);
 }

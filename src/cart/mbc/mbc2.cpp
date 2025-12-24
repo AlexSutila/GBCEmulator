@@ -1,10 +1,13 @@
+#include "cart/cart.hpp"
 #include "cart/mbc.hpp"
+#include "cart/mbc_creator.hpp"
 
 // ---------------------------
 // MBC2
 // ---------------------------
-// Internal 512 x 4-bit RAM at A000–A1FF with echoes; writes in 0000–3FFF use
-// addr bit 8 to pick RAM-enable vs ROM-bank
+// Internal 512 x 4-bit RAM at A000–A1FF with echoes
+// Writes in 0000–3FFF use addr bit 8 to pick RAM-enable vs ROM-bank
+
 class Mbc2 final : public Mbc {
 public:
   Mbc2(std::span<const byte_t> const rom, bool const battery)
@@ -78,3 +81,8 @@ private:
     return (idx < rom_.size()) ? rom_[idx] : open_bus();
   }
 };
+
+std::unique_ptr<Mbc> make_mbc2(const cart& c) {
+  const bool battery = type_has_battery(c.header.cartridge_type);
+  return std::make_unique<Mbc2>(c.rom_span(), battery);
+}

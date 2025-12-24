@@ -49,12 +49,14 @@ static bool type_has_battery(const byte_t t) {
   case 0x03: // MBC1+RAM+BATTERY
   case 0x06: // MBC2+BATTERY
   case 0x09: // ROM+RAM+BATTERY (No MBC)
+  case 0x0D: // MMM01+RAM+BATTERY
   case 0x0F: // MBC3+TIMER+BATTERY
   case 0x10: // MBC3+TIMER+RAM+BATTERY
   case 0x13: // MBC3+RAM+BATTERY
   case 0x1B: // MBC5+RAM+BATTERY
   case 0x1E: // MBC5+RUMBLE+RAM+BATTERY
-  case 0xFF: // HuC1+RAM+BATTERY (not implemented here)
+  case 0x22: // MBC7+SENSOR+RUMBLE+RAM+BATTERY
+  case 0xFF: // HuC1+RAM+BATTERY
     return true;
   default:
     return false;
