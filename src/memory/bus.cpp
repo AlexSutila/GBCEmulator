@@ -13,6 +13,13 @@
 #include <stdexcept>
 #include <vector>
 
+/* To make the contents of this file slightly less aggregious of a playground
+ * for performing heap corruption exploits lmao */
+constexpr addr_t VRAM_MASK = 0x1FFF;
+constexpr addr_t WRAM_MASK = 0x0FFF;
+constexpr addr_t OAM_MASK = 0x009F;
+constexpr addr_t HRAM_MASK = 0x007F;
+
 template <typename T> std::unique_ptr<T[]> make_zeroed(std::size_t size) {
   auto p = std::make_unique<T[]>(size);
   std::fill_n(p.get(), size, T{});
@@ -132,32 +139,32 @@ const byte_t AddressBus::read_byte(const addr_t addr) {
   /* Read from VRAM, only banked in CGB mode */
   else if (is_vram_range(addr)) {
     const auto bank = get_vram_bank();
-    return vram.at(bank)[addr - 0x8000];
+    return vram.at(bank)[(addr - 0x8000) & VRAM_MASK];
   }
 
   /* Read from WRAM, low bank is always mapped to zero */
   else if (is_wram_range(addr)) {
     if (addr < 0xD000)
-      return wram.at(0)[addr - 0xC000];
+      return wram.at(0)[(addr - 0xC000) & WRAM_MASK];
     else {
       const auto bank = get_wram_bank();
-      return wram.at(bank)[addr - 0xD000];
+      return wram.at(bank)[(addr - 0xD000) & WRAM_MASK];
     }
   }
 
   /* Echoes 0xC000-0xDDFF */
   else if (is_echo_range(addr)) {
     if (addr < 0xF000)
-      return wram.at(0)[addr - 0xE000];
+      return wram.at(0)[(addr - 0xE000) & WRAM_MASK];
     else {
       const auto bank = get_wram_bank();
-      return wram.at(bank)[addr - 0xF000];
+      return wram.at(bank)[(addr - 0xF000) & WRAM_MASK];
     }
   }
 
   /* Read from Object Attribute Memory */
   else if (is_oam_range(addr))
-    return oam[addr - 0xFE00];
+    return oam[(addr - 0xFE00) & OAM_MASK];
 
   /* Read from memory mapped IO register */
   else if (io_registers.contains(addr)) {
@@ -170,7 +177,7 @@ const byte_t AddressBus::read_byte(const addr_t addr) {
 
   /* Read from to High RAM */
   else if (is_hram_range(addr))
-    return hram[addr - 0xFF80];
+    return hram[(addr - 0xFF80) & HRAM_MASK];
 
   /* Not actually sure what happens here, assume reads all ones */
   return open_bus();
@@ -185,32 +192,32 @@ void AddressBus::write_byte(const addr_t addr, const byte_t value) {
   /* Write to VRAM, only banked in CGB mode */
   else if (is_vram_range(addr)) {
     const auto bank = get_vram_bank();
-    vram.at(bank)[addr - 0x8000] = value;
+    vram.at(bank)[(addr - 0x8000) & VRAM_MASK] = value;
   }
 
   /* Write to WRAM, low bank is always mapped to zero */
   else if (is_wram_range(addr)) {
     if (addr < 0xD000)
-      wram.at(0)[addr - 0xC000] = value;
+      wram.at(0)[(addr - 0xC000) & WRAM_MASK] = value;
     else {
       const auto bank = get_wram_bank();
-      wram.at(bank)[addr - 0xD000] = value;
+      wram.at(bank)[(addr - 0xD000) & WRAM_MASK] = value;
     }
   }
 
   /* Echoes 0xC000-0xDDFF */
   else if (is_echo_range(addr)) {
     if (addr < 0xF000)
-      wram.at(0)[addr - 0xE000] = value;
+      wram.at(0)[(addr - 0xE000) & WRAM_MASK] = value;
     else {
       const auto bank = get_wram_bank();
-      wram.at(bank)[addr - 0xF000] = value;
+      wram.at(bank)[(addr - 0xF000) & WRAM_MASK] = value;
     }
   }
 
   /* Write to Object Attribute Memory */
   else if (is_oam_range(addr))
-    oam[addr - 0xFE00] = value;
+    oam[(addr - 0xFE00) & WRAM_MASK] = value;
 
   /* Write to memory mapped IO register */
   else if (io_registers.contains(addr)) {
@@ -224,7 +231,7 @@ void AddressBus::write_byte(const addr_t addr, const byte_t value) {
 
   /* Write to High RAM */
   else if (is_hram_range(addr))
-    hram[addr - 0xFF80] = value;
+    hram[(addr - 0xFF80) & HRAM_MASK] = value;
 }
 
 bool AddressBus::boot_rom_enabled() {
