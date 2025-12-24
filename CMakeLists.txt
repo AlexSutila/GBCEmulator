@@ -31,7 +31,9 @@ set(GBC_CORE_SOURCES
 
     src/memory/boot.cpp
     src/memory/bus.cpp
-    src/memory/mmio.cpp
+    src/memory/mmio/mmio.cpp
+    src/memory/mmio/dmg.cpp
+    src/memory/mmio/cgb.cpp
 
     src/ppu/ppu.cpp
     src/ppu/status.cpp

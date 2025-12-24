@@ -4,7 +4,7 @@
 #include "cpu/registers/regfile.hpp"
 #include "emu_types.hpp"
 #include "instr/instr.hpp"
-#include "memory/mmio.hpp"
+#include "memory/mmio/mmio.hpp"
 #include <cassert>
 
 enum class InterruptFlagMask : byte_t {

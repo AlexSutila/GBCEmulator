@@ -2,7 +2,7 @@
 #define __VRAM_H
 
 #include "emu_types.hpp"
-#include "memory/mmio.hpp"
+#include "memory/mmio/mmio.hpp"
 
 class VramBank : public MMIORegister {
 public:

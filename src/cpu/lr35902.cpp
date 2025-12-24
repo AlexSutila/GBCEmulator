@@ -3,7 +3,7 @@
 #include "cpu/interrupts.hpp"
 #include "cpu/registers/flags.hpp"
 #include "cpu/registers/register.hpp"
-#include "memory/mmio.hpp"
+#include "memory/mmio/mmio.hpp"
 
 #include <cassert>
 #include <iomanip>

@@ -1,4 +1,4 @@
-#include "memory/mmio.hpp"
+#include "memory/mmio/mmio.hpp"
 
 void MMIORegister::write(const byte_t value) { state = value; }
 
