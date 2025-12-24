@@ -17,7 +17,6 @@
  * for performing heap corruption exploits lmao */
 constexpr addr_t VRAM_MASK = 0x1FFF;
 constexpr addr_t WRAM_MASK = 0x0FFF;
-constexpr addr_t OAM_MASK = 0x009F;
 constexpr addr_t HRAM_MASK = 0x007F;
 
 template <typename T> std::unique_ptr<T[]> make_zeroed(std::size_t size) {
@@ -164,7 +163,7 @@ const byte_t AddressBus::read_byte(const addr_t addr) {
 
   /* Read from Object Attribute Memory */
   else if (is_oam_range(addr))
-    return oam[(addr - 0xFE00) & OAM_MASK];
+    return oam[addr - 0xFE00];
 
   /* Read from memory mapped IO register */
   else if (io_registers.contains(addr)) {
@@ -217,7 +216,7 @@ void AddressBus::write_byte(const addr_t addr, const byte_t value) {
 
   /* Write to Object Attribute Memory */
   else if (is_oam_range(addr))
-    oam[(addr - 0xFE00) & WRAM_MASK] = value;
+    oam[addr - 0xFE00] = value;
 
   /* Write to memory mapped IO register */
   else if (io_registers.contains(addr)) {
