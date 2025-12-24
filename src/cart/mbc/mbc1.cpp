@@ -1,4 +1,6 @@
+#include "cart/cart.hpp"
 #include "cart/mbc.hpp"
+#include "cart/mbc_creator.hpp"
 
 // ---------------------------
 // MBC1
@@ -116,3 +118,8 @@ private:
     ram_[idx] = v;
   }
 };
+
+std::unique_ptr<Mbc> make_mbc1(const cart& c) {
+  const bool battery = type_has_battery(c.header.cartridge_type);
+  return std::make_unique<Mbc1>(c.rom_span(), c.declared_ram_bytes, battery);
+}

@@ -1,4 +1,6 @@
+#include "cart/cart.hpp"
 #include "cart/mbc.hpp"
+#include "cart/mbc_creator.hpp"
 
 // ---------------------------
 // MBC2
@@ -79,3 +81,8 @@ private:
     return (idx < rom_.size()) ? rom_[idx] : open_bus();
   }
 };
+
+std::unique_ptr<Mbc> make_mbc2(const cart& c) {
+  const bool battery = type_has_battery(c.header.cartridge_type);
+  return std::make_unique<Mbc2>(c.rom_span(), battery);
+}

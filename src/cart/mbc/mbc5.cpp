@@ -1,4 +1,6 @@
+#include "cart/cart.hpp"
 #include "cart/mbc.hpp"
+#include "cart/mbc_creator.hpp"
 
 // ---------------------------
 // MBC5
@@ -7,6 +9,7 @@
 // ROM bank low 8 (2000-2FFF)
 // ROM bank bit 9 (3000-3FFF)
 // RAM bank (4000-5FFF)
+// Rumble + guaranteed timing in CGB double speed
 
 class Mbc5 final : public Mbc {
 public:
@@ -79,3 +82,13 @@ private:
         return (idx < rom_.size()) ? rom_[idx] : open_bus();
     }
 };
+
+std::unique_ptr<Mbc> make_mbc5(const cart& c) {
+    const bool battery = type_has_battery(c.header.cartridge_type);
+    const bool rumble = (c.header.cartridge_type == 0x1C || // MBC5+RUMBLE
+                         c.header.cartridge_type == 0x1D || // MBC5+RUMBLE+RAM
+                         c.header.cartridge_type == 0x1E || // MBC5+RUMBLE+RAM+BATTERY
+                         c.header.cartridge_type == 0x22);  // MBC7+SENSOR+RUMBLE+RAM+BATTERY
+
+    return std::make_unique<Mbc5>(c.rom_span(), c.declared_ram_bytes, battery, rumble);
+}
