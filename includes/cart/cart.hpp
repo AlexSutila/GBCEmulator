@@ -3,6 +3,7 @@
 
 #include "cart/mbc.hpp"
 #include "emu_types.hpp"
+#include "mbc_creator.hpp"
 
 #include <array>
 #include <filesystem>
@@ -67,6 +68,8 @@ class Cartridge {
 public:
   explicit Cartridge(cart image)
       : image_(std::move(image)), mbc_(make_mbc(image_)) {}
+  explicit Cartridge()
+      : image_({}), mbc_(make_test_mbc()) {}
 
   [[nodiscard]] byte_t read(addr_t addr) { return mbc_->read(addr); }
   void write(addr_t addr, byte_t v) { mbc_->write(addr, v); }

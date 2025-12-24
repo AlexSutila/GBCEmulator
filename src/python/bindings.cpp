@@ -85,6 +85,7 @@ PYBIND11_MODULE(gbc_py, m) {
   // Expose main Address Bus class
   py::class_<AddressBus>(m, "AddressBus")
       .def(py::init<>())
+      .def("init_test_bed", &AddressBus::init_test_bed)
       .def("write_byte", &AddressBus::write_byte, py::arg("addr"),
            py::arg("value"))
       .def("read_byte", &AddressBus::read_byte, py::arg("addr"));
@@ -168,6 +169,7 @@ PYBIND11_MODULE(gbc_py, m) {
   // Master Emulator class
   py::class_<GameBoyColor>(m, "GameBoyColor")
       .def(py::init<>())
+      .def("init_test_bed", &GameBoyColor::init_test_bed)
       .def("run", &GameBoyColor::run)
       .def("get_bus", &GameBoyColor::get_bus,
            py::return_value_policy::reference_internal)

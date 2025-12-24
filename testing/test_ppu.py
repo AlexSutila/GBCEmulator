@@ -12,6 +12,7 @@ def __get_ppu_mode(bus: AddressBus) -> int:
 def test_ppu_mode_timing():
     '''Basic validation of PPU mode timings'''
     bus = AddressBus()
+    bus.init_test_bed()
     ppu = PixelProcessor(bus)
 
     for frame in range(10):

@@ -13,22 +13,54 @@
 #include <stdexcept>
 #include <vector>
 
+template <typename T> std::unique_ptr<T[]> make_zeroed(std::size_t size) {
+  auto p = std::make_unique<T[]>(size);
+  std::fill_n(p.get(), size, T{});
+  return p;
+}
+
+static constexpr bool is_bootrom_range(const addr_t a) noexcept {
+  return (a <= 0x00FF) || (a >= 0x0200 && a <= 0x0900);
+}
+
+static constexpr bool is_cart_range(const addr_t a) noexcept {
+  return (a <= 0x7FFF) || (a >= 0xA000 && a <= 0xBFFF);
+}
+
+static constexpr bool is_vram_range(const addr_t a) noexcept {
+  return (a >= 0x8000 && a <= 0x9FFF);
+}
+
+static constexpr bool is_wram_range(const addr_t a) noexcept {
+  return (a >= 0xC000 && a <= 0xDFFF);
+}
+
+static constexpr bool is_echo_range(const addr_t a) noexcept {
+  return (a >= 0xE000 && a <= 0xFDFF);
+}
+
+static constexpr bool is_oam_range(const addr_t a) noexcept {
+  return (a >= 0xFE00 && a <= 0xFE9F);
+}
+
+static constexpr bool is_hram_range(const addr_t a) noexcept {
+  return (a >= 0xFF80 && a <= 0xFFFE);
+}
+
 AddressBus::AddressBus() {
   constexpr std::size_t vram_bank_size = 0x2000;
   constexpr std::size_t wram_bank_size = 0x1000;
+  constexpr std::size_t hram_size = 0x7F;
+  constexpr std::size_t oam_size = 0xA0;
   using ioregs = IORegisterMapping;
 
-  /* Initialize VRAM, two banks in CGB mode, second bank unused for DMG */
-  for (auto &bank : vram) {
-    bank = std::make_unique<byte_t[]>(vram_bank_size);
-    std::fill_n(bank.get(), vram_bank_size, 0);
-  }
-
-  /* Initialize WRAM, eight banks in CGB mode, two for DMG */
-  for (auto &bank : wram) {
-    bank = std::make_unique<byte_t[]>(wram_bank_size);
-    std::fill_n(bank.get(), wram_bank_size, 0);
-  }
+  /* Initialize banked and non-banked memory */
+  std::generate(vram.begin(), vram.end(),
+                [&] { return make_zeroed<byte_t>(vram_bank_size); });
+  std::generate(wram.begin(), wram.end(),
+                [&] { return make_zeroed<byte_t>(wram_bank_size); });
+  hram = make_zeroed<byte_t>(hram_size);
+  oam = make_zeroed<byte_t>(oam_size);
 
   /* Populates io-registers lookup table */
   init_io_registers();
@@ -44,9 +76,6 @@ AddressBus::AddressBus() {
   reg = get_mmio(ioregs::MMIO_WRAM_BANK);
   if (!(wram_bank_ctrl = dynamic_cast<WramBank *>(reg)))
     throw std::logic_error("Failed to connect MMIO_WRAM_BANK");
-
-  /* TODO: Remove fallback memory */
-  mem = std::make_unique<byte_t[]>(0x10000);
 }
 
 void AddressBus::init_io_registers() {
@@ -83,36 +112,22 @@ void AddressBus::insert_cartridge(cart c) {
   /* May limit interaction with specific MMIO if disabled */
   is_cgb = cgb_enabled(cgb_flag);
 }
+void AddressBus::init_test_bed() {
+  /* Default constructor initializes an instance of TestMBC */
+  cart_ = std::make_unique<Cartridge>();
+}
 void AddressBus::eject_cartridge() { cart_.reset(); }
-
-static constexpr bool is_bootrom_range(const addr_t a) noexcept {
-  return (a <= 0x00FF) || (a >= 0x0200 && a <= 0x0900);
-}
-
-static constexpr bool is_cart_range(const addr_t a) noexcept {
-  return (a <= 0x7FFF) || (a >= 0xA000 && a <= 0xBFFF);
-}
-
-static constexpr bool is_vram_range(const addr_t a) noexcept {
-  return (a >= 0x8000 && a <= 0x9FFF);
-}
-
-static constexpr bool is_wram_range(const addr_t a, bool high) noexcept {
-  return high ? (a >= 0xD000 && a <= 0xDFFF) : (a >= 0xC000 & a <= 0xCFFF);
-}
 
 const byte_t AddressBus::read_byte(const addr_t addr) {
   const std::vector<byte_t> &boot_rom = get_boot_rom();
 
   /* Read from boot ROM if it is mapped (boot ROM overrides READs only) */
-  if (boot_rom_enabled() && is_bootrom_range(addr)) {
+  if (boot_rom_enabled() && is_bootrom_range(addr))
     return boot_rom.at(addr);
-  }
 
   /* Cartridge memory */
-  else if (cart_ && is_cart_range(addr)) {
+  else if (cart_ && is_cart_range(addr))
     return cart_->read(addr);
-  }
 
   /* Read from VRAM, only banked in CGB mode */
   else if (is_vram_range(addr)) {
@@ -121,15 +136,28 @@ const byte_t AddressBus::read_byte(const addr_t addr) {
   }
 
   /* Read from WRAM, low bank is always mapped to zero */
-  else if (is_wram_range(addr, false)) {
-    return wram.at(0)[addr - 0xC000];
+  else if (is_wram_range(addr)) {
+    if (addr < 0xD000)
+      return wram.at(0)[addr - 0xC000];
+    else {
+      const auto bank = get_wram_bank();
+      return wram.at(bank)[addr - 0xD000];
+    }
   }
 
-  /* Read from WRAM, high bank mapped 1-7 for CGB */
-  else if (is_wram_range(addr, true)) {
-    const auto bank = get_wram_bank();
-    return wram.at(bank)[addr - 0xD000];
+  /* Echoes 0xC000-0xDDFF */
+  else if (is_echo_range(addr)) {
+    if (addr < 0xF000)
+      return wram.at(0)[addr - 0xE000];
+    else {
+      const auto bank = get_wram_bank();
+      return wram.at(bank)[addr - 0xF000];
+    }
   }
+
+  /* Read from Object Attribute Memory */
+  else if (is_oam_range(addr))
+    return oam[addr - 0xFE00];
 
   /* Read from memory mapped IO register */
   else if (io_registers.contains(addr)) {
@@ -137,20 +165,22 @@ const byte_t AddressBus::read_byte(const addr_t addr) {
     auto const &mmio = io_registers.at(addr);
 
     // Only write CGB registers if in CGB mode, fallback to 0xFF otherwise
-    return (!mmio->cgb() || is_cgb) ? mmio->read() : 0xFF;
+    return (!mmio->cgb() || is_cgb) ? mmio->read() : open_bus();
   }
 
-  /* Fallback memory */
-  else
-    return mem[addr];
+  /* Read from to High RAM */
+  else if (is_hram_range(addr))
+    return hram[addr - 0xFF80];
+
+  /* Not actually sure what happens here, assume reads all ones */
+  return open_bus();
 }
 
 void AddressBus::write_byte(const addr_t addr, const byte_t value) {
 
   /* Cartridge sees writes too (bank switching etc.) */
-  if (cart_ && is_cart_range(addr)) {
+  if (cart_ && is_cart_range(addr))
     cart_->write(addr, value);
-  }
 
   /* Write to VRAM, only banked in CGB mode */
   else if (is_vram_range(addr)) {
@@ -159,15 +189,28 @@ void AddressBus::write_byte(const addr_t addr, const byte_t value) {
   }
 
   /* Write to WRAM, low bank is always mapped to zero */
-  else if (is_wram_range(addr, false)) {
-    wram.at(0)[addr - 0xC000] = value;
+  else if (is_wram_range(addr)) {
+    if (addr < 0xD000)
+      wram.at(0)[addr - 0xC000] = value;
+    else {
+      const auto bank = get_wram_bank();
+      wram.at(bank)[addr - 0xD000] = value;
+    }
   }
 
-  /* Write to WRAM, high bank mapped 1-7 for CGB */
-  else if (is_wram_range(addr, true)) {
-    const auto bank = get_wram_bank();
-    wram.at(bank)[addr - 0xD000] = value;
+  /* Echoes 0xC000-0xDDFF */
+  else if (is_echo_range(addr)) {
+    if (addr < 0xF000)
+      wram.at(0)[addr - 0xE000] = value;
+    else {
+      const auto bank = get_wram_bank();
+      wram.at(bank)[addr - 0xF000] = value;
+    }
   }
+
+  /* Write to Object Attribute Memory */
+  else if (is_oam_range(addr))
+    oam[addr - 0xFE00] = value;
 
   /* Write to memory mapped IO register */
   else if (io_registers.contains(addr)) {
@@ -179,9 +222,9 @@ void AddressBus::write_byte(const addr_t addr, const byte_t value) {
       mmio->write(value);
   }
 
-  /* Fallback memory */
-  else
-    mem[addr] = value;
+  /* Write to High RAM */
+  else if (is_hram_range(addr))
+    hram[addr - 0xFF80] = value;
 }
 
 bool AddressBus::boot_rom_enabled() {

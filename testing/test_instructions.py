@@ -78,17 +78,24 @@ def __evaluate_test_vectors(test_vecs: List[CpuTestVector]):
 
         # Emulator instance
         gbc = GameBoyColor()
+        gbc.init_test_bed()
         cpu = gbc.get_cpu()
 
         # Get bus reference and disable boot ROM
         bus = gbc.get_bus()
         bus.write_byte(0xFF50, 0)
 
-        # Update RAM state
+        # Update RAM state - skip a couple address ranges because the test
+        # suite sucks miserable ass and doesn't account for their behavior
         for addr, byte in test_vec.initial.ram:
             if addr >= 0xFF00 and addr <= 0xFF7F:
-                skip = True
-            bus.write_byte(addr, byte)
+                skip = True  # Skip IO-registers
+            elif addr >= 0xFEA0 and addr <= 0xFEFF:
+                skip = True  # Skip unusable memory
+            elif addr >= 0xE000 and addr <= 0xFDFF:
+                skip = True  # Skip echo RAM
+            else:
+                bus.write_byte(addr, byte)
 
         # For the time being, I am skipping bizzare cases that rely on accurate
         # emulation of MMIO registers. This test is supposed to be rudimentary

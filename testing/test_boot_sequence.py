@@ -9,6 +9,7 @@ import hashlib
 def test_boot_rom_bus_dump():
     '''Validate bus dump of boot ROM against ground truth'''
     bus = AddressBus()
+    bus.init_test_bed()
     rom = get_boot_rom()
 
     # Generate a bus dump of what should be the boot ROM
@@ -23,6 +24,7 @@ def test_boot_rom_bus_dump():
 def test_boot_rom_banking():
     '''Validate the writing the control register to bank out of boot ROM'''
     bus = AddressBus()
+    bus.init_test_bed()
 
     # Take the first byte of the ROM, and validate content
     first_byte = get_boot_rom()[0]

@@ -22,6 +22,14 @@ void GameBoyColor::insert_cartridge(cart c) {
   ppu->set_cgb(c.header.cgb_flag());
 }
 
+void GameBoyColor::init_test_bed() {
+  if (!bus)
+    throw std::logic_error("Bus not initialized");
+
+  /* Init convenience RAM-only cartridge for testing */
+  bus->init_test_bed();
+}
+
 void GameBoyColor::run() {
   bool running = true;
 

@@ -38,32 +38,33 @@ public:
   AddressBus();
   void insert_cartridge(cart c);
   void eject_cartridge();
+  void init_test_bed();
 
 private:
-  std::unique_ptr<byte_t[]> mem{};
-  void init_io_registers();
-
-  /* VRAM is banked in CGB, second bank remains unused for DMG */
   std::array<std::unique_ptr<byte_t[]>, 2> vram{};
-  PPU::VramBank *vram_bank_ctrl{};
-  const byte_t get_vram_bank() const;
-
-  /* Upper half of WRAM is banked in CGB, contiguous in DMG */
   std::array<std::unique_ptr<byte_t[]>, 8> wram{};
-  WramBank *wram_bank_ctrl{};
-  const byte_t get_wram_bank() const;
+  std::unique_ptr<byte_t[]> hram{};
+  std::unique_ptr<byte_t[]> oam{};
+  std::unique_ptr<Cartridge> cart_;
 
-  /* Unmaps boot rom after execution of BIOS has completed */
+  /* MMIO refs maintained for convenience */
+  PPU::VramBank *vram_bank_ctrl{};
+  WramBank *wram_bank_ctrl{};
   BootROMCtrl *boot_rom_ctrl{};
+
+  /* Helpers */
+  constexpr byte_t open_bus() { return 0xFF; }
+  const byte_t get_vram_bank() const;
+  const byte_t get_wram_bank() const;
   bool boot_rom_enabled();
 
   /* Maps memory mapped IO registers to their respective addresses in memory.
    * Usage of raw pointers is waranted because this map is not responsible for
    * ownership of any of the resources pointed to. */
   std::map<addr_t, std::unique_ptr<MMIORegister>> io_registers{};
+  void init_io_registers();
 
   /* Usable hardware features are determined by the cartridge header. */
-  std::unique_ptr<Cartridge> cart_;
   bool is_cgb{};
 };
 

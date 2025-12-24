@@ -13,5 +13,6 @@ std::unique_ptr<Mbc> make_mbc1(const cart &c);
 std::unique_ptr<Mbc> make_mbc2(const cart &c);
 std::unique_ptr<Mbc> make_mbc3(const cart &c);
 std::unique_ptr<Mbc> make_mbc5(const cart &c);
+std::unique_ptr<Mbc> make_test_mbc();
 
 #endif //__GBC_MBC_CREATOR_HPP

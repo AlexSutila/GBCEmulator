@@ -13,6 +13,7 @@ class GameBoyColor {
 public:
   GameBoyColor();
   void insert_cartridge(cart c);
+  void init_test_bed();
   void run();
 
   /* Getters mainly for python bindings */

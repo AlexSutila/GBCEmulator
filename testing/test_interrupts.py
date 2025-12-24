@@ -9,6 +9,7 @@ from gbc_py import (
 def test_ie_register_unused_bits():
     '''Validate the behavior of the unused bits for the IE register'''
     bus = AddressBus()
+    bus.init_test_bed()
     assert bus.read_byte(0xFFFF) == 0x00
     bus.write_byte(0xFFFF, 0xFF)
     assert bus.read_byte(0xFFFF) == 0xFF
@@ -17,6 +18,7 @@ def test_ie_register_unused_bits():
 def test_if_register_unused_bits():
     '''Validate the behavior of the unused bits for the IF register'''
     bus = AddressBus()
+    bus.init_test_bed()
     assert bus.read_byte(0xFF0F) == 0xE0
     bus.write_byte(0xFF0F, 0xFF)
     assert bus.read_byte(0xFF0F) == 0xFF
@@ -90,6 +92,9 @@ def test_ime_enable_ei_timing_full():
         0x00,   # NOP - ime enabled
     ]
     gbc = GameBoyColor()
+    gbc.init_test_bed()
+
+    # Component refs
     cpu = gbc.get_cpu()
     bus = gbc.get_bus()
 
@@ -98,14 +103,15 @@ def test_ime_enable_ei_timing_full():
     for addr, byte in enumerate(bytecode):
         bus.write_byte(addr, byte)
 
-    for _ in range(8): cpu.step()
+    for _ in range(8):
+        cpu.step()
     assert not cpu.get_state().ime_enabled
-    for _ in range(4): cpu.step()
+    for _ in range(4):
+        cpu.step()
     assert cpu.get_state().ime_enabled
 
 
-
-def test_ime_ei_di_quirk():
+def test_ime_ei_di_quirk_full():
     '''Test EI followed by DI with actual bytecode'''
     bytecode = [
         0xFB,   # EI  - delay begins
@@ -113,6 +119,9 @@ def test_ime_ei_di_quirk():
         0x00,   # NOP - ime enabled
     ]
     gbc = GameBoyColor()
+    gbc.init_test_bed()
+
+    # Component refs
     cpu = gbc.get_cpu()
     bus = gbc.get_bus()
 
@@ -121,5 +130,6 @@ def test_ime_ei_di_quirk():
     for addr, byte in enumerate(bytecode):
         bus.write_byte(addr, byte)
 
-    for _ in range(12): cpu.step()
+    for _ in range(12):
+        cpu.step()
     assert not cpu.get_state().ime_enabled
