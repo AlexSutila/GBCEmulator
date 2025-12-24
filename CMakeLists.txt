@@ -35,6 +35,7 @@ set(GBC_CORE_SOURCES
     src/memory/mmio/mmio.cpp
 
     src/ppu/ppu.cpp
+    src/ppu/fifo.cpp
 
     src/cart/cart.cpp
     src/cart/cart_display.cpp

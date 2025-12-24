@@ -5,6 +5,7 @@
 #include "memory/bus.hpp"
 #include "memory/mmio/dmg.hpp"
 #include "memory/mmio/mmio.hpp"
+#include "ppu/fifo.hpp"
 
 #include <cstddef>
 #include <optional>
@@ -46,6 +47,10 @@ private:
   void request_lcd() {
     if_reg->put_flag(InterruptFlagMask::INT_FLAG_LCD, true);
   }
+
+  /* Pixel FIFO renderers */
+  PixelFifo obj_fifo{};
+  PixelFifo bg_fifo{};
 
   /* Determined by cartridge header, dictates usable PPU features */
   bool is_cgb{};

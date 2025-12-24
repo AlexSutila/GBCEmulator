@@ -40,6 +40,10 @@ public:
   void eject_cartridge();
   void init_test_bed();
 
+  /* Convenience getters for PixelProcessor */
+  std::array<std::unique_ptr<byte_t[]>, 2> &get_vram() { return vram; }
+  std::unique_ptr<byte_t[]> &get_oam() { return oam; }
+
 private:
   std::array<std::unique_ptr<byte_t[]>, 2> vram{};
   std::array<std::unique_ptr<byte_t[]>, 8> wram{};
