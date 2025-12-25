@@ -27,7 +27,6 @@ Renderer::Renderer() {
     throw std::runtime_error(SDL_GetError());
 
   /* Enable vsync (SDL3 way) */
-  SDL_SetRenderVSync(renderer, 1);
   texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
                               SDL_TEXTUREACCESS_STREAMING, FB_WIDTH, FB_HEIGHT);
   if (!texture)
