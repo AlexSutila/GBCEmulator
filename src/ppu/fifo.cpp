@@ -54,7 +54,6 @@ byte_t PixelFifo::fetch_tile_data(bool high) const {
 void PixelFifo::get_tile() {
   constexpr std::size_t max_state_clks = 2;
   using modes = PixelFifo::PixelFifoState;
-  constexpr auto x_coor_mask = 0x1F;
 
   // State entry logic - compute tile index
   if (!total_clks.has_value()) {
@@ -62,7 +61,9 @@ void PixelFifo::get_tile() {
     total_clks = max_state_clks;
 
     // Advance the state of the fetcher, always < 32
-    fetcher.x_coor = (fetcher.x_coor + 1) & x_coor_mask;
+    // fetcher.x_coor = (fetcher.x_coor + 1) & x_coor_mask;
+    if (++fetcher.x_coor >= 20)
+      fetcher.x_coor = 0;
   }
   ++cur_clks;
 
