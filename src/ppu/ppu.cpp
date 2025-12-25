@@ -97,7 +97,10 @@ void PixelProcessor::do_draw() {
 
   // Rendering step
   if (bg_fifo.can_pop()) {
-    bg_fifo.pop();
+    const auto pixel_data = bg_fifo.pop();
+    renderer->putPixel(row_pixels_rendered, // Denotes X-coordinate
+                       ly_reg->read(),      // Denotes Y-coordinate
+                       pixel_data.palette_idx);
     ++row_pixels_rendered;
   }
   bg_fifo.step();
@@ -133,6 +136,9 @@ void PixelProcessor::do_vblank() {
   assert(stat_reg->get_mode() == modes::MODE_VBLANK);
   assert(!ly_reg->is_visible());
   blank();
+
+  // Present visuals written to frame buffer
+  renderer->present();
 }
 
 void PixelProcessor::blank() {

@@ -3,6 +3,7 @@
 
 #include "cart/cart.hpp"
 #include "cpu/lr35902.hpp"
+#include "frontend/renderer.hpp"
 #include "memory/bus.hpp"
 #include "ppu/ppu.hpp"
 
@@ -11,7 +12,7 @@
 
 class GameBoyColor {
 public:
-  GameBoyColor();
+  GameBoyColor(bool headless);
   void insert_cartridge(cart c);
   void init_test_bed();
   void run();
@@ -22,6 +23,7 @@ public:
   PixelProcessor *get_ppu() { return ppu.get(); }
 
 private:
+  std::unique_ptr<Renderer> renderer{};
   std::unique_ptr<AddressBus> bus{};
   std::unique_ptr<LR35902> cpu{};
   std::unique_ptr<PixelProcessor> ppu{};

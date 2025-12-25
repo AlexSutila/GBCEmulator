@@ -8,7 +8,8 @@ int main(const int argc, const char **argv) {
   if (argc < 2)
     throw std::logic_error(usage);
 
-  GameBoyColor emulator;
+  // False to run in non-headless mode
+  GameBoyColor emulator = GameBoyColor(false);
   cart cart = load_cart(argv[1]);
 
   emulator.insert_cartridge(cart);

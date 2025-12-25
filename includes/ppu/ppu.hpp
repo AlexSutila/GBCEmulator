@@ -2,6 +2,7 @@
 #define __PPU_H
 
 #include "cpu/interrupts.hpp"
+#include "frontend/renderer.hpp"
 #include "memory/bus.hpp"
 #include "memory/mmio/dmg.hpp"
 #include "memory/mmio/mmio.hpp"
@@ -13,6 +14,7 @@
 class PixelProcessor {
 public:
   PixelProcessor(AddressBus *bus_ptr);
+  void connect_renderer(std::unique_ptr<Renderer> &r) { renderer = r.get(); }
   void set_cgb(const byte_t cgb_flag);
   void step();
 
@@ -20,6 +22,7 @@ private:
   AddressBus *const bus{};
   InterruptBits *ie_reg{};
   InterruptBits *if_reg{};
+  Renderer *renderer{};
 
   /* Pixel Processor status registers */
   PPU::STAT *stat_reg{};
