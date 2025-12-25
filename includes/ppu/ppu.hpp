@@ -25,6 +25,7 @@ private:
   Renderer *renderer{};
 
   /* Pixel Processor status registers */
+  PPU::LCDCtrl *lcdc_reg{};
   PPU::STAT *stat_reg{};
   PPU::LY *ly_reg{};
   MMIORegister *lyc_reg{};

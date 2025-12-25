@@ -4,6 +4,34 @@
 
 namespace PPU {
 
+/* All bytes are used so this logic isn't too convoluted */
+void LCDCtrl::write(byte_t value) { state = value; }
+byte_t LCDCtrl::read() { return state; }
+
+/* LCD Control helpers */
+const bool LCDCtrl::lcd_enabled() const { return (state & 0x80) != 0; }
+const TileMapArea LCDCtrl::win_tilemap_base() const {
+  return (state & 0x40) != 0 ? TileMapArea::HI_TILEMAP_BASE
+                             : TileMapArea::LO_TILEMAP_BASE;
+}
+const bool LCDCtrl::win_enabled() const { return (state & 0x20) != 0; }
+const TileDataArea LCDCtrl::bg_win_data_area() const {
+  return (state & 0x10) != 0 ? TileDataArea::HI_TILEDATA_BASE
+                             : TileDataArea::LO_TILEDATA_BASE;
+}
+const TileMapArea LCDCtrl::bg_tilemap_base() const {
+  return (state & 0x08) != 0 ? TileMapArea::HI_TILEMAP_BASE
+                             : TileMapArea::LO_TILEMAP_BASE;
+}
+
+/* The return value here will always be in reference to the height (pixels) of
+ * the sprites. Sprites will never not be 8 pixels wide. */
+const SpriteHeight LCDCtrl::obj_size() const {
+  return (state & 0x04) != 0 ? SpriteHeight::TALL_SPRITES
+                             : SpriteHeight::SHORT_SPRITES;
+}
+const bool LCDCtrl::obj_enable() const { return (state & 0x02) != 0; }
+
 void STAT::write(byte_t value) {
   // Most significant bit is un-mapped, preserve mode bits
   state = (state & 0x03) | (value & 0x7C) | 0x80;

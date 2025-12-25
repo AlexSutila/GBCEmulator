@@ -86,6 +86,7 @@ AddressBus::AddressBus() {
 
 void AddressBus::init_io_registers() {
   io_registers[0xFF0F] = std::make_unique<::InterruptBits>(true);
+  io_registers[0xFF40] = std::make_unique<PPU::LCDCtrl>();
   io_registers[0xFF41] = std::make_unique<PPU::STAT>();
   io_registers[0xFF44] = std::make_unique<PPU::LY>();
   io_registers[0xFF45] = std::make_unique<::MMIORegister>(); // LYC

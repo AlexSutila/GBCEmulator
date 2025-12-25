@@ -60,8 +60,7 @@ void PixelFifo::get_tile() {
     fetcher.tile_idx = calc_tile_idx();
     total_clks = max_state_clks;
 
-    // Advance the state of the fetcher, always < 32
-    // fetcher.x_coor = (fetcher.x_coor + 1) & x_coor_mask;
+    // Advance the state of the fetcher, always < 20
     if (++fetcher.x_coor >= 20)
       fetcher.x_coor = 0;
   }

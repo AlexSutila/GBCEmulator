@@ -28,6 +28,7 @@ PixelProcessor::PixelProcessor(AddressBus *bus_ptr)
   /* Configure convenience MMIO register references */
   ie_reg = init_mmio<InterruptBits>(bus, mmio::MMIO_INT_ENABLE);
   if_reg = init_mmio<InterruptBits>(bus, mmio::MMIO_INT_FLAGS);
+  lcdc_reg = init_mmio<LCDCtrl>(bus, mmio::MMIO_LCD_CONTROL);
   stat_reg = init_mmio<STAT>(bus, mmio::MMIO_LCD_STATUS);
   ly_reg = init_mmio<LY>(bus, mmio::MMIO_LCD_Y_COOR);
   lyc_reg = init_mmio<MMIORegister>(bus, mmio::MMIO_LCD_Y_COMP);
