@@ -89,6 +89,19 @@ private:
   void get_tile_data_hi();
   void sleep();
 
+  std::size_t calc_tile_idx() const;
+  byte_t fetch_tile_data(bool low) const;
+
+  struct {
+    std::size_t tile_idx;
+    // A row of tile consists of two consecutive bytes
+    byte_t data_lo;
+    byte_t data_hi;
+    // In unit of tiles - between 0 and 31
+    std::size_t x_coor;
+    // Y coor is tracked in pixels, can leverage LY register
+  } fetcher;
+
   // For state transition logic
   std::optional<std::size_t> total_clks;
   std::size_t cur_clks;

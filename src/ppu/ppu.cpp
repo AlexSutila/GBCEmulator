@@ -91,6 +91,7 @@ void PixelProcessor::do_draw() {
 
   // TODO:
   // - Actually perform rendering here
+  bg_fifo.step();
 
   // Step dot clock
   ++cur_scanline_clks;
