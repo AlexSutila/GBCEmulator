@@ -36,6 +36,7 @@ void GameBoyColor::run() {
   while (running) [[likely]] {
     cpu->step();
     ppu->step();
+    bus->get_timer()->tick_tcycles(1);
     ++elapsed_clocks_;
   }
 }

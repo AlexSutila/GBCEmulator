@@ -82,9 +82,15 @@ AddressBus::AddressBus() {
   reg = get_mmio(ioregs::MMIO_WRAM_BANK);
   if (!(wram_bank_ctrl = dynamic_cast<WramBank *>(reg)))
     throw std::logic_error("Failed to connect MMIO_WRAM_BANK");
+  timer = Timer::TimerUnit(is_cgb);
+  timer.connect_if(*get_mmio(ioregs::MMIO_INT_FLAGS));
 }
 
 void AddressBus::init_io_registers() {
+  io_registers[0xFF04] = std::make_unique<Timer::DIV>(timer);
+  io_registers[0xFF05] = std::make_unique<Timer::TIMA>(timer);
+  io_registers[0xFF06] = std::make_unique<Timer::TMA>(timer);
+  io_registers[0xFF07] = std::make_unique<Timer::TAC>(timer);
   io_registers[0xFF0F] = std::make_unique<::InterruptBits>(true);
   io_registers[0xFF41] = std::make_unique<PPU::STAT>();
   io_registers[0xFF44] = std::make_unique<PPU::LY>();
@@ -113,7 +119,7 @@ const byte_t AddressBus::get_wram_bank() const {
 
 void AddressBus::insert_cartridge(cart c) {
   cart_ = std::make_unique<Cartridge>(std::move(c));
-  const byte_t cgb_flag = c.header.cgb_flag();
+  const byte_t cgb_flag = cart_->image().header.cgb_flag();
 
   /* May limit interaction with specific MMIO if disabled */
   is_cgb = cgb_enabled(cgb_flag);
@@ -242,4 +248,8 @@ MMIORegister *AddressBus::get_mmio(IORegisterMapping mapping) const {
   assert(io_registers.contains(addr));
   /* The address bus maintains ownership, so raw pointers are fine. */
   return io_registers.at(addr).get();
+}
+
+Timer::TimerUnit *AddressBus::get_timer() {
+  return &timer;
 }
