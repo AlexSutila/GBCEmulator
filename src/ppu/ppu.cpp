@@ -98,9 +98,10 @@ void PixelProcessor::do_draw() {
   // Rendering step
   if (bg_fifo.can_pop()) {
     const auto pixel_data = bg_fifo.pop();
-    renderer->putPixel(row_pixels_rendered, // Denotes X-coordinate
-                       ly_reg->read(),      // Denotes Y-coordinate
-                       pixel_data.palette_idx);
+    if (renderer) // Disabled in headless mode, so this is conditional
+      renderer->putPixel(row_pixels_rendered, // Denotes X-coordinate
+                         ly_reg->read(),      // Denotes Y-coordinate
+                         pixel_data.palette_idx);
     ++row_pixels_rendered;
   }
   bg_fifo.step();
@@ -138,7 +139,8 @@ void PixelProcessor::do_vblank() {
   blank();
 
   // Present visuals written to frame buffer
-  renderer->present();
+  if (renderer)
+    renderer->present();
 }
 
 void PixelProcessor::blank() {
