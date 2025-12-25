@@ -54,10 +54,6 @@ void PixelProcessor::do_oam_scan() {
   if (!total_mode_clks.has_value()) {
     cur_scanline_clks = cur_mode_clks = 0;
     total_mode_clks = oam_t_cycles;
-
-    // Present visuals written to frame buffer
-    if (renderer)
-      renderer->present();
   }
 
   // TODO:
@@ -162,8 +158,12 @@ void PixelProcessor::blank() {
     request_vblank();
 
   // End of scanline logic
-  stat_reg->set_mode(ly_reg->is_visible() ? modes::MODE_OAM_SCAN
-                                          : modes::MODE_VBLANK);
+  if (ly_reg->is_visible()) {
+    stat_reg->set_mode(modes::MODE_OAM_SCAN);
+    if (renderer)
+      renderer->present();
+  } else
+    stat_reg->set_mode(modes::MODE_VBLANK);
   total_mode_clks.reset();
   cur_scanline_clks = 0;
 }
