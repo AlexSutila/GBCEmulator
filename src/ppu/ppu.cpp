@@ -54,6 +54,10 @@ void PixelProcessor::do_oam_scan() {
   if (!total_mode_clks.has_value()) {
     cur_scanline_clks = cur_mode_clks = 0;
     total_mode_clks = oam_t_cycles;
+
+    // Present visuals written to frame buffer
+    if (renderer)
+      renderer->present();
   }
 
   // TODO:
@@ -137,10 +141,6 @@ void PixelProcessor::do_vblank() {
   assert(stat_reg->get_mode() == modes::MODE_VBLANK);
   assert(!ly_reg->is_visible());
   blank();
-
-  // Present visuals written to frame buffer
-  if (renderer)
-    renderer->present();
 }
 
 void PixelProcessor::blank() {
