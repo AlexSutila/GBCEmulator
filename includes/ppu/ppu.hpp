@@ -35,11 +35,6 @@ private:
   void do_vblank();
   void blank();
 
-  /* Timing and FSM metadata */
-  std::optional<std::size_t> total_mode_clks{};
-  std::size_t cur_scanline_clks{};
-  std::size_t cur_mode_clks{};
-
   /* Interrupt helpers */
   void request_vblank() {
     if_reg->put_flag(InterruptFlagMask::INT_FLAG_VBLANK, true);
@@ -47,6 +42,12 @@ private:
   void request_lcd() {
     if_reg->put_flag(InterruptFlagMask::INT_FLAG_LCD, true);
   }
+
+  /* Timing and FSM metadata */
+  std::optional<std::size_t> total_mode_clks{};
+  std::size_t cur_scanline_clks{};
+  std::size_t cur_mode_clks{};
+  std::size_t row_pixels_rendered{};
 
   /* Pixel FIFO renderers */
   PixelFifo bg_fifo;

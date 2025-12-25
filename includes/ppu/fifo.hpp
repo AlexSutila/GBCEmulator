@@ -8,7 +8,7 @@
 #include <stdexcept>
 
 struct pixel {
-  byte_t color; // A value between 0 and 3
+  byte_t palette_idx; // A value between 0 and 3
 };
 class PixelProcessor;
 
@@ -62,7 +62,6 @@ public:
       throw std::runtime_error("CircularFifo::front() called on empty");
     return buf[tail];
   }
-
   void clear() noexcept { head = tail = count = 0; }
 
 private:
@@ -75,19 +74,23 @@ public:
   PixelFifo(PixelProcessor *ppu_ptr);
   void step();
 
+  /* Pop a fully processed pixel */
+  bool can_pop() const { return fifo.size() > 0; }
+  pixel pop() { return fifo.pop(); }
+
 private:
   enum PixelFifoState {
-    STATE_GET_TILE,
+    STATE_GET_TILE, // Miseading name, computes index
     STATE_GET_TILE_DATA_LOW,
     STATE_GET_TILE_DATA_HIGH,
-    STATE_SLEEP,
+    STATE_PUSH,
   };
   CircularFifo<pixel, 16> fifo;
 
   void get_tile();
   void get_tile_data_lo();
   void get_tile_data_hi();
-  void sleep();
+  void do_push();
 
   std::size_t calc_tile_idx() const;
   byte_t fetch_tile_data(bool high) const;

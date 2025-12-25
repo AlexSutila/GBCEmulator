@@ -31,7 +31,7 @@ std::size_t PixelFifo::calc_tile_idx() const {
   // TODO: Consider configurable indexing modes
   const addr_t tile_idx = (y_tile << tile_shift) | x_tile;
   constexpr auto tilemap_base = 0x9800;
-  return ppu->bus->read_byte(tilemap_base | tile_idx);
+  return ppu->bus->read_byte(tilemap_base + tile_idx);
 }
 
 byte_t PixelFifo::fetch_tile_data(bool high) const {
@@ -45,7 +45,7 @@ byte_t PixelFifo::fetch_tile_data(bool high) const {
 
   // Need to consider y-offset based on LY register
   const addr_t tile_base_addr = fetcher.tile_idx * tile_size_bytes;
-  addr_t data_addr = vram_base_addr | tile_base_addr | y_offset;
+  addr_t data_addr = vram_base_addr + tile_base_addr + y_offset;
   if (high)
     ++data_addr;
   return ppu->bus->read_byte(data_addr);
@@ -106,28 +106,44 @@ void PixelFifo::get_tile_data_hi() {
 
   // Get tile incomplete
   if (cur_clks >= total_clks.value()) {
-    state = modes::STATE_SLEEP;
+    state = modes::STATE_PUSH;
     total_clks.reset();
     cur_clks = 0;
   }
 }
 
-void PixelFifo::sleep() {
-  constexpr std::size_t max_state_clks = 2;
+void PixelFifo::do_push() {
   using modes = PixelFifo::PixelFifoState;
+  constexpr std::size_t min_state_clks = 2;
+  constexpr auto pixels_per_row = 8;
 
   // State entry logic
-  if (!total_clks.has_value()) {
-    total_clks = max_state_clks;
-  }
+  if (!total_clks.has_value())
+    total_clks = min_state_clks;
   ++cur_clks;
 
-  // Get tile incomplete
-  if (cur_clks >= total_clks.value()) {
-    state = modes::STATE_SLEEP;
-    total_clks.reset();
-    cur_clks = 0;
+  // This takes two clock cycles at best
+  if (cur_clks < min_state_clks)
+    return;
+
+  // Eight pixels are pushed at a time, must have room
+  if (fifo.size() > fifo.capacity() - pixels_per_row)
+    return;
+
+  // Compute palette indices
+  for (int shift{7}; shift >= 0; shift--) {
+    const byte_t hi_bit = (fetcher.data_hi & (1 << shift)) != 0 ? 1 : 0;
+    const byte_t lo_bit = (fetcher.data_lo & (1 << shift)) != 0 ? 1 : 0;
+    const byte_t palette_idx = (hi_bit << 1) | lo_bit;
+
+    // TODO: Index palette, just pushing the index for now
+    fifo.push({.palette_idx = palette_idx});
   }
+
+  // State transition after push to fetch next row
+  state = modes::STATE_GET_TILE;
+  total_clks.reset();
+  cur_clks = 0;
 }
 
 void PixelFifo::step() {
@@ -141,8 +157,8 @@ void PixelFifo::step() {
   case STATE_GET_TILE_DATA_HIGH:
     get_tile_data_hi();
     break;
-  case STATE_SLEEP:
-    sleep();
+  case STATE_PUSH:
+    do_push();
     break;
   }
 }

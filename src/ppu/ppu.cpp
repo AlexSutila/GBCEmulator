@@ -16,7 +16,8 @@ template <typename T> T *init_mmio(AddressBus *bus, IORegisterMapping reg_id) {
   throw std::logic_error(std::string("Failed to configure MMIO (PPU)"));
 }
 
-PixelProcessor::PixelProcessor(AddressBus *bus_ptr) : bus(bus_ptr), bg_fifo(this) {
+PixelProcessor::PixelProcessor(AddressBus *bus_ptr)
+    : bus(bus_ptr), bg_fifo(this) {
   using mmio = IORegisterMapping;
   using namespace PPU;
 
@@ -73,6 +74,7 @@ void PixelProcessor::do_oam_scan() {
 
 void PixelProcessor::do_draw() {
   constexpr std::size_t min_drawing_cycles = 172; // Variable
+  constexpr std::size_t pixels_per_row = 160;     // H-Resolution
   using modes = PPU::StatModes;
 
   // Rendering always happens on visible scanlines
@@ -83,14 +85,21 @@ void PixelProcessor::do_draw() {
    * features cause the rendering process to stall. This additional stalling
    * time lengthens the duration of this operation mode. */
   if (!total_mode_clks.has_value()) {
-    // Simply set to minimum, raise as quirks come up during rendering
+    // Simply set to minimum, raise as quirks come up during rendering. We do
+    // not use this to determine end of state.
     total_mode_clks = min_drawing_cycles;
     // We are still mid-scanline, so do not touch `cur_scanline_clks`
     cur_mode_clks = 0;
+    // Counts how many pixels have been rendered on this row. This determines
+    // when rendering is complete.
+    row_pixels_rendered = 0;
   }
 
-  // TODO:
-  // - Actually perform rendering here
+  // Rendering step
+  if (bg_fifo.can_pop()) {
+    bg_fifo.pop();
+    ++row_pixels_rendered;
+  }
   bg_fifo.step();
 
   // Step dot clock
@@ -98,7 +107,7 @@ void PixelProcessor::do_draw() {
   ++cur_mode_clks;
 
   // Rendering incomplete
-  if (cur_mode_clks < total_mode_clks.value())
+  if (row_pixels_rendered < pixels_per_row)
     return;
 
   // State transition logic
