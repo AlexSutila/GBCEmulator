@@ -90,7 +90,7 @@ private:
   void sleep();
 
   std::size_t calc_tile_idx() const;
-  byte_t fetch_tile_data(bool low) const;
+  byte_t fetch_tile_data(bool high) const;
 
   struct {
     std::size_t tile_idx;
