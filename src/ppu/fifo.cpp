@@ -146,6 +146,17 @@ void PixelFifo::do_push() {
   cur_clks = 0;
 }
 
+void PixelFifo::reset() {
+  using modes = PixelFifo::PixelFifoState;
+  state = modes::STATE_GET_TILE;
+
+  /* Reset internal timing and state info */
+  fetcher.x_coor = 0;
+  total_clks.reset();
+  cur_clks = 0;
+  fifo.clear();
+}
+
 void PixelFifo::step() {
   switch (state) {
   case STATE_GET_TILE:

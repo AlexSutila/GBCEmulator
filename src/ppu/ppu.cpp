@@ -21,10 +21,6 @@ PixelProcessor::PixelProcessor(AddressBus *bus_ptr)
   using mmio = IORegisterMapping;
   using namespace PPU;
 
-  /* Configure FSM timing metadata */
-  total_mode_clks = std::nullopt;
-  cur_scanline_clks = cur_mode_clks = 0;
-
   /* Configure convenience MMIO register references */
   ie_reg = init_mmio<InterruptBits>(bus, mmio::MMIO_INT_ENABLE);
   if_reg = init_mmio<InterruptBits>(bus, mmio::MMIO_INT_FLAGS);
@@ -33,10 +29,8 @@ PixelProcessor::PixelProcessor(AddressBus *bus_ptr)
   ly_reg = init_mmio<LY>(bus, mmio::MMIO_LCD_Y_COOR);
   lyc_reg = init_mmio<MMIORegister>(bus, mmio::MMIO_LCD_Y_COMP);
 
-  /* Configure status MMIO registers initial state - drives FSM */
-  stat_reg->set_mode(StatModes::MODE_OAM_SCAN);
-  ly_reg->reset(); // Scanline zero
-  lyc_reg->write(0x00);
+  /* Configure PPU to initial state */
+  reset();
 }
 
 void PixelProcessor::set_cgb(const byte_t cgb_flag) {
@@ -169,7 +163,29 @@ void PixelProcessor::blank() {
   cur_scanline_clks = 0;
 }
 
+void PixelProcessor::reset() {
+  using namespace PPU;
+  bg_fifo.reset();
+
+  /* Configure FSM timing metadata */
+  cur_scanline_clks = cur_mode_clks = 0;
+  total_mode_clks = std::nullopt;
+
+  /* Configure status MMIO registers initial state - drives FSM */
+  stat_reg->set_mode(StatModes::MODE_OAM_SCAN);
+  ly_reg->reset();
+}
+
 void PixelProcessor::step() {
+
+  /* When the PPU is disabled, the screen just shows plain white and the state
+   * is set to it's initial state until it is re-enabled again. */
+  if (!lcdc_reg->lcd_enabled()) [[unlikely]] {
+    reset();
+    return;
+  }
+
+  /* Rendering is enabled, perform FSM logic */
   switch (stat_reg->get_mode()) {
   case PPU::StatModes::MODE_HBLANK:
     do_hblank();

@@ -72,6 +72,7 @@ private:
 class PixelFifo {
 public:
   PixelFifo(PixelProcessor *ppu_ptr);
+  void reset();
   void step();
 
   /* Pop a fully processed pixel */
