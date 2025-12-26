@@ -89,20 +89,20 @@ bool BootROMCtrl::boot_rom_enabled() const { return map_boot_rom; }
 
 namespace Timer {
 
-DIV::DIV(TimerUnit *t) : MMIORegister{}, t_(t) {}
-void DIV::write(byte_t) { t_->write_div(); }
-byte_t DIV::read() { return t_->read_div(); }
+DIV::DIV(TimerUnit &t) : MMIORegister{}, t_(t) {}
+void DIV::write(byte_t) { t_.write_div(); }
+byte_t DIV::read() { return t_.read_div(); }
 
-TIMA::TIMA(TimerUnit *t) : MMIORegister{}, t_(t) {}
-void TIMA::write(byte_t v) { t_->write_tima(v); }
-byte_t TIMA::read() { return t_->read_tima(); }
+TIMA::TIMA(TimerUnit &t) : MMIORegister{}, t_(t) {}
+void TIMA::write(byte_t v) { t_.write_tima(v); }
+byte_t TIMA::read() { return t_.read_tima(); }
 
-TMA::TMA(TimerUnit *t) : MMIORegister{}, t_(t) {}
-void TMA::write(byte_t v) { t_->write_tma(v); }
-byte_t TMA::read() { return t_->read_tma(); }
+TMA::TMA(TimerUnit &t) : MMIORegister{}, t_(t) {}
+void TMA::write(byte_t v) { t_.write_tma(v); }
+byte_t TMA::read() { return t_.read_tma(); }
 
-TAC::TAC(TimerUnit *t) : MMIORegister{}, t_(t) {}
-void TAC::write(byte_t v) { t_->write_tac(v); }
-byte_t TAC::read() { return t_->read_tac(); }
+TAC::TAC(TimerUnit &t) : MMIORegister{}, t_(t) {}
+void TAC::write(byte_t v) { t_.write_tac(v); }
+byte_t TAC::read() { return t_.read_tac(); }
 
 } // namespace Timer

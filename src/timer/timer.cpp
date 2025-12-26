@@ -5,10 +5,10 @@
 
 TimerUnit::TimerUnit(AddressBus *const bus_ptr, const bool cgb_model)
     : cgb_model_(cgb_model), // Since we emulate a GameBoyColor, always true
-      tima_reg(this),        // Timer counter register
-      tma_reg(this),         // Timer modulo register
-      tac_reg(this),         // Timer control register
-      div_reg(this)          // Divider register
+      tima_reg(*this),       // Timer counter register
+      tma_reg(*this),        // Timer modulo register
+      tac_reg(*this),        // Timer control register
+      div_reg(*this)         // Divider register
 {
   using mmio = IORegisterMapping;
   using namespace PPU;

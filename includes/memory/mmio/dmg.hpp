@@ -204,42 +204,42 @@ namespace Timer {
 
 class DIV final : public MMIORegister {
 public:
-  explicit DIV(TimerUnit *const t);
+  explicit DIV(TimerUnit &t);
   void write(byte_t v) override;
   byte_t read() override;
 
 private:
-  TimerUnit *const t_;
+  TimerUnit &t_;
 };
 
 class TIMA final : public MMIORegister {
 public:
-  explicit TIMA(TimerUnit *const t);
+  explicit TIMA(TimerUnit &t);
   void write(byte_t v) override;
   byte_t read() override;
 
 private:
-  TimerUnit *const t_;
+  TimerUnit &t_;
 };
 
 class TMA final : public MMIORegister {
 public:
-  explicit TMA(TimerUnit *const t);
+  explicit TMA(TimerUnit &t);
   void write(byte_t v) override;
   byte_t read() override;
 
 private:
-  TimerUnit *const t_;
+  TimerUnit &t_;
 };
 
 class TAC final : public MMIORegister {
 public:
-  explicit TAC(TimerUnit *const t);
+  explicit TAC(TimerUnit &t);
   void write(byte_t v) override;
   byte_t read() override;
 
 private:
-  TimerUnit *const t_;
+  TimerUnit &t_;
 };
 
 } // namespace Timer
