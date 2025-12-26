@@ -6,6 +6,76 @@
 
 namespace PPU {
 
+/**
+ * FF40 — LCDC (LCD Control)
+ *
+ * Main LCD/PPU control register. Each bit enables or configures a display feature.
+ *
+ * Bit 7 — LCD & PPU Enable
+ *   0: LCD/PPU off
+ *   1: LCD/PPU on
+ *
+ * Bit 6 — Window Tile Map Area
+ *   0: 0x9800–0x9BFF
+ *   1: 0x9C00–0x9FFF
+ *
+ * Bit 5 — Window Enable
+ *   0: Window off
+ *   1: Window on
+ *
+ * Bit 4 — BG & Window Tile Data Area
+ *   0: 0x8800–0x97FF
+ *   1: 0x8000–0x8FFF
+ *
+ * Bit 3 — BG Tile Map Area
+ *   0: 0x9800–0x9BFF
+ *   1: 0x9C00–0x9FFF
+ *
+ * Bit 2 — OBJ (Sprite) Size
+ *   0: 8×8
+ *   1: 8×16
+ *
+ * Bit 1 — OBJ (Sprite) Enable
+ *   0: Sprites off
+ *   1: Sprites on
+ *
+ * Bit 0 — BG & Window Enable / Priority
+ *   DMG: 0 = BG & Window off, 1 = on
+ *   CGB: Controls BG/OBJ priority behavior
+ */
+
+enum class TileMapArea : addr_t {
+  LO_TILEMAP_BASE = 0x9800,
+  HI_TILEMAP_BASE = 0x9C00,
+};
+enum class TileDataArea : addr_t {
+  LO_TILEDATA_BASE = 0x8800,
+  HI_TILEDATA_BASE = 0x8000,
+};
+enum class SpriteHeight : byte_t {
+  TALL_SPRITES = 16,
+  SHORT_SPRITES = 8,
+};
+
+class LCDCtrl : public MMIORegister {
+public:
+  void write(byte_t value) override;
+  byte_t read() override;
+  LCDCtrl() : state(0) {}
+
+  /* Helpers */
+  const bool lcd_enabled() const;
+  const TileMapArea win_tilemap_base() const;
+  const TileMapArea bg_tilemap_base() const;
+  const TileDataArea bg_win_data_area() const;
+  const SpriteHeight obj_size() const;
+  const bool obj_enable() const;
+  const bool win_enabled() const;
+
+private:
+  byte_t state{};
+};
+
 /*
  * FF41 — STAT: LCD Status Register
  *

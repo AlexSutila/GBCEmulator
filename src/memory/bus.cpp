@@ -92,8 +92,13 @@ void AddressBus::init_io_registers() {
   io_registers[0xFF06] = std::make_unique<Timer::TMA>(timer_);
   io_registers[0xFF07] = std::make_unique<Timer::TAC>(timer_);
   io_registers[0xFF0F] = std::make_unique<::InterruptBits>(true);
+  io_registers[0xFF40] = std::make_unique<PPU::LCDCtrl>();
   io_registers[0xFF41] = std::make_unique<PPU::STAT>();
+  // PPU scroll registers are basic, so use generic MMIORegister
+  io_registers[0xFF42] = std::make_unique<MMIORegister>();
+  io_registers[0xFF43] = std::make_unique<MMIORegister>();
   io_registers[0xFF44] = std::make_unique<PPU::LY>();
+  // LYC register is basic, so use generic MMIORegister
   io_registers[0xFF45] = std::make_unique<::MMIORegister>(); // LYC
   io_registers[0xFF4F] = std::make_unique<PPU::VramBank>();
   io_registers[0xFF50] = std::make_unique<::BootROMCtrl>();

@@ -168,7 +168,7 @@ PYBIND11_MODULE(gbc_py, m) {
 
   // Master Emulator class
   py::class_<GameBoyColor>(m, "GameBoyColor")
-      .def(py::init<>())
+      .def(py::init<bool>(), py::arg("headless") = true)
       .def("init_test_bed", &GameBoyColor::init_test_bed)
       .def("run", &GameBoyColor::run)
       .def("get_bus", &GameBoyColor::get_bus,

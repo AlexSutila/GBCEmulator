@@ -16,28 +16,24 @@ template <typename T> T *init_mmio(AddressBus *bus, IORegisterMapping reg_id) {
   throw std::logic_error(std::string("Failed to configure MMIO (PPU)"));
 }
 
-PixelProcessor::PixelProcessor(AddressBus *bus_ptr) : bus(bus_ptr) {
+PixelProcessor::PixelProcessor(AddressBus *bus_ptr)
+    : bus(bus_ptr), bg_fifo(this) {
   using mmio = IORegisterMapping;
   using namespace PPU;
 
-  /* Configure FSM timing metadata */
-  total_mode_clks = std::nullopt;
-  cur_scanline_clks = cur_mode_clks = 0;
-
-  /* Configure interrupts */
+  /* Configure convenience MMIO register references */
   ie_reg = init_mmio<InterruptBits>(bus, mmio::MMIO_INT_ENABLE);
   if_reg = init_mmio<InterruptBits>(bus, mmio::MMIO_INT_FLAGS);
-
-  /* Initialize status MMIO registers */
+  lcdc_reg = init_mmio<LCDCtrl>(bus, mmio::MMIO_LCD_CONTROL);
   stat_reg = init_mmio<STAT>(bus, mmio::MMIO_LCD_STATUS);
   ly_reg = init_mmio<LY>(bus, mmio::MMIO_LCD_Y_COOR);
-  /* LYC is just a typical R/W register, so use MMIORegister */
   lyc_reg = init_mmio<MMIORegister>(bus, mmio::MMIO_LCD_Y_COMP);
+  scy_reg = init_mmio<MMIORegister>(bus, mmio::MMIO_LCD_SCY);
+  scx_reg = init_mmio<MMIORegister>(bus, mmio::MMIO_LCD_SCX);
 
-  /* Configure status MMIO registers initial state - drives FSM */
-  stat_reg->set_mode(StatModes::MODE_OAM_SCAN);
-  ly_reg->reset(); // Scanline zero
-  lyc_reg->write(0x00);
+  /* Configure PPU to initial state, doesn't technically happen until PPU is
+   * enabled but we do it anyway just because. */
+  reset();
 }
 
 void PixelProcessor::set_cgb(const byte_t cgb_flag) {
@@ -76,6 +72,7 @@ void PixelProcessor::do_oam_scan() {
 
 void PixelProcessor::do_draw() {
   constexpr std::size_t min_drawing_cycles = 172; // Variable
+  constexpr std::size_t pixels_per_row = 160;     // H-Resolution
   using modes = PPU::StatModes;
 
   // Rendering always happens on visible scanlines
@@ -86,21 +83,33 @@ void PixelProcessor::do_draw() {
    * features cause the rendering process to stall. This additional stalling
    * time lengthens the duration of this operation mode. */
   if (!total_mode_clks.has_value()) {
-    // Simply set to minimum, raise as quirks come up during rendering
+    // Simply set to minimum, raise as quirks come up during rendering. We do
+    // not use this to determine end of state.
     total_mode_clks = min_drawing_cycles;
     // We are still mid-scanline, so do not touch `cur_scanline_clks`
     cur_mode_clks = 0;
+    // Counts how many pixels have been rendered on this row. This determines
+    // when rendering is complete.
+    row_pixels_rendered = 0;
   }
 
-  // TODO:
-  // - Actually perform rendering here
+  // Rendering step
+  if (bg_fifo.can_pop()) {
+    const auto pixel_data = bg_fifo.pop();
+    if (renderer) // Disabled in headless mode, so this is conditional
+      renderer->putPixel(row_pixels_rendered, // Denotes X-coordinate
+                         ly_reg->read(),      // Denotes Y-coordinate
+                         pixel_data.color);
+    ++row_pixels_rendered;
+  }
+  bg_fifo.step();
 
   // Step dot clock
   ++cur_scanline_clks;
   ++cur_mode_clks;
 
   // Rendering incomplete
-  if (cur_mode_clks < total_mode_clks.value())
+  if (row_pixels_rendered < pixels_per_row)
     return;
 
   // State transition logic
@@ -147,13 +156,39 @@ void PixelProcessor::blank() {
     request_vblank();
 
   // End of scanline logic
-  stat_reg->set_mode(ly_reg->is_visible() ? modes::MODE_OAM_SCAN
-                                          : modes::MODE_VBLANK);
+  if (ly_reg->is_visible()) {
+    stat_reg->set_mode(modes::MODE_OAM_SCAN);
+    if (renderer)
+      renderer->present();
+  } else
+    stat_reg->set_mode(modes::MODE_VBLANK);
   total_mode_clks.reset();
   cur_scanline_clks = 0;
 }
 
+void PixelProcessor::reset() {
+  using namespace PPU;
+  bg_fifo.reset();
+
+  /* Configure FSM timing metadata */
+  cur_scanline_clks = cur_mode_clks = 0;
+  total_mode_clks = std::nullopt;
+
+  /* Configure status MMIO registers initial state - drives FSM */
+  stat_reg->set_mode(StatModes::MODE_OAM_SCAN);
+  ly_reg->reset();
+}
+
 void PixelProcessor::step() {
+
+  /* When the PPU is disabled, the screen just shows plain white and the state
+   * is set to it's initial state until it is re-enabled again. */
+  if (!lcdc_reg->lcd_enabled()) [[unlikely]] {
+    reset();
+    return;
+  }
+
+  /* Rendering is enabled, perform FSM logic */
   switch (stat_reg->get_mode()) {
   case PPU::StatModes::MODE_HBLANK:
     do_hblank();

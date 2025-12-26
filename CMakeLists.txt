@@ -14,9 +14,11 @@ FetchContent_Declare(
     GIT_TAG        v2.12.0
 )
 FetchContent_MakeAvailable(pybind11)
+find_package(SDL3 REQUIRED)
 
 # Common sources
 set(GBC_CORE_SOURCES
+    src/frontend/renderer.cpp
     src/gbc.cpp
 
     src/cpu/lr35902.cpp
@@ -35,6 +37,7 @@ set(GBC_CORE_SOURCES
     src/memory/mmio/mmio.cpp
 
     src/ppu/ppu.cpp
+    src/ppu/fifo.cpp
 
     src/cart/cart.cpp
     src/cart/cart_display.cpp
@@ -52,13 +55,16 @@ set(GBC_INCLUDE_DIR
 set(GBC_COMPILE_OPTIONS
     -Wall
     $<$<CONFIG:Debug>:-g -O0>
-    $<$<CONFIG:Release>:-O3>
+    $<$<CONFIG:Release>:-Ofast>
 )
 
 # Emulator executable
 add_executable(gbc
     main.cpp
     ${GBC_CORE_SOURCES}
+)
+target_link_libraries(gbc
+    PRIVATE SDL3::SDL3
 )
 target_include_directories(gbc
     PRIVATE ${GBC_INCLUDE_DIR}
@@ -71,6 +77,9 @@ target_compile_options(gbc
 pybind11_add_module(gbc_py
     src/python/bindings.cpp
     ${GBC_CORE_SOURCES}
+)
+target_link_libraries(gbc_py
+    PRIVATE SDL3::SDL3
 )
 target_include_directories(gbc_py
     PRIVATE ${GBC_INCLUDE_DIR}

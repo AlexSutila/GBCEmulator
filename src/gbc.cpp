@@ -1,14 +1,18 @@
 #include "gbc.hpp"
 #include "cpu/lr35902.hpp"
+#include "frontend/renderer.hpp"
 #include "memory"
 #include "memory/bus.hpp"
 #include "ppu/ppu.hpp"
+#include <memory>
 
-GameBoyColor::GameBoyColor() {
+GameBoyColor::GameBoyColor(bool headless) {
   timer = std::make_unique<Timer::TimerUnit>();
   bus = std::make_unique<AddressBus>(*timer);
   cpu = std::make_unique<LR35902>(bus.get());
   ppu = std::make_unique<PixelProcessor>(bus.get());
+  if (!headless)
+    renderer = std::make_unique<Renderer>();
   elapsed_clocks_ = 0;
 }
 
@@ -32,9 +36,10 @@ void GameBoyColor::init_test_bed() {
 }
 
 void GameBoyColor::run() {
-  bool running = true;
+  if (renderer)
+    ppu->connect_renderer(renderer);
 
-  while (running) [[likely]] {
+  while (renderer->get_running()) [[likely]] {
     cpu->step();
     ppu->step();
     timer->tick_tcycles(1);
