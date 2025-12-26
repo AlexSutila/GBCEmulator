@@ -135,6 +135,10 @@ void PixelProcessor::do_vblank() {
   assert(stat_reg->get_mode() == modes::MODE_VBLANK);
   assert(!ly_reg->is_visible());
   blank();
+
+  // Render at end of frame (ly goes back to zero after blanking)
+  if (ly_reg->is_visible() && renderer)
+    renderer->present();
 }
 
 void PixelProcessor::blank() {
@@ -156,12 +160,11 @@ void PixelProcessor::blank() {
     request_vblank();
 
   // End of scanline logic
-  if (ly_reg->is_visible()) {
+  if (ly_reg->is_visible())
     stat_reg->set_mode(modes::MODE_OAM_SCAN);
-    if (renderer)
-      renderer->present();
-  } else
+  else
     stat_reg->set_mode(modes::MODE_VBLANK);
+
   total_mode_clks.reset();
   cur_scanline_clks = 0;
 }
