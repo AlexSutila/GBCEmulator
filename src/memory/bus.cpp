@@ -123,6 +123,7 @@ void AddressBus::insert_cartridge(cart c) {
 
   /* May limit interaction with specific MMIO if disabled */
   is_cgb = cgb_enabled(cgb_flag);
+  timer.set_cgb_model(is_cgb);
 }
 void AddressBus::init_test_bed() {
   /* Default constructor initializes an instance of TestMBC */

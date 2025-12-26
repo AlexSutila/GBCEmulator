@@ -65,6 +65,11 @@ namespace Timer {
 
 TimerUnit::TimerUnit(const bool cgb_model) : cgb_model_(cgb_model) { reset(); }
 
+void TimerUnit::set_cgb_model(bool cgb_model) noexcept {
+  cgb_model_ = cgb_model;
+  reset();
+}
+
 void TimerUnit::connect_if(MMIORegister& if_reg) noexcept { if_reg_ = &if_reg; }
 
 void TimerUnit::reset() noexcept {

@@ -134,6 +134,7 @@ public:
   explicit TimerUnit(bool cgb_model = true);
 
   void connect_if(MMIORegister& if_reg) noexcept;
+  void set_cgb_model(bool cgb_model) noexcept;
 
   void reset() noexcept;
 
