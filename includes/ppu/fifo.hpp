@@ -10,7 +10,7 @@
 struct pixel {
   byte_t color; // A value between 0 and 3
 };
-class PixelProcessor;
+class PixelProcessingUnit;
 
 /*
  * Custom FIFO implemented via circular buffer to prevent repeated heap
@@ -71,7 +71,7 @@ private:
 
 class PixelFifo {
 public:
-  PixelFifo(PixelProcessor *ppu_ptr);
+  PixelFifo(PixelProcessingUnit *ppu_ptr);
   void reset();
   void step();
 
@@ -112,7 +112,7 @@ private:
   std::size_t cur_clks;
   PixelFifoState state;
 
-  PixelProcessor *const ppu;
+  PixelProcessingUnit *const ppu;
 };
 
 #endif // __FIFO_H

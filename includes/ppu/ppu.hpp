@@ -11,9 +11,9 @@
 #include <cstddef>
 #include <optional>
 
-class PixelProcessor {
+class PixelProcessingUnit {
 public:
-  PixelProcessor(AddressBus *bus_ptr);
+  PixelProcessingUnit(AddressBus *bus_ptr);
   void connect_renderer(std::unique_ptr<Renderer> &r) { renderer = r.get(); }
   void set_cgb(const byte_t cgb_flag);
   void reset();

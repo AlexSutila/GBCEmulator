@@ -16,7 +16,7 @@ template <typename T> T *init_mmio(AddressBus *bus, IORegisterMapping reg_id) {
   throw std::logic_error(std::string("Failed to configure MMIO (PPU)"));
 }
 
-PixelProcessor::PixelProcessor(AddressBus *bus_ptr)
+PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus_ptr)
     : bus(bus_ptr), bg_fifo(this) {
   using mmio = IORegisterMapping;
   using namespace PPU;
@@ -36,11 +36,11 @@ PixelProcessor::PixelProcessor(AddressBus *bus_ptr)
   reset();
 }
 
-void PixelProcessor::set_cgb(const byte_t cgb_flag) {
+void PixelProcessingUnit::set_cgb(const byte_t cgb_flag) {
   is_cgb = cgb_enabled(cgb_flag);
 }
 
-void PixelProcessor::do_oam_scan() {
+void PixelProcessingUnit::do_oam_scan() {
   constexpr std::size_t oam_t_cycles = 80; // Fixed
   using modes = PPU::StatModes;
 
@@ -70,7 +70,7 @@ void PixelProcessor::do_oam_scan() {
   total_mode_clks.reset();
 }
 
-void PixelProcessor::do_draw() {
+void PixelProcessingUnit::do_draw() {
   constexpr std::size_t min_drawing_cycles = 172; // Variable
   constexpr std::size_t pixels_per_row = 160;     // H-Resolution
   using modes = PPU::StatModes;
@@ -117,7 +117,7 @@ void PixelProcessor::do_draw() {
   total_mode_clks.reset();
 }
 
-void PixelProcessor::do_hblank() {
+void PixelProcessingUnit::do_hblank() {
   constexpr std::size_t total_scanline_cycles = 456; // Fixed
   using modes = PPU::StatModes;
 
@@ -127,7 +127,7 @@ void PixelProcessor::do_hblank() {
   blank();
 }
 
-void PixelProcessor::do_vblank() {
+void PixelProcessingUnit::do_vblank() {
   constexpr std::size_t total_scanline_cycles = 456;
   using modes = PPU::StatModes;
 
@@ -141,7 +141,7 @@ void PixelProcessor::do_vblank() {
     renderer->present();
 }
 
-void PixelProcessor::blank() {
+void PixelProcessingUnit::blank() {
   constexpr std::size_t total_scanline_cycles = 456;
   using modes = PPU::StatModes;
 
@@ -169,7 +169,7 @@ void PixelProcessor::blank() {
   cur_scanline_clks = 0;
 }
 
-void PixelProcessor::reset() {
+void PixelProcessingUnit::reset() {
   using namespace PPU;
   bg_fifo.reset();
 
@@ -182,7 +182,7 @@ void PixelProcessor::reset() {
   ly_reg->reset();
 }
 
-void PixelProcessor::step() {
+void PixelProcessingUnit::step() {
 
   /* When the PPU is disabled, the screen just shows plain white and the state
    * is set to it's initial state until it is re-enabled again. */

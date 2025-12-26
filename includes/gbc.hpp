@@ -20,13 +20,13 @@ public:
   /* Getters mainly for python bindings */
   AddressBus *get_bus() { return bus.get(); };
   LR35902 *get_cpu() { return cpu.get(); };
-  PixelProcessor *get_ppu() { return ppu.get(); }
+  PixelProcessingUnit *get_ppu() { return ppu.get(); }
 
 private:
   std::unique_ptr<Renderer> renderer{};
   std::unique_ptr<AddressBus> bus{};
   std::unique_ptr<LR35902> cpu{};
-  std::unique_ptr<PixelProcessor> ppu{};
+  std::unique_ptr<PixelProcessingUnit> ppu{};
   std::size_t elapsed_clocks_{};
 };
 
