@@ -35,8 +35,7 @@ public:
   void write_byte(const addr_t addr, const byte_t value);
   const byte_t read_byte(const addr_t addr);
   MMIORegister *get_mmio(IORegisterMapping mapping) const;
-  Timer::TimerUnit *get_timer();
-  AddressBus();
+  AddressBus(Timer::TimerUnit& timer);
   void insert_cartridge(cart c);
   void eject_cartridge();
   void init_test_bed();
@@ -52,7 +51,7 @@ private:
   PPU::VramBank *vram_bank_ctrl{};
   WramBank *wram_bank_ctrl{};
   BootROMCtrl *boot_rom_ctrl{};
-  Timer::TimerUnit timer{};
+  Timer::TimerUnit &timer_;
 
   /* Helpers */
   constexpr byte_t open_bus() { return 0xFF; }

@@ -5,7 +5,8 @@
 #include "ppu/ppu.hpp"
 
 GameBoyColor::GameBoyColor() {
-  bus = std::make_unique<AddressBus>();
+  timer = std::make_unique<Timer::TimerUnit>();
+  bus = std::make_unique<AddressBus>(*timer);
   cpu = std::make_unique<LR35902>(bus.get());
   ppu = std::make_unique<PixelProcessor>(bus.get());
   elapsed_clocks_ = 0;
@@ -36,7 +37,7 @@ void GameBoyColor::run() {
   while (running) [[likely]] {
     cpu->step();
     ppu->step();
-    bus->get_timer()->tick_tcycles(1);
+    timer->tick_tcycles(1);
     ++elapsed_clocks_;
   }
 }
