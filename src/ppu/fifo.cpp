@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <optional>
 
-PixelFifo::PixelFifo(PixelProcessor *ppu_ptr)
+PixelFifo::PixelFifo(PixelProcessingUnit *ppu_ptr)
     : fifo(CircularFifo<pixel, 16>()), ppu(ppu_ptr) {
   total_clks = std::nullopt;
   cur_clks = 0;

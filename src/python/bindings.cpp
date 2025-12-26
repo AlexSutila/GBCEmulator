@@ -161,10 +161,10 @@ PYBIND11_MODULE(gbc_py, m) {
                              "True when LY is in VBlank (144–153)");
 
   // Pixel Processor class
-  py::class_<PixelProcessor>(m, "PixelProcessor")
+  py::class_<PixelProcessingUnit>(m, "PixelProcessor")
       .def(py::init<AddressBus *>(), py::arg("bus"),
            py::keep_alive<1, 2>()) // PixelProcessor keeps AddressBus alive
-      .def("step", &PixelProcessor::step);
+      .def("step", &PixelProcessingUnit::step);
 
   // Master Emulator class
   py::class_<GameBoyColor>(m, "GameBoyColor")

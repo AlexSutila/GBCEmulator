@@ -10,7 +10,7 @@ GameBoyColor::GameBoyColor(bool headless) {
   timer = std::make_unique<Timer::TimerUnit>();
   bus = std::make_unique<AddressBus>(*timer);
   cpu = std::make_unique<LR35902>(bus.get());
-  ppu = std::make_unique<PixelProcessor>(bus.get());
+  ppu = std::make_unique<PixelProcessingUnit>(bus.get());
   if (!headless)
     renderer = std::make_unique<Renderer>();
   elapsed_clocks_ = 0;
