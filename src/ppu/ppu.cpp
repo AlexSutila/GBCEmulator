@@ -28,8 +28,11 @@ PixelProcessor::PixelProcessor(AddressBus *bus_ptr)
   stat_reg = init_mmio<STAT>(bus, mmio::MMIO_LCD_STATUS);
   ly_reg = init_mmio<LY>(bus, mmio::MMIO_LCD_Y_COOR);
   lyc_reg = init_mmio<MMIORegister>(bus, mmio::MMIO_LCD_Y_COMP);
+  scy_reg = init_mmio<MMIORegister>(bus, mmio::MMIO_LCD_SCY);
+  scx_reg = init_mmio<MMIORegister>(bus, mmio::MMIO_LCD_SCX);
 
-  /* Configure PPU to initial state */
+  /* Configure PPU to initial state, doesn't technically happen until PPU is
+   * enabled but we do it anyway just because. */
   reset();
 }
 

@@ -25,11 +25,13 @@ private:
   InterruptBits *if_reg{};
   Renderer *renderer{};
 
-  /* Pixel Processor status registers */
+  /* Convenience references to important PPU mmio registers */
   PPU::LCDCtrl *lcdc_reg{};
   PPU::STAT *stat_reg{};
   PPU::LY *ly_reg{};
   MMIORegister *lyc_reg{};
+  MMIORegister *scy_reg{};
+  MMIORegister *scx_reg{};
 
   /* Pixel Processor operation modes */
   void do_oam_scan();
