@@ -99,7 +99,7 @@ void PixelProcessor::do_draw() {
     if (renderer) // Disabled in headless mode, so this is conditional
       renderer->putPixel(row_pixels_rendered, // Denotes X-coordinate
                          ly_reg->read(),      // Denotes Y-coordinate
-                         pixel_data.palette_idx);
+                         pixel_data.color);
     ++row_pixels_rendered;
   }
   bg_fifo.step();

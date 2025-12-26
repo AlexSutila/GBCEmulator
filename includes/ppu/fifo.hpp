@@ -8,7 +8,7 @@
 #include <stdexcept>
 
 struct pixel {
-  byte_t palette_idx; // A value between 0 and 3
+  byte_t color; // A value between 0 and 3
 };
 class PixelProcessor;
 
@@ -87,6 +87,7 @@ private:
     STATE_PUSH,
   };
   CircularFifo<pixel, 16> fifo;
+  const byte_t get_pixel_y() const;
 
   void get_tile();
   void get_tile_data_lo();

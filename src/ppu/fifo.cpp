@@ -18,16 +18,18 @@ PixelFifo::PixelFifo(PixelProcessor *ppu_ptr)
   };
 }
 
+const byte_t PixelFifo::get_pixel_y() const {
+  const byte_t scy = ppu->scy_reg->read();
+  const byte_t ly = ppu->ly_reg->read();
+  return (ly + scy) % 0xFF;
+}
+
 /* Calculate which tile to read from based on tilemaps */
 std::size_t PixelFifo::calc_tile_idx() const {
   constexpr auto tile_mask = 0x1F; // Maximum value of 31
   constexpr auto tile_pixels = 8;
   constexpr auto tile_shift = 5;
-
-  // Calculate Y-pixel considering verticle scroll
-  const byte_t scy = ppu->scy_reg->read();
-  const byte_t ly = ppu->ly_reg->read();
-  const byte_t y_pixel = (ly + scy) % 0xFF;
+  const byte_t y_pixel = get_pixel_y();
 
   // Calculate X and Y coordinates of tile
   const std::size_t y_tile = (y_pixel / tile_pixels) & tile_mask;
@@ -45,7 +47,7 @@ byte_t PixelFifo::fetch_tile_data(bool high) const {
   constexpr auto tile_row_bytes = 2;
 
   // Get the current Y coordinate at a pixel granularity
-  const byte_t y_pixel_idx = ppu->ly_reg->read() & 0x7;
+  const byte_t y_pixel_idx = get_pixel_y() & 0x7;
   const addr_t y_offset = y_pixel_idx * tile_row_bytes;
 
   // Need to consider y-offset based on LY register
@@ -142,7 +144,7 @@ void PixelFifo::do_push() {
     const byte_t palette_idx = (hi_bit << 1) | lo_bit;
 
     // TODO: Index palette, just pushing the index for now
-    fifo.push({.palette_idx = palette_idx});
+    fifo.push({.color = palette_idx});
   }
 
   // State transition after push to fetch next row
