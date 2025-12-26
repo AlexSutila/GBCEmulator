@@ -24,8 +24,13 @@ std::size_t PixelFifo::calc_tile_idx() const {
   constexpr auto tile_pixels = 8;
   constexpr auto tile_shift = 5;
 
+  // Calculate Y-pixel considering verticle scroll
+  const byte_t scy = ppu->scy_reg->read();
+  const byte_t ly = ppu->ly_reg->read();
+  const byte_t y_pixel = (ly + scy) % 0xFF;
+
   // Calculate X and Y coordinates of tile
-  const std::size_t y_tile = (ppu->ly_reg->read() / tile_pixels) & tile_mask;
+  const std::size_t y_tile = (y_pixel / tile_pixels) & tile_mask;
   const std::size_t x_tile = fetcher.x_coor & tile_mask; // Tile
 
   // TODO: Consider configurable indexing modes
