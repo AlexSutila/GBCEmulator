@@ -13,7 +13,10 @@ def test_ppu_mode_timing():
     '''Basic validation of PPU mode timings'''
     bus = AddressBus()
     bus.init_test_bed()
+
+    # Obtain ppu reference and enable
     ppu = PixelProcessor(bus)
+    bus.write_byte(0xFF40, 0x80)
 
     for frame in range(10):
         for ly in range(144):
