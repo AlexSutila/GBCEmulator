@@ -1,6 +1,5 @@
 #include "memory/bus.hpp"
 #include "cart/cart.hpp"
-#include "cpu/interrupts.hpp"
 #include "emu_types.hpp"
 #include "memory/boot.hpp"
 #include "memory/mmio/cgb.hpp"
@@ -53,12 +52,12 @@ static constexpr bool is_hram_range(const addr_t a) noexcept {
   return (a >= 0xFF80 && a <= 0xFFFE);
 }
 
-AddressBus::AddressBus(Timer::TimerUnit& timer) : timer_(timer) {
+AddressBus::AddressBus() {
   constexpr std::size_t vram_bank_size = 0x2000;
   constexpr std::size_t wram_bank_size = 0x1000;
   constexpr std::size_t hram_size = 0x7F;
   constexpr std::size_t oam_size = 0xA0;
-  using ioregs = IORegisterMapping;
+  using mmio = IORegisterMapping;
 
   /* Initialize banked and non-banked memory */
   std::generate(vram.begin(), vram.end(),
@@ -68,48 +67,22 @@ AddressBus::AddressBus(Timer::TimerUnit& timer) : timer_(timer) {
   hram = make_zeroed<byte_t>(hram_size);
   oam = make_zeroed<byte_t>(oam_size);
 
-  /* Populates io-registers lookup table */
-  init_io_registers();
-
-  /* We maintain access to various mmio registers via a raw pointer
-   * for access convenience during memory reads and writes. */
-  auto *reg = get_mmio(ioregs::MMIO_BOOT_ROM_CTRL);
-  if (!(boot_rom_ctrl = dynamic_cast<BootROMCtrl *>(reg)))
-    throw std::logic_error("Failed to connect MMIO_BOOT_ROM_CTRL");
-  reg = get_mmio(ioregs::MMIO_VRAM_BANK);
-  if (!(vram_bank_ctrl = dynamic_cast<PPU::VramBank *>(reg)))
-    throw std::logic_error("Failed to connect MMIO_VRAM_BANK");
-  reg = get_mmio(ioregs::MMIO_WRAM_BANK);
-  if (!(wram_bank_ctrl = dynamic_cast<WramBank *>(reg)))
-    throw std::logic_error("Failed to connect MMIO_WRAM_BANK");
-  timer_.set_cgb_model(is_cgb);
-  timer_.connect_if(*get_mmio(ioregs::MMIO_INT_FLAGS));
+  /* Connect memory mapped IO owned by address bus */
+  connect_mmio(static_cast<addr_t>(mmio::MMIO_BOOT_ROM_CTRL), &boot_rom_ctrl);
+  connect_mmio(static_cast<addr_t>(mmio::MMIO_WRAM_BANK), &wram_bank_ctrl);
+  connect_mmio(static_cast<addr_t>(mmio::MMIO_VRAM_BANK), &vram_bank_ctrl);
 }
 
-void AddressBus::init_io_registers() {
-  io_registers[0xFF04] = std::make_unique<Timer::DIV>(timer_);
-  io_registers[0xFF05] = std::make_unique<Timer::TIMA>(timer_);
-  io_registers[0xFF06] = std::make_unique<Timer::TMA>(timer_);
-  io_registers[0xFF07] = std::make_unique<Timer::TAC>(timer_);
-  io_registers[0xFF0F] = std::make_unique<::InterruptBits>(true);
-  io_registers[0xFF40] = std::make_unique<PPU::LCDCtrl>();
-  io_registers[0xFF41] = std::make_unique<PPU::STAT>();
-  // PPU scroll registers are basic, so use generic MMIORegister
-  io_registers[0xFF42] = std::make_unique<MMIORegister>();
-  io_registers[0xFF43] = std::make_unique<MMIORegister>();
-  io_registers[0xFF44] = std::make_unique<PPU::LY>();
-  // LYC register is basic, so use generic MMIORegister
-  io_registers[0xFF45] = std::make_unique<::MMIORegister>(); // LYC
-  io_registers[0xFF4F] = std::make_unique<PPU::VramBank>();
-  io_registers[0xFF50] = std::make_unique<::BootROMCtrl>();
-  io_registers[0xFF70] = std::make_unique<::WramBank>();
-  io_registers[0xFFFF] = std::make_unique<::InterruptBits>(false);
+void AddressBus::connect_mmio(const addr_t addr, MMIORegister *const reg) {
+  if (!reg)
+    throw std::logic_error("AddressBus::connect_mmio() connected `nullptr`");
+  io_registers[addr] = reg;
 }
 
 const byte_t AddressBus::get_vram_bank() const {
   if (!is_cgb) // Unbanked for DMG
     return 0;
-  return vram_bank_ctrl->get_bank();
+  return vram_bank_ctrl.get_bank();
 }
 
 const byte_t AddressBus::get_wram_bank() const {
@@ -119,7 +92,7 @@ const byte_t AddressBus::get_wram_bank() const {
     return 1;
   /* Maps to banks 1-7. Zero also maps to bank one, but that logic is handled in
    * the MMIORegister itself. This is garunteed to be between 1 and 7. */
-  return wram_bank_ctrl->get_bank();
+  return wram_bank_ctrl.get_bank();
 }
 
 void AddressBus::insert_cartridge(cart c) {
@@ -128,7 +101,6 @@ void AddressBus::insert_cartridge(cart c) {
 
   /* May limit interaction with specific MMIO if disabled */
   is_cgb = cgb_enabled(cgb_flag);
-  timer_.set_cgb_model(is_cgb);
 }
 void AddressBus::init_test_bed() {
   /* Default constructor initializes an instance of TestMBC */
@@ -246,12 +218,12 @@ void AddressBus::write_byte(const addr_t addr, const byte_t value) {
 }
 
 bool AddressBus::boot_rom_enabled() {
-  return boot_rom_ctrl->boot_rom_enabled();
+  return boot_rom_ctrl.boot_rom_enabled();
 }
 
 MMIORegister *AddressBus::get_mmio(IORegisterMapping mapping) const {
   const addr_t addr = static_cast<addr_t>(mapping);
   assert(io_registers.contains(addr));
   /* The address bus maintains ownership, so raw pointers are fine. */
-  return io_registers.at(addr).get();
+  return io_registers.at(addr);
 }

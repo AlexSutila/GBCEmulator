@@ -8,7 +8,8 @@ from gbc_py import (
 
 def test_ie_register_unused_bits():
     '''Validate the behavior of the unused bits for the IE register'''
-    bus = AddressBus()
+    gbc = GameBoyColor()
+    bus = gbc.get_bus()
     bus.init_test_bed()
     assert bus.read_byte(0xFFFF) == 0x00
     bus.write_byte(0xFFFF, 0xFF)
@@ -17,7 +18,8 @@ def test_ie_register_unused_bits():
 
 def test_if_register_unused_bits():
     '''Validate the behavior of the unused bits for the IF register'''
-    bus = AddressBus()
+    gbc = GameBoyColor()
+    bus = gbc.get_bus()
     bus.init_test_bed()
     assert bus.read_byte(0xFF0F) == 0xE0
     bus.write_byte(0xFF0F, 0xFF)

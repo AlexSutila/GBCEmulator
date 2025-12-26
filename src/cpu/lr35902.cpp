@@ -13,9 +13,14 @@
 #include <sstream>
 #include <stdexcept>
 
-LR35902::LR35902(AddressBus *bus_ptr) : bus(bus_ptr) {
-  using ioregs = IORegisterMapping;
+LR35902::LR35902(AddressBus *bus_ptr)
+    : bus(bus_ptr),  // For memory access
+      ime(),         // Acts as interrupt master enable
+      ie_reg(false), // Enables individual interrupts
+      if_reg(true)   // Requests individual interrupts
+{
   using flags = InterruptFlagMask;
+  using mmio = IORegisterMapping;
   using vecs = InterruptVector;
 
   /* Init fetch decode execute fsm */
@@ -39,14 +44,10 @@ LR35902::LR35902(AddressBus *bus_ptr) : bus(bus_ptr) {
   init_moves(lookup);
 
   /* Configure interrupts */
-  ime = InterruptMasterEnable();
-  auto *reg = bus->get_mmio(ioregs::MMIO_INT_ENABLE);
-  if (!(ie_reg = dynamic_cast<InterruptBits *>(reg)))
-    throw std::logic_error("Failed to connect MMIO_INT_ENABLE");
-  reg = bus->get_mmio(ioregs::MMIO_INT_FLAGS);
-  if (!(if_reg = dynamic_cast<InterruptBits *>(reg)))
-    throw std::logic_error("Failed to connect MMIO_INT_FLAGS");
-  assert(ie_reg != nullptr && if_reg != nullptr);
+  if (!bus)
+    throw std::logic_error("LR35902::LR35902() bus_ptr is `nullptr`");
+  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_INT_FLAGS), &if_reg);
+  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_INT_ENABLE), &ie_reg);
 
   /* Lastly, configure interrupt service routines */
   isr_lookup = {
@@ -60,7 +61,7 @@ LR35902::LR35902(AddressBus *bus_ptr) : bus(bus_ptr) {
 
 template <InterruptFlagMask mask, InterruptVector vec>
 std::unique_ptr<Instruction> LR35902::mk_isr() {
-  return std::make_unique<ISR<mask, vec>>(&reg_file, bus, &ime, if_reg);
+  return std::make_unique<ISR<mask, vec>>(&reg_file, bus, &ime, &if_reg);
 }
 
 void LR35902::load_state(LR35902::ProcessorState state) {
@@ -107,7 +108,7 @@ std::tuple<bool, Instruction *> LR35902::should_interrupt() {
   // Lower bits get higher priority, return the corresponding ISR
   for (byte_t shift{0}; shift < 5; shift++) {
     const auto flag = static_cast<InterruptFlagMask>(1 << shift);
-    if (ie_reg->get_flag(flag) && if_reg->get_flag(flag))
+    if (ie_reg.get_flag(flag) && if_reg.get_flag(flag))
       return {true, isr_lookup.at(shift).get()};
   }
   return {false, nullptr};

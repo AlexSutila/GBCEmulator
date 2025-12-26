@@ -46,9 +46,9 @@ private:
   template <InterruptFlagMask mask, InterruptVector vec>
   std::unique_ptr<Instruction> mk_isr(); // Helper
   std::array<std::unique_ptr<Instruction>, 5> isr_lookup{};
-  InterruptMasterEnable ime{};
-  InterruptBits *ie_reg{};
-  InterruptBits *if_reg{};
+  InterruptMasterEnable ime;
+  InterruptBits ie_reg;
+  InterruptBits if_reg;
 
   /* Opcode decoding configuration */
   using lookup_table_t = std::array<std::unique_ptr<Instruction>, 256>;

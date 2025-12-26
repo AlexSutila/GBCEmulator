@@ -19,8 +19,8 @@ PixelFifo::PixelFifo(PixelProcessingUnit *ppu_ptr)
 }
 
 const byte_t PixelFifo::get_pixel_y() const {
-  const byte_t scy = ppu->scy_reg->read();
-  const byte_t ly = ppu->ly_reg->read();
+  const byte_t scy = ppu->scy_reg.read();
+  const byte_t ly = ppu->ly_reg.read();
   return (ly + scy) % 0xFF;
 }
 

@@ -4,6 +4,7 @@
 #include "cpu/interrupts.hpp"
 #include "frontend/renderer.hpp"
 #include "memory/bus.hpp"
+#include "memory/mmio/cgb.hpp"
 #include "memory/mmio/dmg.hpp"
 #include "memory/mmio/mmio.hpp"
 #include "ppu/fifo.hpp"
@@ -21,17 +22,17 @@ public:
 
 private:
   AddressBus *const bus{};
-  InterruptBits *ie_reg{};
   InterruptBits *if_reg{};
   Renderer *renderer{};
 
   /* Convenience references to important PPU mmio registers */
-  PPU::LCDCtrl *lcdc_reg{};
-  PPU::STAT *stat_reg{};
-  PPU::LY *ly_reg{};
-  MMIORegister *lyc_reg{};
-  MMIORegister *scy_reg{};
-  MMIORegister *scx_reg{};
+  PPU::VramBank *vbk_reg{};
+  PPU::LCDCtrl lcdc_reg{};
+  PPU::STAT stat_reg{};
+  PPU::LY ly_reg{};
+  MMIORegister lyc_reg{};
+  MMIORegister scy_reg{};
+  MMIORegister scx_reg{};
 
   /* Pixel Processor operation modes */
   void do_oam_scan();

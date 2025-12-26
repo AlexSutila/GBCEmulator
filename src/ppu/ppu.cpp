@@ -2,6 +2,7 @@
 #include "cart/cart.hpp"
 #include "cpu/interrupts.hpp"
 #include "memory/bus.hpp"
+#include "memory/mmio/cgb.hpp"
 #include "memory/mmio/dmg.hpp"
 #include "memory/mmio/mmio.hpp"
 
@@ -17,19 +18,23 @@ template <typename T> T *init_mmio(AddressBus *bus, IORegisterMapping reg_id) {
 }
 
 PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus_ptr)
-    : bus(bus_ptr), bg_fifo(this) {
+    : bus(bus_ptr), // For accessing graphics memory
+      bg_fifo(this) // Pushes background/window pixels
+{
   using mmio = IORegisterMapping;
   using namespace PPU;
 
   /* Configure convenience MMIO register references */
-  ie_reg = init_mmio<InterruptBits>(bus, mmio::MMIO_INT_ENABLE);
+  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_CONTROL), &lcdc_reg);
+  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_STATUS), &stat_reg);
+  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_Y_COOR), &ly_reg);
+  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_Y_COMP), &lyc_reg);
+  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_SCY), &scy_reg);
+  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_SCX), &scx_reg);
+
+  /* Not owned by the pixel processing unit, so have to fetch references */
+  vbk_reg = init_mmio<VramBank>(bus, mmio::MMIO_VRAM_BANK);
   if_reg = init_mmio<InterruptBits>(bus, mmio::MMIO_INT_FLAGS);
-  lcdc_reg = init_mmio<LCDCtrl>(bus, mmio::MMIO_LCD_CONTROL);
-  stat_reg = init_mmio<STAT>(bus, mmio::MMIO_LCD_STATUS);
-  ly_reg = init_mmio<LY>(bus, mmio::MMIO_LCD_Y_COOR);
-  lyc_reg = init_mmio<MMIORegister>(bus, mmio::MMIO_LCD_Y_COMP);
-  scy_reg = init_mmio<MMIORegister>(bus, mmio::MMIO_LCD_SCY);
-  scx_reg = init_mmio<MMIORegister>(bus, mmio::MMIO_LCD_SCX);
 
   /* Configure PPU to initial state, doesn't technically happen until PPU is
    * enabled but we do it anyway just because. */
@@ -45,8 +50,8 @@ void PixelProcessingUnit::do_oam_scan() {
   using modes = PPU::StatModes;
 
   // OAM scan always happens on visible scanlines
-  assert(stat_reg->get_mode() == modes::MODE_OAM_SCAN);
-  assert(ly_reg->is_visible());
+  assert(stat_reg.get_mode() == modes::MODE_OAM_SCAN);
+  assert(ly_reg.is_visible());
 
   // State entry
   if (!total_mode_clks.has_value()) {
@@ -66,7 +71,7 @@ void PixelProcessingUnit::do_oam_scan() {
     return;
 
   // State transition logic
-  stat_reg->set_mode(modes::MODE_DRAWING);
+  stat_reg.set_mode(modes::MODE_DRAWING);
   total_mode_clks.reset();
 }
 
@@ -76,8 +81,8 @@ void PixelProcessingUnit::do_draw() {
   using modes = PPU::StatModes;
 
   // Rendering always happens on visible scanlines
-  assert(stat_reg->get_mode() == modes::MODE_DRAWING);
-  assert(ly_reg->is_visible());
+  assert(stat_reg.get_mode() == modes::MODE_DRAWING);
+  assert(ly_reg.is_visible());
 
   /* By default, the PPU outputs one pixel to the screen per dot, however some
    * features cause the rendering process to stall. This additional stalling
@@ -98,7 +103,7 @@ void PixelProcessingUnit::do_draw() {
     const auto pixel_data = bg_fifo.pop();
     if (renderer) // Disabled in headless mode, so this is conditional
       renderer->putPixel(row_pixels_rendered, // Denotes X-coordinate
-                         ly_reg->read(),      // Denotes Y-coordinate
+                         ly_reg.read(),       // Denotes Y-coordinate
                          pixel_data.color);
     ++row_pixels_rendered;
   }
@@ -113,7 +118,7 @@ void PixelProcessingUnit::do_draw() {
     return;
 
   // State transition logic
-  stat_reg->set_mode(modes::MODE_HBLANK);
+  stat_reg.set_mode(modes::MODE_HBLANK);
   total_mode_clks.reset();
 }
 
@@ -122,8 +127,8 @@ void PixelProcessingUnit::do_hblank() {
   using modes = PPU::StatModes;
 
   // HBlank will only ever occur during visible scanlines
-  assert(stat_reg->get_mode() == modes::MODE_HBLANK);
-  assert(ly_reg->is_visible());
+  assert(stat_reg.get_mode() == modes::MODE_HBLANK);
+  assert(ly_reg.is_visible());
   blank();
 }
 
@@ -132,12 +137,12 @@ void PixelProcessingUnit::do_vblank() {
   using modes = PPU::StatModes;
 
   // VBlank will only ever occur during invisible scanlines - duh
-  assert(stat_reg->get_mode() == modes::MODE_VBLANK);
-  assert(!ly_reg->is_visible());
+  assert(stat_reg.get_mode() == modes::MODE_VBLANK);
+  assert(!ly_reg.is_visible());
   blank();
 
   // Render at end of frame (ly goes back to zero after blanking)
-  if (ly_reg->is_visible() && renderer)
+  if (ly_reg.is_visible() && renderer)
     renderer->present();
 }
 
@@ -153,17 +158,17 @@ void PixelProcessingUnit::blank() {
   // Blanking incomplete
   if (cur_scanline_clks < total_mode_clks.value())
     return;
-  ly_reg->inc();
+  ly_reg.inc();
 
   // Request VBlank interrupt
-  if (ly_reg->read() == 144)
+  if (ly_reg.read() == 144)
     request_vblank();
 
   // End of scanline logic
-  if (ly_reg->is_visible())
-    stat_reg->set_mode(modes::MODE_OAM_SCAN);
+  if (ly_reg.is_visible())
+    stat_reg.set_mode(modes::MODE_OAM_SCAN);
   else
-    stat_reg->set_mode(modes::MODE_VBLANK);
+    stat_reg.set_mode(modes::MODE_VBLANK);
 
   total_mode_clks.reset();
   cur_scanline_clks = 0;
@@ -178,21 +183,21 @@ void PixelProcessingUnit::reset() {
   total_mode_clks = std::nullopt;
 
   /* Configure status MMIO registers initial state - drives FSM */
-  stat_reg->set_mode(StatModes::MODE_OAM_SCAN);
-  ly_reg->reset();
+  stat_reg.set_mode(StatModes::MODE_OAM_SCAN);
+  ly_reg.reset();
 }
 
 void PixelProcessingUnit::step() {
 
   /* When the PPU is disabled, the screen just shows plain white and the state
    * is set to it's initial state until it is re-enabled again. */
-  if (!lcdc_reg->lcd_enabled()) [[unlikely]] {
+  if (!lcdc_reg.lcd_enabled()) [[unlikely]] {
     reset();
     return;
   }
 
   /* Rendering is enabled, perform FSM logic */
-  switch (stat_reg->get_mode()) {
+  switch (stat_reg.get_mode()) {
   case PPU::StatModes::MODE_HBLANK:
     do_hblank();
     break;

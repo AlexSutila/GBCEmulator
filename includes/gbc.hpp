@@ -6,6 +6,7 @@
 #include "frontend/renderer.hpp"
 #include "memory/bus.hpp"
 #include "ppu/ppu.hpp"
+#include "timer/timer.hpp"
 
 #include <cstddef>
 #include <memory>
@@ -21,15 +22,15 @@ public:
   AddressBus *get_bus() { return bus.get(); };
   LR35902 *get_cpu() { return cpu.get(); };
   PixelProcessingUnit *get_ppu() { return ppu.get(); }
-  Timer::TimerUnit *get_timer() { return timer.get(); }
+  TimerUnit *get_timer() { return timer.get(); }
 
 private:
   std::unique_ptr<Renderer> renderer{};
   std::unique_ptr<AddressBus> bus{};
   std::unique_ptr<LR35902> cpu{};
   std::unique_ptr<PixelProcessingUnit> ppu{};
+  std::unique_ptr<TimerUnit> timer{};
   std::size_t elapsed_clocks_{};
-  std::unique_ptr<Timer::TimerUnit> timer{};
 };
 
 #endif // __GBC_H

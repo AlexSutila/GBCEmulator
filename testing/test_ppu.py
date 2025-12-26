@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 from gbc_py import (
     AddressBus,
-    PixelProcessor
+    GameBoyColor
 )
 
 
@@ -11,11 +11,14 @@ def __get_ppu_mode(bus: AddressBus) -> int:
 
 def test_ppu_mode_timing():
     '''Basic validation of PPU mode timings'''
-    bus = AddressBus()
+    gbc = GameBoyColor()
+
+    # Obtain bus reference and init test cart
+    bus = gbc.get_bus()
     bus.init_test_bed()
 
     # Obtain ppu reference and enable
-    ppu = PixelProcessor(bus)
+    ppu = gbc.get_ppu()
     bus.write_byte(0xFF40, 0x80)
 
     for frame in range(10):
