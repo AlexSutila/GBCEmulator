@@ -33,18 +33,6 @@ void TimerUnit::reset() noexcept {
   reload_delay_ = 0;
 }
 
-void TimerUnit::tick_tcycles(const std::uint32_t tcycles,
-                             const bool double_speed) noexcept {
-  // Note: double_speed param is supposed to be false, and it is expected that
-  // the outer loop handles "double speed" logic. For interest of convenience
-  // and completeness, we support it here too Normally it would tick only 1
-  // cycle per call
-  const std::uint32_t total = double_speed ? tcycles * 2 : tcycles;
-  for (std::uint32_t i = 0; i < total; ++i) {
-    advance_one_tcycle();
-  }
-}
-
 byte_t TimerUnit::read_div() const noexcept {
   // DIV increments at 16384 Hz; in double-speed it's 32768 Hz
   // If sys_ increments once per "timer t-cycle", DIV is sys_[15:8].
@@ -137,9 +125,7 @@ bool TimerUnit::tick_allowed_on_fall() const noexcept {
 void TimerUnit::request_timer_irq() const noexcept {
   if (!if_reg)
     return;
-  byte_t v = if_reg->read();
-  v |= 0x04; // IF bit 2 = Timer
-  if_reg->write(v);
+  if_reg->put_flag(InterruptFlagMask::INT_FLAG_TIMER, true);
 }
 
 void TimerUnit::start_overflow_pipeline() noexcept {
@@ -181,7 +167,7 @@ void TimerUnit::timer_tick_pulse() noexcept {
   }
 }
 
-void TimerUnit::advance_one_tcycle() noexcept {
+void TimerUnit::step() noexcept {
   service_overflow_pipeline();
 
   const bool prev = edge_input(sys_, tac_);

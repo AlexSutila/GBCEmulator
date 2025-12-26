@@ -42,7 +42,7 @@ void GameBoyColor::run() {
   while (renderer->get_running()) [[likely]] {
     cpu->step();
     ppu->step();
-    timer->tick_tcycles(1);
+    timer->step();
     ++elapsed_clocks_;
   }
 }

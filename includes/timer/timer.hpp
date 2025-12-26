@@ -1,6 +1,7 @@
 #ifndef __TIMER_H
 #define __TIMER_H
 
+#include "cpu/interrupts.hpp"
 #include "emu_types.hpp"
 #include "memory/bus.hpp"
 #include "memory/mmio/dmg.hpp"
@@ -17,8 +18,8 @@ T *init_mmio(AddressBus *const bus, IORegisterMapping reg_id) {
 class TimerUnit {
 public:
   explicit TimerUnit(AddressBus *const bus_ptr, bool cgb_model = true);
-  void tick_tcycles(std::uint32_t tcycles, bool double_speed = false) noexcept;
   void reset() noexcept;
+  void step() noexcept;
 
   // MMIO-facing helpers
   [[nodiscard]] byte_t read_div() const noexcept;
@@ -45,11 +46,9 @@ private:
   void start_overflow_pipeline() noexcept;
   void service_overflow_pipeline() noexcept;
   void request_timer_irq() const noexcept;
-
   void timer_tick_pulse() noexcept;
-  void advance_one_tcycle() noexcept;
 
-  MMIORegister *if_reg{};
+  InterruptBits *if_reg{};
   bool cgb_model_{true};
 
   Timer::TIMA tima_reg;
@@ -58,10 +57,10 @@ private:
   Timer::DIV div_reg;
 
   std::uint16_t sys_{};
-  byte_t tima_;
-  byte_t tma_;
-  byte_t tac_;
-  byte_t div_;
+  byte_t tima_{};
+  byte_t tma_{};
+  byte_t tac_{};
+  byte_t div_{};
 
   // Overflow "cycle A/B"
   bool overflow_pending_{};
