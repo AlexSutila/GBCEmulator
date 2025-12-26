@@ -197,4 +197,106 @@ private:
   bool map_boot_rom;
 };
 
+namespace Timer {
+
+class TimerUnit {
+public:
+  explicit TimerUnit(bool cgb_model = true);
+
+  void connect_if(MMIORegister& if_reg) noexcept;
+  void set_cgb_model(bool cgb_model) noexcept;
+
+  void reset() noexcept;
+
+  // Tick by PPU-dot-based t-cycles. If double_speed=true, timer/DIV tick 2x per dot
+  void tick_tcycles(std::uint32_t tcycles, bool double_speed=false) noexcept;
+
+  // MMIO-facing helpers
+  [[nodiscard]] byte_t read_div() const noexcept;
+  void write_div() noexcept;
+
+  [[nodiscard]] byte_t read_tima() const noexcept;
+  void write_tima(byte_t v) noexcept;
+
+  [[nodiscard]] byte_t read_tma() const noexcept;
+  void write_tma(byte_t v) noexcept;
+
+  [[nodiscard]] byte_t read_tac() const noexcept;
+  void write_tac(byte_t v) noexcept;
+
+private:
+  [[nodiscard]] static byte_t tac_sel(byte_t tac) noexcept;
+  [[nodiscard]] static bool  tac_en(byte_t tac) noexcept;
+  [[nodiscard]] static bool  selected_bit(std::uint16_t sys, byte_t sel) noexcept;
+
+  [[nodiscard]] bool edge_input(std::uint16_t sys, byte_t tac) const noexcept;
+  [[nodiscard]] bool tick_allowed_on_fall() const noexcept;
+
+  void request_timer_irq() const noexcept;
+
+  void start_overflow_pipeline() noexcept;
+  void service_overflow_pipeline() noexcept;
+
+  void timer_tick_pulse() noexcept;
+  void advance_one_tcycle() noexcept;
+
+  std::uint16_t sys_{};
+  byte_t tima_{};
+  byte_t tma_{};
+  byte_t tac_{};
+
+  MMIORegister* if_reg_{};
+
+  bool cgb_model_{true};
+
+  // Overflow "cycle A/B"
+  bool overflow_pending_{};
+  std::uint8_t overflow_delay_{};
+
+  bool reload_latch_{};
+  std::uint8_t reload_delay_{};
+};
+
+// ---------------------------------------------------------------------------
+// Timer registers
+// ---------------------------------------------------------------------------
+
+class DIV final : public MMIORegister {
+public:
+  explicit DIV(TimerUnit& t);
+  void write(byte_t v) override;
+  byte_t read() override;
+private:
+  TimerUnit& t_;
+};
+
+class TIMA final : public MMIORegister {
+public:
+  explicit TIMA(TimerUnit& t);
+  void write(byte_t v) override;
+  byte_t read() override;
+private:
+  TimerUnit& t_;
+};
+
+class TMA final : public MMIORegister {
+public:
+  explicit TMA(TimerUnit& t);
+  void write(byte_t v) override;
+  byte_t read() override;
+private:
+  TimerUnit& t_;
+};
+
+class TAC final : public MMIORegister {
+public:
+  explicit TAC(TimerUnit& t);
+  void write(byte_t v) override;
+  byte_t read() override;
+private:
+  TimerUnit& t_;
+};
+
+}
+
 #endif // __MMIO_DMG_H

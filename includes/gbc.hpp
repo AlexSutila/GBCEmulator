@@ -21,6 +21,7 @@ public:
   AddressBus *get_bus() { return bus.get(); };
   LR35902 *get_cpu() { return cpu.get(); };
   PixelProcessingUnit *get_ppu() { return ppu.get(); }
+  Timer::TimerUnit *get_timer() { return timer.get(); }
 
 private:
   std::unique_ptr<Renderer> renderer{};
@@ -28,6 +29,7 @@ private:
   std::unique_ptr<LR35902> cpu{};
   std::unique_ptr<PixelProcessingUnit> ppu{};
   std::size_t elapsed_clocks_{};
+  std::unique_ptr<Timer::TimerUnit> timer{};
 };
 
 #endif // __GBC_H

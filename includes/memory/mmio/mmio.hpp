@@ -27,6 +27,10 @@
  *  FF70            CGB              WRAM bank select
  */
 enum class IORegisterMapping : addr_t {
+  MMIO_TIMER_DIV = 0xFF04,
+  MMIO_TIMER_TIMA = 0xFF05,
+  MMIO_TIMER_TMA = 0xFF06,
+  MMIO_TIMER_TAC = 0xFF07,
   MMIO_INT_FLAGS = 0xFF0F,
   MMIO_LCD_CONTROL = 0xFF40,
   MMIO_LCD_STATUS = 0xFF41,

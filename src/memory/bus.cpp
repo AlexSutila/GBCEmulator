@@ -53,7 +53,7 @@ static constexpr bool is_hram_range(const addr_t a) noexcept {
   return (a >= 0xFF80 && a <= 0xFFFE);
 }
 
-AddressBus::AddressBus() {
+AddressBus::AddressBus(Timer::TimerUnit& timer) : timer_(timer) {
   constexpr std::size_t vram_bank_size = 0x2000;
   constexpr std::size_t wram_bank_size = 0x1000;
   constexpr std::size_t hram_size = 0x7F;
@@ -82,9 +82,15 @@ AddressBus::AddressBus() {
   reg = get_mmio(ioregs::MMIO_WRAM_BANK);
   if (!(wram_bank_ctrl = dynamic_cast<WramBank *>(reg)))
     throw std::logic_error("Failed to connect MMIO_WRAM_BANK");
+  timer_.set_cgb_model(is_cgb);
+  timer_.connect_if(*get_mmio(ioregs::MMIO_INT_FLAGS));
 }
 
 void AddressBus::init_io_registers() {
+  io_registers[0xFF04] = std::make_unique<Timer::DIV>(timer_);
+  io_registers[0xFF05] = std::make_unique<Timer::TIMA>(timer_);
+  io_registers[0xFF06] = std::make_unique<Timer::TMA>(timer_);
+  io_registers[0xFF07] = std::make_unique<Timer::TAC>(timer_);
   io_registers[0xFF0F] = std::make_unique<::InterruptBits>(true);
   io_registers[0xFF40] = std::make_unique<PPU::LCDCtrl>();
   io_registers[0xFF41] = std::make_unique<PPU::STAT>();
@@ -118,10 +124,11 @@ const byte_t AddressBus::get_wram_bank() const {
 
 void AddressBus::insert_cartridge(cart c) {
   cart_ = std::make_unique<Cartridge>(std::move(c));
-  const byte_t cgb_flag = c.header.cgb_flag();
+  const byte_t cgb_flag = cart_->image().header.cgb_flag();
 
   /* May limit interaction with specific MMIO if disabled */
   is_cgb = cgb_enabled(cgb_flag);
+  timer_.set_cgb_model(is_cgb);
 }
 void AddressBus::init_test_bed() {
   /* Default constructor initializes an instance of TestMBC */
