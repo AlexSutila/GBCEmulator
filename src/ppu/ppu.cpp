@@ -122,7 +122,7 @@ void PixelProcessingUnit::do_draw() {
       ++pixels_discarded;
 
     else {
-      const auto x = ++row_pixels_rendered;
+      const auto x = row_pixels_rendered++;
       const auto y = ly_reg.read();
 
       // Conditional because of headless mode
