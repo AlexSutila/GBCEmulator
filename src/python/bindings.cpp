@@ -1,6 +1,9 @@
 #include <pybind11/functional.h>
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <pybind11/stl/filesystem.h>
 
+#include "cart/cart.hpp"
 #include "cpu/interrupts.hpp"
 #include "cpu/lr35902.hpp"
 #include "cpu/registers/flags.hpp"
@@ -34,9 +37,74 @@ public:
   addr_t read() const override { PYBIND11_OVERRIDE(addr_t, CpuRegister, read); }
 };
 
+bool poll_mooneye_test(GameBoyColor &gbc) {
+  std::uint32_t max_cycles = 10000000, cycles = 0;
+  byte_t op = 0;
+  while (op != 0x40 && cycles < max_cycles) {
+    const auto &bus = gbc.get_bus();
+    const auto &cpu = gbc.get_cpu();
+
+    const auto state = cpu->get_state();
+    op = bus->read_byte(state.pc);
+
+    gbc.step(); // Run until 'LD B, B'
+    gbc.step();
+    gbc.step();
+    gbc.step();
+    ++cycles;
+  }
+  return op == 0x40;
+}
+
 PYBIND11_MODULE(gbc_py, m) {
   m.doc() = "Game Boy Color emulator bindings";
 
+  // Cartridge helper classes
+  py::class_<rom_header>(m, "RomHeader")
+      .def(py::init<>())
+      .def_readonly("entry_point", &rom_header::entry_point)
+      .def_readonly("nintendo_logo", &rom_header::nintendo_logo)
+      .def_readonly("title_area", &rom_header::title_area)
+      .def_readonly("new_licensee_code", &rom_header::new_licensee_code)
+      .def_readonly("sgb_flag", &rom_header::sgb_flag)
+      .def_readonly("cartridge_type", &rom_header::cartridge_type)
+      .def_readonly("rom_size_code", &rom_header::rom_size_code)
+      .def_readonly("ram_size_code", &rom_header::ram_size_code)
+      .def_readonly("destination_code", &rom_header::destination_code)
+      .def_readonly("old_licensee_code", &rom_header::old_licensee_code)
+      .def_readonly("mask_rom_version", &rom_header::mask_rom_version)
+      .def_readonly("header_checksum", &rom_header::header_checksum)
+      .def_readonly("global_checksum", &rom_header::global_checksum)
+      .def("cgb_flag", &rom_header::cgb_flag)
+      .def("title", &rom_header::title)
+      .def("manufacturer_code", &rom_header::manufacturer_code);
+  py::class_<cart>(m, "Cart")
+      .def(py::init<>())
+      .def_readonly("file_path", &cart::file_path)
+      .def_readonly("header", &cart::header)
+      .def_readonly("declared_rom_bytes", &cart::declared_rom_bytes)
+      .def_readonly("declared_ram_bytes", &cart::declared_ram_bytes)
+      .def_readonly("logo_ok", &cart::logo_ok)
+      .def_readonly("header_checksum_ok", &cart::header_checksum_ok)
+      .def_readonly("global_checksum_ok", &cart::global_checksum_ok)
+      .def_property_readonly(
+          "rom",
+          [](const cart &c) {
+            return py::bytes(reinterpret_cast<const char *>(c.rom_data()),
+                             c.rom_size());
+          },
+          "ROM contents as immutable bytes")
+      .def_property_readonly("rom_size", &cart::rom_size);
+  m.def(
+      "load_cart_raw",
+      [](py::bytes data) {
+        std::string_view view = data;
+        std::vector<byte_t> rom(view.begin(), view.end());
+        return load_cart_raw(std::move(rom));
+      },
+      py::arg("rom_bytes"), "Load a Game Boy cartridge from raw ROM bytes");
+
+  // CPU Regsiter class
   py::class_<CpuRegister, PyCpuRegister>(m, "CpuRegister")
       .def(py::init<>())
 
@@ -169,7 +237,9 @@ PYBIND11_MODULE(gbc_py, m) {
   // Master Emulator class
   py::class_<GameBoyColor>(m, "GameBoyColor")
       .def(py::init<bool>(), py::arg("headless") = true)
+      .def("insert_cartridge", &GameBoyColor::insert_cartridge)
       .def("init_test_bed", &GameBoyColor::init_test_bed)
+      .def("step", &GameBoyColor::step)
       .def("run", &GameBoyColor::run)
       .def("get_bus", &GameBoyColor::get_bus,
            py::return_value_policy::reference_internal)
@@ -177,4 +247,8 @@ PYBIND11_MODULE(gbc_py, m) {
            py::return_value_policy::reference_internal)
       .def("get_ppu", &GameBoyColor::get_ppu,
            py::return_value_policy::reference_internal);
+
+  // For testing
+  m.def("poll_mooneye_test", &poll_mooneye_test, py::arg("gbc"),
+        "Run the emulator until the Mooneye LD B,B end marker is reached");
 }

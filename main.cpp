@@ -10,7 +10,7 @@ int main(const int argc, const char **argv) {
 
   // False to run in non-headless mode
   GameBoyColor emulator = GameBoyColor(false);
-  cart cart = load_cart(argv[1]);
+  cart cart = load_cart_fs(argv[1]);
 
   emulator.insert_cartridge(cart);
   emulator.run();

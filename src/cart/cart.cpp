@@ -170,21 +170,14 @@ static rom_header parse_header(std::span<const byte_t> rom) {
   return h;
 }
 
-cart load_cart(const fs::path &rom_path) {
-  cart c{};
-  c.file_path = rom_path;
-  c.rom = read_all_bytes(rom_path);
-
+void validate(cart &c) {
   if (c.rom.size() < kMinRomSize) {
     throw std::runtime_error(
         "load_cart: ROM is too small to contain a valid header");
   }
-
   c.header = parse_header(c.rom);
-
   c.declared_rom_bytes = rom_bytes_from_code(c.header.rom_size_code);
   c.declared_ram_bytes = ram_bytes_from_code(c.header.ram_size_code);
-
   c.logo_ok = check_logo(c.rom);
 
   const byte_t computed_hchk = compute_header_checksum(c.rom);
@@ -198,6 +191,20 @@ cart load_cart(const fs::path &rom_path) {
     throw std::runtime_error(
         "load_cart: ROM file smaller than header-declared ROM size");
   }
+}
 
+cart load_cart_fs(const fs::path &rom_path) {
+  cart c{};
+  c.file_path = rom_path;
+  c.rom = read_all_bytes(rom_path);
+  validate(c);
+  return c;
+}
+
+cart load_cart_raw(std::vector<byte_t> rom_bytes) {
+  cart c{};
+  c.file_path.clear();
+  c.rom = std::move(rom_bytes);
+  validate(c);
   return c;
 }

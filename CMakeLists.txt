@@ -37,7 +37,6 @@ set(GBC_CORE_SOURCES
     src/memory/mmio/mmio.cpp
 
     src/timer/timer.cpp
-
     src/ppu/ppu.cpp
     src/ppu/fifo.cpp
 

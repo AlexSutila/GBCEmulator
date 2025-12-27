@@ -35,14 +35,17 @@ void GameBoyColor::init_test_bed() {
   bus->init_test_bed();
 }
 
+void GameBoyColor::step() {
+  cpu->step();
+  ppu->step();
+  timer->step();
+  ++elapsed_clocks_;
+}
+
 void GameBoyColor::run() {
   if (renderer)
     ppu->connect_renderer(renderer);
 
-  while (renderer->get_running()) [[likely]] {
-    cpu->step();
-    ppu->step();
-    timer->step();
-    ++elapsed_clocks_;
-  }
+  while (renderer->get_running()) [[likely]]
+    step();
 }

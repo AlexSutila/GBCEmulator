@@ -16,6 +16,7 @@ public:
   GameBoyColor(bool headless);
   void insert_cartridge(cart c);
   void init_test_bed();
+  void step();
   void run();
 
   /* Getters mainly for python bindings */
