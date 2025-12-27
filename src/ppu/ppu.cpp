@@ -77,7 +77,7 @@ void PixelProcessingUnit::do_oam_scan() {
     return;
 
   // State transition logic
-  stat_reg.set_mode(modes::MODE_DRAWING);
+  switch_mode(modes::MODE_DRAWING);
   total_mode_clks.reset();
 }
 
@@ -124,7 +124,7 @@ void PixelProcessingUnit::do_draw() {
     return;
 
   // State transition logic
-  stat_reg.set_mode(modes::MODE_HBLANK);
+  switch_mode(modes::MODE_HBLANK);
   total_mode_clks.reset();
 }
 
@@ -172,12 +172,35 @@ void PixelProcessingUnit::blank() {
 
   // End of scanline logic
   if (ly_reg.is_visible())
-    stat_reg.set_mode(modes::MODE_OAM_SCAN);
+    switch_mode(modes::MODE_OAM_SCAN);
   else
-    stat_reg.set_mode(modes::MODE_VBLANK);
+    switch_mode(modes::MODE_VBLANK);
 
   total_mode_clks.reset();
   cur_scanline_clks = 0;
+}
+
+void PixelProcessingUnit::switch_mode(PPU::StatModes new_mode) {
+  using modes = PPU::StatModes;
+  stat_reg.set_mode(new_mode);
+
+  /* Transitioning between two PPU modes may fire an LCD interrupt. */
+  switch (new_mode) {
+  case PPU::StatModes::MODE_HBLANK:
+    if (stat_reg.int_enabled(PPU::StatIntFlags::MODE_0_SEL))
+      request_lcd_irq();
+    break;
+  case PPU::StatModes::MODE_VBLANK:
+    if (stat_reg.int_enabled(PPU::StatIntFlags::MODE_1_SEL))
+      request_lcd_irq();
+    break;
+  case PPU::StatModes::MODE_OAM_SCAN:
+    if (stat_reg.int_enabled(PPU::StatIntFlags::MODE_2_SEL))
+      request_lcd_irq();
+    break;
+  default:
+    break;
+  }
 }
 
 void PixelProcessingUnit::sync_ly_lyc() {

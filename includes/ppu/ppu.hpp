@@ -50,6 +50,7 @@ private:
   void request_lcd_irq() {
     if_reg->put_flag(InterruptFlagMask::INT_FLAG_LCD, true);
   }
+  void switch_mode(PPU::StatModes new_mode);
   void sync_ly_lyc();
 
   /* Timing and FSM metadata */
