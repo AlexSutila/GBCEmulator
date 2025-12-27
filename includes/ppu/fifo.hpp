@@ -96,6 +96,7 @@ private:
   void do_push();
 
   std::size_t calc_tile_idx() const;
+  addr_t calc_tilemap_base() const;
   byte_t fetch_tile_data(bool high) const;
 
   struct {

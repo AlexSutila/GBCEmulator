@@ -1,4 +1,5 @@
 #include "ppu/fifo.hpp"
+#include "memory/mmio/dmg.hpp"
 #include "ppu/ppu.hpp"
 #include <cstddef>
 #include <optional>
@@ -42,12 +43,17 @@ std::size_t PixelFifo::calc_tile_idx() const {
 
   // TODO: Consider configurable indexing modes
   const addr_t tile_idx = (y_tile << tile_shift) | x_tile;
-  constexpr auto tilemap_base = 0x9800;
+  const addr_t tilemap_base = calc_tilemap_base();
   return ppu_.bus->read_byte(tilemap_base + tile_idx);
 }
 
+/* Calculate the base address of the tilemap for bg/win */
+addr_t PixelFifo::calc_tilemap_base() const {
+  const auto base_addr = ppu_.lcdc_reg.bg_tilemap_base();
+  return static_cast<addr_t>(base_addr);
+}
+
 byte_t PixelFifo::fetch_tile_data(bool high) const {
-  constexpr auto vram_base_addr = 0x8000;
   constexpr auto tile_size_bytes = 16;
   constexpr auto tile_row_bytes = 2;
 
@@ -56,11 +62,22 @@ byte_t PixelFifo::fetch_tile_data(bool high) const {
   const addr_t y_offset = y_pixel_idx * tile_row_bytes;
 
   // Need to consider y-offset based on LY register
-  const addr_t tile_base_addr = fetcher.tile_idx * tile_size_bytes;
-  addr_t data_addr = vram_base_addr + tile_base_addr + y_offset;
+  addr_t data_offset = (fetcher.tile_idx * tile_size_bytes) + y_offset;
   if (high)
-    ++data_addr;
-  return ppu_.bus->read_byte(data_addr);
+    ++data_offset;
+
+  // Read data based on bg/win data addressing mode
+  switch (ppu_.lcdc_reg.bg_win_data_area()) {
+  case PPU::TileDataArea::LO_TILEDATA_BASE:
+    /* Inlined some math here, so if it's above 0x9000 you index it normally,
+     * but if it is below you basically treat the tile offset like a 0-127
+     * offset from 0x8800. You can just use 0x8800 - (127 * tile size in bytes)
+     * to achieve the same effect, hence I deviate from the docs a bit. */
+    return fetcher.tile_idx < 128 ? ppu_.bus->read_byte(0x9000 + data_offset)
+                                  : ppu_.bus->read_byte(0x8000 + data_offset);
+  case PPU::TileDataArea::HI_TILEDATA_BASE:
+    return ppu_.bus->read_byte(0x8000 + data_offset);
+  }
 }
 
 void PixelFifo::get_tile() {
