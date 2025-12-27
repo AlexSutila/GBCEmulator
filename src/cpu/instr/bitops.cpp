@@ -3,6 +3,7 @@
 #include "cpu/lr35902.hpp"
 
 #include <array>
+#include <format>
 #include <iomanip>
 #include <memory>
 #include <sstream>
@@ -34,6 +35,11 @@ std::size_t CB_PREFIX::exec() {
   // Parse instruction operands and execute just like in CPU code
   ins->parse();
   return ins->exec();
+}
+
+// TODO: This could fuck up royally but we ball lmao
+std::string CB_PREFIX::describe() {
+  return std::format("(CB) {}", lookup.at(op)->describe());
 }
 
 void CB_PREFIX::parse() { op = bus->read_byte(reg_file->reg_pc++); }

@@ -6,6 +6,7 @@
 #include "cpu/registers/regfile.hpp"
 #include "emu_types.hpp"
 #include "memory/bus.hpp"
+#include <format>
 
 /*
  * Complement Accumulator
@@ -21,6 +22,7 @@ public:
     reg_file->reg_af.set_flag(StatusFlagMask::FLAG_H_MASK);
     return 4;
   }
+  std::string describe() override { return std::format("CPL"); }
 };
 
 /*
@@ -36,6 +38,7 @@ public:
     reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_H_MASK);
     return 4;
   }
+  std::string describe() override { return std::format("SCF"); }
 };
 
 /*
@@ -52,6 +55,7 @@ public:
     reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_H_MASK);
     return 4;
   }
+  std::string describe() override { return std::format("CCF"); }
 };
 
 /*
@@ -61,6 +65,7 @@ class NOP : public Instruction {
 public:
   NOP(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
+  std::string describe() override { return std::format("NOP"); }
   std::size_t exec() override { return 4; }
 };
 
@@ -76,6 +81,7 @@ public:
     ime->disable();
     return 4;
   }
+  std::string describe() override { return std::format("DI"); }
 
 private:
   InterruptMasterEnable *const ime;
@@ -93,6 +99,7 @@ public:
     ime->enable(true);
     return 4;
   }
+  std::string describe() override { return std::format("EI"); }
 
 private:
   InterruptMasterEnable *const ime;
@@ -106,6 +113,7 @@ public:
   HALT(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override { return 4; }
+  std::string describe() override { return std::format("HALT"); }
 };
 
 /*
@@ -116,6 +124,7 @@ public:
   STOP(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override { return 4; }
+  std::string describe() override { return std::format("STOP"); }
 };
 
 #endif // __CONTROL_H

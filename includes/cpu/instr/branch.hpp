@@ -8,6 +8,7 @@
 #include "memory/bus.hpp"
 
 #include <cstdint>
+#include <format>
 
 /*
  * Absolute jump
@@ -19,6 +20,9 @@ public:
   std::size_t exec() override {
     reg_file->reg_pc = imm;
     return 16;
+  }
+  std::string describe() override {
+    return std::format("JP {}", static_cast<int>(imm));
   }
   void parse() override {
     const byte_t lo = bus->read_byte(reg_file->reg_pc++);
@@ -41,6 +45,7 @@ public:
     reg_file->reg_pc = read_reg<Register16Bit::REG_HL>();
     return 4;
   }
+  std::string describe() override { return std::format("JP HL"); }
 };
 
 /*
@@ -57,6 +62,10 @@ public:
       return 12;
     reg_file->reg_pc = imm;
     return 16;
+  }
+  std::string describe() override {
+    return std::format("JP {}, {}", to_string<flag, expect>(),
+                       static_cast<int>(imm));
   }
   void parse() override {
     const byte_t lo = bus->read_byte(reg_file->reg_pc++);
@@ -78,6 +87,9 @@ public:
   std::size_t exec() override {
     reg_file->reg_pc += static_cast<addr_t>(imm);
     return 12;
+  }
+  std::string describe() override {
+    return std::format("JP {}", static_cast<int>(imm));
   }
   void parse() override {
     imm = static_cast<int8_t>(bus->read_byte(reg_file->reg_pc++));
@@ -101,6 +113,10 @@ public:
       return 8;
     reg_file->reg_pc += static_cast<addr_t>(imm);
     return 12;
+  }
+  std::string describe() override {
+    return std::format("JP {}, {}", to_string<flag, expect>(),
+                       static_cast<int>(imm));
   }
   void parse() override {
     imm = static_cast<int8_t>(bus->read_byte(reg_file->reg_pc++));
@@ -129,6 +145,9 @@ public:
     reg_file->reg_sp.write(sp);
     reg_file->reg_pc = imm;
     return 24;
+  }
+  std::string describe() override {
+    return std::format("CALL {}", static_cast<int>(imm));
   }
   void parse() override {
     const byte_t lo = bus->read_byte(reg_file->reg_pc++);
@@ -164,6 +183,10 @@ public:
     reg_file->reg_pc = imm;
     return 24;
   }
+  std::string describe() override {
+    return std::format("CALL {}, {}", to_string<flag, expect>(),
+                       static_cast<int>(imm));
+  }
   void parse() override {
     const byte_t lo = bus->read_byte(reg_file->reg_pc++);
     const byte_t hi = bus->read_byte(reg_file->reg_pc++);
@@ -191,6 +214,7 @@ public:
     reg_file->reg_pc = lo | (hi << 8);
     return 16;
   }
+  std::string describe() override { return std::format("RET"); }
 };
 
 /*
@@ -213,6 +237,9 @@ public:
     reg_file->reg_sp.write(sp);
     reg_file->reg_pc = lo | (hi << 8);
     return 20;
+  }
+  std::string describe() override {
+    return std::format("RET {}", to_string<flag, expect>());
   }
 };
 
@@ -237,6 +264,7 @@ public:
     reg_file->reg_pc = lo | (hi << 8);
     return 16;
   }
+  std::string describe() override { return std::format("RETI"); }
 
 private:
   InterruptMasterEnable *const ime;
@@ -260,6 +288,9 @@ public:
     reg_file->reg_sp.write(sp);
     reg_file->reg_pc = vec;
     return 16;
+  }
+  std::string describe() override {
+    return std::format("RST {}", static_cast<int>(vec));
   }
 };
 

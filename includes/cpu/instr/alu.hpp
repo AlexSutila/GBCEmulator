@@ -8,6 +8,7 @@
 #include "memory/bus.hpp"
 
 #include <cstdint>
+#include <format>
 
 /*
  * Add value in 8-bit register X to A
@@ -33,6 +34,9 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 4;
   }
+  std::string describe() override {
+    return std::format("ADD A, {}", to_string<src>());
+  }
 };
 
 /*
@@ -57,6 +61,9 @@ public:
     // Write back
     write_reg<Register8Bit::REG_A>(result);
     return 8;
+  }
+  std::string describe() override {
+    return std::format("ADD A, {}", static_cast<int>(imm));
   }
   void parse() override { imm = bus->read_byte(reg_file->reg_pc++); }
 
@@ -88,6 +95,7 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 8;
   }
+  std::string describe() override { return std::format("ADD A, HL"); }
 };
 
 /*
@@ -119,6 +127,9 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 4;
   }
+  std::string describe() override {
+    return std::format("ADC A, {}", to_string<src>());
+  }
 };
 
 /*
@@ -148,6 +159,9 @@ public:
     // Write back
     write_reg<Register8Bit::REG_A>(result);
     return 8;
+  }
+  std::string describe() override {
+    return std::format("ADC A, {}", static_cast<int>(imm));
   }
   void parse() override { imm = bus->read_byte(reg_file->reg_pc++); }
 
@@ -184,6 +198,7 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 8;
   }
+  std::string describe() override { return std::format("ADC A, HL"); }
 };
 
 /*
@@ -209,6 +224,9 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 4;
   }
+  std::string describe() override {
+    return std::format("SUB A, {}", to_string<src>());
+  }
 };
 
 /*
@@ -232,6 +250,9 @@ public:
     // Write back
     write_reg<Register8Bit::REG_A>(result);
     return 8;
+  }
+  std::string describe() override {
+    return std::format("SUB A, {}", static_cast<int>(imm));
   }
   void parse() override { imm = bus->read_byte(reg_file->reg_pc++); }
 
@@ -262,6 +283,7 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 8;
   }
+  std::string describe() override { return std::format("SUB A, HL"); }
 };
 
 /*
@@ -294,6 +316,9 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 4;
   }
+  std::string describe() override {
+    return std::format("SBC A, {}", to_string<src>());
+  }
 };
 
 /*
@@ -324,6 +349,9 @@ public:
     // Write back
     write_reg<Register8Bit::REG_A>(result);
     return 8;
+  }
+  std::string describe() override {
+    return std::format("SBC A, {}", static_cast<int>(imm));
   }
   void parse() override { imm = bus->read_byte(reg_file->reg_pc++); }
 
@@ -361,6 +389,7 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 8;
   }
+  std::string describe() override { return std::format("SBC A, HL"); }
 };
 
 /*
@@ -385,6 +414,9 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 4;
   }
+  std::string describe() override {
+    return std::format("AND A, {}", to_string<src>());
+  }
 };
 
 /*
@@ -407,6 +439,9 @@ public:
     // Write back
     write_reg<Register8Bit::REG_A>(result);
     return 8;
+  }
+  std::string describe() override {
+    return std::format("AND A, {}", static_cast<int>(imm));
   }
   void parse() override { imm = bus->read_byte(reg_file->reg_pc++); }
 
@@ -436,6 +471,7 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 8;
   }
+  std::string describe() override { return std::format("AND A, HL"); }
 };
 
 /*
@@ -460,6 +496,9 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 4;
   }
+  std::string describe() override {
+    return std::format("XOR A, {}", to_string<src>());
+  }
 };
 
 /*
@@ -482,6 +521,9 @@ public:
     // Write back
     write_reg<Register8Bit::REG_A>(result);
     return 8;
+  }
+  std::string describe() override {
+    return std::format("XOR A, {}", static_cast<int>(imm));
   }
   void parse() override { imm = bus->read_byte(reg_file->reg_pc++); }
 
@@ -511,6 +553,7 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 8;
   }
+  std::string describe() override { return std::format("XOR A, HL"); }
 };
 
 /*
@@ -535,6 +578,9 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 4;
   }
+  std::string describe() override {
+    return std::format("OR A, {}", to_string<src>());
+  }
 };
 
 /*
@@ -557,6 +603,9 @@ public:
     // Write back
     write_reg<Register8Bit::REG_A>(result);
     return 8;
+  }
+  std::string describe() override {
+    return std::format("OR A, {}", static_cast<int>(imm));
   }
   void parse() override { imm = bus->read_byte(reg_file->reg_pc++); }
 
@@ -586,6 +635,7 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 8;
   }
+  std::string describe() override { return std::format("OR A, HL"); }
 };
 
 /*
@@ -608,6 +658,9 @@ public:
     reg_file->reg_af.put_flag(StatusFlagMask::FLAG_C_MASK, a < x);
     return 4;
   }
+  std::string describe() override {
+    return std::format("CP A, {}", to_string<src>());
+  }
 };
 
 /*
@@ -628,6 +681,9 @@ public:
     reg_file->reg_af.put_flag(StatusFlagMask::FLAG_H_MASK, half_carry);
     reg_file->reg_af.put_flag(StatusFlagMask::FLAG_C_MASK, a < imm);
     return 8;
+  }
+  std::string describe() override {
+    return std::format("CP A, {}", static_cast<int>(imm));
   }
   void parse() override { imm = bus->read_byte(reg_file->reg_pc++); }
 
@@ -655,6 +711,7 @@ public:
     reg_file->reg_af.put_flag(StatusFlagMask::FLAG_C_MASK, a < n);
     return 8;
   }
+  std::string describe() override { return std::format("CP A, HL"); }
 };
 
 /*
@@ -677,6 +734,9 @@ public:
     // Write back
     write_reg<src>(result);
     return 4;
+  }
+  std::string describe() override {
+    return std::format("INC {}", to_string<src>());
   }
 };
 
@@ -701,6 +761,7 @@ public:
     bus->write_byte(read_reg<Register16Bit::REG_HL>(), result);
     return 12;
   }
+  std::string describe() override { return std::format("INC HL"); }
 };
 
 /*
@@ -723,6 +784,9 @@ public:
     // Write back
     write_reg<src>(result);
     return 4;
+  }
+  std::string describe() override {
+    return std::format("DEC {}", to_string<src>());
   }
 };
 
@@ -747,6 +811,7 @@ public:
     bus->write_byte(read_reg<Register16Bit::REG_HL>(), result);
     return 12;
   }
+  std::string describe() override { return std::format("DEC HL"); }
 };
 
 /*
@@ -790,6 +855,7 @@ public:
     write_reg<Register8Bit::REG_A>(a);
     return 4;
   }
+  std::string describe() override { return std::format("DAA"); }
 };
 
 /*
@@ -814,6 +880,9 @@ public:
     write_reg<Register16Bit::REG_HL>(static_cast<addr_t>(sum));
     return 8;
   }
+  std::string describe() override {
+    return std::format("ADD HL, {}", to_string<src>());
+  }
 };
 
 /*
@@ -828,6 +897,9 @@ public:
     write_reg<dst>(xx + 1);
     return 8;
   }
+  std::string describe() override {
+    return std::format("INC {}", to_string<dst>());
+  }
 };
 
 /*
@@ -841,6 +913,9 @@ public:
     const addr_t xx = read_reg<dst>();
     write_reg<dst>(xx - 1);
     return 8;
+  }
+  std::string describe() override {
+    return std::format("DEC {}", to_string<dst>());
   }
 };
 
@@ -866,6 +941,9 @@ public:
     // Write back
     reg_file->reg_sp.write(sp + nn);
     return 16;
+  }
+  std::string describe() override {
+    return std::format("ADD SP, {}", static_cast<int>(imm));
   }
   void parse() override {
     imm = static_cast<int8_t>(bus->read_byte(reg_file->reg_pc++));
@@ -898,6 +976,9 @@ public:
     // Write back
     write_reg<Register16Bit::REG_HL>(sp + nn);
     return 12;
+  }
+  std::string describe() override {
+    return std::format("LD HL, SP+{}", static_cast<int>(imm));
   }
   void parse() override {
     imm = static_cast<int8_t>(bus->read_byte(reg_file->reg_pc++));

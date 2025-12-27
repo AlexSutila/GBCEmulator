@@ -1,10 +1,12 @@
 #ifndef __INSTR_H
 #define __INSTR_H
 
+#include "cpu/registers/flags.hpp"
 #include "cpu/registers/regfile.hpp"
 #include "emu_types.hpp"
 #include "memory/bus.hpp"
 #include <cstddef>
+#include <string>
 
 class Instruction {
 public:
@@ -32,12 +34,65 @@ public:
    */
   virtual void parse() {}
 
+  /**
+   * @return A string describing the instruction
+   */
+  virtual std::string describe() { return "Un-implemented"; }
+
 protected:
-  /*
+  /**
    * All just compile time stuff to reduce having to go through unnecessry
    * decode logic during runtime. A lot of it can be done during compile time
    * unless an instruction deals with immediate values.
    */
+
+  template <Register16Bit reg> inline const char *to_string() const {
+    if constexpr (reg == Register16Bit::REG_AF)
+      return "AF";
+    else if constexpr (reg == Register16Bit::REG_BC)
+      return "BC";
+    else if constexpr (reg == Register16Bit::REG_DE)
+      return "DE";
+    else if constexpr (reg == Register16Bit::REG_HL)
+      return "HL";
+    else if constexpr (reg == Register16Bit::REG_SP)
+      return "SP";
+    else
+      static_assert("Invalid 16-bit register");
+  }
+
+  template <Register8Bit reg> inline const char *to_string() const {
+    if constexpr (reg == Register8Bit::REG_A)
+      return "A";
+    else if constexpr (reg == Register8Bit::REG_F)
+      return "F";
+    else if constexpr (reg == Register8Bit::REG_B)
+      return "B";
+    else if constexpr (reg == Register8Bit::REG_C)
+      return "C";
+    else if constexpr (reg == Register8Bit::REG_D)
+      return "D";
+    else if constexpr (reg == Register8Bit::REG_E)
+      return "E";
+    else if constexpr (reg == Register8Bit::REG_H)
+      return "H";
+    else if constexpr (reg == Register8Bit::REG_L)
+      return "L";
+    else
+      static_assert("Invalid 8-bit register");
+  }
+
+  template <StatusFlagMask flag, bool expect>
+  inline const char *to_string() const {
+    if constexpr (flag == StatusFlagMask::FLAG_C_MASK)
+      return expect ? "C" : "!C";
+    if constexpr (flag == StatusFlagMask::FLAG_N_MASK)
+      return expect ? "N" : "!N";
+    if constexpr (flag == StatusFlagMask::FLAG_Z_MASK)
+      return expect ? "Z" : "!Z";
+    if constexpr (flag == StatusFlagMask::FLAG_H_MASK)
+      return expect ? "H" : "!H";
+  }
 
   template <Register16Bit reg> inline void write_reg(addr_t addr) const {
     if constexpr (reg == Register16Bit::REG_AF)

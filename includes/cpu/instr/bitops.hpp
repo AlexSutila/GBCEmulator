@@ -35,6 +35,7 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 4;
   }
+  std::string describe() override { return std::format("RLCA"); }
 };
 
 /*
@@ -62,6 +63,7 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 4;
   }
+  std::string describe() override { return std::format("RRCA"); }
 };
 
 /*
@@ -90,6 +92,7 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 4;
   }
+  std::string describe() override { return std::format("RLA"); }
 };
 
 /*
@@ -118,6 +121,7 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 4;
   }
+  std::string describe() override { return std::format("RRA"); }
 };
 
 /*
@@ -128,6 +132,7 @@ class CB_PREFIX : public Instruction {
 public:
   CB_PREFIX(RegisterFile *reg_file_ptr, AddressBus *bus_ptr);
   std::size_t exec() override;
+  std::string describe() override;
   void parse() override;
 
 private:
@@ -159,6 +164,9 @@ public:
     write_reg<dst>(result);
     return 8;
   }
+  std::string describe() override {
+    return std::format("RLC {}", to_string<dst>());
+  }
 };
 
 class RLC_HL : public Instruction {
@@ -181,6 +189,7 @@ public:
     bus->write_byte(addr, result);
     return 16;
   }
+  std::string describe() override { return std::format("RLC HL"); }
 };
 
 template <Register8Bit dst> class RL_X : public Instruction {
@@ -202,6 +211,9 @@ public:
     // Write back
     write_reg<dst>(result);
     return 8;
+  }
+  std::string describe() override {
+    return std::format("RL {}", to_string<dst>());
   }
 };
 
@@ -226,6 +238,7 @@ public:
     bus->write_byte(hl, result);
     return 16;
   }
+  std::string describe() override { return std::format("RL HL"); }
 };
 
 template <Register8Bit dst> class RRC_X : public Instruction {
@@ -246,6 +259,9 @@ public:
     // Write back
     write_reg<dst>(result);
     return 8;
+  }
+  std::string describe() override {
+    return std::format("RRC {}", to_string<dst>());
   }
 };
 
@@ -270,6 +286,7 @@ public:
     bus->write_byte(addr, result);
     return 16;
   }
+  std::string describe() override { return std::format("RRC HL"); }
 };
 
 template <Register8Bit dst> class RR_X : public Instruction {
@@ -291,6 +308,9 @@ public:
     // Write back
     write_reg<dst>(result);
     return 8;
+  }
+  std::string describe() override {
+    return std::format("RR {}", to_string<dst>());
   }
 };
 
@@ -315,6 +335,7 @@ public:
     bus->write_byte(addr, result);
     return 16;
   }
+  std::string describe() override { return std::format("RR HL"); }
 };
 
 template <Register8Bit dst> class SLA_X : public Instruction {
@@ -335,6 +356,9 @@ public:
     // Write back
     write_reg<dst>(result);
     return 8;
+  }
+  std::string describe() override {
+    return std::format("SLA {}", to_string<dst>());
   }
 };
 
@@ -358,6 +382,7 @@ public:
     bus->write_byte(addr, result);
     return 16;
   }
+  std::string describe() override { return std::format("SLA HL"); }
 };
 
 template <Register8Bit dst> class SRA_X : public Instruction {
@@ -378,6 +403,9 @@ public:
     // Write back
     write_reg<dst>(result);
     return 8;
+  }
+  std::string describe() override {
+    return std::format("SLA {}", to_string<dst>());
   }
 };
 
@@ -401,6 +429,7 @@ public:
     bus->write_byte(addr, result);
     return 16;
   }
+  std::string describe() override { return std::format("SLA HL"); }
 };
 
 template <Register8Bit dst> class SWAP_X : public Instruction {
@@ -420,6 +449,9 @@ public:
     // Write back
     write_reg<dst>(result);
     return 8;
+  }
+  std::string describe() override {
+    return std::format("SWAP {}", to_string<dst>());
   }
 };
 
@@ -442,6 +474,7 @@ public:
     bus->write_byte(addr, result);
     return 16;
   }
+  std::string describe() override { return std::format("SWAP HL"); }
 };
 
 template <Register8Bit dst> class SRL_X : public Instruction {
@@ -462,6 +495,9 @@ public:
     // Write back
     write_reg<dst>(result);
     return 8;
+  }
+  std::string describe() override {
+    return std::format("SRL {}", to_string<dst>());
   }
 };
 
@@ -485,10 +521,10 @@ public:
     bus->write_byte(addr, result);
     return 16;
   }
+  std::string describe() override { return std::format("SRL HL"); }
 };
 
-template <byte_t bit, Register8Bit dst>
-class BIT_N_X : public Instruction {
+template <byte_t bit, Register8Bit dst> class BIT_N_X : public Instruction {
 public:
   BIT_N_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -502,10 +538,12 @@ public:
     reg_file->reg_af.put_flag(StatusFlagMask::FLAG_H_MASK, true);
     return 8;
   }
+  std::string describe() override {
+    return std::format("BIT {}, {}", static_cast<int>(bit), to_string<dst>());
+  }
 };
 
-template <byte_t bit>
-class BIT_N_HL : public Instruction {
+template <byte_t bit> class BIT_N_HL : public Instruction {
 public:
   BIT_N_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -520,10 +558,12 @@ public:
     reg_file->reg_af.put_flag(StatusFlagMask::FLAG_H_MASK, true);
     return 12;
   }
+  std::string describe() override {
+    return std::format("BIT {}, HL", static_cast<int>(bit));
+  }
 };
 
-template <byte_t bit, Register8Bit dst>
-class RES_N_X : public Instruction {
+template <byte_t bit, Register8Bit dst> class RES_N_X : public Instruction {
 public:
   RES_N_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -533,10 +573,12 @@ public:
     write_reg<dst>(x);
     return 8;
   }
+  std::string describe() override {
+    return std::format("RES {}, {}", static_cast<int>(bit), to_string<dst>());
+  }
 };
 
-template <byte_t bit>
-class RES_N_HL : public Instruction {
+template <byte_t bit> class RES_N_HL : public Instruction {
 public:
   RES_N_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -549,8 +591,7 @@ public:
   }
 };
 
-template <byte_t bit, Register8Bit dst>
-class SET_N_X : public Instruction {
+template <byte_t bit, Register8Bit dst> class SET_N_X : public Instruction {
 public:
   SET_N_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -560,10 +601,12 @@ public:
     write_reg<dst>(x);
     return 8;
   }
+  std::string describe() override {
+    return std::format("SET {}, {}", static_cast<int>(bit), to_string<dst>());
+  }
 };
 
-template <byte_t bit>
-class SET_N_HL : public Instruction {
+template <byte_t bit> class SET_N_HL : public Instruction {
 public:
   SET_N_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -573,6 +616,9 @@ public:
     n |= (1 << bit);
     bus->write_byte(hl, n);
     return 16;
+  }
+  std::string describe() override {
+    return std::format("SET {}, HL", static_cast<int>(bit));
   }
 };
 
