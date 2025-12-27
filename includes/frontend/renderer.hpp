@@ -24,10 +24,13 @@ public:
 
 private:
   std::chrono::time_point<std::chrono::steady_clock> elapsed_time;
-  std::unique_ptr<std::uint32_t[]> pixels;
-  SDL_Window *window{};
   SDL_Renderer *renderer{};
   SDL_Texture *texture{};
+  SDL_Window *window{};
+
+  // Frame buffer and rendering control
+  std::unique_ptr<std::uint32_t[]> pixels;
+  std::uint32_t pixels_rendered{};
 
   // System keep-alive
   bool running{};

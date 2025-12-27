@@ -31,6 +31,7 @@ Renderer::Renderer() {
   if (!texture)
     throw std::runtime_error(SDL_GetError());
   pixels = std::make_unique<std::uint32_t[]>(FB_HEIGHT * FB_WIDTH);
+  pixels_rendered = 0;
 
   /* For 60hz synchronization */
   elapsed_time = std::chrono::steady_clock::now();
@@ -49,6 +50,12 @@ void Renderer::putPixel(int x, int y, byte_t paletteIndex) {
   if (x < 0 || x >= FB_WIDTH || y < 0 || y >= FB_HEIGHT)
     return;
   pixels[y * FB_WIDTH + x] = PALETTE[paletteIndex & 0x03];
+  ++pixels_rendered;
+
+  if (pixels_rendered != FB_HEIGHT * FB_WIDTH)
+    return;
+  pixels_rendered = 0;
+  present();
 }
 
 void Renderer::poll_events() {

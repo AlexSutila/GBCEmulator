@@ -162,10 +162,6 @@ void PixelProcessingUnit::do_vblank() {
   assert(stat_reg.get_mode() == modes::MODE_VBLANK);
   assert(!ly_reg.is_visible());
   blank();
-
-  // Render at end of frame (ly goes back to zero after blanking)
-  if (ly_reg.is_visible() && renderer)
-    renderer->present();
 }
 
 void PixelProcessingUnit::blank() {
