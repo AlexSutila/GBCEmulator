@@ -19,16 +19,22 @@ PixelFifo::PixelFifo(PixelProcessingUnit &ppu)
   };
 }
 
+/* We derive the Y-coordinate at a pixel level using the LY register. */
 const byte_t PixelFifo::get_pixel_y() const {
   const byte_t scy = ppu_.scy_reg.read();
   const byte_t ly = ppu_.ly_reg.read();
   return (ly + scy) & 0xFF;
 }
 
+/* We derive the X-coordinate at a tile level, since the FIFO fetches eight
+ * pixels at a time. As a result, we have to remember to divide the scroll
+ * value by the size of a pixel to accomodate the change in units.  */
 const byte_t PixelFifo::get_tile_x() const {
+  constexpr byte_t pixels_per_row = 8;
   const byte_t scx = ppu_.scx_reg.read();
   const byte_t x = fetcher.x_coor;
-  return (x + scx) & 0xFF;
+  // Since returning unit tiles, can only be 32 max
+  return (x + (scx / pixels_per_row)) & 0x1F;
 }
 
 /* Calculate which tile to read from based on tilemaps */
@@ -41,7 +47,7 @@ std::size_t PixelFifo::calc_tile_idx() const {
   const std::size_t y_tile = (y_pixel / tile_pixels);
   const std::size_t x_tile = get_tile_x();
 
-  // TODO: Consider configurable indexing modes
+  // Base address changes depending on LCDC bits being set
   const addr_t tile_idx = (y_tile << tile_shift) | x_tile;
   const addr_t tilemap_base = calc_tilemap_base();
   return ppu_.bus->read_byte(tilemap_base + tile_idx);
