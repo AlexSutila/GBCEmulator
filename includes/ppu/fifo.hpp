@@ -76,7 +76,7 @@ public:
   void step();
 
   /* Pop a fully processed pixel */
-  bool can_pop() const { return fifo.size() > 0; }
+  bool can_pop() const { return fifo.size() >= 8; }
   pixel pop() { return fifo.pop(); }
 
 private:

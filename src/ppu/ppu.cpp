@@ -123,6 +123,9 @@ void PixelProcessingUnit::do_draw() {
   if (row_pixels_rendered < pixels_per_row)
     return;
 
+  // Clean fifos for next scanline
+  bg_fifo.reset();
+
   // State transition logic
   switch_mode(modes::MODE_HBLANK);
   total_mode_clks.reset();
