@@ -43,6 +43,16 @@ byte_t STAT::read() {
   return state | 0x80;
 }
 
+/* This bit must be set and cleared by the pixel processor, as this register
+ * does not have visibility into the values of LY and LYC to perform the updates
+ * itself. */
+void STAT::set_ly_eq_lyc(bool value) {
+  state = (state & ~0x04);
+  if (value)
+    state |= 0x04;
+}
+const bool STAT::get_ly_eq_lyc() const { return (state & 0x04) != 0; }
+
 const StatModes STAT::get_mode() const {
   constexpr byte_t mode_mask = 0x03;
   const StatModes mode = static_cast<StatModes>(state & mode_mask);

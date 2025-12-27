@@ -133,6 +133,8 @@ public:
   const bool int_enabled(StatIntFlags flag) const {
     return (state & static_cast<byte_t>(flag)) != 0;
   }
+  const bool get_ly_eq_lyc() const;
+  void set_ly_eq_lyc(bool value);
   const StatModes get_mode() const;
   void set_mode(StatModes mode);
 

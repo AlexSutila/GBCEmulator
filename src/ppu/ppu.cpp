@@ -168,7 +168,7 @@ void PixelProcessingUnit::blank() {
 
   // Request VBlank interrupt
   if (ly_reg.read() == 144)
-    request_vblank();
+    request_vblank_irq();
 
   // End of scanline logic
   if (ly_reg.is_visible())
@@ -178,6 +178,17 @@ void PixelProcessingUnit::blank() {
 
   total_mode_clks.reset();
   cur_scanline_clks = 0;
+}
+
+void PixelProcessingUnit::sync_ly_lyc() {
+  bool eq = lyc_reg.read() == ly_reg.read();
+  bool old_bit = stat_reg.get_ly_eq_lyc();
+  stat_reg.set_ly_eq_lyc(eq);
+
+  /* We have to maintain the second bit of the STAT register and fire interrupts
+   * when appropriate. This bit is always maintained unconditionally. */
+  if (stat_reg.int_enabled(PPU::StatIntFlags::LYC_EQ_LY) && !old_bit && eq)
+    request_lcd_irq();
 }
 
 void PixelProcessingUnit::reset() {
@@ -217,4 +228,7 @@ void PixelProcessingUnit::step() {
     do_draw();
     break;
   }
+
+  /* Updates LY=LYC status bit, and fires interrupt if appropriate. */
+  sync_ly_lyc();
 }

@@ -44,12 +44,13 @@ private:
   void blank();
 
   /* Interrupt helpers */
-  void request_vblank() {
+  void request_vblank_irq() {
     if_reg->put_flag(InterruptFlagMask::INT_FLAG_VBLANK, true);
   }
-  void request_lcd() {
+  void request_lcd_irq() {
     if_reg->put_flag(InterruptFlagMask::INT_FLAG_LCD, true);
   }
+  void sync_ly_lyc();
 
   /* Timing and FSM metadata */
   std::optional<std::size_t> total_mode_clks{};
