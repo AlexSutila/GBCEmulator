@@ -102,22 +102,28 @@ void PixelProcessingUnit::do_draw() {
     // Counts how many pixels have been rendered on this row. This determines
     // when rendering is complete.
     row_pixels_rendered = 0;
-  }
 
-  // Rendering step
-  if (bg_fifo.can_pop()) {
-    const auto pixel_data = bg_fifo.pop();
-    if (renderer) // Disabled in headless mode, so this is conditional
-      renderer->putPixel(row_pixels_rendered, // Denotes X-coordinate
-                         ly_reg.read(),       // Denotes Y-coordinate
-                         pixel_data.color);
-    ++row_pixels_rendered;
+    max_pixels_discarded = scx_reg.read() % 8;
+    pixels_discarded = 0;
   }
-  bg_fifo.step();
 
   // Step dot clock
   ++cur_scanline_clks;
   ++cur_mode_clks;
+
+  // Rendering step
+  if (bg_fifo.can_pop()) {
+    const pixel pixel_data = bg_fifo.pop();
+    if (pixels_discarded < max_pixels_discarded)
+      ++pixels_discarded;
+    else if (renderer) {
+      renderer->putPixel(row_pixels_rendered, // Denotes X-coordinate
+                         ly_reg.read(),       // Denotes Y-coordinate
+                         pixel_data.color);
+      ++row_pixels_rendered;
+    }
+  }
+  bg_fifo.step();
 
   // Rendering incomplete
   if (row_pixels_rendered < pixels_per_row)

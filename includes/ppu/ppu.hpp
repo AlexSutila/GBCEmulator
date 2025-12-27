@@ -60,6 +60,8 @@ private:
   std::size_t row_pixels_rendered{};
 
   /* Pixel FIFO renderers */
+  std::size_t max_pixels_discarded{};
+  std::size_t pixels_discarded{};
   PixelFifo bg_fifo;
   friend PixelFifo;
 

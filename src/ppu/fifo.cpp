@@ -94,10 +94,7 @@ void PixelFifo::get_tile() {
   if (!total_clks.has_value()) {
     fetcher.tile_idx = calc_tile_idx();
     total_clks = max_state_clks;
-
-    // Advance the state of the fetcher, always < 20
-    if (++fetcher.x_coor >= 20)
-      fetcher.x_coor = 0;
+    fetcher.x_coor = (++fetcher.x_coor & 0x1F);
   }
   ++cur_clks;
 
