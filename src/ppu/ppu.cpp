@@ -77,7 +77,7 @@ void PixelProcessingUnit::do_oam_scan() {
     return;
 
   // State transition logic
-  switch_mode(modes::MODE_DRAWING);
+  stat_reg.set_mode(modes::MODE_DRAWING);
   total_mode_clks.reset();
 }
 
@@ -133,7 +133,7 @@ void PixelProcessingUnit::do_draw() {
   bg_fifo.reset();
 
   // State transition logic
-  switch_mode(modes::MODE_HBLANK);
+  stat_reg.set_mode(modes::MODE_HBLANK);
   total_mode_clks.reset();
 }
 
@@ -181,46 +181,42 @@ void PixelProcessingUnit::blank() {
 
   // End of scanline logic
   if (ly_reg.is_visible())
-    switch_mode(modes::MODE_OAM_SCAN);
+    stat_reg.set_mode(modes::MODE_OAM_SCAN);
   else
-    switch_mode(modes::MODE_VBLANK);
+    stat_reg.set_mode(modes::MODE_VBLANK);
 
   total_mode_clks.reset();
   cur_scanline_clks = 0;
 }
 
-void PixelProcessingUnit::switch_mode(PPU::StatModes new_mode) {
-  using modes = PPU::StatModes;
-  stat_reg.set_mode(new_mode);
+void PixelProcessingUnit::update_stat() {
+  /* The actual firing of the interrupt is fired on a rising edge of an internal
+   * signal. That signal is set based on various conditions. */
+  const bool old = stat_irq_signal_edge;
 
-  /* Transitioning between two PPU modes may fire an LCD interrupt. */
-  switch (new_mode) {
-  case PPU::StatModes::MODE_HBLANK:
-    if (stat_reg.int_enabled(PPU::StatIntFlags::MODE_0_SEL))
-      request_lcd_irq();
-    break;
-  case PPU::StatModes::MODE_VBLANK:
-    if (stat_reg.int_enabled(PPU::StatIntFlags::MODE_1_SEL))
-      request_lcd_irq();
-    break;
-  case PPU::StatModes::MODE_OAM_SCAN:
-    if (stat_reg.int_enabled(PPU::StatIntFlags::MODE_2_SEL))
-      request_lcd_irq();
-    break;
-  default:
-    break;
-  }
-}
+  /* Condition 1: The LY register is equal to the LYC register */
+  const bool cond_a = (ly_reg.read() == lyc_reg.read()) &&
+                      stat_reg.int_enabled(PPU::StatIntFlags::LYC_EQ_LY);
 
-void PixelProcessingUnit::sync_ly_lyc() {
-  bool eq = lyc_reg.read() == ly_reg.read();
-  bool old_bit = stat_reg.get_ly_eq_lyc();
-  stat_reg.set_ly_eq_lyc(eq);
+  /* Condition 2: We are in HBLANK and the STAT source bit is set */
+  const bool cond_b = (stat_reg.get_mode() == PPU::StatModes::MODE_HBLANK) &&
+                      stat_reg.int_enabled(PPU::StatIntFlags::MODE_0_SEL);
 
-  /* We have to maintain the second bit of the STAT register and fire interrupts
-   * when appropriate. This bit is always maintained unconditionally. */
-  if (stat_reg.int_enabled(PPU::StatIntFlags::LYC_EQ_LY) && !old_bit && eq)
+  /* Condition 3: We are in OAM and the STAT source bit is set */
+  const bool cond_c = (stat_reg.get_mode() == PPU::StatModes::MODE_OAM_SCAN) &&
+                      stat_reg.int_enabled(PPU::StatIntFlags::MODE_2_SEL);
+
+  /* Condition 4: We are in VBLANK and the STAT source bit is set. For some
+   * reason, this condition is also met in OAM scan as per TCAGBD. */
+  const bool cond_d = (stat_reg.get_mode() == PPU::StatModes::MODE_VBLANK) &&
+                      (stat_reg.int_enabled(PPU::StatIntFlags::MODE_0_SEL) ||
+                       stat_reg.int_enabled(PPU::StatIntFlags::MODE_1_SEL));
+
+  // Detect rising edge, fire IRQ appropriately
+  stat_irq_signal_edge = cond_a || cond_b || cond_c || cond_d;
+  if (!old && stat_irq_signal_edge)
     request_lcd_irq();
+  stat_reg.set_ly_eq_lyc(ly_reg.read() == lyc_reg.read());
 }
 
 void PixelProcessingUnit::reset() {
@@ -234,6 +230,9 @@ void PixelProcessingUnit::reset() {
   /* Configure status MMIO registers initial state - drives FSM */
   stat_reg.set_mode(StatModes::MODE_OAM_SCAN);
   ly_reg.reset();
+
+  /* Reset edge that triggers stat IRQs */
+  stat_irq_signal_edge = false;
 }
 
 void PixelProcessingUnit::step() {
@@ -261,6 +260,6 @@ void PixelProcessingUnit::step() {
     break;
   }
 
-  /* Updates LY=LYC status bit, and fires interrupt if appropriate. */
-  sync_ly_lyc();
+  /* Update status register */
+  update_stat();
 }
