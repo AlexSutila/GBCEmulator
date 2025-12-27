@@ -3,6 +3,7 @@
 
 #include "emu_types.hpp"
 #include <SDL3/SDL.h>
+#include <chrono>
 #include <cstdint>
 #include <memory>
 
@@ -22,6 +23,7 @@ public:
   void clear();
 
 private:
+  std::chrono::time_point<std::chrono::steady_clock> elapsed_time;
   std::unique_ptr<std::uint32_t[]> pixels;
   SDL_Window *window{};
   SDL_Renderer *renderer{};

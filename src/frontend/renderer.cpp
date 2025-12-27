@@ -1,6 +1,7 @@
 #include "frontend/renderer.hpp"
 #include "emu_types.hpp"
 #include <SDL3/SDL.h>
+#include <chrono>
 #include <cstdint>
 #include <memory>
 #include <stdexcept>
@@ -15,8 +16,6 @@ static constexpr std::uint32_t PALETTE[4] = {
 Renderer::Renderer() {
   if (!SDL_Init(SDL_INIT_VIDEO))
     throw std::runtime_error(SDL_GetError());
-  running = true;
-
   window = SDL_CreateWindow("GBC", FB_WIDTH * SCALE, FB_HEIGHT * SCALE,
                             SDL_WINDOW_RESIZABLE);
   if (!window)
@@ -32,6 +31,10 @@ Renderer::Renderer() {
   if (!texture)
     throw std::runtime_error(SDL_GetError());
   pixels = std::make_unique<std::uint32_t[]>(FB_HEIGHT * FB_WIDTH);
+
+  /* For 60hz synchronization */
+  elapsed_time = std::chrono::steady_clock::now();
+  running = true;
   clear();
 }
 
@@ -56,10 +59,18 @@ void Renderer::poll_events() {
   }
 }
 
-void Renderer::present() {
-  int pitch;
-  uint32_t *texturePixels;
+inline auto calc_delta(const std::chrono::steady_clock::time_point &start) {
+  return std::chrono::duration_cast<std::chrono::microseconds>(
+             std::chrono::steady_clock::now() - start)
+      .count();
+}
 
+void Renderer::present() {
+  constexpr float delta = 16666.66667f;
+  using namespace std::chrono;
+
+  uint32_t *texturePixels;
+  int pitch;
   SDL_LockTexture(texture, nullptr, reinterpret_cast<void **>(&texturePixels),
                   &pitch);
 
@@ -73,6 +84,11 @@ void Renderer::present() {
   SDL_RenderTexture(renderer, texture, nullptr, nullptr);
   SDL_RenderPresent(renderer);
   poll_events();
+
+  /* Sync to sixty herts */
+  while (calc_delta(elapsed_time) < delta)
+    ;
+  elapsed_time = std::chrono::steady_clock::now();
 }
 
 void Renderer::clear() {
