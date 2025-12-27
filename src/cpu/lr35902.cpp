@@ -26,6 +26,7 @@ LR35902::LR35902(AddressBus *bus_ptr)
   /* Init fetch decode execute fsm */
   state = CpuStates::STATE_FETCH;
   total_ins_clks = std::nullopt;
+  cur_ins_clks = 0;
 
   /* Register initialization */
   reg_file.reg_af = CpuFlagsRegister();
