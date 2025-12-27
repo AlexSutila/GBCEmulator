@@ -102,8 +102,10 @@ void PixelProcessingUnit::do_draw() {
     // Counts how many pixels have been rendered on this row. This determines
     // when rendering is complete.
     row_pixels_rendered = 0;
-
-    max_pixels_discarded = scx_reg.read() % 8;
+    // The three least significant bits of SCX are used to determine how many
+    // pixels to discard at the beginning of a scanline to implement scrolling.
+    max_pixels_discarded = scx_reg.read() & 0x7;
+    // Start with zero
     pixels_discarded = 0;
   }
 
@@ -111,11 +113,15 @@ void PixelProcessingUnit::do_draw() {
   ++cur_scanline_clks;
   ++cur_mode_clks;
 
-  // Rendering step
+  // Rendering step, try to pop pixels when ready from the fifo
   if (bg_fifo.can_pop()) {
     const pixel pixel_data = bg_fifo.pop();
+
+    // Pixel is discarded
     if (pixels_discarded < max_pixels_discarded)
       ++pixels_discarded;
+
+    // Pixel is rendered to the LCD
     else if (renderer) {
       renderer->putPixel(row_pixels_rendered, // Denotes X-coordinate
                          ly_reg.read(),       // Denotes Y-coordinate
