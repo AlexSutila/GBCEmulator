@@ -115,18 +115,19 @@ void PixelProcessingUnit::do_draw() {
 
   // Rendering step, try to pop pixels when ready from the fifo
   if (bg_fifo.can_pop()) {
-    const pixel pixel_data = bg_fifo.pop();
+    const bool discard = pixels_discarded < max_pixels_discarded;
+    const pixel px = bg_fifo.pop();
 
-    // Pixel is discarded
-    if (pixels_discarded < max_pixels_discarded)
+    if (discard)
       ++pixels_discarded;
 
-    // Pixel is rendered to the LCD
-    else if (renderer) {
-      renderer->putPixel(row_pixels_rendered, // Denotes X-coordinate
-                         ly_reg.read(),       // Denotes Y-coordinate
-                         pixel_data.color);
-      ++row_pixels_rendered;
+    else {
+      const auto x = ++row_pixels_rendered;
+      const auto y = ly_reg.read();
+
+      // Conditional because of headless mode
+      if (renderer)
+        renderer->putPixel(x, y, px.color);
     }
   }
   bg_fifo.step();
