@@ -71,7 +71,7 @@ private:
 
 class PixelFifo {
 public:
-  PixelFifo(PixelProcessingUnit *ppu_ptr);
+  PixelFifo(PixelProcessingUnit &ppu);
   void reset();
   void step();
 
@@ -88,6 +88,7 @@ private:
   };
   CircularFifo<pixel, 16> fifo;
   const byte_t get_pixel_y() const;
+  const byte_t get_tile_x() const;
 
   void get_tile();
   void get_tile_data_lo();
@@ -112,7 +113,7 @@ private:
   std::size_t cur_clks;
   PixelFifoState state;
 
-  PixelProcessingUnit *const ppu;
+  PixelProcessingUnit &ppu_;
 };
 
 #endif // __FIFO_H

@@ -96,6 +96,21 @@ def __load_cart_from_url(url: str, *, rom_name: str | None = None) -> Cart:
         f'{RELEASE}/acceptance/ppu/intr_2_oam_ok_timing.gb',
         f'{RELEASE}/acceptance/ppu/stat_irq_blocking.gb',
         f'{RELEASE}/acceptance/ppu/stat_lyc_onoff.gb',
+
+        # TODO: Document
+        f'{RELEASE}/emulator-only/mbc1/bits_bank1.gb',
+        f'{RELEASE}/emulator-only/mbc1/bits_bank2.gb',
+        f'{RELEASE}/emulator-only/mbc1/bits_mode.gb',
+        f'{RELEASE}/emulator-only/mbc1/bits_ramg.gb',
+        f'{RELEASE}/emulator-only/mbc1/multicart_rom_8Mb.gb',
+        f'{RELEASE}/emulator-only/mbc1/ram_256kb.gb',
+        f'{RELEASE}/emulator-only/mbc1/ram_64kb.gb',
+        f'{RELEASE}/emulator-only/mbc1/rom_16Mb.gb',
+        f'{RELEASE}/emulator-only/mbc1/rom_1Mb.gb',
+        f'{RELEASE}/emulator-only/mbc1/rom_2Mb.gb',
+        f'{RELEASE}/emulator-only/mbc1/rom_4Mb.gb',
+        f'{RELEASE}/emulator-only/mbc1/rom_512kb.gb',
+        f'{RELEASE}/emulator-only/mbc1/rom_8Mb.gb',
     ]
 )
 def test_mooneye(path: str):

@@ -18,8 +18,14 @@ template <typename T> T *init_mmio(AddressBus *bus, IORegisterMapping reg_id) {
 }
 
 PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus_ptr)
-    : bus(bus_ptr), // For accessing graphics memory
-      bg_fifo(this) // Pushes background/window pixels
+    : bus(bus_ptr),  // For accessing graphics memory
+      lcdc_reg(),    // LCD control
+      stat_reg(),    // PPU status
+      ly_reg(),      // Current scanline
+      lyc_reg(),     // Current scanline compare
+      scy_reg(),     // BG scroll Y
+      scx_reg(),     // BG scroll X
+      bg_fifo(*this) // Pushes background/window pixels
 {
   using mmio = IORegisterMapping;
   using namespace PPU;

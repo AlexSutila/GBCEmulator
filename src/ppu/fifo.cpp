@@ -3,8 +3,8 @@
 #include <cstddef>
 #include <optional>
 
-PixelFifo::PixelFifo(PixelProcessingUnit *ppu_ptr)
-    : fifo(CircularFifo<pixel, 16>()), ppu(ppu_ptr) {
+PixelFifo::PixelFifo(PixelProcessingUnit &ppu)
+    : fifo(CircularFifo<pixel, 16>()), ppu_(ppu) {
   total_clks = std::nullopt;
   cur_clks = 0;
   state = PixelFifoState::STATE_GET_TILE;
@@ -19,26 +19,31 @@ PixelFifo::PixelFifo(PixelProcessingUnit *ppu_ptr)
 }
 
 const byte_t PixelFifo::get_pixel_y() const {
-  const byte_t scy = ppu->scy_reg.read();
-  const byte_t ly = ppu->ly_reg.read();
-  return (ly + scy) % 0xFF;
+  const byte_t scy = ppu_.scy_reg.read();
+  const byte_t ly = ppu_.ly_reg.read();
+  return (ly + scy) & 0xFF;
+}
+
+const byte_t PixelFifo::get_tile_x() const {
+  const byte_t scx = ppu_.scx_reg.read();
+  const byte_t x = fetcher.x_coor;
+  return (x + scx) & 0xFF;
 }
 
 /* Calculate which tile to read from based on tilemaps */
 std::size_t PixelFifo::calc_tile_idx() const {
-  constexpr auto tile_mask = 0x1F; // Maximum value of 31
   constexpr auto tile_pixels = 8;
   constexpr auto tile_shift = 5;
   const byte_t y_pixel = get_pixel_y();
 
   // Calculate X and Y coordinates of tile
-  const std::size_t y_tile = (y_pixel / tile_pixels) & tile_mask;
-  const std::size_t x_tile = fetcher.x_coor & tile_mask; // Tile
+  const std::size_t y_tile = (y_pixel / tile_pixels);
+  const std::size_t x_tile = get_tile_x();
 
   // TODO: Consider configurable indexing modes
   const addr_t tile_idx = (y_tile << tile_shift) | x_tile;
   constexpr auto tilemap_base = 0x9800;
-  return ppu->bus->read_byte(tilemap_base + tile_idx);
+  return ppu_.bus->read_byte(tilemap_base + tile_idx);
 }
 
 byte_t PixelFifo::fetch_tile_data(bool high) const {
@@ -55,7 +60,7 @@ byte_t PixelFifo::fetch_tile_data(bool high) const {
   addr_t data_addr = vram_base_addr + tile_base_addr + y_offset;
   if (high)
     ++data_addr;
-  return ppu->bus->read_byte(data_addr);
+  return ppu_.bus->read_byte(data_addr);
 }
 
 void PixelFifo::get_tile() {
