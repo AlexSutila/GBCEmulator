@@ -33,7 +33,6 @@ std::size_t CB_PREFIX::exec() {
   }
 
   // Parse instruction operands and execute just like in CPU code
-  ins->parse();
   return ins->exec();
 }
 
@@ -42,7 +41,11 @@ std::string CB_PREFIX::describe() {
   return std::format("(CB) {}", lookup.at(op)->describe());
 }
 
-void CB_PREFIX::parse() { op = bus->read_byte(reg_file->reg_pc++); }
+void CB_PREFIX::parse() {
+  op = bus->read_byte(reg_file->reg_pc++);
+  unique_ptr<Instruction> &ins = lookup.at(op);
+  ins->parse();
+}
 
 void LR35902::init_bitops(lookup_table_t &lookup) {
   lookup.at(0x07) = make_unique<RLCA>(&reg_file, bus);
