@@ -228,6 +228,22 @@ PYBIND11_MODULE(gbc_py, m) {
       .def_property_readonly("is_vblank", &PPU::LY::is_vblank,
                              "True when LY is in VBlank (144–153)");
 
+  // Timer class
+  py::class_<TimerUnit>(m, "TimerUnit")
+      .def(py::init<AddressBus *, bool>(),
+           py::arg("bus"),
+           py::arg("cgb_model") = true)
+      .def("reset", &TimerUnit::reset)
+      .def("step", &TimerUnit::step)
+      .def("read_div", &TimerUnit::read_div)
+      .def("write_div", &TimerUnit::write_div)
+      .def("read_tima", &TimerUnit::read_tima)
+      .def("write_tima", &TimerUnit::write_tima)
+      .def("read_tma", &TimerUnit::read_tma)
+      .def("write_tma", &TimerUnit::write_tma)
+      .def("read_tac", &TimerUnit::read_tac)
+      .def("write_tac", &TimerUnit::write_tac);
+
   // Pixel Processor class
   py::class_<PixelProcessingUnit>(m, "PixelProcessor")
       .def(py::init<AddressBus *>(), py::arg("bus"),
@@ -246,6 +262,8 @@ PYBIND11_MODULE(gbc_py, m) {
       .def("get_cpu", &GameBoyColor::get_cpu,
            py::return_value_policy::reference_internal)
       .def("get_ppu", &GameBoyColor::get_ppu,
+           py::return_value_policy::reference_internal)
+      .def("get_timer", &GameBoyColor::get_timer,
            py::return_value_policy::reference_internal);
 
   // For testing

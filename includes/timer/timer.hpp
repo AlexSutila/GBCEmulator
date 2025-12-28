@@ -60,7 +60,6 @@ private:
   byte_t tima_{};
   byte_t tma_{};
   byte_t tac_{};
-  byte_t div_{};
 
   // Overflow "cycle A/B"
   bool overflow_pending_{};
