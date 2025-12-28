@@ -17,6 +17,7 @@ TimerUnit::TimerUnit(AddressBus *const bus_ptr, const bool cgb_model)
   bus_ptr->connect_mmio(static_cast<addr_t>(mmio::MMIO_TIMER_TIMA), &tima_reg);
   bus_ptr->connect_mmio(static_cast<addr_t>(mmio::MMIO_TIMER_TMA), &tma_reg);
   bus_ptr->connect_mmio(static_cast<addr_t>(mmio::MMIO_TIMER_TAC), &tac_reg);
+  bus_ptr->connect_mmio(static_cast<addr_t>(mmio::MMIO_TIMER_DIV), &div_reg);
 
   /* Not owned by the pixel processing unit, so have to fetch references */
   if_reg = init_mmio<InterruptBits>(bus_ptr, mmio::MMIO_INT_FLAGS);
