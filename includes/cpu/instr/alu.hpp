@@ -748,20 +748,33 @@ public:
   INC_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
-    const byte_t n = bus->read_byte(read_reg<Register16Bit::REG_HL>());
-    const byte_t result = n + 1;
+    switch (state) {
+    case InstrStates::INSTR_STATE_READ:
+      n = bus->read_byte(read_reg<Register16Bit::REG_HL>());
+      result = n + 1;
 
-    // Update flags - C is left alone for this instruction
-    const bool half_carry = (n & 0x0F) == 0x0F;
-    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_Z_MASK, result == 0);
-    reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_N_MASK);
-    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_H_MASK, half_carry);
-
-    // Write back
-    bus->write_byte(read_reg<Register16Bit::REG_HL>(), result);
+      // Update flags - C is left alone for this instruction
+      reg_file->reg_af.put_flag(StatusFlagMask::FLAG_Z_MASK, result == 0);
+      reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_N_MASK);
+      reg_file->reg_af.put_flag(StatusFlagMask::FLAG_H_MASK, (n & 0xF) == 0xF);
+      state = InstrStates::INSTR_STATE_WRITE;
+      break;
+    case InstrStates::INSTR_STATE_WRITE:
+      bus->write_byte(read_reg<Register16Bit::REG_HL>(), result);
+      break;
+    }
     return 12;
   }
+  std::size_t mem_access_t_cycle() override {
+    return state == InstrStates::INSTR_STATE_READ ? 0 : 4;
+  }
   std::string describe() override { return std::format("INC HL"); }
+  void parse() override { state = InstrStates::INSTR_STATE_READ; }
+
+private:
+  InstrStates state{};
+  byte_t result{};
+  byte_t n{};
 };
 
 /*
@@ -798,20 +811,33 @@ public:
   DEC_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
-    const byte_t n = bus->read_byte(read_reg<Register16Bit::REG_HL>());
-    const byte_t result = n - 1;
+    switch (state) {
+    case InstrStates::INSTR_STATE_READ:
+      n = bus->read_byte(read_reg<Register16Bit::REG_HL>());
+      result = n - 1;
 
-    // Update flags
-    const bool half_carry = (n & 0x0F) == 0x00;
-    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_Z_MASK, result == 0);
-    reg_file->reg_af.set_flag(StatusFlagMask::FLAG_N_MASK);
-    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_H_MASK, half_carry);
-
-    // Write back
-    bus->write_byte(read_reg<Register16Bit::REG_HL>(), result);
+      // Update flags
+      reg_file->reg_af.put_flag(StatusFlagMask::FLAG_Z_MASK, result == 0);
+      reg_file->reg_af.set_flag(StatusFlagMask::FLAG_N_MASK);
+      reg_file->reg_af.put_flag(StatusFlagMask::FLAG_H_MASK, (n & 0xF) == 0);
+      state = InstrStates::INSTR_STATE_WRITE;
+      break;
+    case InstrStates::INSTR_STATE_WRITE:
+      bus->write_byte(read_reg<Register16Bit::REG_HL>(), result);
+      break;
+    }
     return 12;
   }
+  std::size_t mem_access_t_cycle() override {
+    return state == InstrStates::INSTR_STATE_READ ? 0 : 4;
+  }
   std::string describe() override { return std::format("DEC HL"); }
+  void parse() override { state = InstrStates::INSTR_STATE_READ; }
+
+private:
+  InstrStates state{};
+  byte_t result{};
+  byte_t n{};
 };
 
 /*

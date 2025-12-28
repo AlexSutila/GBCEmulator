@@ -8,6 +8,11 @@
 #include <cstddef>
 #include <string>
 
+enum class InstrStates {
+  INSTR_STATE_READ,
+  INSTR_STATE_WRITE,
+};
+
 class Instruction {
 public:
   Instruction(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)

@@ -176,21 +176,36 @@ public:
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const addr_t addr = read_reg<Register16Bit::REG_HL>();
-    const byte_t n = bus->read_byte(addr);
-    const bool carry = (n & 0x80) != 0x00;
-    byte_t result = (n << 1) | (carry ? 0x01 : 0x00);
+    switch (state) {
+    case InstrStates::INSTR_STATE_READ:
+      n = bus->read_byte(addr);
+      c = (n & 0x80) != 0x00;
+      result = (n << 1) | (c ? 0x01 : 0x00);
 
-    // Update flags
-    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_Z_MASK, result == 0);
-    reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_N_MASK);
-    reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_H_MASK);
-    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_C_MASK, carry);
-
-    // Write back
-    bus->write_byte(addr, result);
+      // Update flags
+      reg_file->reg_af.put_flag(StatusFlagMask::FLAG_Z_MASK, result == 0);
+      reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_N_MASK);
+      reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_H_MASK);
+      reg_file->reg_af.put_flag(StatusFlagMask::FLAG_C_MASK, c);
+      state = InstrStates::INSTR_STATE_WRITE;
+      break;
+    case InstrStates::INSTR_STATE_WRITE:
+      bus->write_byte(addr, result);
+      break;
+    }
     return 16;
   }
+  std::size_t mem_access_t_cycle() override {
+    return state == InstrStates::INSTR_STATE_READ ? 4 : 8;
+  }
   std::string describe() override { return std::format("RLC HL"); }
+  void parse() override { state = InstrStates::INSTR_STATE_READ; }
+
+private:
+  InstrStates state{};
+  byte_t result{};
+  byte_t n{};
+  bool c{};
 };
 
 template <Register8Bit dst> class RL_X : public Instruction {
@@ -224,22 +239,36 @@ public:
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const addr_t hl = read_reg<Register16Bit::REG_HL>();
-    const byte_t n = bus->read_byte(hl);
-    const bool old_c = reg_file->reg_af.get_flag(StatusFlagMask::FLAG_C_MASK);
-    const bool new_c = (n & 0x80) != 0x00;
-    const byte_t result = (n << 1) | (old_c ? 0x01 : 0x00);
+    switch (state) {
+    case InstrStates::INSTR_STATE_READ:
+      n = bus->read_byte(hl);
+      c = reg_file->reg_af.get_flag(StatusFlagMask::FLAG_C_MASK);
+      result = (n << 1) | (c ? 0x01 : 0x00);
 
-    // Update flags
-    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_Z_MASK, result == 0);
-    reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_N_MASK);
-    reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_H_MASK);
-    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_C_MASK, new_c);
-
-    // Write back
-    bus->write_byte(hl, result);
+      // Update flags
+      reg_file->reg_af.put_flag(StatusFlagMask::FLAG_Z_MASK, result == 0);
+      reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_N_MASK);
+      reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_H_MASK);
+      reg_file->reg_af.put_flag(StatusFlagMask::FLAG_C_MASK, (n & 0x80) != 0);
+      state = InstrStates::INSTR_STATE_WRITE;
+      break;
+    case InstrStates::INSTR_STATE_WRITE:
+      bus->write_byte(hl, result);
+      break;
+    }
     return 16;
   }
+  std::size_t mem_access_t_cycle() override {
+    return state == InstrStates::INSTR_STATE_READ ? 4 : 8;
+  }
   std::string describe() override { return std::format("RL HL"); }
+  void parse() override { state = InstrStates::INSTR_STATE_READ; }
+
+private:
+  InstrStates state{};
+  byte_t result{};
+  byte_t n{};
+  bool c{};
 };
 
 template <Register8Bit dst> class RRC_X : public Instruction {
@@ -272,22 +301,36 @@ public:
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const addr_t addr = read_reg<Register16Bit::REG_HL>();
-    const byte_t n = bus->read_byte(addr);
+    switch (state) {
+    case InstrStates::INSTR_STATE_READ:
+      n = bus->read_byte(addr);
+      c = (n & 0x01) != 0x00;
+      result = (n >> 1) | (c ? 0x80 : 0x00);
 
-    const bool carry = (n & 0x01) != 0x00;
-    const byte_t result = (n >> 1) | (carry ? 0x80 : 0x00);
-
-    // Update flags
-    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_Z_MASK, result == 0);
-    reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_N_MASK);
-    reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_H_MASK);
-    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_C_MASK, carry);
-
-    // Write back
-    bus->write_byte(addr, result);
+      // Update flags
+      reg_file->reg_af.put_flag(StatusFlagMask::FLAG_Z_MASK, result == 0);
+      reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_N_MASK);
+      reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_H_MASK);
+      reg_file->reg_af.put_flag(StatusFlagMask::FLAG_C_MASK, c);
+      state = InstrStates::INSTR_STATE_WRITE;
+      break;
+    case InstrStates::INSTR_STATE_WRITE:
+      bus->write_byte(addr, result);
+      break;
+    }
     return 16;
   }
+  std::size_t mem_access_t_cycle() override {
+    return state == InstrStates::INSTR_STATE_READ ? 4 : 8;
+  }
   std::string describe() override { return std::format("RRC HL"); }
+  void parse() override { state = InstrStates::INSTR_STATE_READ; }
+
+private:
+  InstrStates state{};
+  byte_t result{};
+  byte_t n{};
+  bool c{};
 };
 
 template <Register8Bit dst> class RR_X : public Instruction {
@@ -321,22 +364,36 @@ public:
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const addr_t addr = read_reg<Register16Bit::REG_HL>();
-    const byte_t n = bus->read_byte(addr);
-    const bool old_c = reg_file->reg_af.get_flag(StatusFlagMask::FLAG_C_MASK);
-    const bool new_c = (n & 0x01) != 0x00;
-    const byte_t result = (n >> 1) | (old_c ? 0x80 : 0x00);
+    switch (state) {
+    case InstrStates::INSTR_STATE_READ:
+      n = bus->read_byte(addr);
+      c = reg_file->reg_af.get_flag(StatusFlagMask::FLAG_C_MASK);
+      result = (n >> 1) | (c ? 0x80 : 0x00);
 
-    // Update flags
-    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_Z_MASK, result == 0);
-    reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_N_MASK);
-    reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_H_MASK);
-    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_C_MASK, new_c);
-
-    // Write back
-    bus->write_byte(addr, result);
+      // Update flags
+      reg_file->reg_af.put_flag(StatusFlagMask::FLAG_Z_MASK, result == 0);
+      reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_N_MASK);
+      reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_H_MASK);
+      reg_file->reg_af.put_flag(StatusFlagMask::FLAG_C_MASK, (n & 1) != 0);
+      state = InstrStates::INSTR_STATE_WRITE;
+      break;
+    case InstrStates::INSTR_STATE_WRITE:
+      bus->write_byte(addr, result);
+      break;
+    }
     return 16;
   }
+  std::size_t mem_access_t_cycle() override {
+    return state == InstrStates::INSTR_STATE_READ ? 4 : 8;
+  }
   std::string describe() override { return std::format("RR HL"); }
+  void parse() override { state = InstrStates::INSTR_STATE_READ; }
+
+private:
+  InstrStates state{};
+  byte_t result{};
+  byte_t n{};
+  bool c{};
 };
 
 template <Register8Bit dst> class SLA_X : public Instruction {
@@ -369,21 +426,34 @@ public:
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const addr_t addr = read_reg<Register16Bit::REG_HL>();
-    const byte_t n = bus->read_byte(addr);
-    const bool carry = (n & 0x80) != 0x00;
-    const byte_t result = n << 1;
+    switch (state) {
+    case InstrStates::INSTR_STATE_READ:
+      n = bus->read_byte(addr);
+      result = n << 1;
 
-    // Update flags
-    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_Z_MASK, result == 0);
-    reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_N_MASK);
-    reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_H_MASK);
-    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_C_MASK, carry);
-
-    // Write back
-    bus->write_byte(addr, result);
+      // Update flags
+      reg_file->reg_af.put_flag(StatusFlagMask::FLAG_Z_MASK, result == 0);
+      reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_N_MASK);
+      reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_H_MASK);
+      reg_file->reg_af.put_flag(StatusFlagMask::FLAG_C_MASK, (n & 0x80) != 0);
+      state = InstrStates::INSTR_STATE_WRITE;
+      break;
+    case InstrStates::INSTR_STATE_WRITE:
+      bus->write_byte(addr, result);
+      break;
+    }
     return 16;
   }
+  std::size_t mem_access_t_cycle() override {
+    return state == InstrStates::INSTR_STATE_READ ? 4 : 8;
+  }
   std::string describe() override { return std::format("SLA HL"); }
+  void parse() override { state = InstrStates::INSTR_STATE_READ; }
+
+private:
+  InstrStates state{};
+  byte_t result{};
+  byte_t n{};
 };
 
 template <Register8Bit dst> class SRA_X : public Instruction {
@@ -416,21 +486,34 @@ public:
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const addr_t addr = read_reg<Register16Bit::REG_HL>();
-    const byte_t n = bus->read_byte(addr);
-    const bool carry = (n & 0x01) != 0x00;
-    const byte_t result = (n & 0x80) | (n >> 1);
+    switch (state) {
+    case InstrStates::INSTR_STATE_READ:
+      n = bus->read_byte(addr);
+      result = (n & 0x80) | (n >> 1);
 
-    // Update flags
-    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_Z_MASK, result == 0);
-    reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_N_MASK);
-    reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_H_MASK);
-    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_C_MASK, carry);
-
-    // Write back
-    bus->write_byte(addr, result);
+      // Update flags
+      reg_file->reg_af.put_flag(StatusFlagMask::FLAG_Z_MASK, result == 0);
+      reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_N_MASK);
+      reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_H_MASK);
+      reg_file->reg_af.put_flag(StatusFlagMask::FLAG_C_MASK, (n & 1) != 0);
+      state = InstrStates::INSTR_STATE_WRITE;
+      break;
+    case InstrStates::INSTR_STATE_WRITE:
+      bus->write_byte(addr, result);
+      break;
+    }
     return 16;
   }
+  std::size_t mem_access_t_cycle() override {
+    return state == InstrStates::INSTR_STATE_READ ? 4 : 8;
+  }
   std::string describe() override { return std::format("SLA HL"); }
+  void parse() override { state = InstrStates::INSTR_STATE_READ; }
+
+private:
+  InstrStates state{};
+  byte_t result{};
+  byte_t n{};
 };
 
 template <Register8Bit dst> class SWAP_X : public Instruction {
@@ -462,20 +545,34 @@ public:
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const addr_t addr = read_reg<Register16Bit::REG_HL>();
-    const byte_t n = bus->read_byte(addr);
-    const byte_t result = ((n & 0xF0) >> 4) | ((n & 0x0F) << 4);
+    switch (state) {
+    case InstrStates::INSTR_STATE_READ:
+      n = bus->read_byte(addr);
+      result = ((n & 0xF0) >> 4) | ((n & 0x0F) << 4);
 
-    // Update flags
-    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_Z_MASK, result == 0);
-    reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_N_MASK);
-    reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_H_MASK);
-    reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_C_MASK);
-
-    // Write back
-    bus->write_byte(addr, result);
+      // Update flags
+      reg_file->reg_af.put_flag(StatusFlagMask::FLAG_Z_MASK, result == 0);
+      reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_N_MASK);
+      reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_H_MASK);
+      reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_C_MASK);
+      state = InstrStates::INSTR_STATE_WRITE;
+      break;
+    case InstrStates::INSTR_STATE_WRITE:
+      bus->write_byte(addr, result);
+      break;
+    }
     return 16;
   }
+  std::size_t mem_access_t_cycle() override {
+    return state == InstrStates::INSTR_STATE_READ ? 4 : 8;
+  }
   std::string describe() override { return std::format("SWAP HL"); }
+  void parse() override { state = InstrStates::INSTR_STATE_READ; }
+
+private:
+  InstrStates state{};
+  byte_t result{};
+  byte_t n{};
 };
 
 template <Register8Bit dst> class SRL_X : public Instruction {
@@ -508,21 +605,34 @@ public:
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const addr_t addr = read_reg<Register16Bit::REG_HL>();
-    const byte_t n = bus->read_byte(addr);
-    const bool carry = (n & 0x01) != 0x00;
-    const byte_t result = n >> 1;
+    switch (state) {
+    case InstrStates::INSTR_STATE_READ:
+      n = bus->read_byte(addr);
+      result = n >> 1;
 
-    // Update flags
-    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_Z_MASK, result == 0);
-    reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_N_MASK);
-    reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_H_MASK);
-    reg_file->reg_af.put_flag(StatusFlagMask::FLAG_C_MASK, carry);
-
-    // Write back
-    bus->write_byte(addr, result);
+      // Update flags
+      reg_file->reg_af.put_flag(StatusFlagMask::FLAG_Z_MASK, result == 0);
+      reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_N_MASK);
+      reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_H_MASK);
+      reg_file->reg_af.put_flag(StatusFlagMask::FLAG_C_MASK, (n & 1) != 0);
+      state = InstrStates::INSTR_STATE_WRITE;
+      break;
+    case InstrStates::INSTR_STATE_WRITE:
+      bus->write_byte(addr, result);
+      break;
+    }
     return 16;
   }
+  std::size_t mem_access_t_cycle() override {
+    return state == InstrStates::INSTR_STATE_READ ? 4 : 8;
+  }
   std::string describe() override { return std::format("SRL HL"); }
+  void parse() override { state = InstrStates::INSTR_STATE_READ; }
+
+private:
+  InstrStates state{};
+  byte_t result{};
+  byte_t n{};
 };
 
 template <byte_t bit, Register8Bit dst> class BIT_N_X : public Instruction {
@@ -557,7 +667,7 @@ public:
     reg_file->reg_af.put_flag(StatusFlagMask::FLAG_Z_MASK, bit_is_zero);
     reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_N_MASK);
     reg_file->reg_af.put_flag(StatusFlagMask::FLAG_H_MASK, true);
-    return 16;
+    return 12;
   }
   std::string describe() override {
     return std::format("BIT {}, HL", static_cast<int>(bit));
@@ -585,12 +695,29 @@ public:
   RES_N_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
-    const addr_t hl = read_reg<Register16Bit::REG_HL>();
-    byte_t n = bus->read_byte(hl);
-    n &= ~(1 << bit);
-    bus->write_byte(hl, n);
+    addr_t hl = read_reg<Register16Bit::REG_HL>();
+    switch (state) {
+    case InstrStates::INSTR_STATE_READ:
+      n = bus->read_byte(hl) & ~(1 << bit);
+      state = InstrStates::INSTR_STATE_WRITE;
+      break;
+    case InstrStates::INSTR_STATE_WRITE:
+      bus->write_byte(hl, n);
+      break;
+    }
     return 16;
   }
+  std::size_t mem_access_t_cycle() override {
+    return state == InstrStates::INSTR_STATE_READ ? 4 : 8;
+  }
+  std::string describe() override {
+    return std::format("RST {}, HL", static_cast<int>(bit));
+  }
+  void parse() override { state = InstrStates::INSTR_STATE_READ; }
+
+private:
+  InstrStates state{};
+  byte_t n{};
 };
 
 template <byte_t bit, Register8Bit dst> class SET_N_X : public Instruction {
@@ -614,14 +741,28 @@ public:
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const addr_t hl = read_reg<Register16Bit::REG_HL>();
-    byte_t n = bus->read_byte(hl);
-    n |= (1 << bit);
-    bus->write_byte(hl, n);
+    switch (state) {
+    case InstrStates::INSTR_STATE_READ:
+      n = bus->read_byte(hl) | (1 << bit);
+      state = InstrStates::INSTR_STATE_WRITE;
+      break;
+    case InstrStates::INSTR_STATE_WRITE:
+      bus->write_byte(hl, n);
+      break;
+    }
     return 16;
+  }
+  std::size_t mem_access_t_cycle() override {
+    return state == InstrStates::INSTR_STATE_READ ? 4 : 8;
   }
   std::string describe() override {
     return std::format("SET {}, HL", static_cast<int>(bit));
   }
+  void parse() override { state = InstrStates::INSTR_STATE_READ; }
+
+private:
+  InstrStates state{};
+  byte_t n{};
 };
 
 #endif // __BITOPS_H
