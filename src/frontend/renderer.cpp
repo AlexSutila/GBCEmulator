@@ -13,37 +13,45 @@ static constexpr std::uint32_t PALETTE[4] = {
     0xFF000000  // black
 };
 
-Renderer::Renderer() {
+Renderer::Renderer(bool is_headless) : headless(is_headless) {
   if (!SDL_Init(SDL_INIT_VIDEO))
     throw std::runtime_error(SDL_GetError());
-  window = SDL_CreateWindow("GBC", FB_WIDTH * SCALE, FB_HEIGHT * SCALE,
-                            SDL_WINDOW_RESIZABLE);
-  if (!window)
-    throw std::runtime_error(SDL_GetError());
 
-  renderer = SDL_CreateRenderer(window, nullptr);
-  if (!renderer)
-    throw std::runtime_error(SDL_GetError());
+  if (!headless) {
+    window = SDL_CreateWindow("GBC", FB_WIDTH * SCALE, FB_HEIGHT * SCALE,
+                              SDL_WINDOW_RESIZABLE);
+    if (!window)
+      throw std::runtime_error(SDL_GetError());
 
-  /* Enable vsync (SDL3 way) */
-  texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
-                              SDL_TEXTUREACCESS_STREAMING, FB_WIDTH, FB_HEIGHT);
-  if (!texture)
-    throw std::runtime_error(SDL_GetError());
+    renderer = SDL_CreateRenderer(window, nullptr);
+    if (!renderer)
+      throw std::runtime_error(SDL_GetError());
+
+    /* Enable vsync (SDL3 way) */
+    texture =
+        SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
+                          SDL_TEXTUREACCESS_STREAMING, FB_WIDTH, FB_HEIGHT);
+    if (!texture)
+      throw std::runtime_error(SDL_GetError());
+
+    /* For 60hz synchronization */
+    elapsed_time = std::chrono::steady_clock::now();
+  }
+
+  /* Still allocate frame buffer for snapshots in headless mode */
   pixels = std::make_unique<std::uint32_t[]>(FB_HEIGHT * FB_WIDTH);
   pixels_rendered = 0;
-
-  /* For 60hz synchronization */
-  elapsed_time = std::chrono::steady_clock::now();
   running = true;
   clear();
 }
 
 Renderer::~Renderer() {
-  SDL_DestroyTexture(texture);
-  SDL_DestroyRenderer(renderer);
-  SDL_DestroyWindow(window);
-  SDL_Quit();
+  if (!headless) {
+    SDL_DestroyTexture(texture);
+    SDL_DestroyRenderer(renderer);
+    SDL_DestroyWindow(window);
+    SDL_Quit();
+  }
 }
 
 void Renderer::putPixel(int x, int y, byte_t paletteIndex) {
@@ -55,7 +63,9 @@ void Renderer::putPixel(int x, int y, byte_t paletteIndex) {
   if (pixels_rendered != FB_HEIGHT * FB_WIDTH)
     return;
   pixels_rendered = 0;
-  present();
+
+  if (!headless)
+    present();
 }
 
 void Renderer::poll_events() {
@@ -75,6 +85,9 @@ inline auto calc_delta(const std::chrono::steady_clock::time_point &start) {
 void Renderer::present() {
   constexpr float delta = 16666.66667f;
   using namespace std::chrono;
+
+  if (headless)
+    return;
 
   uint32_t *texturePixels;
   int pitch;

@@ -9,7 +9,7 @@
 
 class Renderer {
 public:
-  Renderer();
+  Renderer(bool is_headless);
   ~Renderer();
 
   static constexpr int FB_WIDTH = 160;
@@ -17,10 +17,11 @@ public:
   static constexpr int SCALE = 4;
 
   void putPixel(int x, int y, byte_t paletteIndex);
+  void clear();
+
   bool get_running() const { return running; }
   void poll_events();
   void present();
-  void clear();
 
 private:
   std::chrono::time_point<std::chrono::steady_clock> elapsed_time;
@@ -33,6 +34,7 @@ private:
   std::uint32_t pixels_rendered{};
 
   // System keep-alive
+  const bool headless{};
   bool running{};
 };
 

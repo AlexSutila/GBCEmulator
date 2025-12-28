@@ -7,12 +7,11 @@
 #include <memory>
 
 GameBoyColor::GameBoyColor(bool headless) {
+  renderer = std::make_unique<Renderer>(headless);
   bus = std::make_unique<AddressBus>();
   cpu = std::make_unique<LR35902>(bus.get());
-  ppu = std::make_unique<PixelProcessingUnit>(bus.get());
+  ppu = std::make_unique<PixelProcessingUnit>(bus.get(), renderer.get());
   timer = std::make_unique<TimerUnit>(bus.get());
-  if (!headless)
-    renderer = std::make_unique<Renderer>();
   elapsed_clocks_ = 0;
 }
 
@@ -43,9 +42,6 @@ void GameBoyColor::step() {
 }
 
 void GameBoyColor::run() {
-  if (renderer)
-    ppu->connect_renderer(renderer);
-
   while (renderer->get_running()) [[likely]]
     step();
 }

@@ -14,16 +14,15 @@
 
 class PixelProcessingUnit {
 public:
-  PixelProcessingUnit(AddressBus *bus_ptr);
-  void connect_renderer(std::unique_ptr<Renderer> &r) { renderer = r.get(); }
+  PixelProcessingUnit(AddressBus *bus_ptr, Renderer *render_prt);
   void set_cgb(const byte_t cgb_flag);
   void reset();
   void step();
 
 private:
+  Renderer *const renderer{};
   AddressBus *const bus{};
   InterruptBits *if_reg{};
-  Renderer *renderer{};
 
   /* Convenience references to important PPU mmio registers */
   PPU::VramBank *vbk_reg{};

@@ -1,6 +1,7 @@
 #include "ppu/ppu.hpp"
 #include "cart/cart.hpp"
 #include "cpu/interrupts.hpp"
+#include "frontend/renderer.hpp"
 #include "memory/bus.hpp"
 #include "memory/mmio/cgb.hpp"
 #include "memory/mmio/dmg.hpp"
@@ -17,15 +18,17 @@ template <typename T> T *init_mmio(AddressBus *bus, IORegisterMapping reg_id) {
   throw std::logic_error(std::string("Failed to configure MMIO (PPU)"));
 }
 
-PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus_ptr)
-    : bus(bus_ptr),  // For accessing graphics memory
-      lcdc_reg(),    // LCD control
-      stat_reg(),    // PPU status
-      ly_reg(),      // Current scanline
-      lyc_reg(),     // Current scanline compare
-      scy_reg(),     // BG scroll Y
-      scx_reg(),     // BG scroll X
-      bg_fifo(*this) // Pushes background/window pixels
+PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus_ptr,
+                                         Renderer *render_prt)
+    : bus(bus_ptr),         // For accessing graphics memory
+      renderer(render_prt), // For placing pixel data to frame buffer
+      lcdc_reg(),           // LCD control
+      stat_reg(),           // PPU status
+      ly_reg(),             // Current scanline
+      lyc_reg(),            // Current scanline compare
+      scy_reg(),            // BG scroll Y
+      scx_reg(),            // BG scroll X
+      bg_fifo(*this)        // Pushes background/window pixels
 {
   using mmio = IORegisterMapping;
   using namespace PPU;
@@ -124,10 +127,7 @@ void PixelProcessingUnit::do_draw() {
     else {
       const auto x = row_pixels_rendered++;
       const auto y = ly_reg.read();
-
-      // Conditional because of headless mode
-      if (renderer)
-        renderer->putPixel(x, y, px.color);
+      renderer->putPixel(x, y, px.color);
     }
   }
   bg_fifo.step();

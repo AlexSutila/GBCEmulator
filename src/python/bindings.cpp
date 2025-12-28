@@ -8,6 +8,7 @@
 #include "cpu/lr35902.hpp"
 #include "cpu/registers/flags.hpp"
 #include "cpu/registers/register.hpp"
+#include "frontend/renderer.hpp"
 #include "gbc.hpp"
 #include "memory/boot.hpp"
 #include "memory/bus.hpp"
@@ -230,8 +231,7 @@ PYBIND11_MODULE(gbc_py, m) {
 
   // Timer class
   py::class_<TimerUnit>(m, "TimerUnit")
-      .def(py::init<AddressBus *, bool>(),
-           py::arg("bus"),
+      .def(py::init<AddressBus *, bool>(), py::arg("bus"),
            py::arg("cgb_model") = true)
       .def("reset", &TimerUnit::reset)
       .def("step", &TimerUnit::step)
@@ -244,9 +244,24 @@ PYBIND11_MODULE(gbc_py, m) {
       .def("read_tac", &TimerUnit::read_tac)
       .def("write_tac", &TimerUnit::write_tac);
 
+  // For exposing pixel processor constructor
+  py::class_<Renderer>(m, "Renderer")
+      .def(py::init<bool>(), py::arg("headless"))
+      .def_readonly_static("FB_WIDTH", &Renderer::FB_WIDTH)
+      .def_readonly_static("FB_HEIGHT", &Renderer::FB_HEIGHT)
+      .def_readonly_static("SCALE", &Renderer::SCALE)
+      .def("put_pixel", &Renderer::putPixel, py::arg("x"), py::arg("y"),
+           py::arg("palette_index"))
+      .def("clear", &Renderer::clear)
+      .def("present", &Renderer::present)
+      .def("poll_events", &Renderer::poll_events)
+      .def("get_running", &Renderer::get_running,
+           "Return whether the renderer is still running");
+
   // Pixel Processor class
   py::class_<PixelProcessingUnit>(m, "PixelProcessor")
-      .def(py::init<AddressBus *>(), py::arg("bus"),
+      .def(py::init<AddressBus *, Renderer *>(), py::arg("bus"),
+           py::arg("renderer"),
            py::keep_alive<1, 2>()) // PixelProcessor keeps AddressBus alive
       .def("step", &PixelProcessingUnit::step);
 
