@@ -54,6 +54,33 @@ void PixelProcessingUnit::set_cgb(const byte_t cgb_flag) {
   is_cgb = cgb_enabled(cgb_flag);
 }
 
+bool PixelProcessingUnit::should_advance_ly() {
+  constexpr std::size_t total_scanline_cycles = 456; // Fixed
+  const byte_t cur_ly = ly_reg.read();
+
+  /* First, perform a check to make sure we do not accidentally re-increment the
+   * LY before moving onto the next frame from scanline 153, `scanline_153_bug`
+   * is set to false when entering OAM scan. */
+  if (cur_ly == 0 && scanline_153_bug)
+    return false;
+
+  /* Next, if we are on any scanline (including zero) without the bug enabled,
+   * we simply advance to the LY register at the end of the scanline. */
+  else if (cur_ly != 153 && !scanline_153_bug)
+    return cur_scanline_clks >= total_scanline_cycles;
+
+  /* Lastly, if we are on scanline 153, the value of LY is wrapped back around
+   * to zero a few clock cycles in. We must set `scanline_153_bug` to true here
+   * to prevent LY from being increased to one before the next frame. */
+  else if (cur_ly == 153 && cur_scanline_clks >= 8) {
+    scanline_153_bug = true;
+    return true;
+  }
+
+  /* Catch all */
+  return false;
+}
+
 void PixelProcessingUnit::do_oam_scan() {
   constexpr std::size_t oam_t_cycles = 80; // Fixed
   using modes = PPU::StatModes;
@@ -66,6 +93,7 @@ void PixelProcessingUnit::do_oam_scan() {
   if (!total_mode_clks.has_value()) {
     cur_scanline_clks = cur_mode_clks = 0;
     total_mode_clks = oam_t_cycles;
+    scanline_153_bug = false;
   }
 
   // TODO:
@@ -160,7 +188,7 @@ void PixelProcessingUnit::do_vblank() {
 
   // VBlank will only ever occur during invisible scanlines - duh
   assert(stat_reg.get_mode() == modes::MODE_VBLANK);
-  assert(!ly_reg.is_visible());
+  assert(!ly_reg.is_visible() || ly_reg.read() == 0);
   blank();
 }
 
@@ -173,10 +201,14 @@ void PixelProcessingUnit::blank() {
     total_mode_clks = total_scanline_cycles;
   ++cur_scanline_clks;
 
+  // LY will only ever be advanced during blanking. Beware it is possible for LY
+  // to change mid-scanline due to the scanline 153 bug.
+  if (should_advance_ly())
+    ly_reg.inc();
+
   // Blanking incomplete
   if (cur_scanline_clks < total_mode_clks.value())
     return;
-  ly_reg.inc();
 
   // Request VBlank interrupt
   if (ly_reg.read() == 144)

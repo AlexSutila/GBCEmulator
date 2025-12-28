@@ -28,10 +28,15 @@ private:
   PPU::VramBank *vbk_reg{};
   PPU::LCDCtrl lcdc_reg{};
   PPU::STAT stat_reg{};
-  PPU::LY ly_reg{};
   MMIORegister lyc_reg{};
   MMIORegister scy_reg{};
   MMIORegister scx_reg{};
+
+  /* For tracking where we currently are in the rendering process */
+  std::size_t row_pixels_rendered{};
+  bool should_advance_ly();
+  bool scanline_153_bug{};
+  PPU::LY ly_reg{};
 
   /* Pixel Processor operation modes */
   void do_oam_scan();
@@ -56,7 +61,6 @@ private:
   std::optional<std::size_t> total_mode_clks{};
   std::size_t cur_scanline_clks{};
   std::size_t cur_mode_clks{};
-  std::size_t row_pixels_rendered{};
 
   /* Pixel FIFO renderers */
   std::size_t max_pixels_discarded{};
