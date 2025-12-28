@@ -132,6 +132,7 @@ class CB_PREFIX : public Instruction {
 public:
   CB_PREFIX(RegisterFile *reg_file_ptr, AddressBus *bus_ptr);
   std::size_t exec() override;
+  std::size_t mem_access_t_cycle() override;
   std::string describe() override;
   void parse() override;
 
@@ -556,11 +557,12 @@ public:
     reg_file->reg_af.put_flag(StatusFlagMask::FLAG_Z_MASK, bit_is_zero);
     reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_N_MASK);
     reg_file->reg_af.put_flag(StatusFlagMask::FLAG_H_MASK, true);
-    return 12;
+    return 16;
   }
   std::string describe() override {
     return std::format("BIT {}, HL", static_cast<int>(bit));
   }
+  std::size_t mem_access_t_cycle() override { return 4; }
 };
 
 template <byte_t bit, Register8Bit dst> class RES_N_X : public Instruction {

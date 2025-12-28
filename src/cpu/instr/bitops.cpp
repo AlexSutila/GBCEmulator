@@ -36,6 +36,11 @@ std::size_t CB_PREFIX::exec() {
   return ins->exec();
 }
 
+std::size_t CB_PREFIX::mem_access_t_cycle() {
+  unique_ptr<Instruction> &ins = lookup.at(op);
+  return ins->mem_access_t_cycle();
+}
+
 // TODO: This could fuck up royally but we ball lmao
 std::string CB_PREFIX::describe() {
   return std::format("(CB) {}", lookup.at(op)->describe());

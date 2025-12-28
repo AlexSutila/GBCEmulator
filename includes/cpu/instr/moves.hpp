@@ -102,6 +102,7 @@ public:
     const addr_t addr = reg_file->reg_pc++;
     imm = bus->read_byte(addr);
   }
+  std::size_t mem_access_t_cycle() override { return 4; }
 
 private:
   byte_t imm;
@@ -145,6 +146,7 @@ public:
     const byte_t msb = bus->read_byte(reg_file->reg_pc++);
     addr = (msb << 8) | lsb;
   }
+  std::size_t mem_access_t_cycle() override { return 8; }
 
 private:
   addr_t addr;
@@ -188,6 +190,7 @@ public:
     const byte_t msb = bus->read_byte(reg_file->reg_pc++);
     addr = (msb << 8) | lsb;
   }
+  std::size_t mem_access_t_cycle() override { return 8; }
 
 private:
   addr_t addr;
@@ -209,6 +212,7 @@ public:
     return std::format("LD A, {}", static_cast<int>(addr));
   }
   void parse() override { addr = 0xFF00 | bus->read_byte(reg_file->reg_pc++); }
+  std::size_t mem_access_t_cycle() override { return 4; }
 
 private:
   addr_t addr;
@@ -230,6 +234,7 @@ public:
     return std::format("LD {}, A", static_cast<int>(addr));
   }
   void parse() override { addr = 0xFF00 | bus->read_byte(reg_file->reg_pc++); }
+  std::size_t mem_access_t_cycle() override { return 4; }
 
 private:
   addr_t addr;
