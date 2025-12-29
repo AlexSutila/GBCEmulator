@@ -33,6 +33,8 @@ private:
   /* Background and window positional registers */
   MMIORegister scy_reg{};
   MMIORegister scx_reg{};
+  MMIORegister wy_reg{};
+  MMIORegister wx_reg{};
 
   /* For tracking where we currently are in the rendering process */
   std::size_t row_pixels_rendered{};

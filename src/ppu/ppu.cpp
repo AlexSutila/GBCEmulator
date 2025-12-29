@@ -27,6 +27,8 @@ PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus_ptr,
       lyc_reg(),            // Current scanline compare
       scy_reg(),            // BG scroll Y
       scx_reg(),            // BG scroll X
+      wy_reg(),             // Window scroll Y
+      wx_reg(),             // Window scroll X
       ly_reg(),             // Current scanline
       bg_win_fifo(*this)    // Pushes background/window pixels
 {
@@ -40,6 +42,8 @@ PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus_ptr,
   bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_Y_COMP), &lyc_reg);
   bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_SCY), &scy_reg);
   bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_SCX), &scx_reg);
+  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_WY), &wy_reg);
+  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_WX), &wx_reg);
 
   /* Not owned by the pixel processing unit, so have to fetch references */
   vbk_reg = init_mmio<VramBank>(bus, mmio::MMIO_VRAM_BANK);
@@ -138,6 +142,7 @@ void PixelProcessingUnit::do_draw() {
   // Step dot clock
   ++cur_scanline_clks;
   ++cur_mode_clks;
+  bg_win_fifo.step();
 
   // Rendering step, try to pop pixels when ready from the fifo
   if (bg_win_fifo.can_pop()) {
@@ -148,7 +153,6 @@ void PixelProcessingUnit::do_draw() {
       renderer->putPixel(x, y, px.color);
     }
   }
-  bg_win_fifo.step();
 
   // Rendering incomplete
   if (row_pixels_rendered < pixels_per_row)
