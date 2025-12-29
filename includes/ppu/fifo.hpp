@@ -99,7 +99,7 @@ private:
   std::size_t calc_tile_idx() const;
   addr_t calc_tilemap_base() const;
   byte_t fetch_tile_data(bool high) const;
-  bool should_discard() const;
+  bool should_discard();
 
   struct {
     std::size_t tile_idx;
@@ -109,7 +109,7 @@ private:
     // In unit of tiles - between 0 and 31
     std::size_t x_coor; // Y coor is tracked in pixels, can leverage LY register
     // Tracks how many pixels we must discard to implement fine scrolling
-    std::size_t x_fine_scroll;
+    std::optional<byte_t> x_fine_scroll;
     std::size_t bg_discards;
   } fetcher;
 
@@ -118,6 +118,7 @@ private:
   std::size_t cur_clks;
   PixelFifoState state;
 
+  // Internal PPU reference to access registers
   PixelProcessingUnit &ppu_;
 };
 

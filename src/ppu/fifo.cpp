@@ -86,8 +86,12 @@ byte_t PixelFifo::fetch_tile_data(bool high) const {
   }
 }
 
-bool PixelFifo::should_discard() const {
-  return fetcher.bg_discards < (ppu_.scx_reg.read() & 0x7);
+bool PixelFifo::should_discard() {
+  if (!fetcher.x_fine_scroll.has_value()) // Fetch once
+    fetcher.x_fine_scroll = (ppu_.scx_reg.read() & 0x7);
+  // Pandocs claim that the lower three bits of SCX are only sampled once
+  // throughout the duration of the scanline. Hence, we use std::optional
+  return fetcher.bg_discards < fetcher.x_fine_scroll.value();
 }
 
 void PixelFifo::get_tile() {
@@ -203,7 +207,8 @@ void PixelFifo::reset() {
       .data_lo = 0,
       .data_hi = 0,
       .x_coor = 0,
-      .x_fine_scroll = fine_scroll,
+      // Drop value to force fetch on next scanline
+      .x_fine_scroll = std::nullopt,
       .bg_discards = 0,
   };
   total_clks.reset();

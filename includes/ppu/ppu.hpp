@@ -29,6 +29,8 @@ private:
   PPU::LCDCtrl lcdc_reg{};
   PPU::STAT stat_reg{};
   MMIORegister lyc_reg{};
+
+  /* Background and window positional registers */
   MMIORegister scy_reg{};
   MMIORegister scx_reg{};
 

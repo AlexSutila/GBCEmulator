@@ -20,14 +20,14 @@ template <typename T> T *init_mmio(AddressBus *bus, IORegisterMapping reg_id) {
 
 PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus_ptr,
                                          Renderer *render_prt)
-    : bus(bus_ptr),         // For accessing graphics memory
-      renderer(render_prt), // For placing pixel data to frame buffer
+    : renderer(render_prt), // For placing pixel data to frame buffer
+      bus(bus_ptr),         // For accessing graphics memory
       lcdc_reg(),           // LCD control
       stat_reg(),           // PPU status
-      ly_reg(),             // Current scanline
       lyc_reg(),            // Current scanline compare
       scy_reg(),            // BG scroll Y
       scx_reg(),            // BG scroll X
+      ly_reg(),             // Current scanline
       bg_win_fifo(*this)    // Pushes background/window pixels
 {
   using mmio = IORegisterMapping;
@@ -163,7 +163,6 @@ void PixelProcessingUnit::do_draw() {
 }
 
 void PixelProcessingUnit::do_hblank() {
-  constexpr std::size_t total_scanline_cycles = 456; // Fixed
   using modes = PPU::StatModes;
 
   // HBlank will only ever occur during visible scanlines
@@ -173,7 +172,6 @@ void PixelProcessingUnit::do_hblank() {
 }
 
 void PixelProcessingUnit::do_vblank() {
-  constexpr std::size_t total_scanline_cycles = 456;
   using modes = PPU::StatModes;
 
   // VBlank will only ever occur during invisible scanlines - duh
