@@ -28,7 +28,7 @@ PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus_ptr,
       lyc_reg(),            // Current scanline compare
       scy_reg(),            // BG scroll Y
       scx_reg(),            // BG scroll X
-      bg_fifo(*this)        // Pushes background/window pixels
+      bg_win_fifo(*this)    // Pushes background/window pixels
 {
   using mmio = IORegisterMapping;
   using namespace PPU;
@@ -133,11 +133,6 @@ void PixelProcessingUnit::do_draw() {
     // Counts how many pixels have been rendered on this row. This determines
     // when rendering is complete.
     row_pixels_rendered = 0;
-    // The three least significant bits of SCX are used to determine how many
-    // pixels to discard at the beginning of a scanline to implement scrolling.
-    max_pixels_discarded = scx_reg.read() & 0x7;
-    // Start with zero
-    pixels_discarded = 0;
   }
 
   // Step dot clock
@@ -145,27 +140,22 @@ void PixelProcessingUnit::do_draw() {
   ++cur_mode_clks;
 
   // Rendering step, try to pop pixels when ready from the fifo
-  if (bg_fifo.can_pop()) {
-    const bool discard = pixels_discarded < max_pixels_discarded;
-    const pixel px = bg_fifo.pop();
-
-    if (discard)
-      ++pixels_discarded;
-
-    else {
+  if (bg_win_fifo.can_pop()) {
+    const pixel px = bg_win_fifo.pop();
+    if (!px.discard) {
       const auto x = row_pixels_rendered++;
       const auto y = ly_reg.read();
       renderer->putPixel(x, y, px.color);
     }
   }
-  bg_fifo.step();
+  bg_win_fifo.step();
 
   // Rendering incomplete
   if (row_pixels_rendered < pixels_per_row)
     return;
 
   // Clean fifos for next scanline
-  bg_fifo.reset();
+  bg_win_fifo.reset();
 
   // State transition logic
   stat_reg.set_mode(modes::MODE_HBLANK);
@@ -256,7 +246,7 @@ void PixelProcessingUnit::update_stat() {
 
 void PixelProcessingUnit::reset() {
   using namespace PPU;
-  bg_fifo.reset();
+  bg_win_fifo.reset();
 
   /* Configure FSM timing metadata */
   cur_scanline_clks = cur_mode_clks = 0;

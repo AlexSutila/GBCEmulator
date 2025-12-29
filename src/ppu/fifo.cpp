@@ -86,6 +86,10 @@ byte_t PixelFifo::fetch_tile_data(bool high) const {
   }
 }
 
+bool PixelFifo::should_discard() const {
+  return fetcher.bg_discards < (ppu_.scx_reg.read() & 0x7);
+}
+
 void PixelFifo::get_tile() {
   constexpr std::size_t max_state_clks = 2;
   using modes = PixelFifo::PixelFifoState;
@@ -167,9 +171,19 @@ void PixelFifo::do_push() {
     const byte_t hi_bit = (fetcher.data_hi & (1 << shift)) != 0 ? 1 : 0;
     const byte_t lo_bit = (fetcher.data_lo & (1 << shift)) != 0 ? 1 : 0;
     const byte_t palette_idx = (hi_bit << 1) | lo_bit;
+    const bool discard = should_discard();
 
-    // TODO: Index palette, just pushing the index for now
-    fifo.push({.color = palette_idx});
+    // Track number of pixels discarded
+    if (discard)
+      ++fetcher.bg_discards;
+
+    /* We still push the pixel into the FIFO, the PPU makes the final call on
+     * whether to render it or not. If `discard` is `true`, it will pop the
+     * pixel off and ignore it. */
+    fifo.push({
+        .color = palette_idx, // TODO: Fix coloring
+        .discard = discard,
+    });
   }
 
   // State transition after push to fetch next row
@@ -180,10 +194,18 @@ void PixelFifo::do_push() {
 
 void PixelFifo::reset() {
   using modes = PixelFifo::PixelFifoState;
+  byte_t fine_scroll = ppu_.scx_reg.read() & 0x7;
   state = modes::STATE_GET_TILE;
 
   /* Reset internal timing and state info */
-  fetcher.x_coor = 0;
+  fetcher = {
+      .tile_idx = 0,
+      .data_lo = 0,
+      .data_hi = 0,
+      .x_coor = 0,
+      .x_fine_scroll = fine_scroll,
+      .bg_discards = 0,
+  };
   total_clks.reset();
   cur_clks = 0;
   fifo.clear();

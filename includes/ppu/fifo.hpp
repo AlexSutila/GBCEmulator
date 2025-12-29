@@ -8,7 +8,8 @@
 #include <stdexcept>
 
 struct pixel {
-  byte_t color; // A value between 0 and 3
+  byte_t color; // A value between 0 and 3 (subject to change)
+  bool discard; // Should the PPU render this pixel or drop it?
 };
 class PixelProcessingUnit;
 
@@ -98,6 +99,7 @@ private:
   std::size_t calc_tile_idx() const;
   addr_t calc_tilemap_base() const;
   byte_t fetch_tile_data(bool high) const;
+  bool should_discard() const;
 
   struct {
     std::size_t tile_idx;
@@ -105,8 +107,10 @@ private:
     byte_t data_lo;
     byte_t data_hi;
     // In unit of tiles - between 0 and 31
-    std::size_t x_coor;
-    // Y coor is tracked in pixels, can leverage LY register
+    std::size_t x_coor; // Y coor is tracked in pixels, can leverage LY register
+    // Tracks how many pixels we must discard to implement fine scrolling
+    std::size_t x_fine_scroll;
+    std::size_t bg_discards;
   } fetcher;
 
   // For state transition logic

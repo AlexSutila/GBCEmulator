@@ -63,13 +63,11 @@ private:
   std::size_t cur_mode_clks{};
 
   /* Pixel FIFO renderers */
-  std::size_t max_pixels_discarded{};
-  std::size_t pixels_discarded{};
-  PixelFifo bg_fifo;
-  friend PixelFifo;
+  PixelFifo bg_win_fifo;
 
   /* Determined by cartridge header, dictates usable PPU features */
   bool is_cgb{};
+  friend PixelFifo;
 };
 
 #endif // __PPU_H
