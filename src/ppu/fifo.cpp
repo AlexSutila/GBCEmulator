@@ -5,22 +5,44 @@
 #include <optional>
 
 PixelFifo::PixelFifo(PixelProcessingUnit &ppu)
-    : fifo(CircularFifo<pixel, 16>()), ppu_(ppu) {
-  total_clks = std::nullopt;
-  cur_clks = 0;
-  state = PixelFifoState::STATE_GET_TILE;
+    : fifo(CircularFifo<pixel, 16>()), // Fifo is a queue of 16 pixels
+      ppu_(ppu) // Internal PPU reference for register access
+{
+  reset();
+}
 
-  /* Initialize fifo pixel fetcher */
+void PixelFifo::reset() {
+  using modes = PixelFifo::PixelFifoState;
+  byte_t fine_scroll = ppu_.scx_reg.read() & 0x7;
+  state = modes::STATE_GET_TILE;
+
+  // Reset fetcher data (not really necessary)
   fetcher = {
       .tile_idx = 0,
       .data_lo = 0,
       .data_hi = 0,
       .x_coor = 0,
   };
+
+  // Reset background metadata
+  bg = {
+      .x_fine_scroll = std::nullopt,
+      .bg_discards = 0,
+  };
+
+  // Reset window metadata, internal LY is only reset end of frame
+  win = {
+      .x_position = std::nullopt,
+  };
+
+  // Reset timing metadata
+  total_clks.reset();
+  cur_clks = 0;
+  fifo.clear();
 }
 
 /* We derive the Y-coordinate at a pixel level using the LY register. */
-const byte_t PixelFifo::get_pixel_y() const {
+const byte_t PixelFifo::calc_pixel_y() const {
   const byte_t scy = ppu_.scy_reg.read();
   const byte_t ly = ppu_.ly_reg.read();
   return (ly + scy) & 0xFF;
@@ -29,7 +51,7 @@ const byte_t PixelFifo::get_pixel_y() const {
 /* We derive the X-coordinate at a tile level, since the FIFO fetches eight
  * pixels at a time. As a result, we have to remember to divide the scroll
  * value by the size of a pixel to accomodate the change in units.  */
-const byte_t PixelFifo::get_tile_x() const {
+const byte_t PixelFifo::calc_tile_x() const {
   constexpr byte_t pixels_per_row = 8;
   const byte_t scx = ppu_.scx_reg.read();
   const byte_t x = fetcher.x_coor;
@@ -41,11 +63,11 @@ const byte_t PixelFifo::get_tile_x() const {
 std::size_t PixelFifo::calc_tile_idx() const {
   constexpr auto tile_pixels = 8;
   constexpr auto tile_shift = 5;
-  const byte_t y_pixel = get_pixel_y();
+  const byte_t y_pixel = calc_pixel_y();
 
   // Calculate X and Y coordinates of tile
   const std::size_t y_tile = (y_pixel / tile_pixels);
-  const std::size_t x_tile = get_tile_x();
+  const std::size_t x_tile = calc_tile_x();
 
   // Base address changes depending on LCDC bits being set
   const addr_t tile_idx = (y_tile << tile_shift) | x_tile;
@@ -64,7 +86,7 @@ byte_t PixelFifo::fetch_tile_data(bool high) const {
   constexpr auto tile_row_bytes = 2;
 
   // Get the current Y coordinate at a pixel granularity
-  const byte_t y_pixel_idx = get_pixel_y() & 0x7;
+  const byte_t y_pixel_idx = calc_pixel_y() & 0x7;
   const addr_t y_offset = y_pixel_idx * tile_row_bytes;
 
   // Need to consider y-offset based on LY register
@@ -86,19 +108,11 @@ byte_t PixelFifo::fetch_tile_data(bool high) const {
   }
 }
 
-bool PixelFifo::should_discard() {
-  if (!fetcher.x_fine_scroll.has_value()) // Fetch once
-    fetcher.x_fine_scroll = (ppu_.scx_reg.read() & 0x7);
-  // Pandocs claim that the lower three bits of SCX are only sampled once
-  // throughout the duration of the scanline. Hence, we use std::optional
-  return fetcher.bg_discards < fetcher.x_fine_scroll.value();
-}
-
 void PixelFifo::get_tile() {
   constexpr std::size_t max_state_clks = 2;
   using modes = PixelFifo::PixelFifoState;
 
-  // State entry logic - compute tile index
+  // State entry logic - sample window position and compute tile index
   if (!total_clks.has_value()) {
     fetcher.tile_idx = calc_tile_idx();
     total_clks = max_state_clks;
@@ -179,7 +193,7 @@ void PixelFifo::do_push() {
 
     // Track number of pixels discarded
     if (discard)
-      ++fetcher.bg_discards;
+      ++bg.bg_discards;
 
     /* We still push the pixel into the FIFO, the PPU makes the final call on
      * whether to render it or not. If `discard` is `true`, it will pop the
@@ -196,24 +210,12 @@ void PixelFifo::do_push() {
   cur_clks = 0;
 }
 
-void PixelFifo::reset() {
-  using modes = PixelFifo::PixelFifoState;
-  byte_t fine_scroll = ppu_.scx_reg.read() & 0x7;
-  state = modes::STATE_GET_TILE;
-
-  /* Reset internal timing and state info */
-  fetcher = {
-      .tile_idx = 0,
-      .data_lo = 0,
-      .data_hi = 0,
-      .x_coor = 0,
-      // Drop value to force fetch on next scanline
-      .x_fine_scroll = std::nullopt,
-      .bg_discards = 0,
-  };
-  total_clks.reset();
-  cur_clks = 0;
-  fifo.clear();
+bool PixelFifo::should_discard() {
+  if (!bg.x_fine_scroll.has_value()) // Fetch once
+    bg.x_fine_scroll = (ppu_.scx_reg.read() & 0x7);
+  // Pandocs claim that the lower three bits of SCX are only sampled once
+  // throughout the duration of the scanline. Hence, we use std::optional
+  return bg.bg_discards < bg.x_fine_scroll.value();
 }
 
 void PixelFifo::step() {

@@ -88,8 +88,8 @@ private:
     STATE_PUSH,
   };
   CircularFifo<pixel, 16> fifo;
-  const byte_t get_pixel_y() const;
-  const byte_t get_tile_x() const;
+  const byte_t calc_pixel_y() const;
+  const byte_t calc_tile_x() const;
 
   void get_tile();
   void get_tile_data_lo();
@@ -99,8 +99,9 @@ private:
   std::size_t calc_tile_idx() const;
   addr_t calc_tilemap_base() const;
   byte_t fetch_tile_data(bool high) const;
-  bool should_discard();
 
+  /* Internal fetcher metadata, implements the temporary data that is stored
+   * during the tile data fetching and rendering pipeline. */
   struct {
     std::size_t tile_idx;
     // A row of tile consists of two consecutive bytes
@@ -108,10 +109,25 @@ private:
     byte_t data_hi;
     // In unit of tiles - between 0 and 31
     std::size_t x_coor; // Y coor is tracked in pixels, can leverage LY register
-    // Tracks how many pixels we must discard to implement fine scrolling
+  } fetcher;
+
+  /* Internal background metadata, specifically samples the fine scroll value
+   * once at the beginning of a scanline to determine how many pixels should be
+   * discarded during the initial phase of rendering. */
+  struct {
     std::optional<byte_t> x_fine_scroll;
     std::size_t bg_discards;
-  } fetcher;
+  } bg;
+  bool should_discard();
+
+  /* Internal window metadata, specifically samples the window position at the
+   * beginning of each scanline to determine when it should start rendering. The
+   * window also maintains an internal ly that it uses to track where it is at
+   * during rendering vertically. Many games depend on this counter. */
+  struct {
+    std::optional<byte_t> x_position;
+    std::size_t ly;
+  } win;
 
   // For state transition logic
   std::optional<std::size_t> total_clks;
