@@ -1,14 +1,20 @@
 #include "ppu/fetcher.hpp"
 #include "memory/bus.hpp"
+#include "memory/mmio/mmio.hpp"
 #include "ppu/fifo.hpp"
 
+constexpr byte_t pixels_per_row = 8;
+
 Fetcher::Fetcher(AddressBus *const bus_ptr, PixelFifo &fifo, PPU::LCDCtrl &lcdc,
-                 MMIORegister &scx, MMIORegister &scy, PPU::LY &ly)
+                 MMIORegister &scy, MMIORegister &scx, MMIORegister &wy,
+                 MMIORegister &wx, PPU::LY &ly)
     : bus(bus_ptr), // For reading tile data from VRAM
       fifo_(fifo),  // Pixel fifo
       lcdc_(lcdc),  // LCD control register
-      scx_(scx),    // Scroll X (background)
       scy_(scy),    // Scroll Y (background)
+      scx_(scx),    // Scroll X (background)
+      wy_(wy),      // Window  Y (background)
+      wx_(wx),      // Window  X (background)
       ly_(ly)       // Current scanline
 {
   reset();
@@ -29,6 +35,7 @@ void Fetcher::reset() {
       // due to SCX % 8 being holding a non-zero value.
       .first_tile = true,
   };
+  window_started = false;
 
   // Reset timing metadata
   total_clks.reset();
@@ -44,7 +51,6 @@ const byte_t Fetcher::calc_pixel_y() const {
  * pixels at a time. As a result, we have to remember to divide the scroll
  * value by the size of a pixel to accomodate the change in units.  */
 const byte_t Fetcher::calc_tile_x() const {
-  constexpr byte_t pixels_per_row = 8;
   // Since returning unit tiles, can only be 32 max
   return (data.x_coor + (scx_.read() / pixels_per_row)) & 0x1F;
 }
@@ -55,12 +61,11 @@ const addr_t Fetcher::calc_tilemap_base() const {
 }
 
 std::size_t Fetcher::calc_tile_idx() {
-  constexpr auto row_pixels = 8;
   constexpr auto tile_shift = 5;
   const byte_t y_px = calc_pixel_y();
 
   // Calculate X and Y coordinates of tile
-  const std::size_t y_tile = (y_px / row_pixels);
+  const std::size_t y_tile = (y_px / pixels_per_row);
   const std::size_t x_tile = calc_tile_x();
 
   // Base address changes depending on LCDC bits being set
@@ -69,8 +74,10 @@ std::size_t Fetcher::calc_tile_idx() {
   return bus->read_byte(tilemap_base + tile_idx);
 }
 
+/* Implements fine horizontal scroll and initial tile skip */
 bool Fetcher::should_discard() const {
-  constexpr byte_t pixels_per_row = 8;
+  if (window_started)
+    return false;
   return pixels_discarded < (fine_scroll + pixels_per_row);
 }
 
@@ -179,7 +186,12 @@ void Fetcher::do_push_data() {
     // Otherwise, we compute the pixel info as you would usually
     const byte_t hi_bit = (data.data_hi & (1 << shift)) != 0 ? 1 : 0;
     const byte_t lo_bit = (data.data_lo & (1 << shift)) != 0 ? 1 : 0;
-    const byte_t palette_idx = (hi_bit << 1) | lo_bit;
+    byte_t palette_idx = (hi_bit << 1) | lo_bit;
+
+    // TODO: This is a hack
+    if (window_started)
+      palette_idx = 3;
+
     fifo_.push({
         .color = palette_idx,
         .discard = discard,
@@ -196,6 +208,27 @@ void Fetcher::do_push_data() {
   state = STATE_READ_TILE;
   total_clks.reset();
   cur_clks = 0;
+}
+
+bool Fetcher::window_visible(byte_t pixels_rendered) const {
+  if (!lcdc_.win_enabled())
+    return false;
+  const byte_t wx_px = wx_.read();
+  const byte_t wy_px = wy_.read();
+  // TODO: Implement internal window line counter
+  const byte_t ly_px = ly_.read();
+  return (wx_px <= pixels_rendered + 7) && (ly_px >= wy_px);
+}
+
+void Fetcher::render_window() {
+  // Window is already being rendered
+  if (window_started)
+    return;
+
+  // Flush BG fifo pixel data, incurs additional overhead to fetch the very
+  // first window tile, but after that the rendering process is identical.
+  window_started = true;
+  fifo_.flush();
 }
 
 void Fetcher::step() {

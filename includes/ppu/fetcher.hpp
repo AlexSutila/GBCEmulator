@@ -14,11 +14,18 @@ public:
   Fetcher(AddressBus *const bus_ptr, // For reading tile data from VRAM
           PixelFifo &fifo,           // The pixel fifo
           PPU::LCDCtrl &lcdc,        // The LCD control register
-          MMIORegister &scx,         // The scroll X register
           MMIORegister &scy,         // The scroll Y register
+          MMIORegister &scx,         // The scroll X register
+          MMIORegister &wy,          // The window Y register
+          MMIORegister &wx,          // The window X register
           PPU::LY &ly);              // The current scanline register
   void reset();
   void step();
+
+  /* The PPU will signal to clear the FIFO once the rendering of the window has
+   * begun. All BG pixel data is flushed, and window rendering starts. */
+  bool window_visible(byte_t pixels_rendered) const;
+  void render_window();
 
 private:
   AddressBus *const bus{};
@@ -37,9 +44,11 @@ private:
   /* Internal register references for convenience */
   PixelFifo &fifo_;
   PPU::LCDCtrl &lcdc_;
-  PPU::LY &ly_;
-  MMIORegister &scx_;
   MMIORegister &scy_;
+  MMIORegister &scx_;
+  MMIORegister &wy_;
+  MMIORegister &wx_;
+  PPU::LY &ly_;
 
   /* Internal state of the fetcher, each takes two clock cycles minimum */
   enum FetcherState {
@@ -55,8 +64,13 @@ private:
   void do_push_data();
 
   /* Implements fine horizontal scrolling within an 8x8 pixel tile */
-  std::size_t pixels_discarded{};
+  bool should_discard() const;
+  byte_t pixels_discarded{};
   byte_t fine_scroll{};
+
+  /* Implements window behavior. If the window is enabled, then it is rendered
+   * until the end of the scanline. */
+  bool window_started{};
 
   /* Internal timing metadata */
   std::optional<std::size_t> total_clks{};
@@ -68,7 +82,6 @@ private:
   const addr_t calc_tilemap_base() const;
   const byte_t fetch_tile_data(bool high) const;
   std::size_t calc_tile_idx();
-  bool should_discard() const;
 };
 
 #endif // __FETCHER_H

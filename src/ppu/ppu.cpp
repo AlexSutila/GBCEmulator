@@ -24,28 +24,28 @@ PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus_ptr,
                                          Renderer *render_prt)
     : renderer(render_prt), // For placing pixel data to frame buffer
       bus(bus_ptr),         // For accessing graphics memory
-      lcdc_reg(),           // LCD control
-      stat_reg(),           // PPU status
-      lyc_reg(),            // Current scanline compare
-      scy_reg(),            // BG scroll Y
-      scx_reg(),            // BG scroll X
-      wy_reg(),             // Window scroll Y
-      wx_reg(),             // Window scroll X
-      ly_reg(),             // Current scanline
+      lcdc_(),              // LCD control
+      stat_(),              // PPU status
+      lyc_(),               // Current scanline compare
+      scy_(),               // BG scroll Y
+      scx_(),               // BG scroll X
+      wy_(),                // Window scroll Y
+      wx_(),                // Window scroll X
+      ly_(),                // Current scanline
       fifo(),               // Pushes background/window pixels
-      bg_fetcher(bus_ptr, fifo, lcdc_reg, scx_reg, scy_reg, ly_reg) {
+      bg_fetcher(bus_ptr, fifo, lcdc_, scy_, scx_, wy_, wx_, ly_) {
   using mmio = IORegisterMapping;
   using namespace PPU;
 
   /* Configure convenience MMIO register references */
-  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_CONTROL), &lcdc_reg);
-  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_STATUS), &stat_reg);
-  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_Y_COOR), &ly_reg);
-  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_Y_COMP), &lyc_reg);
-  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_SCY), &scy_reg);
-  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_SCX), &scx_reg);
-  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_WY), &wy_reg);
-  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_WX), &wx_reg);
+  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_CONTROL), &lcdc_);
+  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_STATUS), &stat_);
+  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_Y_COOR), &ly_);
+  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_Y_COMP), &lyc_);
+  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_SCY), &scy_);
+  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_SCX), &scx_);
+  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_WY), &wy_);
+  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_WX), &wx_);
 
   /* Not owned by the pixel processing unit, so have to fetch references */
   vbk_reg = init_mmio<VramBank>(bus, mmio::MMIO_VRAM_BANK);
@@ -62,7 +62,7 @@ void PixelProcessingUnit::set_cgb(const byte_t cgb_flag) {
 
 bool PixelProcessingUnit::should_advance_ly() {
   constexpr std::size_t total_scanline_cycles = 456; // Fixed
-  const byte_t cur_ly = ly_reg.read();
+  const byte_t cur_ly = ly_.read();
 
   /* First, perform a check to make sure we do not accidentally re-increment the
    * LY before moving onto the next frame from scanline 153, `scanline_153_bug`
@@ -92,8 +92,8 @@ void PixelProcessingUnit::do_oam_scan() {
   using modes = PPU::StatModes;
 
   // OAM scan always happens on visible scanlines
-  assert(stat_reg.get_mode() == modes::MODE_OAM_SCAN);
-  assert(ly_reg.is_visible());
+  assert(stat_.get_mode() == modes::MODE_OAM_SCAN);
+  assert(ly_.is_visible());
 
   // State entry
   if (!total_mode_clks.has_value()) {
@@ -114,7 +114,7 @@ void PixelProcessingUnit::do_oam_scan() {
     return;
 
   // State transition logic
-  stat_reg.set_mode(modes::MODE_DRAWING);
+  stat_.set_mode(modes::MODE_DRAWING);
   total_mode_clks.reset();
 }
 
@@ -124,8 +124,8 @@ void PixelProcessingUnit::do_draw() {
   using modes = PPU::StatModes;
 
   // Rendering always happens on visible scanlines
-  assert(stat_reg.get_mode() == modes::MODE_DRAWING);
-  assert(ly_reg.is_visible());
+  assert(stat_.get_mode() == modes::MODE_DRAWING);
+  assert(ly_.is_visible());
 
   /* By default, the PPU outputs one pixel to the screen per dot, however some
    * features cause the rendering process to stall. This additional stalling
@@ -153,9 +153,13 @@ void PixelProcessingUnit::do_draw() {
     const pixel px = fifo.pop();
     if (!px.discard) {
       const auto x = row_pixels_rendered++;
-      const auto y = ly_reg.read();
+      const auto y = ly_.read();
       renderer->putPixel(x, y, px.color);
     }
+
+    // Do we switch the fetcher into window rendering mode?
+    if (bg_fetcher.window_visible(row_pixels_rendered))
+      bg_fetcher.render_window();
   }
 
   // Rendering incomplete
@@ -163,7 +167,7 @@ void PixelProcessingUnit::do_draw() {
     return;
 
   // State transition logic
-  stat_reg.set_mode(modes::MODE_HBLANK);
+  stat_.set_mode(modes::MODE_HBLANK);
   total_mode_clks.reset();
 }
 
@@ -171,8 +175,8 @@ void PixelProcessingUnit::do_hblank() {
   using modes = PPU::StatModes;
 
   // HBlank will only ever occur during visible scanlines
-  assert(stat_reg.get_mode() == modes::MODE_HBLANK);
-  assert(ly_reg.is_visible());
+  assert(stat_.get_mode() == modes::MODE_HBLANK);
+  assert(ly_.is_visible());
   blank();
 }
 
@@ -180,8 +184,8 @@ void PixelProcessingUnit::do_vblank() {
   using modes = PPU::StatModes;
 
   // VBlank will only ever occur during invisible scanlines - duh
-  assert(stat_reg.get_mode() == modes::MODE_VBLANK);
-  assert(!ly_reg.is_visible() || ly_reg.read() == 0);
+  assert(stat_.get_mode() == modes::MODE_VBLANK);
+  assert(!ly_.is_visible() || ly_.read() == 0);
   blank();
 }
 
@@ -197,21 +201,21 @@ void PixelProcessingUnit::blank() {
   // LY will only ever be advanced during blanking. Beware it is possible for LY
   // to change mid-scanline due to the scanline 153 bug.
   if (should_advance_ly())
-    ly_reg.inc();
+    ly_.inc();
 
   // Blanking incomplete
   if (cur_scanline_clks < total_mode_clks.value())
     return;
 
   // Request VBlank interrupt
-  if (ly_reg.read() == 144)
+  if (ly_.read() == 144)
     request_vblank_irq();
 
   // End of scanline logic
-  if (ly_reg.is_visible())
-    stat_reg.set_mode(modes::MODE_OAM_SCAN);
+  if (ly_.is_visible())
+    stat_.set_mode(modes::MODE_OAM_SCAN);
   else
-    stat_reg.set_mode(modes::MODE_VBLANK);
+    stat_.set_mode(modes::MODE_VBLANK);
 
   total_mode_clks.reset();
   cur_scanline_clks = 0;
@@ -223,28 +227,28 @@ void PixelProcessingUnit::update_stat() {
   const bool old = stat_irq_signal_edge;
 
   /* Condition 1: The LY register is equal to the LYC register */
-  const bool cond_a = (ly_reg.read() == lyc_reg.read()) &&
-                      stat_reg.int_enabled(PPU::StatIntFlags::LYC_EQ_LY);
+  const bool cond_a = (ly_.read() == lyc_.read()) &&
+                      stat_.int_enabled(PPU::StatIntFlags::LYC_EQ_LY);
 
   /* Condition 2: We are in HBLANK and the STAT source bit is set */
-  const bool cond_b = (stat_reg.get_mode() == PPU::StatModes::MODE_HBLANK) &&
-                      stat_reg.int_enabled(PPU::StatIntFlags::MODE_0_SEL);
+  const bool cond_b = (stat_.get_mode() == PPU::StatModes::MODE_HBLANK) &&
+                      stat_.int_enabled(PPU::StatIntFlags::MODE_0_SEL);
 
   /* Condition 3: We are in OAM and the STAT source bit is set */
-  const bool cond_c = (stat_reg.get_mode() == PPU::StatModes::MODE_OAM_SCAN) &&
-                      stat_reg.int_enabled(PPU::StatIntFlags::MODE_2_SEL);
+  const bool cond_c = (stat_.get_mode() == PPU::StatModes::MODE_OAM_SCAN) &&
+                      stat_.int_enabled(PPU::StatIntFlags::MODE_2_SEL);
 
   /* Condition 4: We are in VBLANK and the STAT source bit is set. For some
    * reason, this condition is also met in OAM scan as per TCAGBD. */
-  const bool cond_d = (stat_reg.get_mode() == PPU::StatModes::MODE_VBLANK) &&
-                      (stat_reg.int_enabled(PPU::StatIntFlags::MODE_0_SEL) ||
-                       stat_reg.int_enabled(PPU::StatIntFlags::MODE_1_SEL));
+  const bool cond_d = (stat_.get_mode() == PPU::StatModes::MODE_VBLANK) &&
+                      (stat_.int_enabled(PPU::StatIntFlags::MODE_0_SEL) ||
+                       stat_.int_enabled(PPU::StatIntFlags::MODE_1_SEL));
 
   // Detect rising edge, fire IRQ appropriately
   stat_irq_signal_edge = cond_a || cond_b || cond_c || cond_d;
   if (!old && stat_irq_signal_edge)
     request_lcd_irq();
-  stat_reg.set_ly_eq_lyc(ly_reg.read() == lyc_reg.read());
+  stat_.set_ly_eq_lyc(ly_.read() == lyc_.read());
 }
 
 void PixelProcessingUnit::reset() {
@@ -257,8 +261,8 @@ void PixelProcessingUnit::reset() {
   total_mode_clks = std::nullopt;
 
   /* Configure status MMIO registers initial state - drives FSM */
-  stat_reg.set_mode(StatModes::MODE_OAM_SCAN);
-  ly_reg.reset();
+  stat_.set_mode(StatModes::MODE_OAM_SCAN);
+  ly_.reset();
 
   /* Reset edge that triggers stat IRQs */
   stat_irq_signal_edge = false;
@@ -268,13 +272,13 @@ void PixelProcessingUnit::step() {
 
   /* When the PPU is disabled, the screen just shows plain white and the state
    * is set to it's initial state until it is re-enabled again. */
-  if (!lcdc_reg.lcd_enabled()) [[unlikely]] {
+  if (!lcdc_.lcd_enabled()) [[unlikely]] {
     reset();
     return;
   }
 
   /* Rendering is enabled, perform FSM logic */
-  switch (stat_reg.get_mode()) {
+  switch (stat_.get_mode()) {
   case PPU::StatModes::MODE_HBLANK:
     do_hblank();
     break;

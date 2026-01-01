@@ -27,21 +27,21 @@ private:
 
   /* Convenience references to important PPU mmio registers */
   PPU::VramBank *vbk_reg{};
-  PPU::LCDCtrl lcdc_reg{};
-  PPU::STAT stat_reg{};
-  MMIORegister lyc_reg{};
+  PPU::LCDCtrl lcdc_{};
+  PPU::STAT stat_{};
+  MMIORegister lyc_{};
 
   /* Background and window positional registers */
-  MMIORegister scy_reg{};
-  MMIORegister scx_reg{};
-  MMIORegister wy_reg{};
-  MMIORegister wx_reg{};
+  MMIORegister scy_{};
+  MMIORegister scx_{};
+  MMIORegister wy_{};
+  MMIORegister wx_{};
 
   /* For tracking where we currently are in the rendering process */
   std::size_t row_pixels_rendered{};
   bool should_advance_ly();
   bool scanline_153_bug{};
-  PPU::LY ly_reg{};
+  PPU::LY ly_{};
 
   /* Pixel Processor operation modes */
   void do_oam_scan();
