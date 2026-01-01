@@ -7,6 +7,7 @@
 #include "memory/mmio/cgb.hpp"
 #include "memory/mmio/dmg.hpp"
 #include "memory/mmio/mmio.hpp"
+#include "ppu/fetcher.hpp"
 #include "ppu/fifo.hpp"
 
 #include <cstddef>
@@ -67,7 +68,8 @@ private:
   std::size_t cur_mode_clks{};
 
   /* Pixel FIFO renderers */
-  PixelFifo bg_win_fifo;
+  PixelFifo fifo;
+  Fetcher bg_fetcher;
 
   /* Determined by cartridge header, dictates usable PPU features */
   bool is_cgb{};

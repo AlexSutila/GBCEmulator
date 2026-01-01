@@ -32,7 +32,7 @@ PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus_ptr,
       wy_reg(),             // Window scroll Y
       wx_reg(),             // Window scroll X
       ly_reg(),             // Current scanline
-      fifo(),               // Pushes background/window pixels
+      fifo(*this),          // Pushes background/window pixels
       bg_fetcher(bus_ptr, fifo, lcdc_reg, scx_reg, scy_reg, ly_reg) {
   using mmio = IORegisterMapping;
   using namespace PPU;
@@ -131,8 +131,6 @@ void PixelProcessingUnit::do_draw() {
    * features cause the rendering process to stall. This additional stalling
    * time lengthens the duration of this operation mode. */
   if (!total_mode_clks.has_value()) {
-    bg_fetcher.reset();
-    fifo.flush();
     // Simply set to minimum, raise as quirks come up during rendering. We do
     // not use this to determine end of state.
     total_mode_clks = min_drawing_cycles;
@@ -149,8 +147,8 @@ void PixelProcessingUnit::do_draw() {
   bg_fetcher.step();
 
   // Rendering step, try to pop pixels when ready from the fifo
-  if (fifo.can_pop()) {
-    const pixel px = fifo.pop();
+  if (bg_win_fifo.can_pop()) {
+    const pixel px = bg_win_fifo.pop();
     if (!px.discard) {
       const auto x = row_pixels_rendered++;
       const auto y = ly_reg.read();
@@ -161,6 +159,9 @@ void PixelProcessingUnit::do_draw() {
   // Rendering incomplete
   if (row_pixels_rendered < pixels_per_row)
     return;
+
+  // Clean fifos for next scanline
+  bg_win_fifo.reset();
 
   // State transition logic
   stat_reg.set_mode(modes::MODE_HBLANK);
@@ -249,8 +250,7 @@ void PixelProcessingUnit::update_stat() {
 
 void PixelProcessingUnit::reset() {
   using namespace PPU;
-  bg_fetcher.reset();
-  fifo.flush();
+  bg_win_fifo.reset();
 
   /* Configure FSM timing metadata */
   cur_scanline_clks = cur_mode_clks = 0;

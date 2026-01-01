@@ -1,16 +1,11 @@
 #ifndef __FIFO_H
 #define __FIFO_H
 
-#include "emu_types.hpp"
+#include "ppu/pixel.hpp"
 #include <array>
 #include <cstddef>
-#include <optional>
 #include <stdexcept>
 
-struct pixel {
-  byte_t color; // A value between 0 and 3 (subject to change)
-  bool discard; // Should the PPU render this pixel or drop it?
-};
 class PixelProcessingUnit;
 
 /*
@@ -72,70 +67,18 @@ private:
 
 class PixelFifo {
 public:
-  PixelFifo(PixelProcessingUnit &ppu);
-  void reset();
+  PixelFifo();
+  void flush();
   void step();
 
   /* Pop a fully processed pixel */
-  bool can_pop() const { return fifo.size() >= 8; }
-  pixel pop() { return fifo.pop(); }
+  bool can_push() const;
+  bool can_pop() const;
+  void push(pixel px);
+  pixel pop();
 
 private:
-  enum PixelFifoState {
-    STATE_GET_TILE, // Miseading name, computes index
-    STATE_GET_TILE_DATA_LOW,
-    STATE_GET_TILE_DATA_HIGH,
-    STATE_PUSH,
-  };
   CircularFifo<pixel, 16> fifo;
-  const byte_t calc_pixel_y() const;
-  const byte_t calc_tile_x() const;
-
-  void get_tile();
-  void get_tile_data_lo();
-  void get_tile_data_hi();
-  void do_push();
-
-  std::size_t calc_tile_idx() const;
-  addr_t calc_tilemap_base() const;
-  byte_t fetch_tile_data(bool high) const;
-
-  /* Internal fetcher metadata, implements the temporary data that is stored
-   * during the tile data fetching and rendering pipeline. */
-  struct {
-    std::size_t tile_idx;
-    // A row of tile consists of two consecutive bytes
-    byte_t data_lo;
-    byte_t data_hi;
-    // In unit of tiles - between 0 and 31
-    std::size_t x_coor; // Y coor is tracked in pixels, can leverage LY register
-  } fetcher;
-
-  /* Internal background metadata, specifically samples the fine scroll value
-   * once at the beginning of a scanline to determine how many pixels should be
-   * discarded during the initial phase of rendering. */
-  struct {
-    std::optional<byte_t> x_fine_scroll;
-    std::size_t bg_discards;
-  } bg;
-  bool should_discard();
-
-  /* Internal window metadata, specifically samples the window position at the
-   * beginning of each scanline to determine when it should start rendering. The
-   * window also maintains an internal ly that it uses to track where it is at
-   * during rendering vertically. Many games depend on this counter. */
-  struct {
-    std::optional<byte_t> x_position;
-    std::size_t ly;
-  } win;
-
-  // For state transition logic
-  std::optional<std::size_t> total_clks;
-  std::size_t cur_clks;
-  PixelFifoState state;
-
-  // Internal PPU reference to access registers
-  PixelProcessingUnit &ppu_;
 };
 
 #endif // __FIFO_H
