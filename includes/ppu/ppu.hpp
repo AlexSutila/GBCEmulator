@@ -16,14 +16,13 @@
 
 class PixelProcessingUnit {
 public:
-  PixelProcessingUnit(AddressBus *bus_ptr, Renderer *render_prt);
+  PixelProcessingUnit(AddressBus *bus, Renderer *renderer);
   void set_cgb(const byte_t cgb_flag);
   void reset();
   void step();
 
 private:
   Renderer *const renderer{};
-  AddressBus *const bus{};
   InterruptBits *if_reg{};
 
   /* Convenience references to important PPU mmio registers */
@@ -74,8 +73,8 @@ private:
   PPU::StatModes state{};
 
   /* Pixel FIFO renderers */
+  std::unique_ptr<Fetcher> bg_fetcher;
   PixelFifo fifo;
-  Fetcher bg_fetcher;
 
   /* Determined by cartridge header, dictates usable PPU features */
   bool is_cgb{};

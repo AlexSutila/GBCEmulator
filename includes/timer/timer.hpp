@@ -17,7 +17,7 @@ T *init_mmio(AddressBus *const bus, IORegisterMapping reg_id) {
 
 class TimerUnit {
 public:
-  explicit TimerUnit(AddressBus *const bus_ptr, bool cgb_model = true);
+  explicit TimerUnit(AddressBus *const bus, bool cgb_model = true);
   void reset() noexcept;
   void step() noexcept;
 

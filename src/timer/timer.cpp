@@ -3,7 +3,7 @@
 #include "memory/bus.hpp"
 #include "memory/mmio/dmg.hpp"
 
-TimerUnit::TimerUnit(AddressBus *const bus_ptr, const bool cgb_model)
+TimerUnit::TimerUnit(AddressBus *const bus, const bool cgb_model)
     : cgb_model_(cgb_model), // Since we emulate a GameBoyColor, always true
       tima_reg(*this),       // Timer counter register
       tma_reg(*this),        // Timer modulo register
@@ -14,13 +14,13 @@ TimerUnit::TimerUnit(AddressBus *const bus_ptr, const bool cgb_model)
   using namespace PPU;
 
   /* Configure convenience MMIO register references */
-  bus_ptr->connect_mmio(static_cast<addr_t>(mmio::MMIO_TIMER_TIMA), &tima_reg);
-  bus_ptr->connect_mmio(static_cast<addr_t>(mmio::MMIO_TIMER_TMA), &tma_reg);
-  bus_ptr->connect_mmio(static_cast<addr_t>(mmio::MMIO_TIMER_TAC), &tac_reg);
-  bus_ptr->connect_mmio(static_cast<addr_t>(mmio::MMIO_TIMER_DIV), &div_reg);
+  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_TIMER_TIMA), &tima_reg);
+  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_TIMER_TMA), &tma_reg);
+  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_TIMER_TAC), &tac_reg);
+  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_TIMER_DIV), &div_reg);
 
   /* Not owned by the pixel processing unit, so have to fetch references */
-  if_reg = init_mmio<InterruptBits>(bus_ptr, mmio::MMIO_INT_FLAGS);
+  if_reg = init_mmio<InterruptBits>(bus, mmio::MMIO_INT_FLAGS);
   reset();
 }
 

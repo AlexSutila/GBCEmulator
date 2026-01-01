@@ -22,21 +22,20 @@ template <typename T> T *init_mmio(AddressBus *bus, IORegisterMapping reg_id) {
   throw std::logic_error(std::string("Failed to configure MMIO (PPU)"));
 }
 
-PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus_ptr,
-                                         Renderer *render_prt)
-    : renderer(render_prt), // For placing pixel data to frame buffer
-      bus(bus_ptr),         // For accessing graphics memory
-      lcdc_(),              // LCD control
-      stat_(),              // PPU status
-      lyc_(),               // Current scanline compare
-      scy_(),               // BG scroll Y
-      scx_(),               // BG scroll X
-      wy_(),                // Window scroll Y
-      wx_(),                // Window scroll X
-      ly_(),                // Current scanline
-      bgp_(),               // DMG background and window palette
-      fifo(),               // Pushes background/window pixels
-      bg_fetcher(bus_ptr, fifo, lcdc_, scy_, scx_, wy_, wx_, ly_) {
+PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus,
+                                         Renderer *render)
+    : renderer(render), // For placing pixel data to frame buffer
+      lcdc_(),          // LCD control
+      stat_(),          // PPU status
+      lyc_(),           // Current scanline compare
+      scy_(),           // BG scroll Y
+      scx_(),           // BG scroll X
+      wy_(),            // Window scroll Y
+      wx_(),            // Window scroll X
+      ly_(),            // Current scanline
+      bgp_(),           // DMG background and window palette
+      fifo()            // Pushes background/window pixels
+{
   using mmio = IORegisterMapping;
   using namespace PPU;
 
@@ -54,6 +53,18 @@ PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus_ptr,
   /* Not owned by the pixel processing unit, so have to fetch references */
   vbk_reg = init_mmio<VramBank>(bus, mmio::MMIO_VRAM_BANK);
   if_reg = init_mmio<InterruptBits>(bus, mmio::MMIO_INT_FLAGS);
+
+  /* Initialize the background pixel FIFO fetching pipeline */
+  bg_fetcher = std::make_unique<Fetcher>(
+      bus,   // TODO: Remove
+      fifo,  // Fetcher must push rows of pixels into this FIFO
+      lcdc_, // Needs to know if certain control bits are set
+      scy_,  // Needed to fetch correct background tile
+      scx_,  // Needed to fetch correct background tile
+      wy_,   // Needed to fetch correct window tile
+      wx_,   // Needed to fetch correct window tile
+      ly_    // Needed to fetch correct background tile
+  );
 
   /* Configure PPU to initial state, doesn't technically happen until PPU is
    * enabled but we do it anyway just because. */
@@ -144,7 +155,7 @@ void PixelProcessingUnit::do_draw() {
    * features cause the rendering process to stall. This additional stalling
    * time lengthens the duration of this operation mode. */
   if (!total_mode_clks.has_value()) {
-    bg_fetcher.reset();
+    bg_fetcher->reset();
     fifo.flush();
     // Simply set to minimum, raise as quirks come up during rendering. We do
     // not use this to determine end of state.
@@ -159,7 +170,7 @@ void PixelProcessingUnit::do_draw() {
   // Step dot clock
   ++cur_scanline_clks;
   ++cur_mode_clks;
-  bg_fetcher.step();
+  bg_fetcher->step();
 
   // Rendering step, try to pop pixels when ready from the fifo
   if (fifo.can_pop()) {
@@ -172,8 +183,8 @@ void PixelProcessingUnit::do_draw() {
     }
 
     // Do we switch the fetcher into window rendering mode?
-    if (bg_fetcher.window_visible(row_pixels_rendered))
-      bg_fetcher.render_window();
+    if (bg_fetcher->window_visible(row_pixels_rendered))
+      bg_fetcher->render_window();
   }
 
   // Rendering incomplete
@@ -184,9 +195,9 @@ void PixelProcessingUnit::do_draw() {
   // rendering progress. Determine if that counter is increased (or reset)
   // here, depending on where we are in the frame.
   if (ly_.read() >= 143)
-    bg_fetcher.reset_win_ly();
-  else if (bg_fetcher.was_window_visible())
-    bg_fetcher.inc_win_ly();
+    bg_fetcher->reset_win_ly();
+  else if (bg_fetcher->was_window_visible())
+    bg_fetcher->inc_win_ly();
 
   // State transition logic
   state = modes::MODE_HBLANK;
@@ -276,7 +287,7 @@ void PixelProcessingUnit::update_stat() {
 
 void PixelProcessingUnit::reset() {
   using namespace PPU;
-  bg_fetcher.reset();
+  bg_fetcher->reset();
   fifo.flush();
 
   /* Configure FSM timing metadata */
