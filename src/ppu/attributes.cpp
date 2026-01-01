@@ -7,5 +7,5 @@ byte_t get_bg_attrib_palelte(byte_t attrib) {
 
 byte_t get_bg_attrib_bank(byte_t attrib) {
   // CGB only: selects which VRAM bank to fetch tile data from
-  return (attrib & 0x8) >> 3;
+  return ((attrib & 0x8) >> 3) & 0x1;
 }

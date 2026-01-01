@@ -1,7 +1,7 @@
 #include "ppu/fetcher.hpp"
 #include "cart/cart.hpp"
-#include "memory/mmio/cgb.hpp"
 #include "memory/mmio/mmio.hpp"
+#include "ppu/attributes.hpp"
 #include "ppu/fifo.hpp"
 
 #include <array>
@@ -13,18 +13,17 @@ constexpr addr_t vram_base_addr = 0x8000;
 constexpr byte_t pixels_per_row = 8;
 
 Fetcher::Fetcher(std::array<std::unique_ptr<byte_t[]>, 2> &vram,
-                 PPU::VramBank *const vbk_ptr, PPU::LCDCtrl &lcdc,
-                 MMIORegister &scy, MMIORegister &scx, MMIORegister &wy,
-                 MMIORegister &wx, PPU::LY &ly, PixelFifo &fifo)
-    : vram_(vram),   // For fetching tile data
-      vbk_(vbk_ptr), // Tile data is banked in CGB mode
-      lcdc_(lcdc),   // LCD control register
-      scy_(scy),     // Scroll Y (background)
-      scx_(scx),     // Scroll X (background)
-      wy_(wy),       // Window  Y (background)
-      wx_(wx),       // Window  X (background)
-      ly_(ly),       // Current scanline
-      fifo_(fifo)    // Pixel fifo
+                 PPU::LCDCtrl &lcdc, MMIORegister &scy, MMIORegister &scx,
+                 MMIORegister &wy, MMIORegister &wx, PPU::LY &ly,
+                 PixelFifo &fifo)
+    : vram_(vram), // For fetching tile data
+      lcdc_(lcdc), // LCD control register
+      scy_(scy),   // Scroll Y (background)
+      scx_(scx),   // Scroll X (background)
+      wy_(wy),     // Window  Y (background)
+      wx_(wx),     // Window  X (background)
+      ly_(ly),     // Current scanline
+      fifo_(fifo)  // Pixel fifo
 {
   reset();
 }
@@ -39,6 +38,7 @@ void Fetcher::reset(bool window_started) {
   // Reset fetcher data, x_coor most important
   data = {
       .tile_idx = 0,
+      .tile_attr = 0,
       .data_lo = 0,
       .data_hi = 0,
       .x_coor = 0,
@@ -65,10 +65,6 @@ byte_t Fetcher::read_vram_byte(addr_t addr, byte_t bank) const {
         "Fetcher::read_vram_byte(), non-zero bank in DMG mode");
   return vram_.at(bank)[addr - vram_base_addr];
 }
-byte_t Fetcher::read_vram_byte(addr_t addr) const {
-  const byte_t vram_bank = is_cgb ? vbk_->read() : 0;
-  return read_vram_byte(addr, vram_bank);
-}
 
 /* We derive the Y-coordinate at a pixel level using the LY register. */
 const byte_t Fetcher::calc_pixel_y() const {
@@ -93,7 +89,12 @@ const addr_t Fetcher::calc_tilemap_base() const {
   return static_cast<addr_t>(base_addr);
 }
 
-std::size_t Fetcher::calc_tile_idx() {
+/* For any given tile, the bytes which represent the index into the tilemap and
+ * the tile attributes actually lie at the same address. The difference between
+ * the physical locations of both bytes is which bank they lie in. Hence, we can
+ * leverage the same address calculation code for tile indices and attributes.
+ */
+const addr_t Fetcher::calc_tile_metadata_addr() const {
   constexpr auto tile_shift = 5;
   const byte_t y_px = calc_pixel_y();
 
@@ -104,9 +105,7 @@ std::size_t Fetcher::calc_tile_idx() {
   // Base address changes depending on LCDC bits being set
   const addr_t tile_idx = (y_tile << tile_shift) | x_tile;
   const addr_t tilemap_base = calc_tilemap_base();
-
-  // Tilemap indices are ALWAYS read from bank zero
-  return read_vram_byte(tilemap_base + tile_idx, 0);
+  return tilemap_base + tile_idx;
 }
 
 /* Implements fine horizontal scroll and initial tile skip */
@@ -130,18 +129,24 @@ const byte_t Fetcher::fetch_tile_data(bool high) const {
   if (high)
     ++data_offset;
 
-  // Read data based on bg/win data addressing mode
-  switch (lcdc_.bg_win_data_area()) {
+  // If we are in CGB mode, the tile data can come from either VRAM bank. The
+  // bank to fetch the tile from comes from the tile attributes. When in DMG
+  // mode, the lower bank is always used.
+  const byte_t bank = is_cgb ? get_bg_attrib_bank(data.tile_attr) : 0;
+
+                             // Read data based on bg/win data addressing mode
+      switch (lcdc_.bg_win_data_area()) {
   case PPU::TileDataArea::LO_TILEDATA_BASE:
     /* Inlined some math here, so if it's above 0x9000 you index it normally,
      * but if it is below you basically treat the tile offset like a 0-127
      * offset from 0x8800. You can just use 0x8800 - (127 * tile size in bytes)
      * to achieve the same effect, hence I deviate from the docs a bit. */
-    return data.tile_idx < 128 ? read_vram_byte(0x9000 + data_offset)
-                               : read_vram_byte(0x8000 + data_offset);
+    return data.tile_idx < 128
+               ? read_vram_byte(0x9000 + data_offset, bank)
+               : read_vram_byte(0x8000 + data_offset, bank);
   case PPU::TileDataArea::HI_TILEDATA_BASE:
     /* The calculation here is much more straight forward, simple offset. */
-    return read_vram_byte(0x8000 + data_offset);
+    return read_vram_byte(0x8000 + data_offset, bank);
   default:
     throw std::runtime_error(
         "Fetcher::fetch_tile_data(), Invalid tilemap addressing mode");
@@ -153,7 +158,12 @@ void Fetcher::do_read_tile() {
 
   // State entry logic
   if (!total_clks.has_value()) {
-    data.tile_idx = calc_tile_idx();
+    const addr_t metadata_addr = calc_tile_metadata_addr();
+    data.tile_idx = read_vram_byte(metadata_addr, 0);
+    // Tile attributes are only fetched in CGB mode, I do not think this
+    // impacts the clock cycle duration of the initial fetching state.
+    if (is_cgb)
+      data.tile_attr = read_vram_byte(metadata_addr, 1);
     total_clks = max_state_clks;
   }
   ++cur_clks;
@@ -228,7 +238,7 @@ void Fetcher::do_push_data() {
     byte_t palette_idx = (hi_bit << 1) | lo_bit;
 
     fifo_.push({
-        .color = palette_idx,
+        .color_idx = palette_idx,
         .discard = discard,
     });
   }

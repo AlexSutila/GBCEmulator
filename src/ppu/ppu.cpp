@@ -57,7 +57,6 @@ PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus,
   /* Initialize the background pixel FIFO fetching pipeline */
   bg_fetcher = std::make_unique<Fetcher>(
       bus->get_vram(), // VRAM reference for fetching tile data
-      vbk_reg,         // Needs to know bank to read tile data for CGB
       lcdc_,           // Needs to know if certain control bits are set
       scy_,            // Needed to fetch correct background tile
       scx_,            // Needed to fetch correct background tile
@@ -74,7 +73,7 @@ PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus,
 
 void PixelProcessingUnit::set_cgb(const byte_t cgb_flag) {
   is_cgb = cgb_enabled(cgb_flag);
-  bg_fetcher->set_cgb(is_cgb);
+  bg_fetcher->set_cgb(cgb_flag);
 }
 
 bool PixelProcessingUnit::should_advance_ly() {
@@ -180,7 +179,7 @@ void PixelProcessingUnit::do_draw() {
     if (!px.discard) {
       const auto x = row_pixels_rendered++;
       const auto y = ly_.read();
-      const auto c = get_rgb(px.color);
+      const auto c = get_rgb(px.color_idx);
       renderer->putPixel(x, y, c);
     }
 

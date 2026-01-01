@@ -2,7 +2,6 @@
 #define __FETCHER_H
 
 #include "emu_types.hpp"
-#include "memory/mmio/cgb.hpp"
 #include "memory/mmio/dmg.hpp"
 #include "memory/mmio/mmio.hpp"
 
@@ -15,21 +14,20 @@ class PixelFifo;
 class Fetcher {
 public:
   Fetcher(std::array<std::unique_ptr<byte_t[]>, 2> &vram,
-          PPU::VramBank *const vbk_ptr, // For tile data banking
-          PPU::LCDCtrl &lcdc,           // The LCD control register
-          MMIORegister &scy,            // The scroll Y register
-          MMIORegister &scx,            // The scroll X register
-          MMIORegister &wy,             // The window Y register
-          MMIORegister &wx,             // The window X register
-          PPU::LY &ly,                  // The current scanline register
-          PixelFifo &fifo);             // The pixel fifo
+          PPU::LCDCtrl &lcdc, // The LCD control register
+          MMIORegister &scy,  // The scroll Y register
+          MMIORegister &scx,  // The scroll X register
+          MMIORegister &wy,   // The window Y register
+          MMIORegister &wx,   // The window X register
+          PPU::LY &ly,        // The current scanline register
+          PixelFifo &fifo);   // The pixel fifo
   void set_cgb(const byte_t cgb_flag);
   void reset(); // Enters background rendering mode, called at start of scanline
   void step();  // Step the fetcher one clock cycle
 
   /* The PPU will signal to clear the FIFO once the rendering of the window has
    * begun. All BG pixel data is flushed, and window rendering starts. */
-  bool is_window_visible(byte_t pixels_rendered) const; // Is it visible at pixel
+  bool is_window_visible(byte_t pixels_rendered) const;
   void render_window(); // Makes the pixel begin fetching window tile data
 
   /* Lastly, the window is kind of strange in that it does not use the curernt
@@ -45,20 +43,19 @@ private:
   /* VRAM tile data and metadata source */
   std::array<std::unique_ptr<byte_t[]>, 2> &vram_;
   byte_t read_vram_byte(addr_t addr, byte_t bank) const;
-  byte_t read_vram_byte(addr_t addr) const;
 
   /* Internal storage that is built up throughout the pixel pushing pipeline.
    * Tile indices are read from memory, data is fetched, and the final data
    * is pushed into the fifo once enough space is free. */
   struct {
     std::size_t tile_idx{};
-    byte_t data_lo{};
-    byte_t data_hi{};
+    byte_t tile_attr{};   // Tile attributes (CGB mode only)
+    byte_t data_lo{};     // Low bits of pixel indices
+    byte_t data_hi{};     // High bits of pixel indices
     std::size_t x_coor{}; // In unit tiles
   } data;
 
   /* Internal register references for convenience */
-  PPU::VramBank *const vbk_;
   PPU::LCDCtrl &lcdc_;
   MMIORegister &scy_;
   MMIORegister &scx_;
@@ -100,7 +97,7 @@ private:
   const byte_t calc_tile_x() const;
   const addr_t calc_tilemap_base() const;
   const byte_t fetch_tile_data(bool high) const;
-  std::size_t calc_tile_idx();
+  const addr_t calc_tile_metadata_addr() const;
 
   /* Determined by cartridge header, dictates usable PPU features */
   bool is_cgb{};
