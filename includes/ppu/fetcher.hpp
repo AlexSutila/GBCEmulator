@@ -71,7 +71,8 @@ private:
 
   /* Implements window behavior. If the window is enabled, then it is rendered
    * until the end of the scanline. */
-  bool window_started{};
+  byte_t win_internal_ly{};
+  bool win_started{};
 
   /* Internal timing metadata */
   std::optional<std::size_t> total_clks{};

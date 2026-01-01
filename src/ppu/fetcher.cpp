@@ -21,14 +21,14 @@ Fetcher::Fetcher(AddressBus *const bus_ptr, PixelFifo &fifo, PPU::LCDCtrl &lcdc,
   reset();
 }
 
-void Fetcher::reset(bool win) {
+void Fetcher::reset(bool window_started) {
   fine_scroll = scx_.read() & 0x7;
   state = STATE_READ_TILE;
   pixels_discarded = 0;
 
   // When rendering the background, the first tile is always fetched twice. This
   // does not happen with the window, so we flip the condition accordingly here.
-  bool double_fetch_first_tile = !win;
+  bool double_fetch_first_tile = !window_started;
 
   // Reset fetcher data, x_coor most important
   data = {
@@ -40,17 +40,19 @@ void Fetcher::reset(bool win) {
       // due to SCX % 8 being holding a non-zero value.
       .first_tile = double_fetch_first_tile,
   };
-  window_started = win;
+  win_started = window_started;
 
   // Reset timing metadata
   total_clks.reset();
   cur_clks = 0;
 }
+
+// Always enters background rendering mode
 void Fetcher::reset() { reset(false); }
 
 /* We derive the Y-coordinate at a pixel level using the LY register. */
 const byte_t Fetcher::calc_pixel_y() const {
-  if (window_started)
+  if (win_started)
     return (ly_.read() - wy_.read()) & 0xFF;
   return (ly_.read() + scy_.read()) & 0xFF;
 }
@@ -59,7 +61,7 @@ const byte_t Fetcher::calc_pixel_y() const {
  * pixels at a time. As a result, we have to remember to divide the scroll
  * value by the size of a pixel to accomodate the change in units.  */
 const byte_t Fetcher::calc_tile_x() const {
-  if (window_started)
+  if (win_started)
     return data.x_coor & 0x1F;
   // Since returning unit tiles, can only be 32 max
   return (data.x_coor + (scx_.read() / pixels_per_row)) & 0x1F;
@@ -67,7 +69,7 @@ const byte_t Fetcher::calc_tile_x() const {
 
 const addr_t Fetcher::calc_tilemap_base() const {
   const auto base_addr =
-      window_started ? lcdc_.win_tilemap_base() : lcdc_.bg_tilemap_base();
+      win_started ? lcdc_.win_tilemap_base() : lcdc_.bg_tilemap_base();
   return static_cast<addr_t>(base_addr);
 }
 
@@ -87,7 +89,7 @@ std::size_t Fetcher::calc_tile_idx() {
 
 /* Implements fine horizontal scroll and initial tile skip */
 bool Fetcher::should_discard() const {
-  if (window_started)
+  if (win_started)
     return false;
   return pixels_discarded < (fine_scroll + pixels_per_row);
 }
@@ -116,6 +118,7 @@ const byte_t Fetcher::fetch_tile_data(bool high) const {
     return data.tile_idx < 128 ? bus->read_byte(0x9000 + data_offset)
                                : bus->read_byte(0x8000 + data_offset);
   case PPU::TileDataArea::HI_TILEDATA_BASE:
+    /* The calculation here is much more straight forward, simple offset. */
     return bus->read_byte(0x8000 + data_offset);
   default:
     throw std::runtime_error(
@@ -232,7 +235,7 @@ bool Fetcher::window_visible(byte_t pixels_rendered) const {
 
 void Fetcher::render_window() {
   // Window is already being rendered
-  if (window_started)
+  if (win_started)
     return;
 
   // Flush BG fifo pixel data, incurs additional overhead to fetch the very
