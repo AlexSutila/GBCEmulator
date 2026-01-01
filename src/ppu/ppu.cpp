@@ -56,14 +56,15 @@ PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus,
 
   /* Initialize the background pixel FIFO fetching pipeline */
   bg_fetcher = std::make_unique<Fetcher>(
-      bus,   // TODO: Remove
-      fifo,  // Fetcher must push rows of pixels into this FIFO
-      lcdc_, // Needs to know if certain control bits are set
-      scy_,  // Needed to fetch correct background tile
-      scx_,  // Needed to fetch correct background tile
-      wy_,   // Needed to fetch correct window tile
-      wx_,   // Needed to fetch correct window tile
-      ly_    // Needed to fetch correct background tile
+      bus->get_vram(), // VRAM reference for fetching tile data
+      vbk_reg,         // Needs to know bank to read tile data for CGB
+      lcdc_,           // Needs to know if certain control bits are set
+      scy_,            // Needed to fetch correct background tile
+      scx_,            // Needed to fetch correct background tile
+      wy_,             // Needed to fetch correct window tile
+      wx_,             // Needed to fetch correct window tile
+      ly_,             // Needed to fetch correct background tile
+      fifo             // Fetcher must push rows of pixels into this FIFO
   );
 
   /* Configure PPU to initial state, doesn't technically happen until PPU is
@@ -73,6 +74,7 @@ PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus,
 
 void PixelProcessingUnit::set_cgb(const byte_t cgb_flag) {
   is_cgb = cgb_enabled(cgb_flag);
+  bg_fetcher->set_cgb(is_cgb);
 }
 
 bool PixelProcessingUnit::should_advance_ly() {
@@ -183,7 +185,7 @@ void PixelProcessingUnit::do_draw() {
     }
 
     // Do we switch the fetcher into window rendering mode?
-    if (bg_fetcher->window_visible(row_pixels_rendered))
+    if (bg_fetcher->is_window_visible(row_pixels_rendered))
       bg_fetcher->render_window();
   }
 

@@ -78,7 +78,6 @@ private:
 
   /* Determined by cartridge header, dictates usable PPU features */
   bool is_cgb{};
-  friend PixelFifo;
 };
 
 #endif // __PPU_H

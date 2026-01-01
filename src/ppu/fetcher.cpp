@@ -1,25 +1,35 @@
 #include "ppu/fetcher.hpp"
-#include "memory/bus.hpp"
+#include "cart/cart.hpp"
+#include "memory/mmio/cgb.hpp"
 #include "memory/mmio/mmio.hpp"
 #include "ppu/fifo.hpp"
+
+#include <array>
+#include <cassert>
+#include <memory>
 #include <stdexcept>
 
+constexpr addr_t vram_base_addr = 0x8000;
 constexpr byte_t pixels_per_row = 8;
 
-Fetcher::Fetcher(AddressBus *const bus_ptr, PixelFifo &fifo, PPU::LCDCtrl &lcdc,
+Fetcher::Fetcher(std::array<std::unique_ptr<byte_t[]>, 2> &vram,
+                 PPU::VramBank *const vbk_ptr, PPU::LCDCtrl &lcdc,
                  MMIORegister &scy, MMIORegister &scx, MMIORegister &wy,
-                 MMIORegister &wx, PPU::LY &ly)
-    : bus(bus_ptr), // For reading tile data from VRAM
-      fifo_(fifo),  // Pixel fifo
-      lcdc_(lcdc),  // LCD control register
-      scy_(scy),    // Scroll Y (background)
-      scx_(scx),    // Scroll X (background)
-      wy_(wy),      // Window  Y (background)
-      wx_(wx),      // Window  X (background)
-      ly_(ly)       // Current scanline
+                 MMIORegister &wx, PPU::LY &ly, PixelFifo &fifo)
+    : vram_(vram),   // For fetching tile data
+      vbk_(vbk_ptr), // Tile data is banked in CGB mode
+      lcdc_(lcdc),   // LCD control register
+      scy_(scy),     // Scroll Y (background)
+      scx_(scx),     // Scroll X (background)
+      wy_(wy),       // Window  Y (background)
+      wx_(wx),       // Window  X (background)
+      ly_(ly),       // Current scanline
+      fifo_(fifo)    // Pixel fifo
 {
   reset();
 }
+
+void Fetcher::set_cgb(const byte_t cgb_flag) { is_cgb = cgb_enabled(cgb_flag); }
 
 void Fetcher::reset(bool window_started) {
   fine_scroll = scx_.read() & 0x7;
@@ -42,8 +52,22 @@ void Fetcher::reset(bool window_started) {
 
 // Always enters background rendering mode, unless window is rendered instantly
 void Fetcher::reset() {
-  bool win_visible = window_visible(0);
+  bool win_visible = is_window_visible(0);
   reset(win_visible);
+}
+
+// The fetcher may need to read from banks which are not currently active to
+// fetch specific tile metadata (CGB mode BG map attributes, for example).
+byte_t Fetcher::read_vram_byte(addr_t addr, byte_t bank) const {
+  assert((addr >= 0x8000 && addr <= 0x9FFF) && (bank < 2));
+  if (!is_cgb && bank != 0)
+    throw std::runtime_error(
+        "Fetcher::read_vram_byte(), non-zero bank in DMG mode");
+  return vram_.at(bank)[addr - vram_base_addr];
+}
+byte_t Fetcher::read_vram_byte(addr_t addr) const {
+  const byte_t vram_bank = is_cgb ? vbk_->read() : 0;
+  return read_vram_byte(addr, vram_bank);
 }
 
 /* We derive the Y-coordinate at a pixel level using the LY register. */
@@ -80,7 +104,9 @@ std::size_t Fetcher::calc_tile_idx() {
   // Base address changes depending on LCDC bits being set
   const addr_t tile_idx = (y_tile << tile_shift) | x_tile;
   const addr_t tilemap_base = calc_tilemap_base();
-  return bus->read_byte(tilemap_base + tile_idx);
+
+  // Tilemap indices are ALWAYS read from bank zero
+  return read_vram_byte(tilemap_base + tile_idx, 0);
 }
 
 /* Implements fine horizontal scroll and initial tile skip */
@@ -111,11 +137,11 @@ const byte_t Fetcher::fetch_tile_data(bool high) const {
      * but if it is below you basically treat the tile offset like a 0-127
      * offset from 0x8800. You can just use 0x8800 - (127 * tile size in bytes)
      * to achieve the same effect, hence I deviate from the docs a bit. */
-    return data.tile_idx < 128 ? bus->read_byte(0x9000 + data_offset)
-                               : bus->read_byte(0x8000 + data_offset);
+    return data.tile_idx < 128 ? read_vram_byte(0x9000 + data_offset)
+                               : read_vram_byte(0x8000 + data_offset);
   case PPU::TileDataArea::HI_TILEDATA_BASE:
     /* The calculation here is much more straight forward, simple offset. */
-    return bus->read_byte(0x8000 + data_offset);
+    return read_vram_byte(0x8000 + data_offset);
   default:
     throw std::runtime_error(
         "Fetcher::fetch_tile_data(), Invalid tilemap addressing mode");
@@ -214,7 +240,7 @@ void Fetcher::do_push_data() {
   cur_clks = 0;
 }
 
-bool Fetcher::window_visible(byte_t pixels_rendered) const {
+bool Fetcher::is_window_visible(byte_t pixels_rendered) const {
   if (!lcdc_.win_enabled())
     return false;
   const byte_t wx_px = wx_.read();
