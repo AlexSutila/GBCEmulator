@@ -4,11 +4,11 @@
 #include "cpu/interrupts.hpp"
 #include "frontend/renderer.hpp"
 #include "memory/bus.hpp"
-#include "memory/mmio/cgb.hpp"
 #include "memory/mmio/dmg.hpp"
 #include "memory/mmio/mmio.hpp"
 #include "ppu/fetcher.hpp"
 #include "ppu/fifo.hpp"
+#include "ppu/palette.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -26,7 +26,6 @@ private:
   InterruptBits *if_reg{};
 
   /* Convenience references to important PPU mmio registers */
-  PPU::VramBank *vbk_reg{};
   PPU::LCDCtrl lcdc_{};
   PPU::STAT stat_{};
   MMIORegister lyc_{};
@@ -77,6 +76,7 @@ private:
   PixelFifo fifo;
 
   /* Determined by cartridge header, dictates usable PPU features */
+  std::unique_ptr<ColorRam> cram;
   bool is_cgb{};
 };
 

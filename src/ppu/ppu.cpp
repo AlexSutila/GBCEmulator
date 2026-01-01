@@ -34,10 +34,14 @@ PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus,
       wx_(),            // Window scroll X
       ly_(),            // Current scanline
       bgp_(),           // DMG background and window palette
-      fifo()            // Pushes background/window pixels
-{
+      fifo(),           // Pushes background/window pixels
+      cram(std::make_unique<ColorRam>()) {
   using mmio = IORegisterMapping;
   using namespace PPU;
+
+  /* TODO: Still not the biggest fan of how we're doing this, refactor? */
+  auto bgpd = cram->get_data_reg();
+  auto bgpi = cram->get_idx_reg();
 
   /* Configure convenience MMIO register references */
   bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_CONTROL), &lcdc_);
@@ -49,9 +53,10 @@ PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus,
   bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_WX), &wx_);
   bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_Y_COOR), &ly_);
   bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_BGP), &bgp_);
+  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_BGPI), bgpi);
+  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_BGPD), bgpd);
 
   /* Not owned by the pixel processing unit, so have to fetch references */
-  vbk_reg = init_mmio<VramBank>(bus, mmio::MMIO_VRAM_BANK);
   if_reg = init_mmio<InterruptBits>(bus, mmio::MMIO_INT_FLAGS);
 
   /* Initialize the background pixel FIFO fetching pipeline */

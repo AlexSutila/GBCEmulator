@@ -1,6 +1,6 @@
 #include "ppu/attributes.hpp"
 
-byte_t get_bg_attrib_palelte(byte_t attrib) {
+byte_t get_bg_attrib_palette(byte_t attrib) {
   // CGB only: selects one of eight color palettes in CRAM
   return attrib & 0x7;
 }

@@ -3,6 +3,7 @@
 
 #include "emu_types.hpp"
 #include "memory/mmio/mmio.hpp"
+#include <array>
 
 namespace PPU {
 
@@ -14,14 +15,64 @@ namespace PPU {
  */
 class VramBank : public MMIORegister {
 public:
-  void write(const byte_t value);
-  byte_t read();
+  void write(const byte_t value) override;
+  byte_t read() override;
   VramBank() : MMIORegister(0), state(0) {}
 
-  constexpr bool cgb() { return true; }
+  constexpr bool cgb() override { return true; }
   const byte_t get_bank() const;
 
 private:
+  byte_t state{};
+};
+
+/**
+ * Background Color Palette Specification / Background Palette Index
+ *
+ * Addressing order:
+ *   BGP0 color 0 (low, high),
+ *   BGP0 color 1 (low, high),
+ *   BGP0 color 2 (low, high),
+ *   BGP0 color 3 (low, high),
+ *   BGP1 color 0 (low, high), ...
+ *
+ * Bit layout:
+ *   Bit 7   Auto-increment
+ *           0 = Disabled
+ *           1 = Increment Address after writing to BCPD
+ *               (increment occurs even during Mode 3, although the write itself
+ *                fails; reads never cause an increment)
+ *   Bits 6-0 Address
+ *           Index (0–63) of the byte in BG palette RAM accessed via BCPD
+ */
+
+class PaletteIdx : public MMIORegister {
+public:
+  void write(const byte_t value) override;
+  byte_t read() override;
+  PaletteIdx() : state(0) {}
+  constexpr bool cgb() override { return true; }
+
+  // Writes to color RAM can increase register value
+  bool auto_inc_enabled() const;
+  void inc();
+  // Index color RAM contents
+  addr_t get_address() const;
+
+private:
+  byte_t state{};
+};
+
+class PaletteData : public MMIORegister {
+public:
+  void write(const byte_t value) override;
+  byte_t read() override;
+  PaletteData(std::array<byte_t, 64> &mem, PaletteIdx &idx);
+  constexpr bool cgb() override { return true; }
+
+private:
+  std::array<byte_t, 64> &mem_;
+  PaletteIdx &idx_;
   byte_t state{};
 };
 
@@ -36,11 +87,11 @@ private:
  */
 class WramBank : public MMIORegister {
 public:
-  void write(const byte_t value);
-  byte_t read();
+  void write(const byte_t value) override;
+  byte_t read() override;
   WramBank() : MMIORegister(0), state(1) {}
 
-  constexpr bool cgb() { return true; }
+  constexpr bool cgb() override { return true; }
   const byte_t get_bank() const;
 
 private:

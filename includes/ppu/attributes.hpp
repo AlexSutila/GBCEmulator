@@ -46,7 +46,7 @@
  *   1:9800 affects only that specific map position, not all tiles $2A.
  */
 
-[[nodiscard]] byte_t get_bg_attrib_palelte(byte_t attrib);
+[[nodiscard]] byte_t get_bg_attrib_palette(byte_t attrib);
 [[nodiscard]] byte_t get_bg_attrib_bank(byte_t attrib);
 
 #endif // __ATTRIBUTES_H

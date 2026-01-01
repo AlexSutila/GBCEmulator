@@ -92,8 +92,7 @@ const addr_t Fetcher::calc_tilemap_base() const {
 /* For any given tile, the bytes which represent the index into the tilemap and
  * the tile attributes actually lie at the same address. The difference between
  * the physical locations of both bytes is which bank they lie in. Hence, we can
- * leverage the same address calculation code for tile indices and attributes.
- */
+ * leverage the same address calculation for tile indices and attributes. */
 const addr_t Fetcher::calc_tile_metadata_addr() const {
   constexpr auto tile_shift = 5;
   const byte_t y_px = calc_pixel_y();
@@ -134,16 +133,15 @@ const byte_t Fetcher::fetch_tile_data(bool high) const {
   // mode, the lower bank is always used.
   const byte_t bank = is_cgb ? get_bg_attrib_bank(data.tile_attr) : 0;
 
-                             // Read data based on bg/win data addressing mode
-      switch (lcdc_.bg_win_data_area()) {
+  // Read data based on bg/win data addressing mode
+  switch (lcdc_.bg_win_data_area()) {
   case PPU::TileDataArea::LO_TILEDATA_BASE:
     /* Inlined some math here, so if it's above 0x9000 you index it normally,
      * but if it is below you basically treat the tile offset like a 0-127
      * offset from 0x8800. You can just use 0x8800 - (127 * tile size in bytes)
      * to achieve the same effect, hence I deviate from the docs a bit. */
-    return data.tile_idx < 128
-               ? read_vram_byte(0x9000 + data_offset, bank)
-               : read_vram_byte(0x8000 + data_offset, bank);
+    return data.tile_idx < 128 ? read_vram_byte(0x9000 + data_offset, bank)
+                               : read_vram_byte(0x8000 + data_offset, bank);
   case PPU::TileDataArea::HI_TILEDATA_BASE:
     /* The calculation here is much more straight forward, simple offset. */
     return read_vram_byte(0x8000 + data_offset, bank);
@@ -232,15 +230,21 @@ void Fetcher::do_push_data() {
     if (discard)
       ++pixels_discarded;
 
-    // Otherwise, we compute the pixel info as you would usually
+    // Otherwise, the bits from lo and hi are interleaved to form 8 pixels
     const byte_t hi_bit = (data.data_hi & (1 << shift)) != 0 ? 1 : 0;
     const byte_t lo_bit = (data.data_lo & (1 << shift)) != 0 ? 1 : 0;
-    byte_t palette_idx = (hi_bit << 1) | lo_bit;
 
-    fifo_.push({
-        .color_idx = palette_idx,
+    // Color data is derived from both data bits, and potentially a palette
+    byte_t palette_idx = get_bg_attrib_palette(data.tile_attr);
+    byte_t color_idx = (hi_bit << 1) | lo_bit;
+
+    pixel px = {
+        .color_idx = color_idx,
+        // Not used if in DMG mode, but we populate it anyway
+        .palette_idx = palette_idx,
         .discard = discard,
-    });
+    };
+    fifo_.push(px);
   }
   data.x_coor = (data.x_coor + 1) & 0x1F;
 

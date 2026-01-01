@@ -43,6 +43,8 @@ enum class IORegisterMapping : addr_t {
   MMIO_LCD_BGP = 0xFF47,
   MMIO_VRAM_BANK = 0xFF4F,
   MMIO_BOOT_ROM_CTRL = 0xFF50,
+  MMIO_LCD_BGPI = 0xFF68,
+  MMIO_LCD_BGPD = 0xFF69,
   MMIO_WRAM_BANK = 0xFF70,
   MMIO_INT_ENABLE = 0xFFFF,
 };
@@ -59,7 +61,7 @@ public:
   MMIORegister() : state(0) {}
 
   /* Override and return true if used only in CGB mode */
-  constexpr bool cgb() { return false; }
+  virtual constexpr bool cgb() { return false; }
 
 private:
   byte_t state{}; // Internal state
