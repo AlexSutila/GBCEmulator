@@ -183,6 +183,48 @@ private:
  * MMIORegister class since it doesn't need any additional functionality.
  */
 
+enum class MonoPaletteColor {
+  MONO_PAL_WHITE = 0b00,
+  MONO_PAL_LIIGHT_GRAY = 0b01,
+  MONO_PAL_DARK_GRAY = 0b10,
+  MONO_PAL_BLACK = 0b11,
+};
+
+/*
+ * FF47 — BGP (BG Palette Data) [DMG / Non-CGB mode only]
+ *
+ * This register maps the 2-bit color indices produced by BG and Window tiles
+ * to one of four grayscale shades.
+ *
+ * Bit layout:
+ *   7–6 : Shade for color index 3
+ *   5–4 : Shade for color index 2
+ *   3–2 : Shade for color index 1
+ *   1–0 : Shade for color index 0
+ *
+ * Each 2-bit shade value maps as follows:
+ *   0b00 → White
+ *   0b01 → Light gray
+ *   0b10 → Dark gray
+ *   0b11 → Black
+ *
+ * Note:
+ *   In CGB mode, this register is ignored. BG and Window colors are instead
+ *   selected from CGB palette memory (BCPS / BCPD).
+ */
+class BGP : public MMIORegister {
+public:
+  void write(byte_t value) override;
+  byte_t read() override;
+  BGP() : state(0) {}
+
+  /* Indexes the internal register state to obtain true color index */
+  MonoPaletteColor get_color_idx(byte_t idx) const;
+
+private:
+  byte_t state{};
+};
+
 } // namespace PPU
 
 /*

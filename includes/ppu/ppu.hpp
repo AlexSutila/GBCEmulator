@@ -43,6 +43,9 @@ private:
   bool scanline_153_bug{};
   PPU::LY ly_{};
 
+  /* Color palette configuration */
+  PPU::BGP bgp_{};
+
   /* Pixel Processor operation modes */
   void do_oam_scan();
   void do_draw();

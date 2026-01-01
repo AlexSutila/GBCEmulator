@@ -40,6 +40,7 @@ enum class IORegisterMapping : addr_t {
   MMIO_LCD_WX = 0xFF4B,
   MMIO_LCD_Y_COOR = 0xFF44,
   MMIO_LCD_Y_COMP = 0xFF45,
+  MMIO_LCD_BGP = 0xFF47,
   MMIO_VRAM_BANK = 0xFF4F,
   MMIO_BOOT_ROM_CTRL = 0xFF50,
   MMIO_WRAM_BANK = 0xFF70,

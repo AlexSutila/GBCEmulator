@@ -32,6 +32,7 @@ PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus_ptr,
       wy_(),                // Window scroll Y
       wx_(),                // Window scroll X
       ly_(),                // Current scanline
+      bgp_(),               // DMG background and window palette
       fifo(),               // Pushes background/window pixels
       bg_fetcher(bus_ptr, fifo, lcdc_, scy_, scx_, wy_, wx_, ly_) {
   using mmio = IORegisterMapping;
@@ -40,12 +41,13 @@ PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus_ptr,
   /* Configure convenience MMIO register references */
   bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_CONTROL), &lcdc_);
   bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_STATUS), &stat_);
-  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_Y_COOR), &ly_);
   bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_Y_COMP), &lyc_);
   bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_SCY), &scy_);
   bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_SCX), &scx_);
   bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_WY), &wy_);
   bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_WX), &wx_);
+  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_Y_COOR), &ly_);
+  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_BGP), &bgp_);
 
   /* Not owned by the pixel processing unit, so have to fetch references */
   vbk_reg = init_mmio<VramBank>(bus, mmio::MMIO_VRAM_BANK);
