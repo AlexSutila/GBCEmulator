@@ -5,6 +5,7 @@
 
 struct pixel {
   byte_t color; // A value between 0 and 3 (subject to change)
+  bool discard;
 };
 
 #endif // __PIXEL_H

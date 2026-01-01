@@ -151,9 +151,11 @@ void PixelProcessingUnit::do_draw() {
   // Rendering step, try to pop pixels when ready from the fifo
   if (fifo.can_pop()) {
     const pixel px = fifo.pop();
-    const auto x = row_pixels_rendered++;
-    const auto y = ly_reg.read();
-    renderer->putPixel(x, y, px.color);
+    if (!px.discard) {
+      const auto x = row_pixels_rendered++;
+      const auto y = ly_reg.read();
+      renderer->putPixel(x, y, px.color);
+    }
   }
 
   // Rendering incomplete
