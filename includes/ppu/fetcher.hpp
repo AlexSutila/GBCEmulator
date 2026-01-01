@@ -46,7 +46,6 @@ private:
     byte_t data_lo{};
     byte_t data_hi{};
     std::size_t x_coor{}; // In unit tiles
-    bool first_tile{};
   } data;
 
   /* Internal register references for convenience */

@@ -26,19 +26,12 @@ void Fetcher::reset(bool window_started) {
   state = STATE_READ_TILE;
   pixels_discarded = 0;
 
-  // When rendering the background, the first tile is always fetched twice. This
-  // does not happen with the window, so we flip the condition accordingly here.
-  bool double_fetch_first_tile = !window_started;
-
   // Reset fetcher data, x_coor most important
   data = {
       .tile_idx = 0,
       .data_lo = 0,
       .data_hi = 0,
       .x_coor = 0,
-      // First tile is always fetched and discarded on top of discarded pixels
-      // due to SCX % 8 being holding a non-zero value.
-      .first_tile = double_fetch_first_tile,
   };
   win_started = window_started;
 
@@ -47,8 +40,11 @@ void Fetcher::reset(bool window_started) {
   cur_clks = 0;
 }
 
-// Always enters background rendering mode
-void Fetcher::reset() { reset(false); }
+// Always enters background rendering mode, unless window is rendered instantly
+void Fetcher::reset() {
+  bool win_visible = window_visible(0);
+  reset(win_visible);
+}
 
 /* We derive the Y-coordinate at a pixel level using the LY register. */
 const byte_t Fetcher::calc_pixel_y() const {
@@ -91,7 +87,7 @@ std::size_t Fetcher::calc_tile_idx() {
 bool Fetcher::should_discard() const {
   if (win_started)
     return false;
-  return pixels_discarded < (fine_scroll + pixels_per_row);
+  return pixels_discarded < fine_scroll;
 }
 
 /* Calculate the base address of the tilemap for bg/win */
@@ -210,12 +206,7 @@ void Fetcher::do_push_data() {
         .discard = discard,
     });
   }
-
-  // If we fetched the first tile, we have to fetch it again.
-  if (data.first_tile)
-    data.first_tile = false;
-  else
-    data.x_coor = (data.x_coor + 1) & 0x1F;
+  data.x_coor = (data.x_coor + 1) & 0x1F;
 
   // State transition after push to fetch next row
   state = STATE_READ_TILE;
