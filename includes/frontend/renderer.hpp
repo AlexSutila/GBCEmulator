@@ -1,7 +1,6 @@
 #ifndef __RENDERER_H
 #define __RENDERER_H
 
-#include "emu_types.hpp"
 #include <SDL3/SDL.h>
 #include <chrono>
 #include <cstdint>
@@ -12,11 +11,11 @@ public:
   Renderer(bool is_headless);
   ~Renderer();
 
-  static constexpr int FB_WIDTH = 160;
-  static constexpr int FB_HEIGHT = 144;
-  static constexpr int SCALE = 4;
+  static constexpr int framebuf_width = 160;
+  static constexpr int framebuf_height = 144;
+  static constexpr int scale = 4;
 
-  void putPixel(int x, int y, byte_t paletteIndex);
+  void putPixel(int x, int y, std::uint32_t c);
   void clear();
 
   bool get_running() const { return running; }

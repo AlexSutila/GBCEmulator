@@ -247,11 +247,11 @@ PYBIND11_MODULE(gbc_py, m) {
   // For exposing pixel processor constructor
   py::class_<Renderer>(m, "Renderer")
       .def(py::init<bool>(), py::arg("headless"))
-      .def_readonly_static("FB_WIDTH", &Renderer::FB_WIDTH)
-      .def_readonly_static("FB_HEIGHT", &Renderer::FB_HEIGHT)
-      .def_readonly_static("SCALE", &Renderer::SCALE)
+      .def_readonly_static("FB_WIDTH", &Renderer::framebuf_width)
+      .def_readonly_static("FB_HEIGHT", &Renderer::framebuf_height)
+      .def_readonly_static("SCALE", &Renderer::scale)
       .def("put_pixel", &Renderer::putPixel, py::arg("x"), py::arg("y"),
-           py::arg("palette_index"))
+           py::arg("color"))
       .def("clear", &Renderer::clear)
       .def("present", &Renderer::present)
       .def("poll_events", &Renderer::poll_events)

@@ -38,6 +38,7 @@ set(GBC_CORE_SOURCES
 
     src/timer/timer.cpp
     src/ppu/ppu.cpp
+    src/ppu/palette.cpp
     src/ppu/fetcher.cpp
     src/ppu/fifo.cpp
 

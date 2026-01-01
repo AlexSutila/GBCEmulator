@@ -1,5 +1,4 @@
 #include "frontend/renderer.hpp"
-#include "emu_types.hpp"
 #include <SDL3/SDL.h>
 #include <chrono>
 #include <cstdint>
@@ -18,8 +17,8 @@ Renderer::Renderer(bool is_headless) : headless(is_headless) {
     throw std::runtime_error(SDL_GetError());
 
   if (!headless) {
-    window = SDL_CreateWindow("GBC", FB_WIDTH * SCALE, FB_HEIGHT * SCALE,
-                              SDL_WINDOW_RESIZABLE);
+    window = SDL_CreateWindow("GBC", framebuf_width * scale,
+                              framebuf_height * scale, SDL_WINDOW_RESIZABLE);
     if (!window)
       throw std::runtime_error(SDL_GetError());
 
@@ -28,9 +27,9 @@ Renderer::Renderer(bool is_headless) : headless(is_headless) {
       throw std::runtime_error(SDL_GetError());
 
     /* Enable vsync (SDL3 way) */
-    texture =
-        SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
-                          SDL_TEXTUREACCESS_STREAMING, FB_WIDTH, FB_HEIGHT);
+    texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
+                                SDL_TEXTUREACCESS_STREAMING, framebuf_width,
+                                framebuf_height);
     if (!texture)
       throw std::runtime_error(SDL_GetError());
 
@@ -39,7 +38,7 @@ Renderer::Renderer(bool is_headless) : headless(is_headless) {
   }
 
   /* Still allocate frame buffer for snapshots in headless mode */
-  pixels = std::make_unique<std::uint32_t[]>(FB_HEIGHT * FB_WIDTH);
+  pixels = std::make_unique<std::uint32_t[]>(framebuf_height * framebuf_width);
   pixels_rendered = 0;
   running = true;
   clear();
@@ -54,13 +53,13 @@ Renderer::~Renderer() {
   }
 }
 
-void Renderer::putPixel(int x, int y, byte_t paletteIndex) {
-  if (x < 0 || x >= FB_WIDTH || y < 0 || y >= FB_HEIGHT)
+void Renderer::putPixel(int x, int y, std::uint32_t c) {
+  if (x < 0 || x >= framebuf_width || y < 0 || y >= framebuf_height)
     return;
-  pixels[y * FB_WIDTH + x] = PALETTE[paletteIndex & 0x03];
+  pixels[y * framebuf_width + x] = c;
   ++pixels_rendered;
 
-  if (pixels_rendered != FB_HEIGHT * FB_WIDTH)
+  if (pixels_rendered != framebuf_height * framebuf_width)
     return;
   pixels_rendered = 0;
 
@@ -95,9 +94,9 @@ void Renderer::present() {
                   &pitch);
 
   pitch /= sizeof(uint32_t);
-  for (int y = 0; y < FB_HEIGHT; ++y)
-    for (int x = 0; x < FB_WIDTH; ++x)
-      texturePixels[y * pitch + x] = pixels[y * FB_WIDTH + x];
+  for (int y = 0; y < framebuf_height; ++y)
+    for (int x = 0; x < framebuf_width; ++x)
+      texturePixels[y * pitch + x] = pixels[y * framebuf_width + x];
 
   SDL_UnlockTexture(texture);
   SDL_RenderClear(renderer);
@@ -112,6 +111,7 @@ void Renderer::present() {
 }
 
 void Renderer::clear() {
-  for (int i = 0; i < FB_WIDTH * FB_HEIGHT; ++i)
-    pixels[i] = 0xFFFFFFFF;
+  constexpr std::uint32_t white = 0xFFFFFFFF;
+  for (int i = 0; i < framebuf_width * framebuf_height; ++i)
+    pixels[i] = white;
 }

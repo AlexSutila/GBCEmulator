@@ -2,7 +2,6 @@
 #include "emu_types.hpp"
 #include "timer/timer.hpp"
 #include <cassert>
-#include <stdexcept>
 
 namespace PPU {
 
@@ -86,18 +85,9 @@ bool LY::inc() {
 void BGP::write(byte_t value) { state = value; }
 byte_t BGP::read() { return state; }
 
-MonoPaletteColor BGP::get_color_idx(byte_t idx) const {
-  switch (idx) {
-  case 0:
-    return static_cast<MonoPaletteColor>(state & 0xFF);
-  case 1:
-    return static_cast<MonoPaletteColor>((state >> 2) & 0xFF);
-  case 2:
-    return static_cast<MonoPaletteColor>((state >> 4) & 0xFF);
-  case 3:
-    return static_cast<MonoPaletteColor>((state >> 6) & 0xFF);
-  }
-  throw std::runtime_error("GBP::get_color_idx(), invalid index");
+byte_t BGP::get_color_idx(byte_t idx) const {
+  // Each color index in the register uses two bits
+  return (state >> (idx * 2)) & 0x3;
 }
 
 }; // namespace PPU

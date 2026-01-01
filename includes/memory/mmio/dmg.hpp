@@ -219,7 +219,7 @@ public:
   BGP() : state(0) {}
 
   /* Indexes the internal register state to obtain true color index */
-  MonoPaletteColor get_color_idx(byte_t idx) const;
+  byte_t get_color_idx(byte_t idx) const;
 
 private:
   byte_t state{};

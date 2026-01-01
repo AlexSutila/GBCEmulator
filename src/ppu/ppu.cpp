@@ -8,8 +8,10 @@
 #include "memory/mmio/mmio.hpp"
 #include "ppu/fetcher.hpp"
 #include "ppu/fifo.hpp"
+#include "ppu/palette.hpp"
 
 #include <cassert>
+#include <cstdint>
 #include <optional>
 #include <stdexcept>
 
@@ -89,6 +91,15 @@ bool PixelProcessingUnit::should_advance_ly() {
   return false;
 }
 
+/* Indexes the corresponding color palette based on the index calculated by the
+ * pixel FIFO rendering pipeline. This produces an RGB value used directly by
+ * our software renderer. Behavior varies between CGB and DMG modes. */
+std::uint32_t PixelProcessingUnit::get_rgb(byte_t idx) const {
+  // TODO: Handle CGB
+  const byte_t true_idx = bgp_.get_color_idx(idx);
+  return get_mono_color(true_idx);
+}
+
 void PixelProcessingUnit::do_oam_scan() {
   constexpr std::size_t oam_t_cycles = 80; // Fixed
   using modes = PPU::StatModes;
@@ -156,7 +167,8 @@ void PixelProcessingUnit::do_draw() {
     if (!px.discard) {
       const auto x = row_pixels_rendered++;
       const auto y = ly_.read();
-      renderer->putPixel(x, y, px.color);
+      const auto c = get_rgb(px.color);
+      renderer->putPixel(x, y, c);
     }
 
     // Do we switch the fetcher into window rendering mode?

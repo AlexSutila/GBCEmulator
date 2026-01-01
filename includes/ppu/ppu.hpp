@@ -11,6 +11,7 @@
 #include "ppu/fifo.hpp"
 
 #include <cstddef>
+#include <cstdint>
 #include <optional>
 
 class PixelProcessingUnit {
@@ -44,6 +45,7 @@ private:
   PPU::LY ly_{};
 
   /* Color palette configuration */
+  std::uint32_t get_rgb(byte_t idx) const;
   PPU::BGP bgp_{};
 
   /* Pixel Processor operation modes */
