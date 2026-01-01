@@ -166,6 +166,14 @@ void PixelProcessingUnit::do_draw() {
   if (row_pixels_rendered < pixels_per_row)
     return;
 
+  // The window uses an internal scanline counter to track it's verticle
+  // rendering progress. Determine if that counter is increased (or reset)
+  // here, depending on where we are in the frame.
+  if (ly_.read() >= 143)
+    bg_fetcher.reset_win_ly();
+  else if (bg_fetcher.was_window_visible())
+    bg_fetcher.inc_win_ly();
+
   // State transition logic
   stat_.set_mode(modes::MODE_HBLANK);
   total_mode_clks.reset();

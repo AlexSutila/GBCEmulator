@@ -53,7 +53,7 @@ void Fetcher::reset() { reset(false); }
 /* We derive the Y-coordinate at a pixel level using the LY register. */
 const byte_t Fetcher::calc_pixel_y() const {
   if (win_started)
-    return (ly_.read() - wy_.read()) & 0xFF;
+    return win_internal_ly & 0xFF;
   return (ly_.read() + scy_.read()) & 0xFF;
 }
 
@@ -228,7 +228,6 @@ bool Fetcher::window_visible(byte_t pixels_rendered) const {
     return false;
   const byte_t wx_px = wx_.read();
   const byte_t wy_px = wy_.read();
-  // TODO: Implement internal window line counter
   const byte_t ly_px = ly_.read();
   return (wx_px <= pixels_rendered + 7) && (ly_px >= wy_px);
 }
@@ -240,7 +239,6 @@ void Fetcher::render_window() {
 
   // Flush BG fifo pixel data, incurs additional overhead to fetch the very
   // first window tile, but after that the rendering process is identical.
-  // window_started = true;
   fifo_.flush();
   reset(true);
 }

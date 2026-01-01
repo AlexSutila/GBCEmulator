@@ -19,16 +19,23 @@ public:
           MMIORegister &wy,          // The window Y register
           MMIORegister &wx,          // The window X register
           PPU::LY &ly);              // The current scanline register
-  void reset(bool window_started);
-  void reset(); // Enters background rendering mode
-  void step();
+  void reset(); // Enters background rendering mode, called at start of scanline
+  void step();  // Step the fetcher one clock cycle
 
   /* The PPU will signal to clear the FIFO once the rendering of the window has
    * begun. All BG pixel data is flushed, and window rendering starts. */
-  bool window_visible(byte_t pixels_rendered) const;
-  void render_window();
+  bool window_visible(byte_t pixels_rendered) const; // Is it visible at pixel
+  void render_window(); // Makes the pixel begin fetching window tile data
+
+  /* Lastly, the window is kind of strange in that it does not use the curernt
+   * scanline register (LY) in the decision to fetch window tiles. It uses an
+   * internal counter that only increments if the window was enabled. */
+  bool was_window_visible() const { return win_started; }
+  void inc_win_ly() { ++win_internal_ly; }
+  void reset_win_ly() { win_internal_ly = 0; } // Reset end of every frame
 
 private:
+  void reset(bool window_started);
   AddressBus *const bus{};
 
   /* Internal storage that is built up throughout the pixel pushing pipeline.
