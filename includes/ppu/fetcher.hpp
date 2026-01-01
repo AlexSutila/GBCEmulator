@@ -19,7 +19,8 @@ public:
           MMIORegister &wy,          // The window Y register
           MMIORegister &wx,          // The window X register
           PPU::LY &ly);              // The current scanline register
-  void reset();
+  void reset(bool window_started);
+  void reset(); // Enters background rendering mode
   void step();
 
   /* The PPU will signal to clear the FIFO once the rendering of the window has

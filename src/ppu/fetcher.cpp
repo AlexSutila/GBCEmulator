@@ -2,6 +2,7 @@
 #include "memory/bus.hpp"
 #include "memory/mmio/mmio.hpp"
 #include "ppu/fifo.hpp"
+#include <stdexcept>
 
 constexpr byte_t pixels_per_row = 8;
 
@@ -20,10 +21,14 @@ Fetcher::Fetcher(AddressBus *const bus_ptr, PixelFifo &fifo, PPU::LCDCtrl &lcdc,
   reset();
 }
 
-void Fetcher::reset() {
+void Fetcher::reset(bool win) {
   fine_scroll = scx_.read() & 0x7;
   state = STATE_READ_TILE;
   pixels_discarded = 0;
+
+  // When rendering the background, the first tile is always fetched twice. This
+  // does not happen with the window, so we flip the condition accordingly here.
+  bool double_fetch_first_tile = !win;
 
   // Reset fetcher data, x_coor most important
   data = {
@@ -33,17 +38,20 @@ void Fetcher::reset() {
       .x_coor = 0,
       // First tile is always fetched and discarded on top of discarded pixels
       // due to SCX % 8 being holding a non-zero value.
-      .first_tile = true,
+      .first_tile = double_fetch_first_tile,
   };
-  window_started = false;
+  window_started = win;
 
   // Reset timing metadata
   total_clks.reset();
   cur_clks = 0;
 }
+void Fetcher::reset() { reset(false); }
 
 /* We derive the Y-coordinate at a pixel level using the LY register. */
 const byte_t Fetcher::calc_pixel_y() const {
+  if (window_started)
+    return (ly_.read() - wy_.read()) & 0xFF;
   return (ly_.read() + scy_.read()) & 0xFF;
 }
 
@@ -51,12 +59,15 @@ const byte_t Fetcher::calc_pixel_y() const {
  * pixels at a time. As a result, we have to remember to divide the scroll
  * value by the size of a pixel to accomodate the change in units.  */
 const byte_t Fetcher::calc_tile_x() const {
+  if (window_started)
+    return data.x_coor & 0x1F;
   // Since returning unit tiles, can only be 32 max
   return (data.x_coor + (scx_.read() / pixels_per_row)) & 0x1F;
 }
 
 const addr_t Fetcher::calc_tilemap_base() const {
-  const auto base_addr = lcdc_.bg_tilemap_base();
+  const auto base_addr =
+      window_started ? lcdc_.win_tilemap_base() : lcdc_.bg_tilemap_base();
   return static_cast<addr_t>(base_addr);
 }
 
@@ -106,6 +117,9 @@ const byte_t Fetcher::fetch_tile_data(bool high) const {
                                : bus->read_byte(0x8000 + data_offset);
   case PPU::TileDataArea::HI_TILEDATA_BASE:
     return bus->read_byte(0x8000 + data_offset);
+  default:
+    throw std::runtime_error(
+        "Fetcher::fetch_tile_data(), Invalid tilemap addressing mode");
   }
 }
 
@@ -188,10 +202,6 @@ void Fetcher::do_push_data() {
     const byte_t lo_bit = (data.data_lo & (1 << shift)) != 0 ? 1 : 0;
     byte_t palette_idx = (hi_bit << 1) | lo_bit;
 
-    // TODO: This is a hack
-    if (window_started)
-      palette_idx = 3;
-
     fifo_.push({
         .color = palette_idx,
         .discard = discard,
@@ -227,8 +237,9 @@ void Fetcher::render_window() {
 
   // Flush BG fifo pixel data, incurs additional overhead to fetch the very
   // first window tile, but after that the rendering process is identical.
-  window_started = true;
+  // window_started = true;
   fifo_.flush();
+  reset(true);
 }
 
 void Fetcher::step() {
