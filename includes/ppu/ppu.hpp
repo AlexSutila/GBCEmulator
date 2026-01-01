@@ -66,6 +66,7 @@ private:
   std::optional<std::size_t> total_mode_clks{};
   std::size_t cur_scanline_clks{};
   std::size_t cur_mode_clks{};
+  PPU::StatModes state{};
 
   /* Pixel FIFO renderers */
   PixelFifo fifo;

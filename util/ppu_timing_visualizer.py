@@ -46,6 +46,9 @@ def run_scanline():
 if __name__ == '__main__':
     show = [0, 1, 143, 144, 152, 153]
     for scanline in range(nr_scanlines):
+        # We prefer to see the timing one frame in
+        run_scanline()
+    for scanline in range(nr_scanlines):
         df = run_scanline()
         if scanline in show:
             print(f'Line {scanline}:\n{df}\n')

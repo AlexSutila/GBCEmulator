@@ -92,7 +92,7 @@ void PixelProcessingUnit::do_oam_scan() {
   using modes = PPU::StatModes;
 
   // OAM scan always happens on visible scanlines
-  assert(stat_.get_mode() == modes::MODE_OAM_SCAN);
+  assert(state == modes::MODE_OAM_SCAN);
   assert(ly_.is_visible());
 
   // State entry
@@ -114,7 +114,7 @@ void PixelProcessingUnit::do_oam_scan() {
     return;
 
   // State transition logic
-  stat_.set_mode(modes::MODE_DRAWING);
+  state = modes::MODE_DRAWING;
   total_mode_clks.reset();
 }
 
@@ -124,7 +124,7 @@ void PixelProcessingUnit::do_draw() {
   using modes = PPU::StatModes;
 
   // Rendering always happens on visible scanlines
-  assert(stat_.get_mode() == modes::MODE_DRAWING);
+  assert(state == modes::MODE_DRAWING);
   assert(ly_.is_visible());
 
   /* By default, the PPU outputs one pixel to the screen per dot, however some
@@ -175,7 +175,7 @@ void PixelProcessingUnit::do_draw() {
     bg_fetcher.inc_win_ly();
 
   // State transition logic
-  stat_.set_mode(modes::MODE_HBLANK);
+  state = modes::MODE_HBLANK;
   total_mode_clks.reset();
 }
 
@@ -183,7 +183,7 @@ void PixelProcessingUnit::do_hblank() {
   using modes = PPU::StatModes;
 
   // HBlank will only ever occur during visible scanlines
-  assert(stat_.get_mode() == modes::MODE_HBLANK);
+  assert(state == modes::MODE_HBLANK);
   assert(ly_.is_visible());
   blank();
 }
@@ -192,7 +192,7 @@ void PixelProcessingUnit::do_vblank() {
   using modes = PPU::StatModes;
 
   // VBlank will only ever occur during invisible scanlines - duh
-  assert(stat_.get_mode() == modes::MODE_VBLANK);
+  assert(state == modes::MODE_VBLANK);
   assert(!ly_.is_visible() || ly_.read() == 0);
   blank();
 }
@@ -221,9 +221,9 @@ void PixelProcessingUnit::blank() {
 
   // End of scanline logic
   if (ly_.is_visible())
-    stat_.set_mode(modes::MODE_OAM_SCAN);
+    state = modes::MODE_OAM_SCAN;
   else
-    stat_.set_mode(modes::MODE_VBLANK);
+    state = modes::MODE_VBLANK;
 
   total_mode_clks.reset();
   cur_scanline_clks = 0;
@@ -233,6 +233,7 @@ void PixelProcessingUnit::update_stat() {
   /* The actual firing of the interrupt is fired on a rising edge of an internal
    * signal. That signal is set based on various conditions. */
   const bool old = stat_irq_signal_edge;
+  stat_.set_mode(state);
 
   /* Condition 1: The LY register is equal to the LYC register */
   const bool cond_a = (ly_.read() == lyc_.read()) &&
@@ -268,8 +269,10 @@ void PixelProcessingUnit::reset() {
   cur_scanline_clks = cur_mode_clks = 0;
   total_mode_clks = std::nullopt;
 
-  /* Configure status MMIO registers initial state - drives FSM */
-  stat_.set_mode(StatModes::MODE_OAM_SCAN);
+  /* Configure status MMIO register initial state. The state bits read zero
+   * (HBLANK) when the PPU is disabled via bit zero of the LCDC register. */
+  state = StatModes::MODE_OAM_SCAN; // PPU itself always starts in OAM SCAN
+  stat_.set_mode(StatModes::MODE_HBLANK);
   ly_.reset();
 
   /* Reset edge that triggers stat IRQs */
@@ -286,7 +289,7 @@ void PixelProcessingUnit::step() {
   }
 
   /* Rendering is enabled, perform FSM logic */
-  switch (stat_.get_mode()) {
+  switch (state) {
   case PPU::StatModes::MODE_HBLANK:
     do_hblank();
     break;

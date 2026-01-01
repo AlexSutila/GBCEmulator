@@ -24,17 +24,19 @@ def test_ppu_mode_timing():
     for frame in range(10):
         for ly in range(144):
             for dot in range(80):
-                assert __get_ppu_mode(bus) == 2, f'dot: {dot}, ly: {ly}'
+                if dot >= 4:  # State bits being set is delayed four cycles
+                    assert __get_ppu_mode(bus) == 2, f'dot: {dot}, ly: {ly}'
                 ppu.step()
             for dot in range(289):
                 # TODO: Need a better way to test this
                 # assert __get_ppu_mode(bus) == 3, f'dot: {dot}, ly: {ly}'
                 ppu.step()
             for dot in range(87):
-                assert __get_ppu_mode(bus) == 0, f'dot: {dot}, ly: {ly}'
+                if dot >= 4:  # State bits being set is delayed four cycles
+                    assert __get_ppu_mode(bus) == 0, f'dot: {dot}, ly: {ly}'
                 ppu.step()
         for ly in range(10):
             for dot in range(456):
-                assert __get_ppu_mode(bus) == 1, f'dot: {dot}, ly: {ly}'
+                if dot >= 4:  # State bits being set is delayed four cycles
+                    assert __get_ppu_mode(bus) == 1, f'dot: {dot}, ly: {ly}'
                 ppu.step()
-        assert __get_ppu_mode(bus) == 2, 'Second frame'
