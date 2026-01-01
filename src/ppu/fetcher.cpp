@@ -25,6 +25,9 @@ void Fetcher::reset() {
       .data_lo = 0,
       .data_hi = 0,
       .x_coor = 0,
+      // First tile is always fetched and discarded on top of discarded pixels
+      // due to SCX % 8 being holding a non-zero value.
+      .first_tile = true,
   };
 
   // Reset timing metadata
@@ -66,9 +69,7 @@ std::size_t Fetcher::calc_tile_idx() {
   return bus->read_byte(tilemap_base + tile_idx);
 }
 
-bool Fetcher::should_discard() const {
-  return pixels_discarded < fine_scroll;
-}
+bool Fetcher::should_discard() const { return pixels_discarded < fine_scroll; }
 
 /* Calculate the base address of the tilemap for bg/win */
 const byte_t Fetcher::fetch_tile_data(bool high) const {
@@ -166,22 +167,31 @@ void Fetcher::do_push_data() {
 
   // Compute palette indices
   for (int shift{7}; shift >= 0; shift--) {
+    const bool discard = should_discard();
+
+    // The first tile is always fetched twice, being ignored the first time just
+    // to ensure the PPU always has eight pixels in the FIFO for sprites.
+    if (data.first_tile)
+      break;
+
+    // Track number of pixels discarded to implement fine scroll
+    if (discard) {
+      ++pixels_discarded;
+      continue;
+    }
+
+    // Otherwise, we compute the pixel info as you would usually
     const byte_t hi_bit = (data.data_hi & (1 << shift)) != 0 ? 1 : 0;
     const byte_t lo_bit = (data.data_lo & (1 << shift)) != 0 ? 1 : 0;
     const byte_t palette_idx = (hi_bit << 1) | lo_bit;
-    const bool discard = should_discard();
-
-    // Track number of pixels discarded to implement fine scroll
-    if (discard)
-      ++pixels_discarded;
-
-    pixel const px = {
-        .color = palette_idx,
-        .discard = discard,
-    };
-    fifo_.push(px);
+    fifo_.push({.color = palette_idx});
   }
-  data.x_coor = (data.x_coor + 1) & 0x1F;
+
+  // If we fetched the first tile, we have to fetch it again.
+  if (data.first_tile)
+    data.first_tile = false;
+  else
+    data.x_coor = (data.x_coor + 1) & 0x1F;
 
   // State transition after push to fetch next row
   state = STATE_READ_TILE;
