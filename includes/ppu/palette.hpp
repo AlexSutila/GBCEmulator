@@ -9,8 +9,10 @@
 
 class ColorRam {
 public:
-  PPU::PaletteData *const get_data_reg() { return &data_reg; }
-  PPU::PaletteIdx *const get_idx_reg() { return &idx_reg; }
+  const std::uint32_t get_cgb_color(const byte_t color_idx,
+                                    const byte_t palette_idx) const;
+  PPU::PaletteData *const get_data_reg();
+  PPU::PaletteIdx *const get_idx_reg();
   ColorRam();
 
 private:

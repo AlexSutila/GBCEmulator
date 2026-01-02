@@ -3,7 +3,6 @@
 #include "cpu/interrupts.hpp"
 #include "frontend/renderer.hpp"
 #include "memory/bus.hpp"
-#include "memory/mmio/cgb.hpp"
 #include "memory/mmio/dmg.hpp"
 #include "memory/mmio/mmio.hpp"
 #include "ppu/fetcher.hpp"
@@ -111,10 +110,12 @@ bool PixelProcessingUnit::should_advance_ly() {
 /* Indexes the corresponding color palette based on the index calculated by the
  * pixel FIFO rendering pipeline. This produces an RGB value used directly by
  * our software renderer. Behavior varies between CGB and DMG modes. */
-std::uint32_t PixelProcessingUnit::get_rgb(byte_t idx) const {
-  // TODO: Handle CGB
-  const byte_t true_idx = bgp_.get_color_idx(idx);
-  return get_mono_color(true_idx);
+std::uint32_t PixelProcessingUnit::get_rgb(const pixel &px) const {
+  if (!is_cgb) {
+    const byte_t true_idx = bgp_.get_color_idx(px.color_idx);
+    return get_mono_color(true_idx);
+  }
+  return cram->get_cgb_color(px.color_idx, px.palette_idx);
 }
 
 void PixelProcessingUnit::do_oam_scan() {
@@ -184,7 +185,7 @@ void PixelProcessingUnit::do_draw() {
     if (!px.discard) {
       const auto x = row_pixels_rendered++;
       const auto y = ly_.read();
-      const auto c = get_rgb(px.color_idx);
+      const auto c = get_rgb(px);
       renderer->putPixel(x, y, c);
     }
 

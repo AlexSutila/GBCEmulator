@@ -237,14 +237,12 @@ void Fetcher::do_push_data() {
     // Color data is derived from both data bits, and potentially a palette
     byte_t palette_idx = get_bg_attrib_palette(data.tile_attr);
     byte_t color_idx = (hi_bit << 1) | lo_bit;
-
-    pixel px = {
+    fifo_.push({
         .color_idx = color_idx,
         // Not used if in DMG mode, but we populate it anyway
         .palette_idx = palette_idx,
         .discard = discard,
-    };
-    fifo_.push(px);
+    });
   }
   data.x_coor = (data.x_coor + 1) & 0x1F;
 

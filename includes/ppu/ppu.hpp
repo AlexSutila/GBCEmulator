@@ -43,7 +43,7 @@ private:
   PPU::LY ly_{};
 
   /* Color palette configuration */
-  std::uint32_t get_rgb(byte_t idx) const;
+  std::uint32_t get_rgb(const pixel &px) const;
   PPU::BGP bgp_{};
 
   /* Pixel Processor operation modes */
