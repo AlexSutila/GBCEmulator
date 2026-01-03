@@ -71,6 +71,7 @@ AddressBus::AddressBus() {
   connect_mmio(static_cast<addr_t>(mmio::MMIO_BOOT_ROM_CTRL), &boot_rom_ctrl);
   connect_mmio(static_cast<addr_t>(mmio::MMIO_WRAM_BANK), &wram_bank_ctrl);
   connect_mmio(static_cast<addr_t>(mmio::MMIO_VRAM_BANK), &vram_bank_ctrl);
+  connect_mmio(static_cast<addr_t>(mmio::MMIO_SPD_KEY0), &key1);
 }
 
 void AddressBus::connect_mmio(const addr_t addr, MMIORegister *const reg) {

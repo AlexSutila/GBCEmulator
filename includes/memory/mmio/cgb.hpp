@@ -5,6 +5,8 @@
 #include "memory/mmio/mmio.hpp"
 #include <array>
 
+namespace SYS {
+
 enum class SpeedSwitchMode {
   SINGLE_SPEED_MODE,
   // Gotta go fast!!!
@@ -37,6 +39,8 @@ public:
 private:
   byte_t state{};
 };
+
+} // namespace SYS
 
 namespace PPU {
 

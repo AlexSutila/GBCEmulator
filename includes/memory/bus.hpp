@@ -38,6 +38,9 @@ public:
   MMIORegister *get_mmio(IORegisterMapping mapping) const;
   AddressBus();
 
+  /* For clock rate control (normal vs double speed mode) */
+  SYS::SpeedSwitchMode get_speed_mode() const { return key1.get_cur_speed(); }
+
   /* Cartridge connections */
   void insert_cartridge(cart c);
   void eject_cartridge();
@@ -53,6 +56,9 @@ private:
   std::unique_ptr<byte_t[]> hram{};
   std::unique_ptr<byte_t[]> oam{};
   std::unique_ptr<Cartridge> cart_;
+
+  /* System control registers: (speed mode, backwards compatability, etc) */
+  SYS::KEY1 key1{};
 
   /* MMIO refs maintained for convenience */
   PPU::VramBank vram_bank_ctrl{};

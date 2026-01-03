@@ -2,6 +2,8 @@
 #include "emu_types.hpp"
 #include <cassert>
 
+namespace SYS {
+
 /* Bits 1-6 are unused, store ones. */
 void KEY1::write(const byte_t value) { state = value | 0x7E; }
 byte_t KEY1::read() { return state | 0x7E; }
@@ -15,6 +17,8 @@ SpeedSwitchMode KEY1::get_cur_speed() const {
 /* Switch to the `other` mode will be made on execution of the next STOP
  * instruction. I'm assuming it just toggles? */
 bool KEY1::switch_armed() const { return (state & 0x1) != 0; }
+
+} // namespace SYS
 
 namespace PPU {
 
