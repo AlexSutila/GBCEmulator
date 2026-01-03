@@ -27,11 +27,6 @@ void GameBoyColor::insert_cartridge(cart c) {
   if (!bus)
     throw std::logic_error("Bus not initialized");
   bus->insert_cartridge(c);
-
-  /* Non-CGB cartridges place the hardware in backwards compatability mode.
-   * Inform the components that need to be informed that backwards compatability
-   * is enabled. */
-  ppu->set_cgb(c.header.cgb_flag());
 }
 
 void GameBoyColor::init_test_bed() {

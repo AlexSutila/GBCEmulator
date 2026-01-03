@@ -1,5 +1,6 @@
 #include "ppu/fetcher.hpp"
-#include "cart/cart.hpp"
+#include "gbc.hpp"
+#include "memory/bus.hpp"
 #include "memory/mmio/mmio.hpp"
 #include "ppu/attributes.hpp"
 #include "ppu/fifo.hpp"
@@ -15,7 +16,7 @@ constexpr byte_t pixels_per_row = 8;
 Fetcher::Fetcher(std::array<std::unique_ptr<byte_t[]>, 2> &vram,
                  PPU::LCDCtrl &lcdc, MMIORegister &scy, MMIORegister &scx,
                  MMIORegister &wy, MMIORegister &wx, PPU::LY &ly,
-                 PixelFifo &fifo)
+                 PixelFifo &fifo, runtime_sys_info &sys)
     : vram_(vram), // For fetching tile data
       lcdc_(lcdc), // LCD control register
       scy_(scy),   // Scroll Y (background)
@@ -23,12 +24,10 @@ Fetcher::Fetcher(std::array<std::unique_ptr<byte_t[]>, 2> &vram,
       wy_(wy),     // Window  Y (background)
       wx_(wx),     // Window  X (background)
       ly_(ly),     // Current scanline
-      fifo_(fifo)  // Pixel fifo
-{
+      fifo_(fifo), // Pixel fifo
+      sys_(sys) {
   reset();
 }
-
-void Fetcher::set_cgb(const byte_t cgb_flag) { is_cgb = cgb_enabled(cgb_flag); }
 
 void Fetcher::reset(bool window_started) {
   fine_scroll = scx_.read() & 0x7;
@@ -60,7 +59,7 @@ void Fetcher::reset() {
 // fetch specific tile metadata (CGB mode BG map attributes, for example).
 byte_t Fetcher::read_vram_byte(addr_t addr, byte_t bank) const {
   assert((addr >= 0x8000 && addr <= 0x9FFF) && (bank < 2));
-  if (!is_cgb && bank != 0)
+  if (!sys_.cgb_mode && bank != 0)
     throw std::runtime_error(
         "Fetcher::read_vram_byte(), non-zero bank in DMG mode");
   return vram_.at(bank)[addr - vram_base_addr];
@@ -131,7 +130,7 @@ const byte_t Fetcher::fetch_tile_data(bool high) const {
   // If we are in CGB mode, the tile data can come from either VRAM bank. The
   // bank to fetch the tile from comes from the tile attributes. When in DMG
   // mode, the lower bank is always used.
-  const byte_t bank = is_cgb ? get_bg_attrib_bank(data.tile_attr) : 0;
+  const byte_t bank = sys_.cgb_mode ? get_bg_attrib_bank(data.tile_attr) : 0;
 
   // Read data based on bg/win data addressing mode
   switch (lcdc_.bg_win_data_area()) {
@@ -160,7 +159,7 @@ void Fetcher::do_read_tile() {
     data.tile_idx = read_vram_byte(metadata_addr, 0);
     // Tile attributes are only fetched in CGB mode, I do not think this
     // impacts the clock cycle duration of the initial fetching state.
-    if (is_cgb)
+    if (sys_.cgb_mode)
       data.tile_attr = read_vram_byte(metadata_addr, 1);
     total_clks = max_state_clks;
   }

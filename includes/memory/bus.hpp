@@ -77,7 +77,6 @@ private:
 
   /* Usable hardware features are determined by the cartridge header. */
   runtime_sys_info &sys_;
-  bool is_cgb{};
 };
 
 #endif // __BUS_H

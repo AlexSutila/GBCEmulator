@@ -11,7 +11,7 @@ void KEY0::write(const byte_t value) {
   state = (value & dmg_mode_mask) | ~dmg_mode_mask;
   /* This will be visible to components that need to be aware about the current
    * speed mode the system is operating in. */
-  sys_.double_speed = (state & dmg_mode_mask) == 0;
+  sys_.cgb_mode = (state & dmg_mode_mask) == 0;
 }
 byte_t KEY0::read() { return state | ~dmg_mode_mask; }
 

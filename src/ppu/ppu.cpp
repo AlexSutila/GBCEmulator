@@ -1,7 +1,7 @@
 #include "ppu/ppu.hpp"
-#include "cart/cart.hpp"
 #include "cpu/interrupts.hpp"
 #include "frontend/renderer.hpp"
+#include "gbc.hpp"
 #include "memory/bus.hpp"
 #include "memory/mmio/dmg.hpp"
 #include "memory/mmio/mmio.hpp"
@@ -68,17 +68,13 @@ PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus, Renderer *render,
       wy_,             // Needed to fetch correct window tile
       wx_,             // Needed to fetch correct window tile
       ly_,             // Needed to fetch correct background tile
-      fifo             // Fetcher must push rows of pixels into this FIFO
+      fifo,            // Fetcher must push rows of pixels into this FIFO
+      sys_             // Fetcher behavior varies between DMG vs CGB mode
   );
 
   /* Configure PPU to initial state, doesn't technically happen until PPU is
    * enabled but we do it anyway just because. */
   reset();
-}
-
-void PixelProcessingUnit::set_cgb(const byte_t cgb_flag) {
-  is_cgb = cgb_enabled(cgb_flag);
-  bg_fetcher->set_cgb(cgb_flag);
 }
 
 bool PixelProcessingUnit::should_advance_ly() {
@@ -112,7 +108,7 @@ bool PixelProcessingUnit::should_advance_ly() {
  * pixel FIFO rendering pipeline. This produces an RGB value used directly by
  * our software renderer. Behavior varies between CGB and DMG modes. */
 std::uint32_t PixelProcessingUnit::get_rgb(const pixel &px) const {
-  if (!is_cgb) {
+  if (!sys_.cgb_mode) {
     const byte_t true_idx = bgp_.get_color_idx(px.color_idx);
     return get_mono_color(true_idx);
   }

@@ -1,6 +1,7 @@
 #include "memory/bus.hpp"
 #include "cart/cart.hpp"
 #include "emu_types.hpp"
+#include "gbc.hpp"
 #include "memory/boot.hpp"
 #include "memory/mmio/cgb.hpp"
 #include "memory/mmio/dmg.hpp"
@@ -86,7 +87,7 @@ void AddressBus::connect_mmio(const addr_t addr, MMIORegister *const reg) {
 }
 
 const byte_t AddressBus::get_vram_bank() const {
-  if (!is_cgb) // Unbanked for DMG
+  if (!sys_.cgb_mode) // Unbanked for DMG
     return 0;
   return vram_bank_ctrl.get_bank();
 }
@@ -94,7 +95,7 @@ const byte_t AddressBus::get_vram_bank() const {
 const byte_t AddressBus::get_wram_bank() const {
   /* Only call for upper address range. Lower address (0xC000-0xDFFF) is always
    * mapped to bank zero, regardless of either CGB/DMG operating mode. */
-  if (!is_cgb)
+  if (!sys_.cgb_mode)
     return 1;
   /* Maps to banks 1-7. Zero also maps to bank one, but that logic is handled in
    * the MMIORegister itself. This is garunteed to be between 1 and 7. */
@@ -102,11 +103,8 @@ const byte_t AddressBus::get_wram_bank() const {
 }
 
 void AddressBus::insert_cartridge(cart c) {
+  /* Generic transfer of ownership for actual game cartridges */
   cart_ = std::make_unique<Cartridge>(std::move(c));
-  const byte_t cgb_flag = cart_->image().header.cgb_flag();
-
-  /* May limit interaction with specific MMIO if disabled */
-  is_cgb = cgb_enabled(cgb_flag);
 }
 void AddressBus::init_test_bed() {
   /* Default constructor initializes an instance of TestMBC */
@@ -161,7 +159,7 @@ const byte_t AddressBus::read_byte(const addr_t addr) {
     auto const &mmio = io_registers.at(addr);
 
     // Only write CGB registers if in CGB mode, fallback to 0xFF otherwise
-    return (!mmio->cgb() || is_cgb) ? mmio->read() : open_bus();
+    return (!mmio->cgb() || sys_.cgb_mode) ? mmio->read() : open_bus();
   }
 
   /* Read from to High RAM */
@@ -214,7 +212,7 @@ void AddressBus::write_byte(const addr_t addr, const byte_t value) {
     auto const &mmio = io_registers.at(addr);
 
     // Only write CGB registers if in CGB mode
-    if (!mmio->cgb() || is_cgb)
+    if (!mmio->cgb() || sys_.cgb_mode)
       mmio->write(value);
   }
 

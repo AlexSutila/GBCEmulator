@@ -20,7 +20,6 @@ class PixelProcessingUnit {
 public:
   PixelProcessingUnit(AddressBus *bus, Renderer *render,
                       runtime_sys_info &sys);
-  void set_cgb(const byte_t cgb_flag);
   void reset();
   void step();
 
@@ -79,9 +78,8 @@ private:
   std::unique_ptr<Fetcher> bg_fetcher;
   PixelFifo fifo;
 
-  /* Determined by cartridge header, dictates usable PPU features */
+  /* Color RAM adding RGB555 support for CGB models */
   std::unique_ptr<ColorRam> cram;
-  bool is_cgb{};
 };
 
 #endif // __PPU_H

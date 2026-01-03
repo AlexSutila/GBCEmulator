@@ -10,7 +10,9 @@
 #include <memory>
 #include <optional>
 
+struct runtime_sys_info;
 class PixelFifo;
+
 class Fetcher {
 public:
   Fetcher(std::array<std::unique_ptr<byte_t[]>, 2> &vram,
@@ -20,8 +22,8 @@ public:
           MMIORegister &wy,   // The window Y register
           MMIORegister &wx,   // The window X register
           PPU::LY &ly,        // The current scanline register
-          PixelFifo &fifo);   // The pixel fifo
-  void set_cgb(const byte_t cgb_flag);
+          PixelFifo &fifo,    // The pixel fifo
+          runtime_sys_info &sys);
   void reset(); // Enters background rendering mode, called at start of scanline
   void step();  // Step the fetcher one clock cycle
 
@@ -99,8 +101,8 @@ private:
   const byte_t fetch_tile_data(bool high) const;
   const addr_t calc_tile_metadata_addr() const;
 
-  /* Determined by cartridge header, dictates usable PPU features */
-  bool is_cgb{};
+  /* Need to distinguish between DMG and CGB */
+  runtime_sys_info &sys_;
 };
 
 #endif // __FETCHER_H
