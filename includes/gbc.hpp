@@ -8,8 +8,17 @@
 #include "ppu/ppu.hpp"
 #include "timer/timer.hpp"
 
-#include <cstddef>
+#include <cstdint>
 #include <memory>
+
+/* A generic data structure that is passed to the components and updated by
+ * various MMIO registers that need to know about things like backwards
+ * compatability and current operating mode. */
+struct runtime_sys_info {
+  bool double_speed{};
+  bool cgb_mode{};
+  std::uint64_t elapsed_clocks{};
+};
 
 class GameBoyColor {
 public:
@@ -31,7 +40,7 @@ private:
   std::unique_ptr<LR35902> cpu{};
   std::unique_ptr<PixelProcessingUnit> ppu{};
   std::unique_ptr<TimerUnit> timer{};
-  std::size_t elapsed_clocks_{};
+  runtime_sys_info sys;
 };
 
 #endif // __GBC_H

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from gbc_py import (
     AddressBus,
+    RuntimeSysInfo,
     get_boot_rom,
 )
 import hashlib
@@ -8,7 +9,7 @@ import hashlib
 
 def test_boot_rom_bus_dump():
     '''Validate bus dump of boot ROM against ground truth'''
-    bus = AddressBus()
+    bus = AddressBus(RuntimeSysInfo())
     bus.init_test_bed()
     rom = get_boot_rom()
 
@@ -23,7 +24,7 @@ def test_boot_rom_bus_dump():
 
 def test_boot_rom_banking():
     '''Validate the writing the control register to bank out of boot ROM'''
-    bus = AddressBus()
+    bus = AddressBus(RuntimeSysInfo())
     bus.init_test_bed()
 
     # Take the first byte of the ROM, and validate content

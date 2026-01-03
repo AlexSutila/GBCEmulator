@@ -52,7 +52,11 @@ static constexpr bool is_hram_range(const addr_t a) noexcept {
   return (a >= 0xFF80 && a <= 0xFFFE);
 }
 
-AddressBus::AddressBus() {
+AddressBus::AddressBus(runtime_sys_info &sys)
+    : key0(sys), // Controls backwards compatability
+      key1(sys), // Controls clock speed mode
+      sys_(sys)  // Generic system information
+{
   constexpr std::size_t vram_bank_size = 0x2000;
   constexpr std::size_t wram_bank_size = 0x1000;
   constexpr std::size_t hram_size = 0x7F;
@@ -219,9 +223,7 @@ void AddressBus::write_byte(const addr_t addr, const byte_t value) {
     hram[(addr - 0xFF80) & HRAM_MASK] = value;
 }
 
-bool AddressBus::boot_rom_enabled() {
-  return boot_rom_ctrl.boot_rom_enabled();
-}
+bool AddressBus::boot_rom_enabled() { return boot_rom_ctrl.boot_rom_enabled(); }
 
 MMIORegister *AddressBus::get_mmio(IORegisterMapping mapping) const {
   const addr_t addr = static_cast<addr_t>(mapping);

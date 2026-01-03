@@ -8,11 +8,19 @@
 
 GameBoyColor::GameBoyColor(bool headless) {
   renderer = std::make_unique<Renderer>(headless);
-  bus = std::make_unique<AddressBus>();
+
+  /* General system operation info */
+  sys = {
+      .double_speed = false,
+      .cgb_mode = true,
+      .elapsed_clocks = 0,
+  };
+
+  /* Component initializaiton */
+  bus = std::make_unique<AddressBus>(sys);
   cpu = std::make_unique<LR35902>(bus.get());
   ppu = std::make_unique<PixelProcessingUnit>(bus.get(), renderer.get());
   timer = std::make_unique<TimerUnit>(bus.get());
-  elapsed_clocks_ = 0;
 }
 
 void GameBoyColor::insert_cartridge(cart c) {
@@ -38,7 +46,7 @@ void GameBoyColor::step() {
   cpu->step();
   ppu->step();
   timer->step();
-  ++elapsed_clocks_;
+  ++sys.elapsed_clocks;
 }
 
 void GameBoyColor::run() {

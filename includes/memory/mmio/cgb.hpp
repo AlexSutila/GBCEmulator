@@ -4,6 +4,7 @@
 #include "emu_types.hpp"
 #include "memory/mmio/mmio.hpp"
 #include <array>
+struct runtime_sys_info;
 
 namespace SYS {
 
@@ -25,9 +26,10 @@ class KEY0 : public MMIORegister {
 public:
   void write(const byte_t value) override;
   byte_t read() override;
-  KEY0() : state(0) {}
+  KEY0(runtime_sys_info &sys) : sys_(sys), state(0) {}
 
 private:
+  runtime_sys_info &sys_;
   byte_t state{};
 };
 
@@ -49,13 +51,14 @@ class KEY1 : public MMIORegister {
 public:
   void write(const byte_t value) override;
   byte_t read() override;
-  KEY1() : state(0) {}
+  KEY1(runtime_sys_info &sys) : sys_(sys), state(0) {}
 
   /* Speed mode is actually set  */
   SpeedSwitchMode get_cur_speed() const;
   bool switch_armed() const;
 
 private:
+  runtime_sys_info &sys_;
   byte_t state{};
 };
 

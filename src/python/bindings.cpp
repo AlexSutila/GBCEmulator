@@ -60,6 +60,13 @@ bool poll_mooneye_test(GameBoyColor &gbc) {
 PYBIND11_MODULE(gbc_py, m) {
   m.doc() = "Game Boy Color emulator bindings";
 
+  // Needed to initialize sone components one-off
+  py::class_<runtime_sys_info>(m, "RuntimeSysInfo")
+      .def(py::init<>())
+      .def_readwrite("double_speed", &runtime_sys_info::double_speed)
+      .def_readwrite("cgb_mode", &runtime_sys_info::cgb_mode)
+      .def_readwrite("elapsed_clocks", &runtime_sys_info::elapsed_clocks);
+
   // Cartridge helper classes
   py::class_<rom_header>(m, "RomHeader")
       .def(py::init<>())
@@ -153,7 +160,7 @@ PYBIND11_MODULE(gbc_py, m) {
 
   // Expose main Address Bus class
   py::class_<AddressBus>(m, "AddressBus")
-      .def(py::init<>())
+      .def(py::init<runtime_sys_info &>(), py::arg("sys"))
       .def("init_test_bed", &AddressBus::init_test_bed)
       .def("write_byte", &AddressBus::write_byte, py::arg("addr"),
            py::arg("value"))

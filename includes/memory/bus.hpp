@@ -11,6 +11,8 @@
 #include <map>
 #include <memory>
 
+struct runtime_sys_info;
+
 /*
  * Game Boy Memory Map
  *
@@ -36,7 +38,7 @@ public:
   const byte_t read_byte(const addr_t addr);
   void connect_mmio(const addr_t addr, MMIORegister *const reg);
   MMIORegister *get_mmio(IORegisterMapping mapping) const;
-  AddressBus();
+  AddressBus(runtime_sys_info &sys);
 
   /* For clock rate control (normal vs double speed mode) */
   SYS::SpeedSwitchMode get_speed_mode() const { return key1.get_cur_speed(); }
@@ -58,8 +60,8 @@ private:
   std::unique_ptr<Cartridge> cart_;
 
   /* System control registers: (speed mode, backwards compatability, etc) */
-  SYS::KEY0 key0{}; // Controls DMG backwards compatability
-  SYS::KEY1 key1{}; // Controls clock speed mode
+  SYS::KEY0 key0; // Controls DMG backwards compatability
+  SYS::KEY1 key1; // Controls clock speed mode
 
   /* MMIO refs maintained for convenience */
   PPU::VramBank vram_bank_ctrl{};
@@ -77,6 +79,7 @@ private:
   void init_io_registers();
 
   /* Usable hardware features are determined by the cartridge header. */
+  runtime_sys_info &sys_;
   bool is_cgb{};
 };
 
