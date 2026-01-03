@@ -17,15 +17,12 @@ enum class SpeedSwitchMode {
  * Bit layout:
  *   7   6   5   4   3   2   1   0
  *   -   -   -   -   -   -   -   A
- *
  *   Bit 7 — Current speed (read-only):
  *            0 = Normal-speed mode
  *            1 = Double-speed mode
- *
  *   Bit 0 — Switch armed (read/write):
  *            0 = Not armed
  *            1 = Armed (prepare speed switch)
- *
  *   Bits 6–1: Unused
  */
 class KEY1 : public MMIORegister {
