@@ -1,5 +1,20 @@
 #include "memory/mmio/cgb.hpp"
+#include "emu_types.hpp"
 #include <cassert>
+
+/* Bits 1-6 are unused, store ones. */
+void KEY1::write(const byte_t value) { state = value | 0x7E; }
+byte_t KEY1::read() { return state | 0x7E; }
+
+/* Getter for current speed mode of the console */
+SpeedSwitchMode KEY1::get_cur_speed() const {
+  const byte_t cur_speed = (state & 0x80) >> 7;
+  return static_cast<SpeedSwitchMode>(cur_speed);
+}
+
+/* Switch to the `other` mode will be made on execution of the next STOP
+ * instruction. I'm assuming it just toggles? */
+bool KEY1::switch_armed() const { return (state & 0x1) != 0; }
 
 namespace PPU {
 

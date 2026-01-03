@@ -5,6 +5,42 @@
 #include "memory/mmio/mmio.hpp"
 #include <array>
 
+enum class SpeedSwitchMode {
+  SINGLE_SPEED_MODE,
+  // Gotta go fast!!!
+  DOUBLE_SPEED_MODE,
+};
+
+/*
+ * FF4D — KEY1/SPD (CGB mode only): Prepare speed switch
+ *
+ * Bit layout:
+ *   7   6   5   4   3   2   1   0
+ *   -   -   -   -   -   -   -   A
+ *
+ *   Bit 7 — Current speed (read-only):
+ *            0 = Normal-speed mode
+ *            1 = Double-speed mode
+ *
+ *   Bit 0 — Switch armed (read/write):
+ *            0 = Not armed
+ *            1 = Armed (prepare speed switch)
+ *
+ *   Bits 6–1: Unused
+ */
+class KEY1 : public MMIORegister {
+public:
+  void write(const byte_t value) override;
+  byte_t read() override;
+
+  /* Speed mode is actually set  */
+  SpeedSwitchMode get_cur_speed() const;
+  bool switch_armed() const;
+
+private:
+  byte_t state{};
+};
+
 namespace PPU {
 
 /*
