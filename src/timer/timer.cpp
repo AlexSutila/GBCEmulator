@@ -3,6 +3,13 @@
 #include "memory/bus.hpp"
 #include "memory/mmio/dmg.hpp"
 
+template <typename T> T *init_mmio(AddressBus *bus, IORegisterMapping reg_id) {
+  auto *reg = bus->get_mmio(reg_id);
+  if (auto *casted = dynamic_cast<T *>(reg))
+    return casted;
+  throw std::logic_error(std::string("Failed to configure MMIO (Timer)"));
+}
+
 TimerUnit::TimerUnit(AddressBus *const bus, runtime_sys_info &sys,
                      bool cgb_model)
     : cgb_model_(cgb_model), // Since we emulate a GameBoyColor, always true

@@ -5,17 +5,8 @@
 #include "emu_types.hpp"
 #include "memory/bus.hpp"
 #include "memory/mmio/dmg.hpp"
-#include "memory/mmio/mmio.hpp"
 
 struct runtime_sys_info;
-
-template <typename T>
-T *init_mmio(AddressBus *const bus, IORegisterMapping reg_id) {
-  auto *reg = bus->get_mmio(reg_id);
-  if (auto *casted = dynamic_cast<T *>(reg))
-    return casted;
-  throw std::logic_error(std::string("Failed to configure MMIO (PPU)"));
-}
 
 class TimerUnit {
 public:
