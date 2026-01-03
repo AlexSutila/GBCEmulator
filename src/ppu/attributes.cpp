@@ -1,18 +1,24 @@
 #include "ppu/attributes.hpp"
 
+byte_t do_y_px_flip(const byte_t y_px, // Offset within tile
+                    const byte_t attr) // Decides flip
+{
+  constexpr byte_t max_pixel_idx = 7, pixel_mask = 0x7;
+  if (get_bg_attrib_y_flip(attr))
+    return max_pixel_idx - (y_px & pixel_mask);
+  return y_px & pixel_mask;
+}
+
 byte_t calc_color_idx(const byte_t lo_byte,  // Low data byte
                       const byte_t hi_byte,  // High data byte
                       std::size_t pixel_idx, // Which pixel?
                       const byte_t attr)     // Decides flip
 {
   byte_t hi_bit{}, lo_bit{};
-
   if (get_bg_attrib_x_flip(attr)) {
     hi_bit = (hi_byte & (0x01 << pixel_idx)) != 0 ? 1 : 0;
     lo_bit = (lo_byte & (0x01 << pixel_idx)) != 0 ? 1 : 0;
-  }
-
-  else {
+  } else {
     hi_bit = (hi_byte & (0x80 >> pixel_idx)) != 0 ? 1 : 0;
     lo_bit = (lo_byte & (0x80 >> pixel_idx)) != 0 ? 1 : 0;
   }

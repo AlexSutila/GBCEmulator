@@ -114,10 +114,11 @@ bool Fetcher::should_discard() const {
 const byte_t Fetcher::fetch_tile_data(bool high) const {
   constexpr auto tile_size_bytes = 16;
   constexpr auto tile_row_bytes = 2;
+  const byte_t y_px_idx = calc_pixel_y();
 
   // Get the current Y coordinate at a pixel granularity
-  const byte_t y_pixel_idx = calc_pixel_y() & 0x7;
-  const addr_t y_offset = y_pixel_idx * tile_row_bytes;
+  const byte_t y_px_idx_flipped = do_y_px_flip(y_px_idx, data.tile_attr);
+  const addr_t y_offset = y_px_idx_flipped * tile_row_bytes;
 
   // Need to consider y-offset based on LY register
   addr_t data_offset = (data.tile_idx * tile_size_bytes) + y_offset;
@@ -227,8 +228,10 @@ void Fetcher::do_push_data() {
       ++pixels_discarded;
 
     // Use data bytes and attribute data to derive pixel information
-    const byte_t color_idx =
-        calc_color_idx(data.data_lo, data.data_hi, shift, data.tile_attr);
+    const byte_t color_idx = calc_color_idx(data.data_lo,    // lsbs
+                                            data.data_hi,    // msbs
+                                            shift,           // which pixel
+                                            data.tile_attr); // flip?
     const byte_t palette_idx = get_bg_attrib_palette(data.tile_attr);
 
     // Pushes a single pixel, may or may not be discarded depending on SCX

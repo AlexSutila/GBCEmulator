@@ -4,9 +4,11 @@
 #include "emu_types.hpp"
 #include <cstddef>
 
-/*
- * Helper functions for flipping tile data, see attribute information below
- */
+[[nodiscard]] byte_t do_y_px_flip(const byte_t y_px,  // Offset within tile
+                                  const byte_t attr); // Decides flip
+
+/* Extracts the color index from the data bytes based on the index itself
+ * and whether or not the tile is flipped */
 [[nodiscard]] byte_t calc_color_idx(const byte_t lo_byte,  // Low data byte
                                     const byte_t hi_byte,  // High data byte
                                     std::size_t pixel_idx, // Which pixel?
