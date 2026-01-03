@@ -4,6 +4,11 @@
 
 namespace SYS {
 
+/* Two is the only bit this emulator concerns itself with, though others are
+ * rumored to have other purposes. */
+void KEY0::write(const byte_t value) { state = value | 0xFB; }
+byte_t KEY0::read() { return state | 0xFB; }
+
 /* Bits 1-6 are unused, store ones. */
 void KEY1::write(const byte_t value) { state = value | 0x7E; }
 byte_t KEY1::read() { return state | 0x7E; }

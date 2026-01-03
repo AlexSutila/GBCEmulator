@@ -58,7 +58,8 @@ private:
   std::unique_ptr<Cartridge> cart_;
 
   /* System control registers: (speed mode, backwards compatability, etc) */
-  SYS::KEY1 key1{};
+  SYS::KEY0 key0{}; // Controls DMG backwards compatability
+  SYS::KEY1 key1{}; // Controls clock speed mode
 
   /* MMIO refs maintained for convenience */
   PPU::VramBank vram_bank_ctrl{};

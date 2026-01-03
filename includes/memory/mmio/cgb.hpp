@@ -14,6 +14,24 @@ enum class SpeedSwitchMode {
 };
 
 /*
+ *  Bit 7 6 5 4 3           2            1 0
+ * KEY0           DMG compatibility mode
+ *      - - - - - ---------------------- - -
+ * DMG compatibility mode:
+ *   0 = Disabled (full CGB mode, for regular CGB cartridges)
+ *   1 = Enabled  (for DMG-only cartridges)
+ */
+class KEY0 : public MMIORegister {
+public:
+  void write(const byte_t value) override;
+  byte_t read() override;
+  KEY0() : state(0) {}
+
+private:
+  byte_t state{};
+};
+
+/*
  * FF4D — KEY1/SPD (CGB mode only): Prepare speed switch
  *
  * Bit layout:
@@ -31,6 +49,7 @@ class KEY1 : public MMIORegister {
 public:
   void write(const byte_t value) override;
   byte_t read() override;
+  KEY1() : state(0) {}
 
   /* Speed mode is actually set  */
   SpeedSwitchMode get_cur_speed() const;
