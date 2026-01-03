@@ -8,12 +8,6 @@ struct runtime_sys_info;
 
 namespace SYS {
 
-enum class SpeedSwitchMode {
-  SINGLE_SPEED_MODE,
-  // Gotta go fast!!!
-  DOUBLE_SPEED_MODE,
-};
-
 /*
  *  Bit 7 6 5 4 3           2            1 0
  * KEY0           DMG compatibility mode
@@ -27,8 +21,10 @@ public:
   void write(const byte_t value) override;
   byte_t read() override;
   KEY0(runtime_sys_info &sys) : sys_(sys), state(0) {}
+  constexpr bool cgb() override { return true; }
 
 private:
+  static constexpr byte_t dmg_mode_mask = 0x04;
   runtime_sys_info &sys_;
   byte_t state{};
 };
@@ -52,12 +48,14 @@ public:
   void write(const byte_t value) override;
   byte_t read() override;
   KEY1(runtime_sys_info &sys) : sys_(sys), state(0) {}
+  constexpr bool cgb() override { return true; }
 
   /* Speed mode is actually set  */
-  SpeedSwitchMode get_cur_speed() const;
   bool switch_armed() const;
 
 private:
+  static constexpr byte_t cur_speed_mask = 0x80;
+  static constexpr byte_t used_bits_mask = 0x81;
   runtime_sys_info &sys_;
   byte_t state{};
 };

@@ -1,22 +1,30 @@
 #include "memory/mmio/cgb.hpp"
 #include "emu_types.hpp"
+#include "gbc.hpp"
 #include <cassert>
 
 namespace SYS {
 
-/* Two is the only bit this emulator concerns itself with, though others are
- * rumored to have other purposes. */
-void KEY0::write(const byte_t value) { state = value | 0xFB; }
-byte_t KEY0::read() { return state | 0xFB; }
+void KEY0::write(const byte_t value) {
+  /* Two is the only bit this emulator concerns itself with, though others are
+   * rumored to have other purposes. */
+  state = (value & dmg_mode_mask) | ~dmg_mode_mask;
+  /* This will be visible to components that need to be aware about the current
+   * speed mode the system is operating in. */
+  sys_.double_speed = (state & dmg_mode_mask) == 0;
+}
+byte_t KEY0::read() { return state | ~dmg_mode_mask; }
 
-/* Bits 1-6 are unused, store ones. */
-void KEY1::write(const byte_t value) { state = value | 0x7E; }
-byte_t KEY1::read() { return state | 0x7E; }
-
-/* Getter for current speed mode of the console */
-SpeedSwitchMode KEY1::get_cur_speed() const {
-  const byte_t cur_speed = (state & 0x80) >> 7;
-  return static_cast<SpeedSwitchMode>(cur_speed);
+void KEY1::write(const byte_t value) {
+  /* The actual meaning of bit 7 in this state is meaningless, differentiation
+   * between modes will be accomplished through the `sys_` member. */
+  state = (value & 0x01) | ~used_bits_mask;
+}
+byte_t KEY1::read() {
+  byte_t value = state | ~used_bits_mask;
+  if (sys_.double_speed)
+    value = value | cur_speed_mask;
+  return value;
 }
 
 /* Switch to the `other` mode will be made on execution of the next STOP

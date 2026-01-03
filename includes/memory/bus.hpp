@@ -40,9 +40,6 @@ public:
   MMIORegister *get_mmio(IORegisterMapping mapping) const;
   AddressBus(runtime_sys_info &sys);
 
-  /* For clock rate control (normal vs double speed mode) */
-  SYS::SpeedSwitchMode get_speed_mode() const { return key1.get_cur_speed(); }
-
   /* Cartridge connections */
   void insert_cartridge(cart c);
   void eject_cartridge();
