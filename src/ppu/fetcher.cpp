@@ -218,24 +218,22 @@ void Fetcher::do_push_data() {
   if (cur_clks < min_state_clks || !fifo_.can_push())
     return;
 
-  // Compute palette indices
-  for (int shift{7}; shift >= 0; shift--) {
+  // Attempt to push pixels to the FIFO, eight are pushed per push operation
+  for (std::size_t shift{0}; shift < 8; shift++) {
     const bool discard = should_discard();
 
     // Track number of pixels discarded to implement fine scroll
     if (discard)
       ++pixels_discarded;
 
-    // Otherwise, the bits from lo and hi are interleaved to form 8 pixels
-    const byte_t hi_bit = (data.data_hi & (1 << shift)) != 0 ? 1 : 0;
-    const byte_t lo_bit = (data.data_lo & (1 << shift)) != 0 ? 1 : 0;
+    // Use data bytes and attribute data to derive pixel information
+    const byte_t color_idx =
+        calc_color_idx(data.data_lo, data.data_hi, shift, data.tile_attr);
+    const byte_t palette_idx = get_bg_attrib_palette(data.tile_attr);
 
-    // Color data is derived from both data bits, and potentially a palette
-    byte_t palette_idx = get_bg_attrib_palette(data.tile_attr);
-    byte_t color_idx = (hi_bit << 1) | lo_bit;
+    // Pushes a single pixel, may or may not be discarded depending on SCX
     fifo_.push({
         .color_idx = color_idx,
-        // Not used if in DMG mode, but we populate it anyway
         .palette_idx = palette_idx,
         .discard = discard,
     });

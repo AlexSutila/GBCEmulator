@@ -2,6 +2,15 @@
 #define __ATTRIBUTES_H
 
 #include "emu_types.hpp"
+#include <cstddef>
+
+/*
+ * Helper functions for flipping tile data, see attribute information below
+ */
+[[nodiscard]] byte_t calc_color_idx(const byte_t lo_byte,  // Low data byte
+                                    const byte_t hi_byte,  // High data byte
+                                    std::size_t pixel_idx, // Which pixel?
+                                    const byte_t attr);    // Decides flip
 
 /*
  * BG Map Attributes (CGB Mode only)
@@ -20,7 +29,8 @@
  *
  * Bit 7 – Priority:
  *   0 = Normal BG/Window priority
- *   1 = BG/Window color indices 1–3 are drawn over OBJ, regardless of OBJ priority
+ *   1 = BG/Window color indices 1–3 are drawn over OBJ, regardless of OBJ
+ * priority
  *
  * Bit 6 – Y flip:
  *   0 = Normal
@@ -48,5 +58,7 @@
 
 [[nodiscard]] byte_t get_bg_attrib_palette(byte_t attrib);
 [[nodiscard]] byte_t get_bg_attrib_bank(byte_t attrib);
+[[nodiscard]] bool get_bg_attrib_x_flip(byte_t attrib);
+[[nodiscard]] bool get_bg_attrib_y_flip(byte_t attrib);
 
 #endif // __ATTRIBUTES_H
