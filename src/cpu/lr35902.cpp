@@ -17,7 +17,8 @@ LR35902::LR35902(AddressBus *bus_ptr)
     : bus(bus_ptr),  // For memory access
       ime(),         // Acts as interrupt master enable
       ie_reg(false), // Enables individual interrupts
-      if_reg(true)   // Requests individual interrupts
+      if_reg(true),  // Requests individual interrupts
+      halted(false)  // Halts execution until interrupted
 {
   using flags = InterruptFlagMask;
   using mmio = IORegisterMapping;
@@ -41,7 +42,7 @@ LR35902::LR35902(AddressBus *bus_ptr)
   init_alu(lookup);
   init_bitops(lookup);
   init_branch(lookup);
-  init_control(lookup);
+  init_control(lookup, &halted);
   init_moves(lookup);
 
   /* Configure interrupts */
@@ -102,11 +103,8 @@ LR35902::ProcessorState LR35902::get_state() const {
   return state;
 }
 
+// Lower bits get higher priority, return the corresponding ISR
 std::tuple<bool, Instruction *> LR35902::should_interrupt() {
-  if (!ime.is_enabled())
-    return {false, nullptr};
-
-  // Lower bits get higher priority, return the corresponding ISR
   for (byte_t shift{0}; shift < 5; shift++) {
     const auto flag = static_cast<InterruptFlagMask>(1 << shift);
     if (ie_reg.get_flag(flag) && if_reg.get_flag(flag))
@@ -116,12 +114,12 @@ std::tuple<bool, Instruction *> LR35902::should_interrupt() {
 }
 
 /* Read opcode from PC, populate `ins_` instruction reference */
-void LR35902::fetch() {
+void LR35902::do_fetch() {
   ime.step();
 
   // Check for interrupts, delay fetch until after ISR
   auto [interrupted, isr] = should_interrupt();
-  if (interrupted)
+  if (ime.is_enabled() && interrupted)
     ins_ = isr;
 
   // Else continue with fetch/decode/exec as usual
@@ -142,7 +140,7 @@ void LR35902::fetch() {
 }
 
 /* Parse operands, prepare for execution */
-void LR35902::decode() {
+void LR35902::do_decode() {
   state = CpuStates::STATE_EXECUTE;
   total_ins_clks.reset();
   cur_ins_clks = 0;
@@ -150,24 +148,62 @@ void LR35902::decode() {
 }
 
 /* Execute instruction on critical mem-access clock cycle */
-void LR35902::execute() {
+void LR35902::do_execute() {
   if (cur_ins_clks == ins_->mem_access_t_cycle())
     total_ins_clks = ins_->exec();
   ++cur_ins_clks;
 
   /* Complete instruction based on execution time */
-  if (total_ins_clks.has_value() && cur_ins_clks == total_ins_clks.value())
+  if (!total_ins_clks.has_value() || cur_ins_clks < total_ins_clks.value())
+    return;
+
+  /* If the instruction executed was `HALT`, the processor suspends its
+   * execution until it is awaken by some interrupt source. The exact behavior
+   * is conditional depending on whether IME is enabled or not. */
+  else if (halted) [[unlikely]]
+    state = CpuStates::STATE_HALTED;
+
+  /* Otherwise, continue fetch/parse/execute pipeline as usual. */
+  else
     state = CpuStates::STATE_FETCH;
+}
+
+void LR35902::do_halt() {
+  ime.step();
+
+  /* The processor waits until an interrupt is requested, in other words two
+   * bits are set in IE and IF such that the bitwise AND is non-zero. The
+   * behavior varies when IME is enabled or disabled. */
+  auto [interrupted, isr] = should_interrupt();
+
+  /* If IME is enabled, execution stops until the interrupt is requested, then
+   * interrupt is serviced and execution resumes as normal. */
+  if (ime.is_enabled() && interrupted) {
+    state = CpuStates::STATE_DECODE;
+    halted = false;
+    ins_ = isr;
+  }
+
+  /* If IME is disabled, the execution still stops. The only difference is the
+   * interrupt will not be serviced and it just continues executing from the
+   * instruction following `HALT`. */
+  else if (interrupted) {
+    state = CpuStates::STATE_FETCH;
+    halted = false;
+  }
 }
 
 void LR35902::step() {
   switch (state) {
   case STATE_FETCH: // Break omitted intentionally
-    fetch();
+    do_fetch();
   case STATE_DECODE: // Break omitted intentionally
-    decode();
+    do_decode();
   case STATE_EXECUTE:
-    execute();
+    do_execute();
+    break;
+  case STATE_HALTED:
+    do_halt();
     break;
   }
 }

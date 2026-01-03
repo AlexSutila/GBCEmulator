@@ -110,10 +110,16 @@ private:
  */
 class HALT : public Instruction {
 public:
-  HALT(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
-  std::size_t exec() override { return 4; }
+  HALT(RegisterFile *reg_file_ptr, AddressBus *bus_ptr, bool *halted_ptr)
+      : Instruction(reg_file_ptr, bus_ptr), halted(halted_ptr) {}
+  std::size_t exec() override {
+    *halted = true;
+    return 4;
+  }
   std::string describe() override { return std::format("HALT"); }
+
+private:
+  bool *const halted{};
 };
 
 /*

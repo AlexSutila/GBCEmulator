@@ -49,13 +49,14 @@ private:
   InterruptMasterEnable ime;
   InterruptBits ie_reg;
   InterruptBits if_reg;
+  bool halted;
 
   /* Opcode decoding configuration */
   using lookup_table_t = std::array<std::unique_ptr<Instruction>, 256>;
   void init_alu(lookup_table_t &lookup);
   void init_bitops(lookup_table_t &lookup);
   void init_branch(lookup_table_t &lookup);
-  void init_control(lookup_table_t &lookup);
+  void init_control(lookup_table_t &lookup, bool *halted);
   void init_moves(lookup_table_t &lookup);
   lookup_table_t lookup{};
 
@@ -63,10 +64,12 @@ private:
     STATE_FETCH,
     STATE_DECODE,
     STATE_EXECUTE,
+    STATE_HALTED,
   } state;
-  void fetch();
-  void decode();
-  void execute();
+  void do_fetch();
+  void do_decode();
+  void do_execute();
+  void do_halt();
 
   Instruction *ins_{}; // Reference to current ins
   std::optional<std::size_t> total_ins_clks{};
