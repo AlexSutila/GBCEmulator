@@ -7,6 +7,8 @@
 #include "memory/mmio/dmg.hpp"
 #include "memory/mmio/mmio.hpp"
 
+struct runtime_sys_info;
+
 template <typename T>
 T *init_mmio(AddressBus *const bus, IORegisterMapping reg_id) {
   auto *reg = bus->get_mmio(reg_id);
@@ -17,7 +19,8 @@ T *init_mmio(AddressBus *const bus, IORegisterMapping reg_id) {
 
 class TimerUnit {
 public:
-  explicit TimerUnit(AddressBus *const bus, bool cgb_model = true);
+  explicit TimerUnit(AddressBus *const bus, runtime_sys_info &sys,
+                     bool cgb_model = true);
   void reset() noexcept;
   void step() noexcept;
 
@@ -56,7 +59,7 @@ private:
   Timer::TAC tac_reg;
   Timer::DIV div_reg;
 
-  std::uint16_t sys_{};
+  std::uint16_t sys_counter_{};
   byte_t tima_{};
   byte_t tma_{};
   byte_t tac_{};
@@ -67,6 +70,8 @@ private:
 
   bool reload_latch_{};
   std::uint8_t reload_delay_{};
+
+  runtime_sys_info &sys_;
 };
 
 #endif // __TIMER_H

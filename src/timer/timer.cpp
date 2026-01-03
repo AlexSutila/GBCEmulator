@@ -3,12 +3,14 @@
 #include "memory/bus.hpp"
 #include "memory/mmio/dmg.hpp"
 
-TimerUnit::TimerUnit(AddressBus *const bus, const bool cgb_model)
+TimerUnit::TimerUnit(AddressBus *const bus, runtime_sys_info &sys,
+                     bool cgb_model)
     : cgb_model_(cgb_model), // Since we emulate a GameBoyColor, always true
       tima_reg(*this),       // Timer counter register
       tma_reg(*this),        // Timer modulo register
       tac_reg(*this),        // Timer control register
-      div_reg(*this)         // Divider register
+      div_reg(*this),        // Divider register
+      sys_(sys)              // General operating mode info
 {
   using mmio = IORegisterMapping;
   using namespace PPU;
@@ -25,7 +27,7 @@ TimerUnit::TimerUnit(AddressBus *const bus, const bool cgb_model)
 }
 
 void TimerUnit::reset() noexcept {
-  sys_ = 0;
+  sys_counter_ = 0;
 
   overflow_pending_ = false;
   overflow_delay_ = 0;
@@ -37,15 +39,15 @@ void TimerUnit::reset() noexcept {
 byte_t TimerUnit::read_div() const noexcept {
   // DIV increments at 16384 Hz; in double-speed it's 32768 Hz
   // If sys_ increments once per "timer t-cycle", DIV is sys_[15:8].
-  return static_cast<byte_t>((sys_ >> 8) & 0xFF);
+  return static_cast<byte_t>((sys_counter_ >> 8) & 0xFF);
 }
 
 void TimerUnit::write_div() noexcept {
   // Writing any value resets DIV (and thus sys counter) and can cause an edge
   // tick
-  const bool prev_in = edge_input(sys_, tac_);
-  sys_ = 0;
-  const bool next_in = edge_input(sys_, tac_);
+  const bool prev_in = edge_input(sys_counter_, tac_);
+  sys_counter_ = 0;
+  const bool next_in = edge_input(sys_counter_, tac_);
 
   // falling edge -> tick (with CGB gating difference)
   if (prev_in && !next_in) {
@@ -85,9 +87,9 @@ void TimerUnit::write_tac(byte_t v) noexcept {
   v &= 0x07;
 
   // "writing to TAC may increase TIMA once"
-  const bool prev_in = edge_input(sys_, tac_);
+  const bool prev_in = edge_input(sys_counter_, tac_);
   tac_ = v;
-  const bool next_in = edge_input(sys_, tac_);
+  const bool next_in = edge_input(sys_counter_, tac_);
   if (prev_in && !next_in) {
     if (tick_allowed_on_fall())
       timer_tick_pulse();
@@ -171,9 +173,9 @@ void TimerUnit::timer_tick_pulse() noexcept {
 void TimerUnit::step() noexcept {
   service_overflow_pipeline();
 
-  const bool prev = edge_input(sys_, tac_);
-  ++sys_;
-  const bool next = edge_input(sys_, tac_);
+  const bool prev = edge_input(sys_counter_, tac_);
+  ++sys_counter_;
+  const bool next = edge_input(sys_counter_, tac_);
 
   if (prev && !next) {
     if (tick_allowed_on_fall())

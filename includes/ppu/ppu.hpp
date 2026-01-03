@@ -14,9 +14,12 @@
 #include <cstdint>
 #include <optional>
 
+struct runtime_sys_info;
+
 class PixelProcessingUnit {
 public:
-  PixelProcessingUnit(AddressBus *bus, Renderer *renderer);
+  PixelProcessingUnit(AddressBus *bus, Renderer *render,
+                      runtime_sys_info &sys);
   void set_cgb(const byte_t cgb_flag);
   void reset();
   void step();
@@ -24,6 +27,7 @@ public:
 private:
   Renderer *const renderer{};
   InterruptBits *if_reg{};
+  runtime_sys_info &sys_;
 
   /* Convenience references to important PPU mmio registers */
   PPU::LCDCtrl lcdc_{};

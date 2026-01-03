@@ -12,13 +12,15 @@
 #include <optional>
 #include <tuple>
 
+struct runtime_sys_info;
+
 /*
  * 8-bit 8080-like Sharp CPU (speculated to be a SM83 core), running
  * between 4.194304 MHz and 8.388608 MHz based on mode of operation
  */
 class LR35902 {
 public:
-  LR35902(AddressBus *bus_ptr);
+  LR35902(AddressBus *bus_ptr, runtime_sys_info &sys);
   void step();
 
   struct ProcessorState {
@@ -40,6 +42,7 @@ public:
 private:
   RegisterFile reg_file{};
   AddressBus *const bus{};
+  runtime_sys_info &sys_;
 
   /* Interrupt handling */
   std::tuple<bool, Instruction *> should_interrupt();

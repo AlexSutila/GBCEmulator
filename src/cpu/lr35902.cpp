@@ -13,8 +13,9 @@
 #include <sstream>
 #include <stdexcept>
 
-LR35902::LR35902(AddressBus *bus_ptr)
+LR35902::LR35902(AddressBus *bus_ptr, runtime_sys_info &sys)
     : bus(bus_ptr),  // For memory access
+      sys_(sys),     // General operating mode info
       ime(),         // Acts as interrupt master enable
       ie_reg(false), // Enables individual interrupts
       if_reg(true),  // Requests individual interrupts

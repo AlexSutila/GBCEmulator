@@ -21,9 +21,10 @@ template <typename T> T *init_mmio(AddressBus *bus, IORegisterMapping reg_id) {
   throw std::logic_error(std::string("Failed to configure MMIO (PPU)"));
 }
 
-PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus,
-                                         Renderer *render)
+PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus, Renderer *render,
+                                         runtime_sys_info &sys)
     : renderer(render), // For placing pixel data to frame buffer
+      sys_(sys),        // General operating mode info
       lcdc_(),          // LCD control
       stat_(),          // PPU status
       lyc_(),           // Current scanline compare

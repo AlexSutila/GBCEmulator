@@ -189,7 +189,8 @@ PYBIND11_MODULE(gbc_py, m) {
       .def_readwrite("l", &LR35902::ProcessorState::l)
       .def_readwrite("ime_enabled", &LR35902::ProcessorState::ime_enabled);
   py::class_<LR35902>(m, "LR35902")
-      .def(py::init<AddressBus *>(), py::arg("bus"),
+      .def(py::init<AddressBus *, runtime_sys_info &>(), py::arg("bus"),
+           py::arg("sys"),
            py::keep_alive<1, 2>() // LR35902 keeps AddressBus alive
            )
       .def("step", &LR35902::step)
@@ -238,8 +239,8 @@ PYBIND11_MODULE(gbc_py, m) {
 
   // Timer class
   py::class_<TimerUnit>(m, "TimerUnit")
-      .def(py::init<AddressBus *, bool>(), py::arg("bus"),
-           py::arg("cgb_model") = true)
+      .def(py::init<AddressBus *, runtime_sys_info &, bool>(), py::arg("bus"),
+           py::arg("sys"), py::arg("cgb_model") = true)
       .def("reset", &TimerUnit::reset)
       .def("step", &TimerUnit::step)
       .def("read_div", &TimerUnit::read_div)
@@ -267,8 +268,8 @@ PYBIND11_MODULE(gbc_py, m) {
 
   // Pixel Processor class
   py::class_<PixelProcessingUnit>(m, "PixelProcessor")
-      .def(py::init<AddressBus *, Renderer *>(), py::arg("bus"),
-           py::arg("renderer"),
+      .def(py::init<AddressBus *, Renderer *, runtime_sys_info &>(),
+           py::arg("bus"), py::arg("renderer"), py::arg("sys"),
            py::keep_alive<1, 2>()) // PixelProcessor keeps AddressBus alive
       .def("step", &PixelProcessingUnit::step);
 

@@ -18,9 +18,9 @@ GameBoyColor::GameBoyColor(bool headless) {
 
   /* Component initializaiton */
   bus = std::make_unique<AddressBus>(sys);
-  cpu = std::make_unique<LR35902>(bus.get());
-  ppu = std::make_unique<PixelProcessingUnit>(bus.get(), renderer.get());
-  timer = std::make_unique<TimerUnit>(bus.get());
+  cpu = std::make_unique<LR35902>(bus.get(), sys);
+  ppu = std::make_unique<PixelProcessingUnit>(bus.get(), renderer.get(), sys);
+  timer = std::make_unique<TimerUnit>(bus.get(), sys);
 }
 
 void GameBoyColor::insert_cartridge(cart c) {
