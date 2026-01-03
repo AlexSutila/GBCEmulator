@@ -62,7 +62,13 @@ public:
   MMIORegister(const byte_t init_state) : state(init_state) {}
   MMIORegister() : state(0) {}
 
-  /* Override and return true if used only in CGB mode */
+  /* Overriding this is entirely optional. The intention is, return true if this
+   * should behave as an unused 'open bus - return 0xFF' in CGB mode type
+   * register. Such support may be useful for extending this code backwards to
+   * re-implement a true DMG gameboy emulator.
+   *
+   * Although it may be useless for this emulator, which strictly emulates a
+   * gameboy color, we leave the option here regardless. */
   virtual constexpr bool cgb() { return false; }
 
 private:

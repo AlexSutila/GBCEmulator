@@ -22,6 +22,9 @@ private:
   PPU::PaletteData data_reg;
 };
 
+/* TODO: This is currently not in use, however I'm leaving the support for it
+ * anyway. It would be cool to offer a togglable "additional" compatability
+ * option that bypasses the coloring the CGB hardware does for DMG games. */
 [[nodiscard]] const std::uint32_t get_mono_color(const byte_t idx);
 
 #endif // __PALETTE_H

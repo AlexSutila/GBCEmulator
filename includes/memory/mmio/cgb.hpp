@@ -4,6 +4,7 @@
 #include "emu_types.hpp"
 #include "memory/mmio/mmio.hpp"
 #include <array>
+
 struct runtime_sys_info;
 
 namespace SYS {
@@ -21,7 +22,6 @@ public:
   void write(const byte_t value) override;
   byte_t read() override;
   KEY0(runtime_sys_info &sys) : sys_(sys), state(0) {}
-  constexpr bool cgb() override { return true; }
 
 private:
   static constexpr byte_t dmg_mode_mask = 0x04;
@@ -48,7 +48,6 @@ public:
   void write(const byte_t value) override;
   byte_t read() override;
   KEY1(runtime_sys_info &sys) : sys_(sys), state(0) {}
-  constexpr bool cgb() override { return true; }
 
   /* Speed mode is actually set  */
   bool switch_armed() const;
@@ -75,8 +74,6 @@ public:
   void write(const byte_t value) override;
   byte_t read() override;
   VramBank() : MMIORegister(0), state(0) {}
-
-  constexpr bool cgb() override { return true; }
   const byte_t get_bank() const;
 
 private:
@@ -108,7 +105,6 @@ public:
   void write(const byte_t value) override;
   byte_t read() override;
   PaletteIdx() : state(0) {}
-  constexpr bool cgb() override { return true; }
 
   // Writes to color RAM can increase register value
   bool auto_inc_enabled() const;
@@ -125,7 +121,6 @@ public:
   void write(const byte_t value) override;
   byte_t read() override;
   PaletteData(std::array<byte_t, 64> &mem, PaletteIdx &idx);
-  constexpr bool cgb() override { return true; }
 
 private:
   std::array<byte_t, 64> &mem_;
@@ -147,8 +142,6 @@ public:
   void write(const byte_t value) override;
   byte_t read() override;
   WramBank() : MMIORegister(0), state(1) {}
-
-  constexpr bool cgb() override { return true; }
   const byte_t get_bank() const;
 
 private:

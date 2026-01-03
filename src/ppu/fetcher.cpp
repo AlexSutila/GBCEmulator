@@ -59,9 +59,6 @@ void Fetcher::reset() {
 // fetch specific tile metadata (CGB mode BG map attributes, for example).
 byte_t Fetcher::read_vram_byte(addr_t addr, byte_t bank) const {
   assert((addr >= 0x8000 && addr <= 0x9FFF) && (bank < 2));
-  if (!sys_.cgb_mode && bank != 0)
-    throw std::runtime_error(
-        "Fetcher::read_vram_byte(), non-zero bank in DMG mode");
   return vram_.at(bank)[addr - vram_base_addr];
 }
 
@@ -130,7 +127,7 @@ const byte_t Fetcher::fetch_tile_data(bool high) const {
   // If we are in CGB mode, the tile data can come from either VRAM bank. The
   // bank to fetch the tile from comes from the tile attributes. When in DMG
   // mode, the lower bank is always used.
-  const byte_t bank = sys_.cgb_mode ? get_bg_attrib_bank(data.tile_attr) : 0;
+  const byte_t bank = get_bg_attrib_bank(data.tile_attr);
 
   // Read data based on bg/win data addressing mode
   switch (lcdc_.bg_win_data_area()) {

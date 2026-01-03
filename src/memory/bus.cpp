@@ -87,18 +87,10 @@ void AddressBus::connect_mmio(const addr_t addr, MMIORegister *const reg) {
 }
 
 const byte_t AddressBus::get_vram_bank() const {
-  if (!sys_.cgb_mode) // Unbanked for DMG
-    return 0;
   return vram_bank_ctrl.get_bank();
 }
 
 const byte_t AddressBus::get_wram_bank() const {
-  /* Only call for upper address range. Lower address (0xC000-0xDFFF) is always
-   * mapped to bank zero, regardless of either CGB/DMG operating mode. */
-  if (!sys_.cgb_mode)
-    return 1;
-  /* Maps to banks 1-7. Zero also maps to bank one, but that logic is handled in
-   * the MMIORegister itself. This is garunteed to be between 1 and 7. */
   return wram_bank_ctrl.get_bank();
 }
 
@@ -159,7 +151,7 @@ const byte_t AddressBus::read_byte(const addr_t addr) {
     auto const &mmio = io_registers.at(addr);
 
     // Only write CGB registers if in CGB mode, fallback to 0xFF otherwise
-    return (!mmio->cgb() || sys_.cgb_mode) ? mmio->read() : open_bus();
+    return mmio->read();
   }
 
   /* Read from to High RAM */
@@ -212,8 +204,7 @@ void AddressBus::write_byte(const addr_t addr, const byte_t value) {
     auto const &mmio = io_registers.at(addr);
 
     // Only write CGB registers if in CGB mode
-    if (!mmio->cgb() || sys_.cgb_mode)
-      mmio->write(value);
+    mmio->write(value);
   }
 
   /* Write to High RAM */
