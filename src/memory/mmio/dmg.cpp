@@ -92,6 +92,15 @@ byte_t BGP::get_color_idx(byte_t idx) const {
 
 }; // namespace PPU
 
+namespace DMA {
+
+void DMA::write(const byte_t value) {
+  src_addr_base = static_cast<addr_t>(value) << 8;
+}
+byte_t DMA::read() { return static_cast<byte_t>(src_addr_base >> 8); }
+
+} // namespace DMA
+
 /* Always start with boot ROM mapped */
 BootROMCtrl::BootROMCtrl() : MMIORegister() { map_boot_rom = true; }
 

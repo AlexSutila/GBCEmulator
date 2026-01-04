@@ -39,8 +39,15 @@ void GameBoyColor::init_test_bed() {
 
 void GameBoyColor::step() {
   cpu->step();
+
+  // Drives any DMA along that may be currently active
+  bus->step_dma();
+
+  // Step remaning components
   ppu->step();
   timer->step();
+
+  // System clocks are maintained in unit `t-cycles`
   ++sys.elapsed_clocks;
 }
 

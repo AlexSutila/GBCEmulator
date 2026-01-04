@@ -3,6 +3,7 @@
 
 #include "cart/cart.hpp"
 #include "emu_types.hpp"
+#include "memory/dma.hpp"
 #include "memory/mmio/cgb.hpp"
 #include "memory/mmio/dmg.hpp"
 #include "memory/mmio/mmio.hpp"
@@ -36,9 +37,14 @@ class AddressBus {
 public:
   void write_byte(const addr_t addr, const byte_t value);
   const byte_t read_byte(const addr_t addr);
+  AddressBus(runtime_sys_info &sys);
+
+  /* Responsible for DMA transfer when DMA routines are active */
+  void step_dma();
+
+  /* For attaching MMIO component interface registers */
   void connect_mmio(const addr_t addr, MMIORegister *const reg);
   MMIORegister *get_mmio(IORegisterMapping mapping) const;
-  AddressBus(runtime_sys_info &sys);
 
   /* Cartridge connections */
   void insert_cartridge(cart c);
@@ -59,6 +65,9 @@ private:
   /* System control registers: (speed mode, backwards compatability, etc) */
   SYS::KEY0 key0; // Controls DMG backwards compatability
   SYS::KEY1 key1; // Controls clock speed mode
+
+  /* Direct memory access routine modules */
+  ObjAttrDMA oam_dma;
 
   /* MMIO refs maintained for convenience */
   PPU::VramBank vram_bank_ctrl{};

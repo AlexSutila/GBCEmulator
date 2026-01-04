@@ -227,6 +227,41 @@ private:
 
 } // namespace PPU
 
+class ObjAttrDMA;
+namespace DMA {
+
+/**
+ * FF46 — DMA: OAM DMA source address & start
+ *
+ * Writing to this register starts a DMA transfer from ROM or RAM to OAM
+ * (Object Attribute Memory).
+ *
+ * The written value specifies the source address divided by 0x100:
+ *
+ *   Source:      0xXX00–0xXX9F   (XX = 0x00 to 0xDF)
+ *   Destination: 0xFE00–0xFE9F
+ *
+ * The transfer copies 160 bytes and takes 160 M-cycles:
+ *   - 640 dots (≈1.4 scanlines) in normal speed
+ *   - 320 dots (≈0.7 scanlines) in CGB double-speed mode
+ *
+ * This operation is significantly faster than a CPU-driven memory copy. This
+ * MMIORegister derived class only serves as the interface to tell DMA to start,
+ * but the underlying ObjAttrDMA class is what actually transfers data.
+ */
+class DMA : public MMIORegister {
+public:
+  void write(const byte_t value) override;
+  byte_t read() override;
+  DMA(ObjAttrDMA &dma) : src_addr_base(0), dma_(dma) {}
+
+private:
+  addr_t src_addr_base{};
+  ObjAttrDMA &dma_;
+};
+
+}; // namespace DMA
+
 /*
  * 0xFF50 - Boot ROM mapping control register
  */

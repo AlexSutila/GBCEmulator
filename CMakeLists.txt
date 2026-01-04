@@ -35,6 +35,7 @@ set(GBC_CORE_SOURCES
     src/memory/mmio/dmg.cpp
     src/memory/mmio/cgb.cpp
     src/memory/mmio/mmio.cpp
+    src/memory/dma.cpp
 
     src/timer/timer.cpp
     src/ppu/ppu.cpp
