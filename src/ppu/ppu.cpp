@@ -108,13 +108,14 @@ bool PixelProcessingUnit::should_advance_ly() {
  * pixel FIFO rendering pipeline. This produces an RGB value used directly by
  * our software renderer. Behavior varies between CGB and DMG modes. */
 std::uint32_t PixelProcessingUnit::get_rgb(const pixel &px) const {
-  auto color_idx = px.color_idx;
   /* If we are running in backwards compatability mode, we have to consult the
    * BGP register to translate the monochrome color index. On top of the extra
    * coloring offered with CGB hardware. */
-  if (!sys_.cgb_mode)
-    color_idx = bgp_.get_color_idx(color_idx);
-  return cram->get_cgb_color(color_idx, px.palette_idx);
+  if (!sys_.cgb_mode) {
+    auto true_color_idx = bgp_.get_color_idx(px.color_idx);
+    return cram->get_cgb_color(true_color_idx, 0);
+  }
+  return cram->get_cgb_color(px.color_idx, px.palette_idx);
 }
 
 void PixelProcessingUnit::do_oam_scan() {

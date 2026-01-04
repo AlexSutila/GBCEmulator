@@ -135,7 +135,7 @@ const byte_t Fetcher::fetch_tile_data(bool high) const {
   case PPU::TileDataArea::LO_TILEDATA_BASE:
     /* Inlined some math here, so if it's above 0x9000 you index it normally,
      * but if it is below you basically treat the tile offset like a 0-127
-     * offset from 0x8800. You can just use 0x8800 - (127 * tile size in bytes)
+     * offset from 0x8800. You can just use 0x8800 - (128 * tile size in bytes)
      * to achieve the same effect, hence I deviate from the docs a bit. */
     return data.tile_idx < 128 ? read_vram_byte(0x9000 + data_offset, bank)
                                : read_vram_byte(0x8000 + data_offset, bank);
