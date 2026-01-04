@@ -39,6 +39,7 @@ def __load_cart_from_url(url: str, *, rom_name: str | None = None) -> Cart:
 
 @pytest.mark.parametrize(
     "path", [
+
         # Form the bulk of the test suite and are easily verifiable on hardware
         f'{RELEASE}/acceptance/div_timing.gb',
         f'{RELEASE}/acceptance/call_cc_timing2.gb',
@@ -67,13 +68,17 @@ def __load_cart_from_url(url: str, *, rom_name: str | None = None) -> Cart:
         f'{RELEASE}/acceptance/reti_timing.gb',
         f'{RELEASE}/acceptance/ret_timing.gb',
         f'{RELEASE}/acceptance/rst_timing.gb',
+
         # Instruction validity
         f'{RELEASE}/acceptance/instr/daa.gb',
+
         # Unused bits
         f'{RELEASE}/acceptance/bits/mem_oam.gb',
         f'{RELEASE}/acceptance/bits/reg_f.gb',
+
         # Interrupt behaviors
         f'{RELEASE}/acceptance/interrupts/ie_push.gb',
+
         # Timer behaviors
         f'{RELEASE}/acceptance/timer/div_write.gb',
         f'{RELEASE}/acceptance/timer/rapid_toggle.gb',
@@ -88,6 +93,7 @@ def __load_cart_from_url(url: str, *, rom_name: str | None = None) -> Cart:
         f'{RELEASE}/acceptance/timer/tima_reload.gb',
         f'{RELEASE}/acceptance/timer/tima_write_reloading.gb',
         f'{RELEASE}/acceptance/timer/tma_write_reloading.gb',
+
         # Ppu behaviors
         f'{RELEASE}/acceptance/ppu/intr_2_0_timing.gb',
         f'{RELEASE}/acceptance/ppu/intr_2_mode0_timing.gb',
@@ -111,6 +117,16 @@ def __load_cart_from_url(url: str, *, rom_name: str | None = None) -> Cart:
         f'{RELEASE}/emulator-only/mbc1/rom_4Mb.gb',
         f'{RELEASE}/emulator-only/mbc1/rom_512kb.gb',
         f'{RELEASE}/emulator-only/mbc1/rom_8Mb.gb',
+
+        # TODO: Document
+        f'{RELEASE}/emulator-only/mbc5/rom_16Mb.gb',
+        f'{RELEASE}/emulator-only/mbc5/rom_1Mb.gb',
+        f'{RELEASE}/emulator-only/mbc5/rom_2Mb.gb',
+        f'{RELEASE}/emulator-only/mbc5/rom_32Mb.gb',
+        f'{RELEASE}/emulator-only/mbc5/rom_4Mb.gb',
+        f'{RELEASE}/emulator-only/mbc5/rom_512kb.gb',
+        f'{RELEASE}/emulator-only/mbc5/rom_64Mb.gb',
+        f'{RELEASE}/emulator-only/mbc5/rom_8Mb.gb',
     ]
 )
 def test_mooneye(path: str):
