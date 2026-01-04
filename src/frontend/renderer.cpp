@@ -5,13 +5,6 @@
 #include <memory>
 #include <stdexcept>
 
-static constexpr std::uint32_t PALETTE[4] = {
-    0xFFFFFFFF, // white
-    0xFFAAAAAA, // light-grey
-    0xFF555555, // dark-grey
-    0xFF000000  // black
-};
-
 Renderer::Renderer(bool is_headless) : headless(is_headless) {
   if (!SDL_Init(SDL_INIT_VIDEO))
     throw std::runtime_error(SDL_GetError());

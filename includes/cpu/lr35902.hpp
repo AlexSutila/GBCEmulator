@@ -45,7 +45,7 @@ private:
   runtime_sys_info &sys_;
 
   /* Interrupt handling */
-  std::tuple<bool, Instruction *> should_interrupt();
+  std::optional<Instruction *> should_interrupt();
   template <InterruptFlagMask mask, InterruptVector vec>
   std::unique_ptr<Instruction> mk_isr(); // Helper
   std::array<std::unique_ptr<Instruction>, 5> isr_lookup{};

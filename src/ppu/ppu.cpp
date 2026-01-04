@@ -60,7 +60,7 @@ PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus, Renderer *render,
   if_reg = init_mmio<InterruptBits>(bus, mmio::MMIO_INT_FLAGS);
 
   /* Initialize the background pixel FIFO fetching pipeline */
-  bg_fetcher = std::make_unique<Fetcher>(
+  bg_fetcher = std::make_unique<BgWinFetcher>(
       bus->get_vram(), // VRAM reference for fetching tile data
       lcdc_,           // Needs to know if certain control bits are set
       scy_,            // Needed to fetch correct background tile

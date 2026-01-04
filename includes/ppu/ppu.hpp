@@ -75,7 +75,7 @@ private:
   PPU::StatModes state{};
 
   /* Pixel FIFO renderers */
-  std::unique_ptr<Fetcher> bg_fetcher;
+  std::unique_ptr<BgWinFetcher> bg_fetcher;
   PixelFifo fifo;
 
   /* Color RAM adding RGB555 support for CGB models */

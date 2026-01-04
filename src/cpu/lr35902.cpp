@@ -105,13 +105,13 @@ LR35902::ProcessorState LR35902::get_state() const {
 }
 
 // Lower bits get higher priority, return the corresponding ISR
-std::tuple<bool, Instruction *> LR35902::should_interrupt() {
+std::optional<Instruction *> LR35902::should_interrupt() {
   for (byte_t shift{0}; shift < 5; shift++) {
     const auto flag = static_cast<InterruptFlagMask>(1 << shift);
     if (ie_reg.get_flag(flag) && if_reg.get_flag(flag))
-      return {true, isr_lookup.at(shift).get()};
+      return isr_lookup.at(shift).get();
   }
-  return {false, nullptr};
+  return std::nullopt;
 }
 
 /* Read opcode from PC, populate `ins_` instruction reference */
@@ -119,9 +119,9 @@ void LR35902::do_fetch() {
   ime.step();
 
   // Check for interrupts, delay fetch until after ISR
-  auto [interrupted, isr] = should_interrupt();
-  if (ime.is_enabled() && interrupted)
-    ins_ = isr;
+  const auto isr = should_interrupt();
+  if (ime.is_enabled() && isr.has_value())
+    ins_ = isr.value();
 
   // Else continue with fetch/decode/exec as usual
   else {
@@ -175,20 +175,20 @@ void LR35902::do_halt() {
   /* The processor waits until an interrupt is requested, in other words two
    * bits are set in IE and IF such that the bitwise AND is non-zero. The
    * behavior varies when IME is enabled or disabled. */
-  auto [interrupted, isr] = should_interrupt();
+  const auto isr = should_interrupt();
 
   /* If IME is enabled, execution stops until the interrupt is requested, then
    * interrupt is serviced and execution resumes as normal. */
-  if (ime.is_enabled() && interrupted) {
+  if (ime.is_enabled() && isr.has_value()) {
     state = CpuStates::STATE_DECODE;
     halted = false;
-    ins_ = isr;
+    ins_ = isr.value();
   }
 
   /* If IME is disabled, the execution still stops. The only difference is the
    * interrupt will not be serviced and it just continues executing from the
    * instruction following `HALT`. */
-  else if (interrupted) {
+  else if (isr.has_value()) {
     state = CpuStates::STATE_FETCH;
     halted = false;
   }
