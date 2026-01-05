@@ -72,6 +72,10 @@ PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus, Renderer *render,
       sys_             // Fetcher behavior varies between DMG vs CGB mode
   );
 
+  /* Initialize OAM search metadata */
+  constexpr auto max_sprites_per_scanline = 10;
+  oam_data.reserve(max_sprites_per_scanline);
+
   /* Configure PPU to initial state, doesn't technically happen until PPU is
    * enabled but we do it anyway just because. */
   reset();
@@ -131,6 +135,12 @@ void PixelProcessingUnit::do_oam_scan() {
     cur_scanline_clks = cur_mode_clks = 0;
     total_mode_clks = oam_t_cycles;
     scanline_153_bug = false;
+
+    /* Keeps track of which sprite we are on being on. If the sprite is visible
+     * on the current scanline, we push it into the vector to so all the sprites
+     * which need to be rendered can be tracked. */
+    sprites_searched = 0;
+    oam_data.clear();
   }
 
   // TODO:
@@ -143,6 +153,13 @@ void PixelProcessingUnit::do_oam_scan() {
   // OAM incomplete
   if (cur_mode_clks < total_mode_clks.value())
     return;
+
+  /* At this point, this vector contains an array of sprites which are visible
+   * on the current scanline. Since the renderer goes from left to right, any
+   * sprites are also rendered in that order during the drawing state as pixels
+   * are pushed onto the LCD. Hence, sort by `x_pos`. */
+  std::sort(oam_data.begin(), oam_data.end(),
+            [](const Sprite &a, const Sprite &b) { return a.x_pos < b.x_pos; });
 
   // State transition logic
   state = modes::MODE_DRAWING;

@@ -9,7 +9,9 @@
 #include "ppu/fetcher.hpp"
 #include "ppu/fifo.hpp"
 #include "ppu/palette.hpp"
+#include "ppu/sprites.hpp"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -18,8 +20,7 @@ struct runtime_sys_info;
 
 class PixelProcessingUnit {
 public:
-  PixelProcessingUnit(AddressBus *bus, Renderer *render,
-                      runtime_sys_info &sys);
+  PixelProcessingUnit(AddressBus *bus, Renderer *render, runtime_sys_info &sys);
   void reset();
   void step();
 
@@ -44,6 +45,10 @@ private:
   bool should_advance_ly();
   bool scanline_153_bug{};
   PPU::LY ly_{};
+
+  /* For tracking locational data for sprites during OAM search */
+  std::size_t sprites_searched{};
+  std::vector<Sprite> oam_data{};
 
   /* Color palette configuration */
   std::uint32_t get_rgb(const pixel &px) const;
