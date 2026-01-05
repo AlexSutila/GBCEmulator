@@ -253,10 +253,10 @@ class DMA : public MMIORegister {
 public:
   void write(const byte_t value) override;
   byte_t read() override;
-  DMA(ObjAttrDMA &dma) : src_addr_base(0), dma_(dma) {}
+  DMA(ObjAttrDMA &dma) : addr_high(0), dma_(dma) {}
 
 private:
-  addr_t src_addr_base{};
+  byte_t addr_high{};
   ObjAttrDMA &dma_;
 };
 

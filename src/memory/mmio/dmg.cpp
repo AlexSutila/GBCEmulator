@@ -95,9 +95,10 @@ byte_t BGP::get_color_idx(byte_t idx) const {
 namespace DMA {
 
 void DMA::write(const byte_t value) {
-  src_addr_base = static_cast<addr_t>(value) << 8;
+  dma_.start(value);
+  addr_high = value;
 }
-byte_t DMA::read() { return static_cast<byte_t>(src_addr_base >> 8); }
+byte_t DMA::read() { return addr_high; }
 
 } // namespace DMA
 

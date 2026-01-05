@@ -57,9 +57,6 @@ def __load_cart_from_url(url: str, *, rom_name: str | None = None) -> Cart:
         f'{RELEASE}/acceptance/jp_cc_timing.gb',
         f'{RELEASE}/acceptance/jp_timing.gb',
         f'{RELEASE}/acceptance/ld_hl_sp_e_timing.gb',
-        f'{RELEASE}/acceptance/oam_dma_restart.gb',
-        f'{RELEASE}/acceptance/oam_dma_start.gb',
-        f'{RELEASE}/acceptance/oam_dma_timing.gb',
         f'{RELEASE}/acceptance/pop_timing.gb',
         f'{RELEASE}/acceptance/push_timing.gb',
         f'{RELEASE}/acceptance/rapid_di_ei.gb',
@@ -102,6 +99,13 @@ def __load_cart_from_url(url: str, *, rom_name: str | None = None) -> Cart:
         f'{RELEASE}/acceptance/ppu/intr_2_oam_ok_timing.gb',
         f'{RELEASE}/acceptance/ppu/stat_irq_blocking.gb',
         f'{RELEASE}/acceptance/ppu/stat_lyc_onoff.gb',
+
+        # OAM DMA behaviors
+        f'{RELEASE}/acceptance/oam_dma/basic.gb',
+        f'{RELEASE}/acceptance/oam_dma/reg_read.gb',
+        f'{RELEASE}/acceptance/oam_dma_restart.gb',
+        f'{RELEASE}/acceptance/oam_dma_start.gb',
+        f'{RELEASE}/acceptance/oam_dma_timing.gb',
 
         # TODO: Document
         f'{RELEASE}/emulator-only/mbc1/bits_bank1.gb',

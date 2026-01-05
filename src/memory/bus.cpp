@@ -54,10 +54,10 @@ static constexpr bool is_hram_range(const addr_t a) noexcept {
 }
 
 AddressBus::AddressBus(runtime_sys_info &sys)
-    : key0(sys), // Controls backwards compatability
-      key1(sys), // Controls clock speed mode
-      oam_dma(), // Performs object attribute DMA (DMG and CGB)
-      sys_(sys)  // Generic system information
+    : key0(sys),      // Controls backwards compatability
+      key1(sys),      // Controls clock speed mode
+      oam_dma(*this), // Performs object attribute DMA (DMG and CGB)
+      sys_(sys)       // Generic system information
 {
   constexpr std::size_t vram_bank_size = 0x2000;
   constexpr std::size_t wram_bank_size = 0x1000;
@@ -87,7 +87,7 @@ AddressBus::AddressBus(runtime_sys_info &sys)
 void AddressBus::step_dma() {
   /* DMA modules have their own mechanism to determine if they are active or
    * not, so calling step() every t-cycle should be perfectly safe. */
-  // oam_dma.step(); TODO
+  oam_dma.step();
 }
 
 void AddressBus::connect_mmio(const addr_t addr, MMIORegister *const reg) {
