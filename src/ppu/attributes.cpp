@@ -44,3 +44,28 @@ bool get_bg_attrib_y_flip(byte_t attrib) {
   // CGB only: determines if tiles are flipped vertically
   return ((attrib & 0x40) >> 6) & 0x1;
 }
+
+byte_t get_obj_attrib_dmg_palette(byte_t attrib) {
+  // Non CGB only: Determiens between palette selection between OBJ0 and OBJ1
+  return ((attrib & 0x10) >> 4) & 0x1;
+}
+
+byte_t get_obj_attrib_bank(byte_t attrib) {
+  // CGB only: Get VRAM bank source for fetching tile data
+  return ((attrib & 0x08) >> 3) & 0x1;
+}
+
+byte_t get_obj_attrib_cgb_palette(byte_t attrib) {
+  // CGB only: Get CGB palette index
+  return attrib & 0x7;
+}
+
+bool get_obj_attrib_x_flip(byte_t attrib) {
+  // Determines if tiles are flipped horizontally
+  return ((attrib & 0x20) >> 5) & 0x1;
+}
+
+bool get_obj_attrib_y_flip(byte_t attrib) {
+  // Determines if tiles are flipped vertically
+  return ((attrib & 0x40) >> 6) & 0x1;
+}

@@ -57,10 +57,45 @@
  *   For example, if 0:9800 contains tile index $2A, the attribute at
  *   1:9800 affects only that specific map position, not all tiles $2A.
  */
-
 [[nodiscard]] byte_t get_bg_attrib_palette(byte_t attrib);
 [[nodiscard]] byte_t get_bg_attrib_bank(byte_t attrib);
 [[nodiscard]] bool get_bg_attrib_x_flip(byte_t attrib);
 [[nodiscard]] bool get_bg_attrib_y_flip(byte_t attrib);
+
+/*
+ * Object (Sprite) Attributes / Flags
+ *
+ * Bit layout:
+ *   Bit:  7        6        5        4        3     2     1     0
+ *         Priority Y flip   X flip   DMG pal  Bank        CGB palette
+ *
+ * Priority:
+ *   0 = OBJ is drawn over BG and Window
+ *   1 = BG and Window color indices 1–3 are drawn over this OBJ
+ *
+ * Y flip:
+ *   0 = Normal
+ *   1 = Entire OBJ is vertically mirrored
+ *
+ * X flip:
+ *   0 = Normal
+ *   1 = Entire OBJ is horizontally mirrored
+ *
+ * DMG palette (Non-CGB mode only):
+ *   0 = OBP0
+ *   1 = OBP1
+ *
+ * Bank (CGB mode only):
+ *   0 = Fetch tile data from VRAM bank 0
+ *   1 = Fetch tile data from VRAM bank 1
+ *
+ * CGB palette (CGB mode only):
+ *   Selects which OBJ palette (OBP0–OBP7) to use
+ */
+[[nodiscard]] byte_t get_obj_attrib_dmg_palette(byte_t attrib);
+[[nodiscard]] byte_t get_obj_attrib_bank(byte_t attrib);
+[[nodiscard]] byte_t get_obj_attrib_cgb_palette(byte_t attrib);
+[[nodiscard]] bool get_obj_attrib_x_flip(byte_t attrib);
+[[nodiscard]] bool get_obj_attrib_y_flip(byte_t attrib);
 
 #endif // __ATTRIBUTES_H
