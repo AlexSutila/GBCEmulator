@@ -8,7 +8,9 @@
 #include "ppu/fetcher.hpp"
 #include "ppu/fifo.hpp"
 #include "ppu/palette.hpp"
+#include "ppu/sprites.hpp"
 
+#include <algorithm>
 #include <cassert>
 #include <cstdint>
 #include <optional>
@@ -23,23 +25,26 @@ template <typename T> T *init_mmio(AddressBus *bus, IORegisterMapping reg_id) {
 
 PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus, Renderer *render,
                                          runtime_sys_info &sys)
-    : renderer(render), // For placing pixel data to frame buffer
-      sys_(sys),        // General operating mode info
-      lcdc_(),          // LCD control
-      stat_(),          // PPU status
-      lyc_(),           // Current scanline compare
-      scy_(),           // BG scroll Y
-      scx_(),           // BG scroll X
-      wy_(),            // Window scroll Y
-      wx_(),            // Window scroll X
-      ly_(),            // Current scanline
-      bgp_(),           // DMG background and window palette
-      fifo(),           // Pushes background/window pixels
+    : renderer(render),      // For placing pixel data to frame buffer
+      sys_(sys),             // General operating mode info
+      vram(bus->get_vram()), // Tile data/map/attribute content
+      oam(bus->get_oam()),   // Object (sprite) attribute memory
+      lcdc_(),               // LCD control
+      stat_(),               // PPU status
+      lyc_(),                // Current scanline compare
+      scy_(),                // BG scroll Y
+      scx_(),                // BG scroll X
+      wy_(),                 // Window scroll Y
+      wx_(),                 // Window scroll X
+      ly_(),                 // Current scanline
+      bgp_(),                // DMG background and window palette
+      fifo(),                // Pushes background/window pixels
       cram(std::make_unique<ColorRam>()) {
   using mmio = IORegisterMapping;
   using namespace PPU;
 
-  /* TODO: Still not the biggest fan of how we're doing this, refactor? */
+  /* These registers are managed by our implementation of the RGB555 color
+   * palette system, so grab the reference rq so we can hold onto them. */
   auto bgpd = cram->get_data_reg();
   auto bgpi = cram->get_idx_reg();
 
@@ -143,8 +148,19 @@ void PixelProcessingUnit::do_oam_scan() {
     oam_data.clear();
   }
 
-  // TODO:
-  // - Actually perform the OAM scan here
+  /* Linear object attribute memory scanning begins here!!!!!
+   * ---------------------------------------------------------------------------
+   * Check one sprite every two clocks. Because we are indexing object attribute
+   * memory array directly, we don't need to consider the base address of object
+   * attribute memory. */
+  if (total_mode_clks.value() % 2 == 0) {
+    const addr_t sprite_base_offset = sprite_size_bytes * sprites_searched;
+    const byte_t x_pos = oam[sprite_base_offset + oam_x_offset];
+    const byte_t y_pos = oam[sprite_base_offset + oam_y_offset];
+
+    // Move to next sprite
+    ++sprites_searched;
+  }
 
   // Step dot clock
   ++cur_scanline_clks;

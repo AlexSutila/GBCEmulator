@@ -11,9 +11,10 @@
 #include "ppu/palette.hpp"
 #include "ppu/sprites.hpp"
 
-#include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <optional>
 
 struct runtime_sys_info;
@@ -28,6 +29,11 @@ private:
   Renderer *const renderer{};
   InterruptBits *if_reg{};
   runtime_sys_info &sys_;
+
+  /* Maintain access to relevant memory structures so we don't have to rely on
+   * AddressBus::read_byte() and AddressBus::write_byte(). */
+  std::array<std::unique_ptr<byte_t[]>, 2> &vram;
+  std::unique_ptr<byte_t[]> &oam;
 
   /* Convenience references to important PPU mmio registers */
   PPU::LCDCtrl lcdc_{};

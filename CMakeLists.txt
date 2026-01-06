@@ -43,6 +43,7 @@ set(GBC_CORE_SOURCES
     src/ppu/palette.cpp
     src/ppu/fetcher.cpp
     src/ppu/fifo.cpp
+    src/ppu/sprites.cpp
 
     src/cart/cart.cpp
     src/cart/cart_display.cpp

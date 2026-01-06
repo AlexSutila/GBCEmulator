@@ -3,7 +3,13 @@
 
 #include "emu_types.hpp"
 
-/* Term `Sprite` is interchangeable with `Object` in OAM. */
+static constexpr addr_t oam_x_offset = 0;
+static constexpr addr_t oam_y_offset = 1;
+static constexpr addr_t oam_tile_idx_offset = 2;
+static constexpr addr_t oam_attr_offset = 3;
+static constexpr addr_t sprite_size_bytes = 4;
+
+// Term `Sprite` is interchangeable with `Object` in OAM
 struct Sprite {
   byte_t y_pos;
   byte_t x_pos;
@@ -15,5 +21,14 @@ struct Sprite {
     return x_pos > other.x_pos;
   }
 };
+
+/* These are helpers that determine if a sprite lies along a scanline, and will
+ * ultimately decide if a row of pixels from a said sprite will be rendered or
+ * not. To be used during OAM search specifically. */
+[[nodiscard]] bool
+sprite_visible(const byte_t x_pos,        // From object attribute memory
+               const byte_t y_pos,        // From object attribute memory
+               const byte_t cur_scanline, // Basically contents of LY register
+               const byte_t cur_pixel);   // Where we're at in the scanline
 
 #endif // __SPRITE_H
