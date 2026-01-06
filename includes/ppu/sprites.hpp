@@ -2,6 +2,7 @@
 #define __SPRITE_H
 
 #include "emu_types.hpp"
+#include <cstddef>
 
 static constexpr addr_t oam_x_offset = 0;
 static constexpr addr_t oam_y_offset = 1;
@@ -11,10 +12,15 @@ static constexpr addr_t sprite_size_bytes = 4;
 
 // Term `Sprite` is interchangeable with `Object` in OAM
 struct Sprite {
+
+  // Sprite attributes
   byte_t y_pos;
   byte_t x_pos;
   byte_t tile_idx;
   byte_t tile_attr;
+
+  // Actual index in object attribute memory
+  std::size_t obj_no;
 
   // For storing in containers, in case we end up doing that
   bool operator<(const Sprite &other) const noexcept {

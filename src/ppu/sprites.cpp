@@ -14,7 +14,13 @@ bool sprite_visible(const byte_t x_pos, const byte_t y_pos,
   // TODO: Consider variable height sprites
   constexpr auto sprite_size_px = 8;
 
-  return (cur_scanline >= y_pos) &&                 // Sprite upper bound
-         (cur_scanline < y_pos + sprite_size_px) && // Sprite lower bound
-         (x_pos == 0 || x_pos >= 168); // Visible on screen horizontally?
+  // The edges of either sprite cut off at these values, there needs to be room
+  // for them to be hidden off screen. These values come straight off pandocs.
+  if (x_pos == 0 || x_pos >= 160)
+    return false;
+
+  // Top of any sprite becomes visible at `y_pos == 16` to allow for sprites
+  // being placed off screen, hidden away physically above the LCD viewport.
+  return (cur_scanline - 16 >= y_pos) &&
+         (cur_scanline - 16 < y_pos + sprite_size_px);
 }

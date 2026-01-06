@@ -78,8 +78,8 @@ PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus, Renderer *render,
   );
 
   /* Initialize OAM search metadata */
-  constexpr auto max_sprites_per_scanline = 10;
-  oam_data.reserve(max_sprites_per_scanline);
+  constexpr auto oam_sprite_count = 40;
+  oam_data.reserve(oam_sprite_count);
 
   /* Configure PPU to initial state, doesn't technically happen until PPU is
    * enabled but we do it anyway just because. */
@@ -153,7 +153,7 @@ void PixelProcessingUnit::do_oam_scan() {
    * Check one sprite every two clocks. Because we are indexing object attribute
    * memory array directly, we don't need to consider the base address of object
    * attribute memory. */
-  if (total_mode_clks.value() % 2 == 0) {
+  if (cur_mode_clks % 2 == 0) {
     const addr_t sprite_base_offset = sprite_size_bytes * sprites_searched;
     const byte_t y_pos = oam[sprite_base_offset + oam_y_offset];
     const byte_t x_pos = oam[sprite_base_offset + oam_x_offset];
@@ -168,6 +168,7 @@ void PixelProcessingUnit::do_oam_scan() {
           .x_pos = x_pos,
           .tile_idx = index,
           .tile_attr = attrs,
+          .obj_no = sprites_searched,
       });
     ++sprites_searched;
   }
