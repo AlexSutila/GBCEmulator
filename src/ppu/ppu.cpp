@@ -155,10 +155,20 @@ void PixelProcessingUnit::do_oam_scan() {
    * attribute memory. */
   if (total_mode_clks.value() % 2 == 0) {
     const addr_t sprite_base_offset = sprite_size_bytes * sprites_searched;
-    const byte_t x_pos = oam[sprite_base_offset + oam_x_offset];
     const byte_t y_pos = oam[sprite_base_offset + oam_y_offset];
+    const byte_t x_pos = oam[sprite_base_offset + oam_x_offset];
+    const byte_t attrs = oam[sprite_base_offset + oam_attr_offset];
+    const byte_t index = oam[sprite_base_offset + oam_tile_idx_offset];
 
-    // Move to next sprite
+    // Worry about ordering later, enough space is reserved ahead of time such
+    // that no unnecessary memory copies occur when the vector fills up.
+    if (sprite_visible(x_pos, y_pos, ly_.read()))
+      oam_data.push_back({
+          .y_pos = y_pos,
+          .x_pos = x_pos,
+          .tile_idx = index,
+          .tile_attr = attrs,
+      });
     ++sprites_searched;
   }
 

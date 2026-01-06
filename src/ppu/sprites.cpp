@@ -1,13 +1,20 @@
 #include "ppu/sprites.hpp"
 
-/* These are helpers that determine if a sprite lies along a scanline, and will
- * ultimately decide if a row of pixels from a said sprite will be rendered or
- * not. To be used during OAM search specifically. */
-bool sprite_visible(
-    const byte_t x_pos,        // From object attribute memory
-    const byte_t y_pos,        // From object attribute memory
-    const byte_t cur_scanline, // Basically contents of LY register
-    const byte_t cur_pixel)    // Where we're at in the scanline
-{
+bool sprite_visible(const byte_t x_pos, const byte_t y_pos,
+                    const byte_t cur_scanline, const byte_t cur_pixel) {
+  // TODO
   return false;
+}
+
+/* Note, we still pass the X position here because AAAAAHGFDHGLSKHJG but also
+ * because it's placed off super far right or left the sprite won't be rendered
+ * and therefore doesn't need to be tracked during OAM search. */
+bool sprite_visible(const byte_t x_pos, const byte_t y_pos,
+                    const byte_t cur_scanline) {
+  // TODO: Consider variable height sprites
+  constexpr auto sprite_size_px = 8;
+
+  return (cur_scanline >= y_pos) &&                 // Sprite upper bound
+         (cur_scanline < y_pos + sprite_size_px) && // Sprite lower bound
+         (x_pos == 0 || x_pos >= 168); // Visible on screen horizontally?
 }
