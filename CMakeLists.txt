@@ -4,7 +4,7 @@ project(gbc LANGUAGES CXX)
 # Global settings
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_CXX_EXTENSIONS ON)
 
 # Dependencies
 include(FetchContent)
@@ -14,7 +14,13 @@ FetchContent_Declare(
     GIT_TAG        v2.12.0
 )
 FetchContent_MakeAvailable(pybind11)
-find_package(SDL3 REQUIRED)
+FetchContent_Declare(
+    SDL3
+    GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
+    GIT_TAG        release-3.4.0
+)
+FetchContent_MakeAvailable(SDL3)
+#find_package(SDL3 REQUIRED)
 
 # Common sources
 set(GBC_CORE_SOURCES
@@ -61,8 +67,12 @@ set(GBC_INCLUDE_DIR
 set(GBC_COMPILE_OPTIONS
     -Wall
     $<$<CONFIG:Debug>:-g -O0>
-    $<$<CONFIG:Release>:-Ofast -flto -fvisibility=hidden>
+    $<$<CONFIG:Release>:-Ofast -flto=auto -fvisibility=hidden>
 )
+
+if (MINGW AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    list(APPEND GBC_COMPILE_OPTIONS -Wa,-mbig-obj)
+endif()
 
 # Emulator executable
 add_executable(gbc
