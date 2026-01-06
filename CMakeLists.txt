@@ -64,10 +64,20 @@ set(GBC_CORE_SOURCES
 set(GBC_INCLUDE_DIR
     ${CMAKE_CURRENT_SOURCE_DIR}/includes
 )
+
+set(GBC_RELEASE_OPTIONS
+    -Ofast
+    -fvisibility=hidden
+)
+
+if(NOT MINGW)
+    list(APPEND GBC_RELEASE_OPTIONS -flto)
+endif()
+
 set(GBC_COMPILE_OPTIONS
     -Wall
-    $<$<CONFIG:Debug>:-g -O0>
-    $<$<CONFIG:Release>:-Ofast -flto=auto -fvisibility=hidden>
+    $<$<CONFIG:Debug>:-g;-O0>
+    $<$<CONFIG:Release>:${GBC_RELEASE_OPTIONS}>
 )
 
 if (MINGW AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
