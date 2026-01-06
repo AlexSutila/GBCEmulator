@@ -10,7 +10,7 @@
  * Copies value from Y into X, operates only on 8-bit registers
  */
 template <Register8Bit dst, Register8Bit src>
-class LD_X_Y : public Instruction {
+class LD_X_Y final : public Instruction {
 public:
   LD_X_Y(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -27,7 +27,7 @@ public:
 /*
  * Copies immediate value into X, operates only on 8-bit registers
  */
-template <Register8Bit dst> class LD_X_imm8 : public Instruction {
+template <Register8Bit dst> class LD_X_imm8 final : public Instruction {
 public:
   LD_X_imm8(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -50,7 +50,7 @@ private:
 /*
  * Copies byte read from address HL into X, operates only on 8-bit registers
  */
-template <Register8Bit dst> class LD_X_HL : public Instruction {
+template <Register8Bit dst> class LD_X_HL final : public Instruction {
 public:
   LD_X_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -68,7 +68,7 @@ public:
 /*
  * Copies byte from X into address HL, operates only on 8-bit registers
  */
-template <Register8Bit src> class LD_HL_X : public Instruction {
+template <Register8Bit src> class LD_HL_X final : public Instruction {
 public:
   LD_HL_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -86,7 +86,7 @@ public:
 /*
  * Copies 8-bit immedaite value into address HL
  */
-class LD_HL_imm8 : public Instruction {
+class LD_HL_imm8 final : public Instruction {
 public:
   LD_HL_imm8(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -111,7 +111,7 @@ private:
 /*
  * Copies 8-bit value from address specified by register XX into A
  */
-template <Register16Bit src> class LD_A_XX : public Instruction {
+template <Register16Bit src> class LD_A_XX final : public Instruction {
 public:
   LD_A_XX(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -129,7 +129,7 @@ public:
 /*
  * Copies 8-bit value from immediate address value into A
  */
-class LD_A_imm16 : public Instruction {
+class LD_A_imm16 final : public Instruction {
 public:
   LD_A_imm16(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -155,7 +155,7 @@ private:
 /*
  * Copies A into address specified by 16-bit register XX
  */
-template <Register16Bit dst> class LD_XX_A : public Instruction {
+template <Register16Bit dst> class LD_XX_A final : public Instruction {
 public:
   LD_XX_A(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -173,7 +173,7 @@ public:
 /*
  * Copies A into address specified by 16-bit immediate value
  */
-class LD_imm16_A : public Instruction {
+class LD_imm16_A final : public Instruction {
 public:
   LD_imm16_A(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -199,7 +199,7 @@ private:
 /*
  * Copy IO-register specified by 8-bit immediate into A
  */
-class LDH_A_imm8 : public Instruction {
+class LDH_A_imm8 final : public Instruction {
 public:
   LDH_A_imm8(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -221,7 +221,7 @@ private:
 /*
  * Copy A into IO-register specified by 8-bit immediate
  */
-class LDH_imm8_A : public Instruction {
+class LDH_imm8_A final : public Instruction {
 public:
   LDH_imm8_A(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -243,7 +243,7 @@ private:
 /*
  * Copy A into IO-register specified by register C
  */
-class LDH_C_A : public Instruction {
+class LDH_C_A final : public Instruction {
 public:
   LDH_C_A(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -258,7 +258,7 @@ public:
 /*
  * Copy IO-register specified by register C into A
  */
-class LDH_A_C : public Instruction {
+class LDH_A_C final : public Instruction {
 public:
   LDH_A_C(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -274,7 +274,7 @@ public:
 /*
  * Copy A into address specified by HL, increment HL
  */
-class LDI_HL_A : public Instruction {
+class LDI_HL_A final : public Instruction {
 public:
   LDI_HL_A(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -293,7 +293,7 @@ public:
 /*
  * Copy from address specified by HL into A, increment HL
  */
-class LDI_A_HL : public Instruction {
+class LDI_A_HL final : public Instruction {
 public:
   LDI_A_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -312,7 +312,7 @@ public:
 /*
  * Copy A into address specified by HL, decrement HL
  */
-class LDD_HL_A : public Instruction {
+class LDD_HL_A final : public Instruction {
 public:
   LDD_HL_A(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -331,7 +331,7 @@ public:
 /*
  * Copy from address specified by HL into A, decrement HL
  */
-class LDD_A_HL : public Instruction {
+class LDD_A_HL final : public Instruction {
 public:
   LDD_A_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -350,7 +350,7 @@ public:
 /*
  * Read 16-bit immediate into 16-bit register XX
  */
-template <Register16Bit src> class LD_XX_imm16 : public Instruction {
+template <Register16Bit src> class LD_XX_imm16 final : public Instruction {
 public:
   LD_XX_imm16(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -373,7 +373,7 @@ private:
 /*
  * Stores SP to address to 16-bit immediate address
  */
-class LD_imm16_SP : public Instruction {
+class LD_imm16_SP final : public Instruction {
 public:
   LD_imm16_SP(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -397,7 +397,7 @@ private:
 /*
  * Copies HL register value into SP
  */
-class LD_SP_HL : public Instruction {
+class LD_SP_HL final : public Instruction {
 public:
   LD_SP_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -412,7 +412,7 @@ public:
 /*
  * Push 16-bit register value
  */
-template <Register16Bit src> class PUSH_XX : public Instruction {
+template <Register16Bit src> class PUSH_XX final : public Instruction {
 public:
   PUSH_XX(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -434,7 +434,7 @@ public:
 /*
  * Pop 16-bit registe value
  */
-template <Register16Bit dst> class POP_XX : public Instruction {
+template <Register16Bit dst> class POP_XX final : public Instruction {
 public:
   POP_XX(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}

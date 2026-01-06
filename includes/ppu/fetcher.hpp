@@ -49,7 +49,7 @@ protected:
   runtime_sys_info &sys_;
 };
 
-class BgWinFetcher : public Fetcher {
+class BgWinFetcher final : public Fetcher {
 public:
   BgWinFetcher(std::array<std::unique_ptr<byte_t[]>, 2> &vram,
                PPU::LCDCtrl &lcdc, // The LCD control register

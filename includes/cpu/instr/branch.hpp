@@ -13,7 +13,7 @@
 /*
  * Absolute jump
  */
-class JP_imm16 : public Instruction {
+class JP_imm16 final : public Instruction {
 public:
   JP_imm16(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -37,7 +37,7 @@ private:
 /*
  * Jump to address stored in HL
  */
-class JP_HL : public Instruction {
+class JP_HL final : public Instruction {
 public:
   JP_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -52,7 +52,7 @@ public:
  * Conditional absolute jump
  */
 template <StatusFlagMask flag, bool expect>
-class JP_cond_imm16 : public Instruction {
+class JP_cond_imm16 final : public Instruction {
 public:
   JP_cond_imm16(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -80,7 +80,7 @@ private:
 /*
  * Unconditional relative jump - NOTE: Offset is signed
  */
-class JR_imm8 : public Instruction {
+class JR_imm8 final : public Instruction {
 public:
   JR_imm8(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -103,7 +103,7 @@ private:
  * Conditional relative jump - NOTE: Offset is signed
  */
 template <StatusFlagMask flag, bool expect>
-class JR_cond_imm8 : public Instruction {
+class JR_cond_imm8 final : public Instruction {
 public:
   JR_cond_imm8(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -129,7 +129,7 @@ private:
 /*
  * Absolute call
  */
-class CALL_imm16 : public Instruction {
+class CALL_imm16 final : public Instruction {
 public:
   CALL_imm16(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -163,7 +163,7 @@ private:
  * Conditional absolute call
  */
 template <StatusFlagMask flag, bool expect>
-class CALL_cond_imm16 : public Instruction {
+class CALL_cond_imm16 final : public Instruction {
 public:
   CALL_cond_imm16(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -200,7 +200,7 @@ private:
 /*
  * Unconditional return
  */
-class RET : public Instruction {
+class RET final : public Instruction {
 public:
   RET(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -221,7 +221,7 @@ public:
  * Unconditional return
  */
 template <StatusFlagMask flag, bool expect>
-class RET_cond : public Instruction {
+class RET_cond final : public Instruction {
 public:
   RET_cond(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -246,7 +246,7 @@ public:
 /*
  * Unconditional return, enable interrupts
  */
-class RETI : public Instruction {
+class RETI final : public Instruction {
 public:
   RETI(RegisterFile *reg_file_ptr, AddressBus *bus_ptr,
        InterruptMasterEnable *ime_ptr)
@@ -273,7 +273,7 @@ private:
 /*
  * Unconditional jump to reset vector
  */
-template <addr_t vec> class RST_vec : public Instruction {
+template <addr_t vec> class RST_vec final : public Instruction {
 public:
   RST_vec(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}

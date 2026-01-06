@@ -13,7 +13,7 @@
 /*
  * Rotate left with carry
  */
-class RLCA : public Instruction {
+class RLCA final : public Instruction {
 public:
   RLCA(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -41,7 +41,7 @@ public:
 /*
  * Rotate right with carry
  */
-class RRCA : public Instruction {
+class RRCA final : public Instruction {
 public:
   RRCA(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -69,7 +69,7 @@ public:
 /*
  * Rotate left through carry
  */
-class RLA : public Instruction {
+class RLA final : public Instruction {
 public:
   RLA(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -98,7 +98,7 @@ public:
 /*
  * Rotate right through carry
  */
-class RRA : public Instruction {
+class RRA final : public Instruction {
 public:
   RRA(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -128,7 +128,7 @@ public:
  * The CB-prefix ISA extension. All instructions below this one lie under this
  * instruction set architecture extention.
  */
-class CB_PREFIX : public Instruction {
+class CB_PREFIX final : public Instruction {
 public:
   CB_PREFIX(RegisterFile *reg_file_ptr, AddressBus *bus_ptr);
   std::size_t exec() override;
@@ -145,7 +145,7 @@ private:
   lookup_table_t lookup{};
 };
 
-template <Register8Bit dst> class RLC_X : public Instruction {
+template <Register8Bit dst> class RLC_X final : public Instruction {
 public:
   RLC_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -170,7 +170,7 @@ public:
   }
 };
 
-class RLC_HL : public Instruction {
+class RLC_HL final : public Instruction {
 public:
   RLC_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -208,7 +208,7 @@ private:
   bool c{};
 };
 
-template <Register8Bit dst> class RL_X : public Instruction {
+template <Register8Bit dst> class RL_X final : public Instruction {
 public:
   RL_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -233,7 +233,7 @@ public:
   }
 };
 
-class RL_HL : public Instruction {
+class RL_HL final : public Instruction {
 public:
   RL_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -271,7 +271,7 @@ private:
   bool c{};
 };
 
-template <Register8Bit dst> class RRC_X : public Instruction {
+template <Register8Bit dst> class RRC_X final : public Instruction {
 public:
   RRC_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -295,7 +295,7 @@ public:
   }
 };
 
-class RRC_HL : public Instruction {
+class RRC_HL final : public Instruction {
 public:
   RRC_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -333,7 +333,7 @@ private:
   bool c{};
 };
 
-template <Register8Bit dst> class RR_X : public Instruction {
+template <Register8Bit dst> class RR_X final : public Instruction {
 public:
   RR_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -358,7 +358,7 @@ public:
   }
 };
 
-class RR_HL : public Instruction {
+class RR_HL final : public Instruction {
 public:
   RR_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -396,7 +396,7 @@ private:
   bool c{};
 };
 
-template <Register8Bit dst> class SLA_X : public Instruction {
+template <Register8Bit dst> class SLA_X final : public Instruction {
 public:
   SLA_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -420,7 +420,7 @@ public:
   }
 };
 
-class SLA_HL : public Instruction {
+class SLA_HL final : public Instruction {
 public:
   SLA_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -456,7 +456,7 @@ private:
   byte_t n{};
 };
 
-template <Register8Bit dst> class SRA_X : public Instruction {
+template <Register8Bit dst> class SRA_X final : public Instruction {
 public:
   SRA_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -480,7 +480,7 @@ public:
   }
 };
 
-class SRA_HL : public Instruction {
+class SRA_HL final : public Instruction {
 public:
   SRA_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -516,7 +516,7 @@ private:
   byte_t n{};
 };
 
-template <Register8Bit dst> class SWAP_X : public Instruction {
+template <Register8Bit dst> class SWAP_X final : public Instruction {
 public:
   SWAP_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -539,7 +539,7 @@ public:
   }
 };
 
-class SWAP_HL : public Instruction {
+class SWAP_HL final : public Instruction {
 public:
   SWAP_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -575,7 +575,7 @@ private:
   byte_t n{};
 };
 
-template <Register8Bit dst> class SRL_X : public Instruction {
+template <Register8Bit dst> class SRL_X final : public Instruction {
 public:
   SRL_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -599,7 +599,7 @@ public:
   }
 };
 
-class SRL_HL : public Instruction {
+class SRL_HL final : public Instruction {
 public:
   SRL_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -635,7 +635,7 @@ private:
   byte_t n{};
 };
 
-template <byte_t bit, Register8Bit dst> class BIT_N_X : public Instruction {
+template <byte_t bit, Register8Bit dst> class BIT_N_X final : public Instruction {
 public:
   BIT_N_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -654,7 +654,7 @@ public:
   }
 };
 
-template <byte_t bit> class BIT_N_HL : public Instruction {
+template <byte_t bit> class BIT_N_HL final : public Instruction {
 public:
   BIT_N_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -675,7 +675,7 @@ public:
   std::size_t mem_access_t_cycle() override { return 4; }
 };
 
-template <byte_t bit, Register8Bit dst> class RES_N_X : public Instruction {
+template <byte_t bit, Register8Bit dst> class RES_N_X final : public Instruction {
 public:
   RES_N_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -690,7 +690,7 @@ public:
   }
 };
 
-template <byte_t bit> class RES_N_HL : public Instruction {
+template <byte_t bit> class RES_N_HL final : public Instruction {
 public:
   RES_N_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -720,7 +720,7 @@ private:
   byte_t n{};
 };
 
-template <byte_t bit, Register8Bit dst> class SET_N_X : public Instruction {
+template <byte_t bit, Register8Bit dst> class SET_N_X final : public Instruction {
 public:
   SET_N_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -735,7 +735,7 @@ public:
   }
 };
 
-template <byte_t bit> class SET_N_HL : public Instruction {
+template <byte_t bit> class SET_N_HL final : public Instruction {
 public:
   SET_N_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}

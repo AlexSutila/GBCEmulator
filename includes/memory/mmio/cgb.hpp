@@ -17,7 +17,7 @@ namespace SYS {
  *   0 = Disabled (full CGB mode, for regular CGB cartridges)
  *   1 = Enabled  (for DMG-only cartridges)
  */
-class KEY0 : public MMIORegister {
+class KEY0 final : public MMIORegister {
 public:
   void write(const byte_t value) override;
   byte_t read() override;
@@ -43,7 +43,7 @@ private:
  *            1 = Armed (prepare speed switch)
  *   Bits 6–1: Unused
  */
-class KEY1 : public MMIORegister {
+class KEY1 final : public MMIORegister {
 public:
   void write(const byte_t value) override;
   byte_t read() override;
@@ -69,7 +69,7 @@ namespace PPU {
  * This register can be written to change VRAM banks. Only bit 0 matters, all
  * other bits are ignored.
  */
-class VramBank : public MMIORegister {
+class VramBank final : public MMIORegister {
 public:
   void write(const byte_t value) override;
   byte_t read() override;
@@ -100,7 +100,7 @@ private:
  *           Index (0–63) of the byte in BG palette RAM accessed via BCPD
  */
 
-class PaletteIdx : public MMIORegister {
+class PaletteIdx final : public MMIORegister {
 public:
   void write(const byte_t value) override;
   byte_t read() override;
@@ -116,7 +116,7 @@ private:
   byte_t state{};
 };
 
-class PaletteData : public MMIORegister {
+class PaletteData final : public MMIORegister {
 public:
   void write(const byte_t value) override;
   byte_t read() override;
@@ -137,7 +137,7 @@ private:
  * into 8 banks of 4 KiB each. Bank 0 is always available in memory at
  * C000–CFFF, banks 1–7 can be selected into the address space at D000–DFFF.
  */
-class WramBank : public MMIORegister {
+class WramBank final : public MMIORegister {
 public:
   void write(const byte_t value) override;
   byte_t read() override;

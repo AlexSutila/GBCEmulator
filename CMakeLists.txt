@@ -61,7 +61,7 @@ set(GBC_INCLUDE_DIR
 set(GBC_COMPILE_OPTIONS
     -Wall
     $<$<CONFIG:Debug>:-g -O0>
-    $<$<CONFIG:Release>:-Ofast>
+    $<$<CONFIG:Release>:-Ofast -flto -fvisibility=hidden>
 )
 
 # Emulator executable

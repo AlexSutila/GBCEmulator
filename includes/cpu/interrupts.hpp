@@ -37,7 +37,7 @@ enum class InterruptVector : addr_t {
  * the execution of an interrupt, but ultimately whether or not that actually
  * happens depends on the enable flags.
  */
-class InterruptBits : public MMIORegister {
+class InterruptBits final : public MMIORegister {
 public:
   void write(byte_t value) override;
   byte_t read() override;
@@ -109,7 +109,7 @@ private:
  * The whole process consumes a fixed 20 clock cycles total
  */
 template <InterruptFlagMask flag, InterruptVector vec>
-class ISR : public Instruction {
+class ISR final : public Instruction {
 public:
   ISR(RegisterFile *reg_file_ptr, AddressBus *bus_ptr,
       InterruptMasterEnable *ime_ptr, InterruptBits *if_ptr)

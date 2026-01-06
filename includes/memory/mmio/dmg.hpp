@@ -59,7 +59,7 @@ enum class SpriteHeight : byte_t {
   SHORT_SPRITES = 8,
 };
 
-class LCDCtrl : public MMIORegister {
+class LCDCtrl final : public MMIORegister {
 public:
   void write(byte_t value) override;
   byte_t read() override;
@@ -122,7 +122,7 @@ enum class StatModes : byte_t {
   MODE_DRAWING = 3,
 };
 
-class STAT : public MMIORegister {
+class STAT final : public MMIORegister {
 public:
   void write(byte_t value) override;
   byte_t read() override;
@@ -154,7 +154,7 @@ private:
  *   144–153: V-Blank period
  */
 
-class LY : public MMIORegister {
+class LY final : public MMIORegister {
 public:
   void write(byte_t) override;
   byte_t read() override;
@@ -212,7 +212,7 @@ enum class MonoPaletteColor {
  *   In CGB mode, this register is ignored. BG and Window colors are instead
  *   selected from CGB palette memory (BCPS / BCPD).
  */
-class BGP : public MMIORegister {
+class BGP final : public MMIORegister {
 public:
   void write(byte_t value) override;
   byte_t read() override;
@@ -249,7 +249,7 @@ namespace DMA {
  * MMIORegister derived class only serves as the interface to tell DMA to start,
  * but the underlying ObjAttrDMA class is what actually transfers data.
  */
-class DMA : public MMIORegister {
+class DMA final : public MMIORegister {
 public:
   void write(const byte_t value) override;
   byte_t read() override;
@@ -265,7 +265,7 @@ private:
 /*
  * 0xFF50 - Boot ROM mapping control register
  */
-class BootROMCtrl : public MMIORegister {
+class BootROMCtrl final : public MMIORegister {
 public:
   void write(const byte_t value) override;
   byte_t read() override;

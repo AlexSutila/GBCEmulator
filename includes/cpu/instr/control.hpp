@@ -11,7 +11,7 @@
 /*
  * Complement Accumulator
  */
-class CPL : public Instruction {
+class CPL final : public Instruction {
 public:
   CPL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -28,7 +28,7 @@ public:
 /*
  * Set carry flag
  */
-class SCF : public Instruction {
+class SCF final : public Instruction {
 public:
   SCF(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -44,7 +44,7 @@ public:
 /*
  * Toggle carry flag
  */
-class CCF : public Instruction {
+class CCF final : public Instruction {
 public:
   CCF(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -61,7 +61,7 @@ public:
 /*
  * No operation
  */
-class NOP : public Instruction {
+class NOP final : public Instruction {
 public:
   NOP(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -72,7 +72,7 @@ public:
 /*
  * Disable interrupts
  */
-class DI : public Instruction {
+class DI final : public Instruction {
 public:
   DI(RegisterFile *reg_file_ptr, AddressBus *bus_ptr,
      InterruptMasterEnable *ime_ptr)
@@ -90,7 +90,7 @@ private:
 /*
  * Enable interrupts
  */
-class EI : public Instruction {
+class EI final : public Instruction {
 public:
   EI(RegisterFile *reg_file_ptr, AddressBus *bus_ptr,
      InterruptMasterEnable *ime_ptr)
@@ -108,7 +108,7 @@ private:
 /*
  * TODO: Halt processor
  */
-class HALT : public Instruction {
+class HALT final : public Instruction {
 public:
   HALT(RegisterFile *reg_file_ptr, AddressBus *bus_ptr, bool *halted_ptr)
       : Instruction(reg_file_ptr, bus_ptr), halted(halted_ptr) {}
@@ -125,7 +125,7 @@ private:
 /*
  * TODO: Who knows honestly lmao. Need to research this instruction
  */
-class STOP : public Instruction {
+class STOP final : public Instruction {
 public:
   STOP(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}

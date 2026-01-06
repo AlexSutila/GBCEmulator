@@ -13,7 +13,7 @@
 /*
  * Add value in 8-bit register X to A
  */
-template <Register8Bit src> class ADD_A_X : public Instruction {
+template <Register8Bit src> class ADD_A_X final : public Instruction {
 public:
   ADD_A_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -42,7 +42,7 @@ public:
 /*
  * Add immediate 8-bit value to A
  */
-class ADD_A_imm8 : public Instruction {
+class ADD_A_imm8 final : public Instruction {
 public:
   ADD_A_imm8(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -74,7 +74,7 @@ private:
 /*
  * Add 8-bit value pointed to by HL to A
  */
-class ADD_A_HL : public Instruction {
+class ADD_A_HL final : public Instruction {
 public:
   ADD_A_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -101,7 +101,7 @@ public:
 /*
  * Add value in 8-bit register X to A with carry
  */
-template <Register8Bit src> class ADC_A_X : public Instruction {
+template <Register8Bit src> class ADC_A_X final : public Instruction {
 public:
   ADC_A_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -135,7 +135,7 @@ public:
 /*
  * Add immediate 8-bit value to A with carry
  */
-class ADC_A_imm8 : public Instruction {
+class ADC_A_imm8 final : public Instruction {
 public:
   ADC_A_imm8(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -172,7 +172,7 @@ private:
 /*
  * Add 8-bit value pointed to by HL to A with carry
  */
-class ADC_A_HL : public Instruction {
+class ADC_A_HL final : public Instruction {
 public:
   ADC_A_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -204,7 +204,7 @@ public:
 /*
  * Subtract value in 8-bit register X from A
  */
-template <Register8Bit src> class SUB_A_X : public Instruction {
+template <Register8Bit src> class SUB_A_X final : public Instruction {
 public:
   SUB_A_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -232,7 +232,7 @@ public:
 /*
  * Subtract immediate 8-bit value from A
  */
-class SUB_A_imm8 : public Instruction {
+class SUB_A_imm8 final : public Instruction {
 public:
   SUB_A_imm8(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -263,7 +263,7 @@ private:
 /*
  * Subtract 8-bit value pointed to by HL to A
  */
-class SUB_A_HL : public Instruction {
+class SUB_A_HL final : public Instruction {
 public:
   SUB_A_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -289,7 +289,7 @@ public:
 /*
  * Subtract value in 8-bit register X from A with carry
  */
-template <Register8Bit src> class SBC_A_X : public Instruction {
+template <Register8Bit src> class SBC_A_X final : public Instruction {
 public:
   SBC_A_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -324,7 +324,7 @@ public:
 /*
  * Subtract 8-bit immediate value from A with carry
  */
-class SBC_A_imm8 : public Instruction {
+class SBC_A_imm8 final : public Instruction {
 public:
   SBC_A_imm8(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -362,7 +362,7 @@ private:
 /*
  * Subtract 8-bit immediate value from A with carry
  */
-class SBC_A_HL : public Instruction {
+class SBC_A_HL final : public Instruction {
 public:
   SBC_A_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -395,7 +395,7 @@ public:
 /*
  * Bitwise AND value from 8-bit register X with A
  */
-template <Register8Bit src> class AND_A_X : public Instruction {
+template <Register8Bit src> class AND_A_X final : public Instruction {
 public:
   AND_A_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -422,7 +422,7 @@ public:
 /*
  * Bitwise AND immediate 8-bit value X with A
  */
-class AND_A_imm8 : public Instruction {
+class AND_A_imm8 final : public Instruction {
 public:
   AND_A_imm8(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -452,7 +452,7 @@ private:
 /*
  * Bitwise AND 8-bit value pointed to by HL with A
  */
-class AND_A_HL : public Instruction {
+class AND_A_HL final : public Instruction {
 public:
   AND_A_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -477,7 +477,7 @@ public:
 /*
  * Bitwise XOR value from 8-bit register X with A
  */
-template <Register8Bit src> class XOR_A_X : public Instruction {
+template <Register8Bit src> class XOR_A_X final : public Instruction {
 public:
   XOR_A_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -504,7 +504,7 @@ public:
 /*
  * Bitwise XOR immediate 8-bit value X with A
  */
-class XOR_A_imm8 : public Instruction {
+class XOR_A_imm8 final : public Instruction {
 public:
   XOR_A_imm8(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -534,7 +534,7 @@ private:
 /*
  * Bitwise XOR 8-bit value pointed to by HL with A
  */
-class XOR_A_HL : public Instruction {
+class XOR_A_HL final : public Instruction {
 public:
   XOR_A_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -559,7 +559,7 @@ public:
 /*
  * Bitwise OR value from 8-bit register X with A
  */
-template <Register8Bit src> class OR_A_X : public Instruction {
+template <Register8Bit src> class OR_A_X final : public Instruction {
 public:
   OR_A_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -586,7 +586,7 @@ public:
 /*
  * Bitwise OR immediate 8-bit value X with A
  */
-class OR_A_imm8 : public Instruction {
+class OR_A_imm8 final : public Instruction {
 public:
   OR_A_imm8(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -616,7 +616,7 @@ private:
 /*
  * Bitwise OR 8-bit value pointed to by HL with A
  */
-class OR_A_HL : public Instruction {
+class OR_A_HL final : public Instruction {
 public:
   OR_A_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -642,7 +642,7 @@ public:
  * Compare 8-bit register X with A. This is basically a subtract operation,
  * but it throws away the result and only updates the flags.
  */
-template <Register8Bit src> class CP_A_X : public Instruction {
+template <Register8Bit src> class CP_A_X final : public Instruction {
 public:
   CP_A_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -667,7 +667,7 @@ public:
  * Compare immediate 8-bit value with A. This is basically a subtract operation,
  * but it throws away the result and only updates the flags.
  */
-class CP_A_imm8 : public Instruction {
+class CP_A_imm8 final : public Instruction {
 public:
   CP_A_imm8(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -695,7 +695,7 @@ private:
  * Compare 8-bit value pointed to by HL with A. This is basically a subtract
  * operation, but it throws away the result and only updates the flags.
  */
-class CP_A_HL : public Instruction {
+class CP_A_HL final : public Instruction {
 public:
   CP_A_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -717,7 +717,7 @@ public:
 /*
  * Increment contents of 8-bit register X
  */
-template <Register8Bit src> class INC_X : public Instruction {
+template <Register8Bit src> class INC_X final : public Instruction {
 public:
   INC_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -743,7 +743,7 @@ public:
 /*
  * Increment contents pointed to by register HL
  */
-class INC_HL : public Instruction {
+class INC_HL final : public Instruction {
 public:
   INC_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -780,7 +780,7 @@ private:
 /*
  * Decrement contents of 8-bit register X
  */
-template <Register8Bit src> class DEC_X : public Instruction {
+template <Register8Bit src> class DEC_X final : public Instruction {
 public:
   DEC_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -806,7 +806,7 @@ public:
 /*
  * Decrement contents pointed to by register HL
  */
-class DEC_HL : public Instruction {
+class DEC_HL final : public Instruction {
 public:
   DEC_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -843,7 +843,7 @@ private:
 /*
  * I will never understand what this shit does ngl lol. Decimal adjust?
  */
-class DAA : public Instruction {
+class DAA final : public Instruction {
 public:
   DAA(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -887,7 +887,7 @@ public:
 /*
  * Increment HL register by contents of 16-bit XX register
  */
-template <Register16Bit src> class ADD_HL_XX : public Instruction {
+template <Register16Bit src> class ADD_HL_XX final : public Instruction {
 public:
   ADD_HL_XX(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -914,7 +914,7 @@ public:
 /*
  * Increment contents of 16-bit XX register
  */
-template <Register16Bit dst> class INC_XX : public Instruction {
+template <Register16Bit dst> class INC_XX final : public Instruction {
 public:
   INC_XX(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -931,7 +931,7 @@ public:
 /*
  * Decrement contents of 16-bit XX register
  */
-template <Register16Bit dst> class DEC_XX : public Instruction {
+template <Register16Bit dst> class DEC_XX final : public Instruction {
 public:
   DEC_XX(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -948,7 +948,7 @@ public:
 /*
  * Add 8-bit immediate value to stack pointer - NOTE: imm is signed
  */
-class ADD_SP_imm8 : public Instruction {
+class ADD_SP_imm8 final : public Instruction {
 public:
   ADD_SP_imm8(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
@@ -983,7 +983,7 @@ private:
  * Add 8-bit immediate value to stack pointer, store result in HL
  * - NOTE: imm is signed
  */
-class LD_HL_SP_E8 : public Instruction {
+class LD_HL_SP_E8 final : public Instruction {
 public:
   LD_HL_SP_E8(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
