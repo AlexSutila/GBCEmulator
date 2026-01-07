@@ -46,7 +46,10 @@ Renderer::Renderer(bool is_headless) : headless(is_headless) {
   }
 
   /* Still allocate frame buffer for snapshots in headless mode */
-  pixels = std::make_unique<std::uint32_t[]>(framebuf_height * framebuf_width);
+  framebuffers[0] =
+      std::make_unique<std::uint32_t[]>(framebuf_height * framebuf_width);
+  framebuffers[1] =
+      std::make_unique<std::uint32_t[]>(framebuf_height * framebuf_width);
   pixels_rendered = 0;
   running = true;
   clear();
@@ -67,15 +70,17 @@ Renderer::~Renderer() {
 void Renderer::putPixel(int x, int y, std::uint32_t c) {
   if (x < 0 || x >= framebuf_width || y < 0 || y >= framebuf_height)
     return;
-  pixels[y * framebuf_width + x] = c;
+  const int back_index = 1 - front_index.load(std::memory_order_relaxed);
+  framebuffers[back_index][y * framebuf_width + x] = c;
   ++pixels_rendered;
 
   if (pixels_rendered != framebuf_height * framebuf_width)
     return;
   pixels_rendered = 0;
 
-  if (!headless)
-    present();
+  // if (!headless)
+  //   present();
+  front_index.store(back_index, std::memory_order_release);
 }
 
 void Renderer::poll_events() {
@@ -101,6 +106,7 @@ void Renderer::present() {
   if (headless)
     return;
 
+  const std::uint32_t *pixels = front_buffer();
   uint32_t *texturePixels;
   int pitch;
   SDL_LockTexture(texture, nullptr, reinterpret_cast<void **>(&texturePixels),
@@ -135,10 +141,12 @@ void Renderer::clear() {
   constexpr std::uint32_t white = 0xFFFFFFFF;
   constexpr std::uint32_t black = 0xFF000000;
   for (int i = 0; i < framebuf_width * framebuf_height; ++i)
-    pixels[i] = black;
+    for (auto &buffer : framebuffers)
+      buffer[i] = black;
 }
 
 bool Renderer::consume_load_request(std::string &rom_path) {
+  std::lock_guard<std::mutex> lock(ui_mutex);
   if (!ui_state.request_load)
     return false;
   ui_state.request_load = false;
@@ -147,10 +155,12 @@ bool Renderer::consume_load_request(std::string &rom_path) {
 }
 
 void Renderer::set_status_message(std::string message) {
+  std::lock_guard<std::mutex> lock(ui_mutex);
   ui_state.status_message = std::move(message);
 }
 
 void Renderer::build_ui() {
+  std::lock_guard<std::mutex> lock(ui_mutex);
   ImGuiIO &io = ImGui::GetIO();
   float display_w = io.DisplaySize.x;
   float display_h = io.DisplaySize.y;
@@ -213,4 +223,8 @@ void Renderer::build_ui() {
     ImGui::TextUnformatted("Settings UI coming soon.");
     ImGui::End();
   }
+}
+
+const std::uint32_t *Renderer::front_buffer() const {
+  return framebuffers[front_index.load(std::memory_order_acquire)].get();
 }

@@ -57,23 +57,35 @@ void GameBoyColor::step() {
 }
 
 void GameBoyColor::run() {
-  while (renderer->get_running()) [[likely]] {
-  std::string rom_path;
-  if (renderer->consume_load_request(rom_path)) {
-    try {
-      cart loaded = load_cart_fs(rom_path.c_str());
-      insert_cartridge(loaded);
-      renderer->set_status_message("ROM loaded.");
-    } catch (const std::exception &e) {
-      renderer->set_status_message(
-          std::string("Failed to load ROM: ") + e.what());
+  auto emulation_loop = [this]() {
+    while (renderer->get_running()) [[likely]] {
+      std::string rom_path;
+      if (renderer->consume_load_request(rom_path)) {
+        try {
+          cart loaded = load_cart_fs(rom_path.c_str());
+          insert_cartridge(loaded);
+          renderer->set_status_message("ROM loaded.");
+        } catch (const std::exception &e) {
+          renderer->set_status_message(
+              std::string("Failed to load ROM: ") + e.what());
+        }
+      }
+
+      if (has_cartridge) {
+        step();
+      } else {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      }
     }
+  };
+  if (renderer->is_headless()) {
+    emulation_loop();
+    return;
   }
 
-  if (has_cartridge) {
-    step();
-  } else {
+  std::thread emu_thread(emulation_loop);
+  while (renderer->get_running()) [[likely]] {
     renderer->present();
   }
-}
+  emu_thread.join();
 }
