@@ -3,7 +3,7 @@
 
 #include <SDL3/SDL.h>
 #include <chrono>
-#include <cstdint>
+#include <ImGuiFileDialog.h>
 #include <memory>
 #include <string>
 
@@ -49,6 +49,9 @@ private:
   const bool headless{};
   bool running{};
   UiState ui_state{};
+
+  IGFD::FileDialogConfig config;
+  ImVec2 max_size, min_size;
 };
 
 #endif // __RENDERER_H
