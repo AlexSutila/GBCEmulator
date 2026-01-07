@@ -41,6 +41,7 @@ private:
   std::unique_ptr<PixelProcessingUnit> ppu{};
   std::unique_ptr<TimerUnit> timer{};
   runtime_sys_info sys;
+  bool has_cartridge{};
 };
 
 #endif // __GBC_H

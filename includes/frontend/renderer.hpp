@@ -5,6 +5,7 @@
 #include <chrono>
 #include <cstdint>
 #include <memory>
+#include <string>
 
 class Renderer {
 public:
@@ -19,10 +20,22 @@ public:
   void clear();
 
   bool get_running() const { return running; }
+  bool consume_load_request(std::string &rom_path);
+  void set_status_message(std::string message);
   void poll_events();
   void present();
 
 private:
+  struct UiState {
+    bool show_load_window{true};
+    bool show_settings_window{false};
+    bool request_load{false};
+    std::string rom_path{};
+    std::string status_message{};
+  };
+
+  void build_ui();
+
   std::chrono::time_point<std::chrono::steady_clock> elapsed_time;
   SDL_Renderer *renderer{};
   SDL_Texture *texture{};
@@ -35,6 +48,7 @@ private:
   // System keep-alive
   const bool headless{};
   bool running{};
+  UiState ui_state{};
 };
 
 #endif // __RENDERER_H

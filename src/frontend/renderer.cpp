@@ -1,5 +1,9 @@
 #include "frontend/renderer.hpp"
 #include <SDL3/SDL.h>
+#include <imgui.h>
+#include <misc/cpp/imgui_stdlib.h>
+#include <backends/imgui_impl_sdl3.h>
+#include <backends/imgui_impl_sdlrenderer3.h>
 #include <chrono>
 #include <cstdint>
 #include <memory>
@@ -26,6 +30,14 @@ Renderer::Renderer(bool is_headless) : headless(is_headless) {
     if (!texture)
       throw std::runtime_error(SDL_GetError());
 
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGui::StyleColorsDark();
+    if (!ImGui_ImplSDL3_InitForSDLRenderer(window, renderer))
+      throw std::runtime_error("Failed to initialize ImGui SDL3 backend");
+    if (!ImGui_ImplSDLRenderer3_Init(renderer))
+      throw std::runtime_error("Failed to initialize ImGui SDL renderer backend");
+
     /* For 60hz synchronization */
     elapsed_time = std::chrono::steady_clock::now();
   }
@@ -39,6 +51,9 @@ Renderer::Renderer(bool is_headless) : headless(is_headless) {
 
 Renderer::~Renderer() {
   if (!headless) {
+    ImGui_ImplSDLRenderer3_Shutdown();
+    ImGui_ImplSDL3_Shutdown();
+    ImGui::DestroyContext();
     SDL_DestroyTexture(texture);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
@@ -63,6 +78,8 @@ void Renderer::putPixel(int x, int y, std::uint32_t c) {
 void Renderer::poll_events() {
   SDL_Event e;
   while (SDL_PollEvent(&e)) {
+    if (!headless)
+      ImGui_ImplSDL3_ProcessEvent(&e);
     if (e.type == SDL_EVENT_QUIT)
       running = false;
   }
@@ -94,6 +111,14 @@ void Renderer::present() {
   SDL_UnlockTexture(texture);
   SDL_RenderClear(renderer);
   SDL_RenderTexture(renderer, texture, nullptr, nullptr);
+
+  ImGui_ImplSDLRenderer3_NewFrame();
+  ImGui_ImplSDL3_NewFrame();
+  ImGui::NewFrame();
+  build_ui();
+  ImGui::Render();
+  ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), renderer);
+
   SDL_RenderPresent(renderer);
   poll_events();
 
@@ -107,4 +132,58 @@ void Renderer::clear() {
   constexpr std::uint32_t white = 0xFFFFFFFF;
   for (int i = 0; i < framebuf_width * framebuf_height; ++i)
     pixels[i] = white;
+}
+
+bool Renderer::consume_load_request(std::string &rom_path) {
+  if (!ui_state.request_load)
+    return false;
+  ui_state.request_load = false;
+  rom_path = ui_state.rom_path;
+  return true;
+}
+
+void Renderer::set_status_message(std::string message) {
+  ui_state.status_message = std::move(message);
+}
+
+void Renderer::build_ui() {
+  if (ImGui::BeginMainMenuBar()) {
+    if (ImGui::BeginMenu("File")) {
+      if (ImGui::MenuItem("Load ROM..."))
+        ui_state.show_load_window = true;
+      if (ImGui::MenuItem("Quit"))
+        running = false;
+      ImGui::EndMenu();
+    }
+    if (ImGui::BeginMenu("Settings")) {
+      if (ImGui::MenuItem("Emulator Settings"))
+        ui_state.show_settings_window = true;
+      ImGui::EndMenu();
+    }
+    ImGui::EndMainMenuBar();
+  }
+
+  if (ui_state.show_load_window) {
+    ImGui::Begin("Load ROM", &ui_state.show_load_window);
+    ImGui::InputText("ROM Path", &ui_state.rom_path);
+    if (ImGui::Button("Load ROM")) {
+      if (ui_state.rom_path.empty()) {
+        ui_state.status_message = "Please enter a ROM path.";
+      } else {
+        ui_state.request_load = true;
+        ui_state.status_message = "Loading ROM...";
+      }
+    }
+    if (!ui_state.status_message.empty()) {
+      ImGui::Spacing();
+      ImGui::TextUnformatted(ui_state.status_message.c_str());
+    }
+    ImGui::End();
+  }
+
+  if (ui_state.show_settings_window) {
+    ImGui::Begin("Settings (Placeholder)", &ui_state.show_settings_window);
+    ImGui::TextUnformatted("Settings UI coming soon.");
+    ImGui::End();
+  }
 }
