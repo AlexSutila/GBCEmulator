@@ -133,8 +133,9 @@ void Renderer::present() {
 
 void Renderer::clear() {
   constexpr std::uint32_t white = 0xFFFFFFFF;
+  constexpr std::uint32_t black = 0xFF000000;
   for (int i = 0; i < framebuf_width * framebuf_height; ++i)
-    pixels[i] = white;
+    pixels[i] = black;
 }
 
 bool Renderer::consume_load_request(std::string &rom_path) {
