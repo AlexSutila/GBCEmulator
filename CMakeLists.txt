@@ -20,7 +20,38 @@ FetchContent_Declare(
     GIT_TAG        release-3.4.0
 )
 FetchContent_MakeAvailable(SDL3)
-#find_package(SDL3 REQUIRED)
+FetchContent_Declare(
+    imgui
+    GIT_REPOSITORY https://github.com/ocornut/imgui.git
+    GIT_TAG        v1.92.5
+)
+FetchContent_MakeAvailable(imgui)
+FetchContent_Declare(
+    imgui_file_dialog
+    GIT_REPOSITORY https://github.com/aiekick/ImGuiFileDialog.git
+    GIT_TAG        v0.6.8
+)
+FetchContent_MakeAvailable(imgui)
+FetchContent_MakeAvailable(imgui_file_dialog)
+
+set(IMGUI_SOURCES
+    ${imgui_SOURCE_DIR}/imgui.cpp
+    ${imgui_SOURCE_DIR}/imgui_draw.cpp
+    ${imgui_SOURCE_DIR}/imgui_tables.cpp
+    ${imgui_SOURCE_DIR}/imgui_widgets.cpp
+    ${imgui_SOURCE_DIR}/backends/imgui_impl_sdl3.cpp
+    ${imgui_SOURCE_DIR}/backends/imgui_impl_sdlrenderer3.cpp
+    ${imgui_SOURCE_DIR}/misc/cpp/imgui_stdlib.cpp
+    ${imgui_file_dialog_SOURCE_DIR}/ImGuiFileDialog.cpp
+)
+add_library(imgui STATIC ${IMGUI_SOURCES})
+target_include_directories(imgui
+    PUBLIC ${imgui_SOURCE_DIR}
+    PUBLIC ${imgui_SOURCE_DIR}/backends
+    PUBLIC ${imgui_SOURCE_DIR}/misc/cpp
+    PUBLIC ${imgui_file_dialog_SOURCE_DIR}
+)
+target_link_libraries(imgui PRIVATE SDL3::SDL3)
 
 # Common sources
 set(GBC_CORE_SOURCES
@@ -91,6 +122,7 @@ add_executable(gbc
 )
 target_link_libraries(gbc
     PRIVATE SDL3::SDL3
+    PRIVATE imgui
 )
 target_include_directories(gbc
     PRIVATE ${GBC_INCLUDE_DIR}
@@ -106,6 +138,7 @@ pybind11_add_module(gbc_py
 )
 target_link_libraries(gbc_py
     PRIVATE SDL3::SDL3
+    PRIVATE imgui
 )
 target_include_directories(gbc_py
     PRIVATE ${GBC_INCLUDE_DIR}
