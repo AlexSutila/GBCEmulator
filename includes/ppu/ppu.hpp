@@ -17,16 +17,18 @@
 #include <optional>
 
 struct runtime_sys_info;
+class Frontend;
 
 class PixelProcessingUnit {
 public:
-  PixelProcessingUnit(AddressBus *bus, runtime_sys_info &sys);
+  PixelProcessingUnit(AddressBus *bus, Frontend &fe, runtime_sys_info &sys);
   void reset();
   void step();
 
 private:
   InterruptBits *if_reg{};
   runtime_sys_info &sys_;
+  Frontend &fe_; // To access frame buffer
 
   /* Maintain access to relevant memory structures so we don't have to rely on
    * AddressBus::read_byte() and AddressBus::write_byte(). */

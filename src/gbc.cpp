@@ -8,17 +8,17 @@
 
 GameBoyColor::GameBoyColor(Frontend &frontend) : fe_(frontend) {
   /* General system operation info */
-  sys = {
+  sys_ = {
       .double_speed = false,
       .cgb_mode = true,
       .elapsed_clocks = 0,
   };
 
   /* Component initializaiton */
-  bus = std::make_unique<AddressBus>(sys);
-  cpu = std::make_unique<LR35902>(bus.get(), sys);
-  ppu = std::make_unique<PixelProcessingUnit>(bus.get(), sys);
-  timer = std::make_unique<TimerUnit>(bus.get(), sys);
+  bus = std::make_unique<AddressBus>(sys_);
+  cpu = std::make_unique<LR35902>(bus.get(), sys_);
+  ppu = std::make_unique<PixelProcessingUnit>(bus.get(), fe_, sys_);
+  timer = std::make_unique<TimerUnit>(bus.get(), sys_);
   has_cartridge = false;
 }
 
@@ -49,5 +49,5 @@ void GameBoyColor::step() {
   timer->step();
 
   // System clocks are maintained in unit `t-cycles`
-  ++sys.elapsed_clocks;
+  ++sys_.elapsed_clocks;
 }

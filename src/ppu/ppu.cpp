@@ -1,5 +1,6 @@
 #include "ppu/ppu.hpp"
 #include "cpu/interrupts.hpp"
+#include "frontend/frontend.hpp"
 #include "gbc.hpp"
 #include "memory/bus.hpp"
 #include "memory/mmio/dmg.hpp"
@@ -22,8 +23,10 @@ template <typename T> T *init_mmio(AddressBus *bus, IORegisterMapping reg_id) {
   throw std::logic_error(std::string("Failed to configure MMIO (PPU)"));
 }
 
-PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus, runtime_sys_info &sys)
+PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus, Frontend &fe,
+                                         runtime_sys_info &sys)
     : sys_(sys),             // General operating mode info
+      fe_(fe),               // To access frame buffer(s)
       vram(bus->get_vram()), // Tile data/map/attribute content
       oam(bus->get_oam()),   // Object (sprite) attribute memory
       lcdc_(),               // LCD control

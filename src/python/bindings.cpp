@@ -280,8 +280,8 @@ PYBIND11_MODULE(gbc_py, m) {
 
   // Pixel Processor class
   py::class_<PixelProcessingUnit>(m, "PixelProcessor")
-      .def(py::init<AddressBus *, runtime_sys_info &>(), py::arg("bus"),
-           py::arg("sys"),
+      .def(py::init<AddressBus *, Frontend &, runtime_sys_info &>(), py::arg("bus"),
+           py::arg("fe"), py::arg("sys"),
            py::keep_alive<1, 2>()) // PixelProcessor keeps AddressBus alive
       .def("step", &PixelProcessingUnit::step);
 

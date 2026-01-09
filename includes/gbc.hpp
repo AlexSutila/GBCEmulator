@@ -40,7 +40,7 @@ private:
   std::unique_ptr<PixelProcessingUnit> ppu{};
   std::unique_ptr<TimerUnit> timer{};
 
-  runtime_sys_info sys{};
+  runtime_sys_info sys_{};
   bool has_cartridge{};
   Frontend &fe_;
 };
