@@ -6,7 +6,7 @@
 #include "timer/timer.hpp"
 #include <memory>
 
-GameBoyColor::GameBoyColor() {
+GameBoyColor::GameBoyColor(Frontend &frontend) : fe_(frontend) {
   /* General system operation info */
   sys = {
       .double_speed = false,

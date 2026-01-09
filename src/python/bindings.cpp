@@ -1,4 +1,5 @@
 #include <cstdint>
+#include <memory>
 #include <pybind11/functional.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -26,6 +27,21 @@ public:
   void clear() override {}
   void start() override {}
 };
+class PyGameBoyColor {
+public:
+  PyGameBoyColor() : fe_() {}
+  void insert_cartridge(cart c) { fe_.get()->insert_cartridge(c); }
+  void init_test_bed() { fe_.get()->init_test_bed(); }
+  void step() { fe_.get()->step(); }
+
+  AddressBus *get_bus() { return fe_.get()->get_bus(); };
+  LR35902 *get_cpu() { return fe_.get()->get_cpu(); };
+  PixelProcessingUnit *get_ppu() { return fe_.get()->get_ppu(); }
+  TimerUnit *get_timer() { return fe_.get()->get_timer(); }
+
+private:
+  PyFrontend fe_;
+};
 
 class PyCpuRegister : public CpuRegister {
 public:
@@ -48,7 +64,7 @@ public:
   addr_t read() const override { PYBIND11_OVERRIDE(addr_t, CpuRegister, read); }
 };
 
-bool poll_mooneye_test(GameBoyColor &gbc) {
+bool poll_mooneye_test(PyGameBoyColor &gbc) {
   std::uint32_t max_cycles = 10000000, cycles = 0;
   byte_t op = 0;
   while (op != 0x40 && cycles < max_cycles) {
@@ -270,18 +286,18 @@ PYBIND11_MODULE(gbc_py, m) {
       .def("step", &PixelProcessingUnit::step);
 
   // Master Emulator class
-  py::class_<GameBoyColor>(m, "GameBoyColor")
+  py::class_<PyGameBoyColor>(m, "GameBoyColor")
       .def(py::init<>())
-      .def("insert_cartridge", &GameBoyColor::insert_cartridge)
-      .def("init_test_bed", &GameBoyColor::init_test_bed)
-      .def("step", &GameBoyColor::step)
-      .def("get_bus", &GameBoyColor::get_bus,
+      .def("insert_cartridge", &PyGameBoyColor::insert_cartridge)
+      .def("init_test_bed", &PyGameBoyColor::init_test_bed)
+      .def("step", &PyGameBoyColor::step)
+      .def("get_bus", &PyGameBoyColor::get_bus,
            py::return_value_policy::reference_internal)
-      .def("get_cpu", &GameBoyColor::get_cpu,
+      .def("get_cpu", &PyGameBoyColor::get_cpu,
            py::return_value_policy::reference_internal)
-      .def("get_ppu", &GameBoyColor::get_ppu,
+      .def("get_ppu", &PyGameBoyColor::get_ppu,
            py::return_value_policy::reference_internal)
-      .def("get_timer", &GameBoyColor::get_timer,
+      .def("get_timer", &PyGameBoyColor::get_timer,
            py::return_value_policy::reference_internal);
 
   // For testing

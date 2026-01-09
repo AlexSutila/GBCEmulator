@@ -7,10 +7,11 @@
 
 class Frontend {
 public:
-  explicit Frontend() : gbc_(std::make_unique<GameBoyColor>()) {}
+  explicit Frontend() : gbc_(std::make_unique<GameBoyColor>(*this)) {}
   virtual void put_pixel(int x, int y, std::uint32_t c) = 0;
   virtual void clear() = 0;
   virtual void start() = 0;
+  std::unique_ptr<GameBoyColor> &get() { return gbc_; }
 
 private:
   std::unique_ptr<GameBoyColor> gbc_;

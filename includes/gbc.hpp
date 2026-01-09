@@ -10,6 +10,8 @@
 #include <cstdint>
 #include <memory>
 
+class Frontend;
+
 /* A generic data structure that is passed to the components and updated by
  * various MMIO registers that need to know about things like backwards
  * compatability and current operating mode. */
@@ -21,7 +23,7 @@ struct runtime_sys_info {
 
 class GameBoyColor {
 public:
-  GameBoyColor();
+  GameBoyColor(Frontend &frontend);
   void insert_cartridge(cart c);
   void init_test_bed();
   void step();
@@ -37,8 +39,10 @@ private:
   std::unique_ptr<LR35902> cpu{};
   std::unique_ptr<PixelProcessingUnit> ppu{};
   std::unique_ptr<TimerUnit> timer{};
-  runtime_sys_info sys;
+
+  runtime_sys_info sys{};
   bool has_cartridge{};
+  Frontend &fe_;
 };
 
 #endif // __GBC_H
