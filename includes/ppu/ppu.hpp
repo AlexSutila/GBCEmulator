@@ -2,7 +2,6 @@
 #define __PPU_H
 
 #include "cpu/interrupts.hpp"
-#include "frontend/renderer.hpp"
 #include "memory/bus.hpp"
 #include "memory/mmio/dmg.hpp"
 #include "memory/mmio/mmio.hpp"
@@ -21,12 +20,11 @@ struct runtime_sys_info;
 
 class PixelProcessingUnit {
 public:
-  PixelProcessingUnit(AddressBus *bus, Renderer *render, runtime_sys_info &sys);
+  PixelProcessingUnit(AddressBus *bus, runtime_sys_info &sys);
   void reset();
   void step();
 
 private:
-  Renderer *const renderer{};
   InterruptBits *if_reg{};
   runtime_sys_info &sys_;
 

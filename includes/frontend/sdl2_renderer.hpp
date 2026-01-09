@@ -1,6 +1,7 @@
 #ifndef __RENDERER_H
 #define __RENDERER_H
 
+#include "frontend/frontend.hpp"
 #include <ImGuiFileDialog.h>
 #include <SDL3/SDL.h>
 #include <array>
@@ -10,20 +11,20 @@
 #include <mutex>
 #include <string>
 
-class Renderer {
+class SDL2Frontend final : public Frontend {
 public:
-  Renderer(bool is_headless);
-  ~Renderer();
+  SDL2Frontend();
+  ~SDL2Frontend();
 
   static constexpr int framebuf_width = 160;
   static constexpr int framebuf_height = 144;
   static constexpr int scale = 4;
 
-  void putPixel(int x, int y, std::uint32_t c);
-  void clear();
+  void put_pixel(int x, int y, std::uint32_t c) override;
+  void clear() override;
+  void start() override;
 
   bool get_running() const { return running.load(); }
-  bool is_headless() const { return headless; }
   bool consume_load_request(std::string &rom_path);
   void set_status_message(std::string message);
   void poll_events();
@@ -37,7 +38,6 @@ private:
     std::string rom_path{};
     std::string status_message{};
   };
-
   void build_ui();
   const std::uint32_t *front_buffer() const;
 
@@ -53,7 +53,6 @@ private:
   mutable std::mutex ui_mutex{};
 
   // System keep-alive
-  const bool headless{};
   std::atomic<bool> running{};
   UiState ui_state{};
 

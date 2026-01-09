@@ -1,4 +1,5 @@
-#include "frontend/renderer.hpp"
+#include "frontend/frontend.hpp"
+#include "frontend/sdl2_renderer.hpp"
 #include <SDL3/SDL.h>
 #include <backends/imgui_impl_sdl3.h>
 #include <backends/imgui_impl_sdlrenderer3.h>
@@ -8,47 +9,40 @@
 #include <misc/cpp/imgui_stdlib.h>
 #include <stdexcept>
 
-const char *filters =
+static const char *filters =
     "GBC ROM files (*.gb *.gbc){.gb,.gbc},All files (*.*){.*}";
 
-Renderer::Renderer(bool is_headless) : headless(is_headless) {
+SDL2Frontend::SDL2Frontend() : Frontend() {
   if (!SDL_Init(SDL_INIT_VIDEO))
     throw std::runtime_error(SDL_GetError());
 
-  if (!headless) {
-    window = SDL_CreateWindow("GBC", framebuf_width * scale,
-                              framebuf_height * scale, SDL_WINDOW_RESIZABLE);
-    if (!window)
-      throw std::runtime_error(SDL_GetError());
+  window = SDL_CreateWindow("GBC", framebuf_width * scale,
+                            framebuf_height * scale, SDL_WINDOW_RESIZABLE);
+  if (!window)
+    throw std::runtime_error(SDL_GetError());
 
-    renderer = SDL_CreateRenderer(window, nullptr);
-    if (!renderer)
-      throw std::runtime_error(SDL_GetError());
+  renderer = SDL_CreateRenderer(window, nullptr);
+  if (!renderer)
+    throw std::runtime_error(SDL_GetError());
 
-    texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
-                                SDL_TEXTUREACCESS_STREAMING, framebuf_width,
-                                framebuf_height);
-    if (!texture)
-      throw std::runtime_error(SDL_GetError());
+  texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
+                              SDL_TEXTUREACCESS_STREAMING, framebuf_width,
+                              framebuf_height);
+  if (!texture)
+    throw std::runtime_error(SDL_GetError());
 
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGui::StyleColorsDark();
-    if (!ImGui_ImplSDL3_InitForSDLRenderer(window, renderer))
-      throw std::runtime_error("Failed to initialize ImGui SDL3 backend");
-    if (!ImGui_ImplSDLRenderer3_Init(renderer))
-      throw std::runtime_error(
-          "Failed to initialize ImGui SDL renderer backend");
+  IMGUI_CHECKVERSION();
+  ImGui::CreateContext();
+  ImGui::StyleColorsDark();
+  if (!ImGui_ImplSDL3_InitForSDLRenderer(window, renderer))
+    throw std::runtime_error("Failed to initialize ImGui SDL3 backend");
+  if (!ImGui_ImplSDLRenderer3_Init(renderer))
+    throw std::runtime_error("Failed to initialize ImGui SDL renderer backend");
 
-    /* For 60hz synchronization */
-    elapsed_time = std::chrono::steady_clock::now();
-
-    config.path = ".";
-    config.flags =
-        ImGuiFileDialogFlags_Modal | ImGuiFileDialogFlags_ReadOnlyFileNameField;
-  }
-
-  /* Still allocate frame buffer for snapshots in headless mode */
+  elapsed_time = std::chrono::steady_clock::now();
+  config.path = ".";
+  config.flags =
+      ImGuiFileDialogFlags_Modal | ImGuiFileDialogFlags_ReadOnlyFileNameField;
   framebuffers[0] =
       std::make_unique<std::uint32_t[]>(framebuf_height * framebuf_width);
   framebuffers[1] =
@@ -58,36 +52,34 @@ Renderer::Renderer(bool is_headless) : headless(is_headless) {
   clear();
 }
 
-Renderer::~Renderer() {
-  if (!headless) {
-    ImGui_ImplSDLRenderer3_Shutdown();
-    ImGui_ImplSDL3_Shutdown();
-    ImGui::DestroyContext();
-    SDL_DestroyTexture(texture);
-    SDL_DestroyRenderer(renderer);
-    SDL_DestroyWindow(window);
-    SDL_Quit();
-  }
+SDL2Frontend::~SDL2Frontend() {
+  ImGui_ImplSDLRenderer3_Shutdown();
+  ImGui_ImplSDL3_Shutdown();
+  ImGui::DestroyContext();
+  SDL_DestroyTexture(texture);
+  SDL_DestroyRenderer(renderer);
+  SDL_DestroyWindow(window);
+  SDL_Quit();
 }
 
-void Renderer::putPixel(int x, int y, std::uint32_t c) {
+void SDL2Frontend::put_pixel(int x, int y, std::uint32_t c) {
   if (x < 0 || x >= framebuf_width || y < 0 || y >= framebuf_height)
     return;
   const int back_index = 1 - front_index.load(std::memory_order_relaxed);
   framebuffers[back_index][y * framebuf_width + x] = c;
   ++pixels_rendered;
 
-  if (pixels_rendered != framebuf_height * framebuf_width)
-    return;
-  pixels_rendered = 0;
-  front_index.store(back_index, std::memory_order_release);
+  /* Frame is complete so swap frame buffers */
+  if (pixels_rendered == framebuf_height * framebuf_width) {
+    front_index.store(back_index, std::memory_order_release);
+    pixels_rendered = 0;
+  }
 }
 
-void Renderer::poll_events() {
+void SDL2Frontend::poll_events() {
   SDL_Event e;
   while (SDL_PollEvent(&e)) {
-    if (!headless)
-      ImGui_ImplSDL3_ProcessEvent(&e);
+    ImGui_ImplSDL3_ProcessEvent(&e);
     if (e.type == SDL_EVENT_QUIT)
       running = false;
   }
@@ -99,11 +91,8 @@ inline auto calc_delta(const std::chrono::steady_clock::time_point &start) {
       .count();
 }
 
-void Renderer::present() {
+void SDL2Frontend::present() {
   using namespace std::chrono;
-
-  if (headless)
-    return;
 
   const std::uint32_t *pixels = front_buffer();
   uint32_t *texturePixels;
@@ -134,14 +123,14 @@ void Renderer::present() {
   elapsed_time = std::chrono::steady_clock::now();
 }
 
-void Renderer::clear() {
+void SDL2Frontend::clear() {
   constexpr std::uint32_t black = 0xFF000000;
   for (int i = 0; i < framebuf_width * framebuf_height; ++i)
     for (auto &buffer : framebuffers)
       buffer[i] = black;
 }
 
-bool Renderer::consume_load_request(std::string &rom_path) {
+bool SDL2Frontend::consume_load_request(std::string &rom_path) {
   std::lock_guard<std::mutex> lock(ui_mutex);
   if (!ui_state.request_load)
     return false;
@@ -150,12 +139,12 @@ bool Renderer::consume_load_request(std::string &rom_path) {
   return true;
 }
 
-void Renderer::set_status_message(std::string message) {
+void SDL2Frontend::set_status_message(std::string message) {
   std::lock_guard<std::mutex> lock(ui_mutex);
   ui_state.status_message = std::move(message);
 }
 
-void Renderer::build_ui() {
+void SDL2Frontend::build_ui() {
   std::lock_guard<std::mutex> lock(ui_mutex);
   ImGuiIO &io = ImGui::GetIO();
   float display_w = io.DisplaySize.x;
@@ -199,6 +188,10 @@ void Renderer::build_ui() {
   }
 }
 
-const std::uint32_t *Renderer::front_buffer() const {
+const std::uint32_t *SDL2Frontend::front_buffer() const {
   return framebuffers[front_index.load(std::memory_order_acquire)].get();
+}
+
+void SDL2Frontend::start() {
+  // TODO: Implement this
 }

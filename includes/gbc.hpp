@@ -3,7 +3,6 @@
 
 #include "cart/cart.hpp"
 #include "cpu/lr35902.hpp"
-#include "frontend/renderer.hpp"
 #include "memory/bus.hpp"
 #include "ppu/ppu.hpp"
 #include "timer/timer.hpp"
@@ -22,11 +21,10 @@ struct runtime_sys_info {
 
 class GameBoyColor {
 public:
-  GameBoyColor(bool headless);
+  GameBoyColor();
   void insert_cartridge(cart c);
   void init_test_bed();
   void step();
-  void run();
 
   /* Getters mainly for python bindings */
   AddressBus *get_bus() { return bus.get(); };
@@ -35,7 +33,6 @@ public:
   TimerUnit *get_timer() { return timer.get(); }
 
 private:
-  std::unique_ptr<Renderer> renderer{};
   std::unique_ptr<AddressBus> bus{};
   std::unique_ptr<LR35902> cpu{};
   std::unique_ptr<PixelProcessingUnit> ppu{};

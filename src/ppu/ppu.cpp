@@ -1,6 +1,5 @@
 #include "ppu/ppu.hpp"
 #include "cpu/interrupts.hpp"
-#include "frontend/renderer.hpp"
 #include "gbc.hpp"
 #include "memory/bus.hpp"
 #include "memory/mmio/dmg.hpp"
@@ -23,10 +22,8 @@ template <typename T> T *init_mmio(AddressBus *bus, IORegisterMapping reg_id) {
   throw std::logic_error(std::string("Failed to configure MMIO (PPU)"));
 }
 
-PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus, Renderer *render,
-                                         runtime_sys_info &sys)
-    : renderer(render),      // For placing pixel data to frame buffer
-      sys_(sys),             // General operating mode info
+PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus, runtime_sys_info &sys)
+    : sys_(sys),             // General operating mode info
       vram(bus->get_vram()), // Tile data/map/attribute content
       oam(bus->get_oam()),   // Object (sprite) attribute memory
       lcdc_(),               // LCD control
@@ -230,7 +227,7 @@ void PixelProcessingUnit::do_draw() {
       const auto x = row_pixels_rendered++;
       const auto y = ly_.read();
       const auto c = get_rgb(px);
-      renderer->putPixel(x, y, c);
+      // TODO: Fix
     }
 
     // Do we switch the fetcher into window rendering mode?

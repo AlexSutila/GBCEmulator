@@ -55,7 +55,6 @@ target_link_libraries(imgui PRIVATE SDL3::SDL3)
 
 # Common sources
 set(GBC_CORE_SOURCES
-    src/frontend/renderer.cpp
     src/gbc.cpp
 
     src/cpu/lr35902.cpp
@@ -117,6 +116,7 @@ endif()
 
 # Emulator executable
 add_executable(gbc
+    src/frontend/sdl2_frontend.cpp
     main.cpp
     ${GBC_CORE_SOURCES}
 )

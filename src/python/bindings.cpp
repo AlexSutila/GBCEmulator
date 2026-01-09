@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <pybind11/functional.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -8,7 +9,7 @@
 #include "cpu/lr35902.hpp"
 #include "cpu/registers/flags.hpp"
 #include "cpu/registers/register.hpp"
-#include "frontend/renderer.hpp"
+#include "frontend/frontend.hpp"
 #include "gbc.hpp"
 #include "memory/boot.hpp"
 #include "memory/bus.hpp"
@@ -16,6 +17,15 @@
 #include "memory/mmio/mmio.hpp"
 
 namespace py = pybind11;
+
+/* Hack front end just to get the compiler to shut up */
+class PyFrontend final : public Frontend {
+public:
+  PyFrontend() : Frontend() {}
+  void put_pixel(int x, int y, std::uint32_t c) override {}
+  void clear() override {}
+  void start() override {}
+};
 
 class PyCpuRegister : public CpuRegister {
 public:
@@ -252,34 +262,19 @@ PYBIND11_MODULE(gbc_py, m) {
       .def("read_tac", &TimerUnit::read_tac)
       .def("write_tac", &TimerUnit::write_tac);
 
-  // For exposing pixel processor constructor
-  py::class_<Renderer>(m, "Renderer")
-      .def(py::init<bool>(), py::arg("headless"))
-      .def_readonly_static("FB_WIDTH", &Renderer::framebuf_width)
-      .def_readonly_static("FB_HEIGHT", &Renderer::framebuf_height)
-      .def_readonly_static("SCALE", &Renderer::scale)
-      .def("put_pixel", &Renderer::putPixel, py::arg("x"), py::arg("y"),
-           py::arg("color"))
-      .def("clear", &Renderer::clear)
-      .def("present", &Renderer::present)
-      .def("poll_events", &Renderer::poll_events)
-      .def("get_running", &Renderer::get_running,
-           "Return whether the renderer is still running");
-
   // Pixel Processor class
   py::class_<PixelProcessingUnit>(m, "PixelProcessor")
-      .def(py::init<AddressBus *, Renderer *, runtime_sys_info &>(),
-           py::arg("bus"), py::arg("renderer"), py::arg("sys"),
+      .def(py::init<AddressBus *, runtime_sys_info &>(), py::arg("bus"),
+           py::arg("sys"),
            py::keep_alive<1, 2>()) // PixelProcessor keeps AddressBus alive
       .def("step", &PixelProcessingUnit::step);
 
   // Master Emulator class
   py::class_<GameBoyColor>(m, "GameBoyColor")
-      .def(py::init<bool>(), py::arg("headless") = true)
+      .def(py::init<>())
       .def("insert_cartridge", &GameBoyColor::insert_cartridge)
       .def("init_test_bed", &GameBoyColor::init_test_bed)
       .def("step", &GameBoyColor::step)
-      .def("run", &GameBoyColor::run)
       .def("get_bus", &GameBoyColor::get_bus,
            py::return_value_policy::reference_internal)
       .def("get_cpu", &GameBoyColor::get_cpu,
