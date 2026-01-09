@@ -1,5 +1,7 @@
 build/
+debug/
 release/
+compile_commands.json
 *build/
 *.mp4
 __pycache__/

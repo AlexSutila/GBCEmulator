@@ -1,11 +1,11 @@
 #ifndef __RENDERER_H
 #define __RENDERER_H
 
+#include <ImGuiFileDialog.h>
 #include <SDL3/SDL.h>
 #include <array>
 #include <atomic>
 #include <chrono>
-#include <ImGuiFileDialog.h>
 #include <memory>
 #include <mutex>
 #include <string>

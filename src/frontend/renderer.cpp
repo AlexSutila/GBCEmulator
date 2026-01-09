@@ -1,14 +1,16 @@
 #include "frontend/renderer.hpp"
 #include <SDL3/SDL.h>
-#include <imgui.h>
-#include <misc/cpp/imgui_stdlib.h>
 #include <backends/imgui_impl_sdl3.h>
 #include <backends/imgui_impl_sdlrenderer3.h>
 #include <chrono>
+#include <imgui.h>
 #include <memory>
+#include <misc/cpp/imgui_stdlib.h>
 #include <stdexcept>
 
-const char *filters = "GBC ROM files (*.gb *.gbc){.gb,.gbc},All files (*.*){.*}";
+const char *filters =
+    "GBC ROM files (*.gb *.gbc){.gb,.gbc},All files (*.*){.*}";
+
 Renderer::Renderer(bool is_headless) : headless(is_headless) {
   if (!SDL_Init(SDL_INIT_VIDEO))
     throw std::runtime_error(SDL_GetError());
@@ -23,7 +25,6 @@ Renderer::Renderer(bool is_headless) : headless(is_headless) {
     if (!renderer)
       throw std::runtime_error(SDL_GetError());
 
-    /* Enable vsync (SDL3 way) */
     texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
                                 SDL_TEXTUREACCESS_STREAMING, framebuf_width,
                                 framebuf_height);
@@ -36,13 +37,15 @@ Renderer::Renderer(bool is_headless) : headless(is_headless) {
     if (!ImGui_ImplSDL3_InitForSDLRenderer(window, renderer))
       throw std::runtime_error("Failed to initialize ImGui SDL3 backend");
     if (!ImGui_ImplSDLRenderer3_Init(renderer))
-      throw std::runtime_error("Failed to initialize ImGui SDL renderer backend");
+      throw std::runtime_error(
+          "Failed to initialize ImGui SDL renderer backend");
 
     /* For 60hz synchronization */
     elapsed_time = std::chrono::steady_clock::now();
 
     config.path = ".";
-    config.flags = ImGuiFileDialogFlags_Modal | ImGuiFileDialogFlags_ReadOnlyFileNameField;
+    config.flags =
+        ImGuiFileDialogFlags_Modal | ImGuiFileDialogFlags_ReadOnlyFileNameField;
   }
 
   /* Still allocate frame buffer for snapshots in headless mode */
@@ -77,9 +80,6 @@ void Renderer::putPixel(int x, int y, std::uint32_t c) {
   if (pixels_rendered != framebuf_height * framebuf_width)
     return;
   pixels_rendered = 0;
-
-  // if (!headless)
-  //   present();
   front_index.store(back_index, std::memory_order_release);
 }
 
@@ -100,7 +100,6 @@ inline auto calc_delta(const std::chrono::steady_clock::time_point &start) {
 }
 
 void Renderer::present() {
-  constexpr float delta = 16666.66667f;
   using namespace std::chrono;
 
   if (headless)
@@ -132,13 +131,10 @@ void Renderer::present() {
   poll_events();
 
   /* Sync to sixty herts */
-  while (calc_delta(elapsed_time) < delta)
-    ;
   elapsed_time = std::chrono::steady_clock::now();
 }
 
 void Renderer::clear() {
-  constexpr std::uint32_t white = 0xFFFFFFFF;
   constexpr std::uint32_t black = 0xFF000000;
   for (int i = 0; i < framebuf_width * framebuf_height; ++i)
     for (auto &buffer : framebuffers)
@@ -165,15 +161,15 @@ void Renderer::build_ui() {
   float display_w = io.DisplaySize.x;
   float display_h = io.DisplaySize.y;
 
-  max_size = ImVec2((float) display_w, (float) display_h);  // The full display area
+  max_size =
+      ImVec2((float)display_w, (float)display_h); // The full display area
   min_size = ImVec2(400.0f, 250.0f);
 
   if (ImGui::BeginMainMenuBar()) {
     if (ImGui::BeginMenu("File")) {
       if (ImGui::MenuItem("Load ROM..."))
-        // ui_state.show_load_window = true;
-          ImGuiFileDialog::Instance()->OpenDialog("RomFileDialog", "Choose a ROM file",
-                                              filters, config);
+        ImGuiFileDialog::Instance()->OpenDialog(
+            "RomFileDialog", "Choose a ROM file", filters, config);
       if (ImGui::MenuItem("Quit"))
         running = false;
       ImGui::EndMenu();
@@ -186,33 +182,11 @@ void Renderer::build_ui() {
     ImGui::EndMainMenuBar();
   }
 
-  // if (ui_state.show_load_window) {
-  //   ImGui::Begin("Load ROM", &ui_state.show_load_window);
-  //   ImGui::InputText("ROM Path", &ui_state.rom_path);
-  //   if (ImGui::Button("Browse...")) {
-  //     ImGuiFileDialog::Instance()->OpenDialog("RomFileDialog", "Choose a ROM file",
-  //                                             filters, config);
-  //   }
-    // if (ImGui::Button("Load ROM")) {
-    //   if (ui_state.rom_path.empty()) {
-    //     ui_state.status_message = "Please enter a ROM path.";
-    //   } else {
-    //     ui_state.request_load = true;
-    //     ui_state.status_message = "Loading ROM...";
-    //   }
-    // }
-    // if (!ui_state.status_message.empty()) {
-    //   ImGui::Spacing();
-    //   ImGui::TextUnformatted(ui_state.status_message.c_str());
-    // }
-  //   ImGui::End();
-  // }
-
-  if (ImGuiFileDialog::Instance()->Display("RomFileDialog", ImGuiWindowFlags_NoCollapse, min_size, max_size )) {
+  if (ImGuiFileDialog::Instance()->Display(
+          "RomFileDialog", ImGuiWindowFlags_NoCollapse, min_size, max_size)) {
     if (ImGuiFileDialog::Instance()->IsOk()) {
       ui_state.rom_path = ImGuiFileDialog::Instance()->GetFilePathName();
       ui_state.request_load = true;
-      // ui_state.status_message = "Loading ROM...";
     }
     ImGuiFileDialog::Instance()->Close();
     ui_state.show_load_window = false;
