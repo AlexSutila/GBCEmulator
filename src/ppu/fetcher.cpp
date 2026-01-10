@@ -13,6 +13,10 @@
 constexpr addr_t vram_base_addr = 0x8000;
 constexpr byte_t pixels_per_row = 8;
 
+/* ======================================================================
+ * Background and window tile data fetching and processing
+ * ====================================================================== */
+
 BgWinFetcher::BgWinFetcher(std::array<std::unique_ptr<byte_t[]>, 2> &vram,
                            PPU::LCDCtrl &lcdc, MMIORegister &scy,
                            MMIORegister &scx, MMIORegister &wy,
@@ -29,23 +33,6 @@ BgWinFetcher::BgWinFetcher(std::array<std::unique_ptr<byte_t[]>, 2> &vram,
       fifo_(fifo)   // Pixel fifo
 {
   reset();
-}
-
-void Fetcher::step() {
-  switch (state) {
-  case STATE_READ_TILE:
-    do_read_tile();
-    break;
-  case STATE_READ_DATA_LO:
-    do_read_data_lo();
-    break;
-  case STATE_READ_DATA_HI:
-    do_read_data_hi();
-    break;
-  case STATE_PUSH_DATA:
-    do_push_data();
-    break;
-  }
 }
 
 void BgWinFetcher::reset(bool window_started) {
@@ -286,4 +273,115 @@ void BgWinFetcher::render_window() {
   // first window tile, but after that the rendering process is identical.
   fifo_.flush();
   reset(true);
+}
+
+void BgWinFetcher::step() {
+  switch (state) {
+  case STATE_READ_TILE:
+    do_read_tile();
+    break;
+  case STATE_READ_DATA_LO:
+    do_read_data_lo();
+    break;
+  case STATE_READ_DATA_HI:
+    do_read_data_hi();
+    break;
+  case STATE_PUSH_DATA:
+    do_push_data();
+    break;
+  }
+}
+
+/* ======================================================================
+ * Sprite (or object) and OAM tile data fetching and processing
+ * ====================================================================== */
+
+ObjFetcher::ObjFetcher(PixelFifo &fifo, runtime_sys_info &sys)
+    : Fetcher(sys), // Implements generic FSM logic
+      fifo_(fifo)   // Maintains pixel color data
+{
+  reset();
+}
+
+void ObjFetcher::reset() {
+  state = STATE_READ_TILE;
+  data = {
+      .tile_idx = 0,
+      .tile_attr = 0,
+      .data_lo = 0,
+      .data_hi = 0,
+      .x_coor = 0,
+  };
+
+  // Reset timing metadata
+  total_clks.reset();
+  cur_clks = 0;
+}
+
+void ObjFetcher::do_read_tile() {
+  constexpr std::size_t max_state_clks = 2;
+
+  // State entry logic, false indicates high byte
+  if (!total_clks.has_value()) {
+    // TODO
+    total_clks = max_state_clks;
+  }
+  ++cur_clks;
+
+  // Read tile incomplete
+  if (cur_clks >= total_clks.value()) {
+    state = STATE_READ_DATA_LO;
+    total_clks.reset();
+    cur_clks = 0;
+  }
+}
+
+void ObjFetcher::do_read_data_lo() {
+  constexpr std::size_t max_state_clks = 2;
+
+  // State entry logic, false indicates high byte
+  if (!total_clks.has_value()) {
+    // TODO
+    total_clks = max_state_clks;
+  }
+  ++cur_clks;
+
+  // Read tile incomplete
+  if (cur_clks >= total_clks.value()) {
+    state = STATE_READ_DATA_HI;
+    total_clks.reset();
+    cur_clks = 0;
+  }
+}
+
+void ObjFetcher::do_read_data_hi() {
+  constexpr std::size_t max_state_clks = 2;
+
+  // State entry logic, false indicates high byte
+  if (!total_clks.has_value()) {
+    // TODO
+    total_clks = max_state_clks;
+  }
+  ++cur_clks;
+
+  // Read tile incomplete
+  if (cur_clks >= total_clks.value()) {
+    state = STATE_READ_TILE;
+    total_clks.reset();
+    cur_clks = 0;
+  }
+}
+
+void ObjFetcher::step() {
+  switch (state) {
+  case STATE_READ_TILE:
+    do_read_tile();
+    break;
+  case STATE_READ_DATA_LO:
+    do_read_data_lo();
+    break;
+  case STATE_READ_DATA_HI:
+    do_read_data_hi();
+    break;
+  }
 }

@@ -17,7 +17,7 @@ class Fetcher {
 public:
   Fetcher(runtime_sys_info &sys) : sys_(sys) {}
   virtual void reset() = 0;
-  void step(); // Step the fetcher one clock cycle
+  virtual void step() = 0;
 
 protected:
   /* Internal storage that is built up throughout the pixel pushing pipeline.
@@ -31,19 +31,9 @@ protected:
     std::size_t x_coor{}; // In unit tiles
   } data;
 
-  /* Internal state of the fetcher, each takes two clock cycles minimum */
-  enum FetcherState {
-    STATE_READ_TILE,
-    STATE_READ_DATA_LO,
-    STATE_READ_DATA_HI,
-    STATE_PUSH_DATA,
-  } state{};
-
-  /* Core fetcher logic */
-  virtual void do_read_tile() = 0;
-  virtual void do_read_data_lo() = 0;
-  virtual void do_read_data_hi() = 0;
-  virtual void do_push_data() = 0;
+  /* Internal timing metadata */
+  std::optional<std::size_t> total_clks{};
+  std::size_t cur_clks{};
 
   /* Need to distinguish between DMG and CGB */
   runtime_sys_info &sys_;
@@ -60,8 +50,8 @@ public:
                PPU::LY &ly,        // The current scanline register
                PixelFifo &fifo,    // The pixel fifo
                runtime_sys_info &sys);
-  void reset()
-      override; // Enters background rendering mode, called at start of scanline
+  void reset() override; // Enters background rendering mode
+  void step() override;
 
   /* The PPU will signal to clear the FIFO once the rendering of the window has
    * begun. All BG pixel data is flushed, and window rendering starts. */
@@ -76,13 +66,18 @@ public:
   void reset_win_ly() { win_internal_ly = 0; } // Reset end of every frame
 
 private:
-  void reset(bool window_started);
+  enum FetcherState {
+    STATE_READ_TILE,
+    STATE_READ_DATA_LO,
+    STATE_READ_DATA_HI,
+    STATE_PUSH_DATA,
+  } state{};
 
   /* Core fetcher logic */
-  void do_read_tile() override;
-  void do_read_data_lo() override;
-  void do_read_data_hi() override;
-  void do_push_data() override;
+  void do_read_tile();
+  void do_read_data_lo();
+  void do_read_data_hi();
+  void do_push_data();
 
   /* VRAM tile data and metadata source */
   std::array<std::unique_ptr<byte_t[]>, 2> &vram_;
@@ -104,12 +99,9 @@ private:
 
   /* Implements window behavior. If the window is enabled, then it is rendered
    * until the end of the scanline. */
+  void reset(bool window_started);
   byte_t win_internal_ly{};
   bool win_started{};
-
-  /* Internal timing metadata */
-  std::optional<std::size_t> total_clks{};
-  std::size_t cur_clks{};
 
   /* Helpers */
   const byte_t calc_pixel_y() const;
@@ -119,7 +111,27 @@ private:
   const addr_t calc_tile_metadata_addr() const;
 };
 
-// TODO: For sprites
-// class ObjFetcher : public Fetcher { };
+class ObjFetcher final : public Fetcher {
+public:
+  ObjFetcher(PixelFifo &fifo, runtime_sys_info &sys);
+  void reset() override;
+  void step() override;
+
+private:
+  enum FetcherState {
+    STATE_READ_TILE,
+    STATE_READ_DATA_LO,
+    STATE_READ_DATA_HI,
+    // Push will always happen instantly, it is slightly different for the
+    // object and sprite FIFO. It should never have to wait.
+  } state{};
+
+  PixelFifo &fifo_;
+
+  /* Core fetcher logic */
+  void do_read_tile();
+  void do_read_data_lo();
+  void do_read_data_hi();
+};
 
 #endif // __FETCHER_H

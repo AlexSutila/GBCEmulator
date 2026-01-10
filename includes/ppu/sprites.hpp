@@ -4,8 +4,8 @@
 #include "emu_types.hpp"
 #include <cstddef>
 
-static constexpr addr_t oam_x_offset = 0;
-static constexpr addr_t oam_y_offset = 1;
+static constexpr addr_t oam_y_offset = 0;
+static constexpr addr_t oam_x_offset = 1;
 static constexpr addr_t oam_tile_idx_offset = 2;
 static constexpr addr_t oam_attr_offset = 3;
 static constexpr addr_t sprite_size_bytes = 4;

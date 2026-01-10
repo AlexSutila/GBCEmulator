@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <stdexcept>
 
@@ -38,7 +39,8 @@ PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus, Frontend &fe,
       wx_(),                 // Window scroll X
       ly_(),                 // Current scanline
       bgp_(),                // DMG background and window palette
-      fifo(),                // Pushes background/window pixels
+      bg_fifo(),             // Pushes background/window pixels
+      obj_fifo(),            // Pushes object (sprite) pixels
       cram(std::make_unique<ColorRam>()) {
   using mmio = IORegisterMapping;
   using namespace PPU;
@@ -64,7 +66,7 @@ PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus, Frontend &fe,
   /* Not owned by the pixel processing unit, so have to fetch references */
   if_reg = init_mmio<InterruptBits>(bus, mmio::MMIO_INT_FLAGS);
 
-  /* Initialize the background pixel FIFO fetching pipeline */
+  /* Initialize the background and object pixel FIFO fetching pipeline */
   bg_fetcher = std::make_unique<BgWinFetcher>(
       bus->get_vram(), // VRAM reference for fetching tile data
       lcdc_,           // Needs to know if certain control bits are set
@@ -73,8 +75,12 @@ PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus, Frontend &fe,
       wy_,             // Needed to fetch correct window tile
       wx_,             // Needed to fetch correct window tile
       ly_,             // Needed to fetch correct background tile
-      fifo,            // Fetcher must push rows of pixels into this FIFO
+      bg_fifo,         // Fetcher must push rows of pixels into this FIFO
       sys_             // Fetcher behavior varies between DMG vs CGB mode
+  );
+  obj_fetcher = std::make_unique<ObjFetcher>(
+      obj_fifo, // Fetcher pushes rows of pixels into a seperate FIFO
+      sys_      // Fetcher behavrior also varies between DMG vs CGB mode
   );
 
   /* Initialize OAM search metadata */
@@ -223,7 +229,7 @@ void PixelProcessingUnit::do_draw() {
    * time lengthens the duration of this operation mode. */
   if (!total_mode_clks.has_value()) {
     bg_fetcher->reset();
-    fifo.flush();
+    bg_fifo.flush();
     // Simply set to minimum, raise as quirks come up during rendering. We do
     // not use this to determine end of state.
     total_mode_clks = min_drawing_cycles;
@@ -240,8 +246,8 @@ void PixelProcessingUnit::do_draw() {
   bg_fetcher->step();
 
   // Rendering step, try to pop pixels when ready from the fifo
-  if (fifo.can_pop()) {
-    const pixel px = fifo.pop();
+  if (bg_fifo.can_pop()) {
+    const pixel px = bg_fifo.pop();
     if (!px.discard) {
       const auto x = row_pixels_rendered++;
       const auto y = ly_.read();
@@ -352,7 +358,7 @@ void PixelProcessingUnit::reset() {
   using namespace PPU;
   flush_on_disable = true;
   bg_fetcher->reset();
-  fifo.flush();
+  bg_fifo.flush();
 
   /* Configure FSM timing metadata */
   cur_scanline_clks = cur_mode_clks = 0;

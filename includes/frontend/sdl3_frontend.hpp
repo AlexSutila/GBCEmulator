@@ -22,7 +22,7 @@ public:
   static constexpr int scale = 4;
 
   void put_pixel(int x, int y, std::uint32_t c) override;
-  void clear(std::uint32_t c = 0xFFFFFFFF) override;
+  void clear(std::uint32_t c = 0x00FFFFFF) override;
   void start() override;
 
   bool consume_load_request(std::string &rom_path);
