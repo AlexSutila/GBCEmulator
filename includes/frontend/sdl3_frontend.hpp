@@ -32,7 +32,7 @@ public:
 
 private:
   void emulation_thread_fn(std::stop_token st, cart c);
-  std::jthread emulation_thread;
+  std::jthread emulation_thread{};
 
   // SDL3 display boilerplate
   SDL_Renderer *renderer{};
@@ -43,9 +43,18 @@ private:
     bool show_load_window{true};
     bool show_settings_window{false};
     bool request_load{false};
+    bool fast_forward{false};
+    bool force_mono_dmg{false};
     std::string rom_path{};
     std::string status_message{};
   };
+
+  struct EmulatorState {
+    std::atomic<bool> fast_forward{};
+    std::atomic<bool> is_cgb{};
+  };
+
+  const std::uint32_t format_pixel_data(std::uint32_t px) const;
   const std::uint32_t *front_buffer() const;
   void build_ui();
 
@@ -57,6 +66,7 @@ private:
 
   // System keep-alive
   std::atomic<bool> running{};
+  EmulatorState emu_state{};
   UiState ui_state{};
 
   IGFD::FileDialogConfig config;

@@ -1,6 +1,7 @@
+#include "frontend/sdl3_frontend.hpp"
 #include "SDL3/SDL_video.h"
 #include "cart/cart.hpp"
-#include "frontend/sdl3_renderer.hpp"
+#include "ppu/palette.hpp"
 #include <SDL3/SDL.h>
 #include <backends/imgui_impl_sdl3.h>
 #include <backends/imgui_impl_sdlrenderer3.h>
@@ -117,8 +118,10 @@ void SDL3Frontend::present_ui() {
 
   pitch /= sizeof(uint32_t);
   for (int y = 0; y < framebuf_height; ++y)
-    for (int x = 0; x < framebuf_width; ++x)
-      texturePixels[y * pitch + x] = pixels[y * framebuf_width + x];
+    for (int x = 0; x < framebuf_width; ++x) {
+      const auto c = format_pixel_data(pixels[y * framebuf_width + x]);
+      texturePixels[y * pitch + x] = c;
+    }
   SDL_UnlockTexture(texture);
 
   ImGui_ImplSDLRenderer3_NewFrame();
@@ -165,13 +168,13 @@ void SDL3Frontend::set_status_message(std::string message) {
 void SDL3Frontend::build_ui() {
   std::lock_guard<std::mutex> lock(ui_mutex);
   ImGuiIO &io = ImGui::GetIO();
-  float display_w = io.DisplaySize.x;
-  float display_h = io.DisplaySize.y;
+  const float display_w = io.DisplaySize.x;
+  const float display_h = io.DisplaySize.y;
 
-  max_size =
-      ImVec2((float)display_w, (float)display_h); // The full display area
+  max_size = ImVec2((float)display_w, (float)display_h);
   min_size = ImVec2(400.0f, 250.0f);
 
+  /* Main menu bar */
   if (ImGui::BeginMainMenuBar()) {
     if (ImGui::BeginMenu("File")) {
       if (ImGui::MenuItem("Load ROM..."))
@@ -189,6 +192,7 @@ void SDL3Frontend::build_ui() {
     ImGui::EndMainMenuBar();
   }
 
+  /* ROM selection dialog */
   if (ImGuiFileDialog::Instance()->Display(
           "RomFileDialog", ImGuiWindowFlags_NoCollapse, min_size, max_size)) {
     if (ImGuiFileDialog::Instance()->IsOk()) {
@@ -199,11 +203,27 @@ void SDL3Frontend::build_ui() {
     ui_state.show_load_window = false;
   }
 
+  /* Settings dialog */
   if (ui_state.show_settings_window) {
-    ImGui::Begin("Settings (Placeholder)", &ui_state.show_settings_window);
-    ImGui::TextUnformatted("Settings UI coming soon.");
+    ImGui::Begin("Settings", &ui_state.show_settings_window);
+    ImGui::Checkbox("Fast forward", &ui_state.fast_forward);
+    ImGui::Checkbox("Force DMG monochrome", &ui_state.force_mono_dmg);
     ImGui::End();
   }
+
+  /* Update additional meta-data, avoid mutex acquisition */
+  emu_state.fast_forward.store(ui_state.fast_forward);
+}
+
+const std::uint32_t SDL3Frontend::format_pixel_data(std::uint32_t px) const {
+  constexpr std::uint32_t alpha_mask = 0xFF000000;
+  /* We are abusing the alpha bits to store DMG color palette indecies */
+  if (!emu_state.is_cgb.load() && ui_state.force_mono_dmg) {
+    const byte_t mono_pal_idx = static_cast<byte_t>((px >> 24) & 0xFF);
+    return get_mono_color(mono_pal_idx) | alpha_mask;
+  }
+  /* CGB mode will always be colored */
+  return px | alpha_mask;
 }
 
 const std::uint32_t *SDL3Frontend::front_buffer() const {
@@ -213,6 +233,7 @@ const std::uint32_t *SDL3Frontend::front_buffer() const {
 void SDL3Frontend::emulation_thread_fn(std::stop_token st, cart c) {
   using steady_clk = std::chrono::steady_clock;
   using ns = std::chrono::nanoseconds;
+  bool ff = false;
 
   constexpr unsigned sync_cycles = 10'000; // T-cycles
   constexpr ns target_step_time = wait_sync_time_ns(sync_cycles);
@@ -230,8 +251,12 @@ void SDL3Frontend::emulation_thread_fn(std::stop_token st, cart c) {
 
     /* Synchronize with real-time */
     const auto elapsed = steady_clk::now() - beg;
-    if (elapsed < target_step_time) [[likely]] // ... I hope lol
+    if (elapsed < target_step_time && !ff)
       std::this_thread::sleep_for(target_step_time - elapsed);
+
+    /* Update additional meta-data, avoid mutex acquisition */
+    emu_state.is_cgb.store(gbc_->is_cgb_mode());
+    ff = emu_state.fast_forward.load();
   }
 }
 

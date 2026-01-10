@@ -115,26 +115,32 @@ bool PixelProcessingUnit::should_advance_ly() {
 
 /* Indexes the corresponding color palette based on the index calculated by the
  * pixel FIFO rendering pipeline. This produces an RGB value used directly by
- * our software renderer. Behavior varies between CGB and DMG modes. */
+ * our software renderer. Behavior varies between CGB and DMG modes.
+ * ----------------------------------------------------------------------------
+ * To support both colored and monochrome modes in DMG mode, we abuse the alpha
+ * bits here to save some storage space and store the index into a monochrome
+ * palette in addition to the actual RGB color. */
 std::uint32_t PixelProcessingUnit::get_rgb(const pixel &px) const {
   /* If we are running in backwards compatability mode, we have to consult the
    * BGP register to translate the monochrome color index. On top of the extra
    * coloring offered with CGB hardware. */
   if (!sys_.cgb_mode) {
-    auto true_color_idx = bgp_.get_color_idx(px.color_idx);
-    return cram->get_cgb_color(true_color_idx, 0);
+    byte_t true_color_idx = bgp_.get_color_idx(px.color_idx);
+    std::uint32_t rgb = cram->get_cgb_color(true_color_idx, 0);
+    // In CGB mode, we can just tie the alpha bits high lol
+    return (rgb & 0x00FFFFFF) | (true_color_idx << 24);
   }
   return cram->get_cgb_color(px.color_idx, px.palette_idx);
 }
 
 void PixelProcessingUnit::do_disabled() {
-  if (!flush_on_disable) [[likely]]
-    return;
+  if (flush_on_disable) {
+    fe_.clear(); // This is slow
+    reset();
 
-  /* Reset PPU state only once when it is disabled. */
-  flush_on_disable = false;
-  fe_.clear();
-  reset();
+    /* Reset PPU state only once when it is disabled. */
+    flush_on_disable = false;
+  }
 }
 
 void PixelProcessingUnit::do_oam_scan() {
@@ -369,7 +375,8 @@ void PixelProcessingUnit::step() {
   if (!lcdc_.lcd_enabled()) {
     do_disabled();
     return;
-  }
+  } else
+    flush_on_disable = true;
 
   /* Rendering is enabled, perform FSM logic */
   switch (state) {

@@ -1,4 +1,4 @@
-#include "frontend/sdl3_renderer.hpp"
+#include "frontend/sdl3_frontend.hpp"
 
 int main(const int argc, const char **argv) {
   auto emulator = SDL3Frontend();
