@@ -15,6 +15,14 @@
 static const char *filters =
     "GBC ROM files (*.gb *.gbc){.gb,.gbc},All files (*.*){.*}";
 
+constexpr std::chrono::nanoseconds wait_sync_time_ns(unsigned sync_cycles) {
+  constexpr std::uint64_t t_cycle_hz = 4'194'304;
+
+  // ns = cycles * 1e9 / Hz
+  return std::chrono::nanoseconds{(sync_cycles * 1'000'000'000ull) /
+                                  t_cycle_hz};
+}
+
 SDL3Frontend::SDL3Frontend() : Frontend() {
   if (!SDL_Init(SDL_INIT_VIDEO))
     throw std::runtime_error(SDL_GetError());
@@ -196,6 +204,11 @@ const std::uint32_t *SDL3Frontend::front_buffer() const {
 }
 
 void SDL3Frontend::emulation_thread_fn(std::stop_token st, cart c) {
+  using steady_clk = std::chrono::steady_clock;
+  using ns = std::chrono::nanoseconds;
+
+  constexpr unsigned sync_cycles = 10'000; // T-cycles
+  constexpr ns target_step_time = wait_sync_time_ns(sync_cycles);
   clear();
 
   /* Re-instantiate emulator instance */
@@ -203,8 +216,16 @@ void SDL3Frontend::emulation_thread_fn(std::stop_token st, cart c) {
   gbc_->insert_cartridge(c);
 
   /* Run emulation in real-time */
-  while (!st.stop_requested()) [[likely]]
-    gbc_->step();
+  while (!st.stop_requested()) [[likely]] {
+    const auto beg = steady_clk::now();
+    for (unsigned i = 0; i < sync_cycles; i++)
+      gbc_->step();
+
+    /* Synchronize with real-time */
+    const auto elapsed = steady_clk::now() - beg;
+    if (elapsed < target_step_time) [[likely]] // ... I hope lol
+      std::this_thread::sleep_for(target_step_time - elapsed);
+  }
 }
 
 void SDL3Frontend::start() {
