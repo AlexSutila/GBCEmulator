@@ -24,7 +24,7 @@ class PyFrontend final : public Frontend {
 public:
   PyFrontend() : Frontend() {}
   void put_pixel(int x, int y, std::uint32_t c) override {}
-  void clear() override {}
+  void clear(std::uint32_t c) override {}
   void start() override {}
 };
 class PyGameBoyColor {

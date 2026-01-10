@@ -127,6 +127,16 @@ std::uint32_t PixelProcessingUnit::get_rgb(const pixel &px) const {
   return cram->get_cgb_color(px.color_idx, px.palette_idx);
 }
 
+void PixelProcessingUnit::do_disabled() {
+  if (!flush_on_disable) [[likely]]
+    return;
+
+  /* Reset PPU state only once when it is disabled. */
+  flush_on_disable = false;
+  fe_.clear();
+  reset();
+}
+
 void PixelProcessingUnit::do_oam_scan() {
   constexpr std::size_t oam_t_cycles = 80; // Fixed
   using modes = PPU::StatModes;
@@ -256,19 +266,15 @@ void PixelProcessingUnit::do_draw() {
 }
 
 void PixelProcessingUnit::do_hblank() {
-  using modes = PPU::StatModes;
-
   // HBlank will only ever occur during visible scanlines
-  assert(state == modes::MODE_HBLANK);
+  assert(state == PPU::StatModes::MODE_HBLANK);
   assert(ly_.is_visible());
   blank();
 }
 
 void PixelProcessingUnit::do_vblank() {
-  using modes = PPU::StatModes;
-
   // VBlank will only ever occur during invisible scanlines - duh
-  assert(state == modes::MODE_VBLANK);
+  assert(state == PPU::StatModes::MODE_VBLANK);
   assert(!ly_.is_visible() || ly_.read() == 0);
   blank();
 }
@@ -338,6 +344,7 @@ void PixelProcessingUnit::update_stat() {
 
 void PixelProcessingUnit::reset() {
   using namespace PPU;
+  flush_on_disable = true;
   bg_fetcher->reset();
   fifo.flush();
 
@@ -359,8 +366,8 @@ void PixelProcessingUnit::step() {
 
   /* When the PPU is disabled, the screen just shows plain white and the state
    * is set to it's initial state until it is re-enabled again. */
-  if (!lcdc_.lcd_enabled()) [[unlikely]] {
-    reset();
+  if (!lcdc_.lcd_enabled()) {
+    do_disabled();
     return;
   }
 

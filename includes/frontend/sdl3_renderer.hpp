@@ -6,6 +6,7 @@
 #include <SDL3/SDL.h>
 #include <array>
 #include <atomic>
+#include <cstdint>
 #include <memory>
 #include <mutex>
 #include <stop_token>
@@ -21,7 +22,7 @@ public:
   static constexpr int scale = 4;
 
   void put_pixel(int x, int y, std::uint32_t c) override;
-  void clear() override;
+  void clear(std::uint32_t c = 0xFFFFFFFF) override;
   void start() override;
 
   bool consume_load_request(std::string &rom_path);

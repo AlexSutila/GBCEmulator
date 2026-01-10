@@ -35,6 +35,10 @@ private:
   std::array<std::unique_ptr<byte_t[]>, 2> &vram;
   std::unique_ptr<byte_t[]> &oam;
 
+  /* PPU outputs nothing when disabled, hence there must be some mechanism to
+   * flush the frame buffers once as the LCDC bit is cleared. */
+  bool flush_on_disable{};
+
   /* Convenience references to important PPU mmio registers */
   PPU::LCDCtrl lcdc_{};
   PPU::STAT stat_{};
@@ -61,6 +65,7 @@ private:
   PPU::BGP bgp_{};
 
   /* Pixel Processor operation modes */
+  void do_disabled();
   void do_oam_scan();
   void do_draw();
 

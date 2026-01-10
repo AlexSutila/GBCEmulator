@@ -15,6 +15,7 @@
 
 static const char *filters =
     "GBC ROM files (*.gb *.gbc){.gb,.gbc},All files (*.*){.*}";
+static constexpr std::uint32_t black = 0xFF000000;
 
 constexpr std::chrono::nanoseconds wait_sync_time_ns(unsigned sync_cycles) {
   constexpr std::uint64_t t_cycle_hz = 4'194'304;
@@ -139,11 +140,10 @@ void SDL3Frontend::present_ui() {
   SDL_RenderPresent(renderer);
 }
 
-void SDL3Frontend::clear() {
-  constexpr std::uint32_t black = 0xFF000000;
+void SDL3Frontend::clear(std::uint32_t c) {
   for (int i = 0; i < framebuf_width * framebuf_height; ++i)
     for (auto &buffer : framebuffers)
-      buffer[i] = black;
+      buffer[i] = c;
 }
 
 bool SDL3Frontend::consume_load_request(std::string &rom_path) {
@@ -216,7 +216,7 @@ void SDL3Frontend::emulation_thread_fn(std::stop_token st, cart c) {
 
   constexpr unsigned sync_cycles = 10'000; // T-cycles
   constexpr ns target_step_time = wait_sync_time_ns(sync_cycles);
-  clear();
+  clear(black);
 
   /* Re-instantiate emulator instance */
   gbc_ = std::make_unique<GameBoyColor>(*this);
@@ -237,6 +237,8 @@ void SDL3Frontend::emulation_thread_fn(std::stop_token st, cart c) {
 
 void SDL3Frontend::start() {
   std::string rom_path{};
+  clear(black);
+
   while (running.load()) [[likely]] {
 
     /* Handle cart re-insertion */
