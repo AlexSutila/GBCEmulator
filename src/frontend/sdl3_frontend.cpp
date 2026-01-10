@@ -262,8 +262,10 @@ void SDL3Frontend::emulation_thread_fn(std::stop_token st, cart c) {
 
 
 void SDL3Frontend::join_emu_thread_if_running() {
-  if (emulation_thread.joinable())
+  if (emulation_thread.joinable()) {
+    emulation_thread.request_stop();
     emulation_thread.join();
+  }
 }
 
 void SDL3Frontend::start() {
