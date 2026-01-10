@@ -1,3 +1,4 @@
+#include "SDL3/SDL_video.h"
 #include "cart/cart.hpp"
 #include "frontend/sdl3_renderer.hpp"
 #include <SDL3/SDL.h>
@@ -35,7 +36,6 @@ SDL3Frontend::SDL3Frontend() : Frontend() {
   renderer = SDL_CreateRenderer(window, nullptr);
   if (!renderer)
     throw std::runtime_error(SDL_GetError());
-
   texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
                               SDL_TEXTUREACCESS_STREAMING, framebuf_width,
                               framebuf_height);
@@ -107,8 +107,10 @@ void SDL3Frontend::present_ui() {
   using namespace std::chrono;
 
   const std::uint32_t *pixels = front_buffer();
-  uint32_t *texturePixels;
-  int pitch;
+  int window_w{}, window_h{};
+  uint32_t *texturePixels{};
+  int pitch{};
+
   SDL_LockTexture(texture, nullptr, reinterpret_cast<void **>(&texturePixels),
                   &pitch);
 
@@ -116,20 +118,25 @@ void SDL3Frontend::present_ui() {
   for (int y = 0; y < framebuf_height; ++y)
     for (int x = 0; x < framebuf_width; ++x)
       texturePixels[y * pitch + x] = pixels[y * framebuf_width + x];
-
   SDL_UnlockTexture(texture);
-  SDL_RenderClear(renderer);
-  SDL_RenderTexture(renderer, texture, nullptr, nullptr);
 
   ImGui_ImplSDLRenderer3_NewFrame();
   ImGui_ImplSDL3_NewFrame();
   ImGui::NewFrame();
   build_ui();
   ImGui::Render();
-  ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), renderer);
+  SDL_RenderClear(renderer);
 
+  /* Need to account for bar consuming space for top few pixels */
+  SDL_GetWindowSize(window, &window_w, &window_h);
+  const float menu_bar_h = ImGui::GetFrameHeight();
+  SDL_FRect dst_rect{0.0f,       // x
+                     menu_bar_h, // y offset by menu bar
+                     float(window_w), float(window_h - menu_bar_h)};
+
+  SDL_RenderTexture(renderer, texture, nullptr, &dst_rect);
+  ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), renderer);
   SDL_RenderPresent(renderer);
-  poll_events();
 }
 
 void SDL3Frontend::clear() {
@@ -244,12 +251,14 @@ void SDL3Frontend::start() {
         cart loaded = load_cart_fs(rom_path.c_str());
         emulation_thread =
             std::jthread(&SDL3Frontend::emulation_thread_fn, this, loaded);
+        set_status_message(std::format("Loaded ROM: {}", rom_path));
       } catch (std::exception &e) {
         set_status_message(std::format("Failed to load ROM: {}", e.what()));
       }
     }
 
     /* Shows ui in what ever state it is currently in */
+    poll_events();
     present_ui();
   }
 }
