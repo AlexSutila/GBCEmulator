@@ -62,6 +62,7 @@ private:
 
   /* Color palette configuration */
   std::uint32_t get_rgb(const pixel &px) const;
+  std::optional<pixel> get_next_pixel();
   PPU::BGP bgp_{};
 
   /* Pixel Processor operation modes */

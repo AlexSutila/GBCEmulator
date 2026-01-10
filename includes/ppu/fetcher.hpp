@@ -132,6 +132,10 @@ private:
   void do_read_tile();
   void do_read_data_lo();
   void do_read_data_hi();
+
+  /* This is what actually pushes data into the FIFO, we just do this all this
+   * instantaneously at the end of `do_read_data_hi()` before next state. */
+  void do_push_data();
 };
 
 #endif // __FETCHER_H

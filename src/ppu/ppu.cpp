@@ -139,6 +139,19 @@ std::uint32_t PixelProcessingUnit::get_rgb(const pixel &px) const {
   return cram->get_cgb_color(px.color_idx, px.palette_idx);
 }
 
+std::optional<pixel> PixelProcessingUnit::get_next_pixel() {
+  bg_fetcher->step();
+
+  // Simple background logic
+  if (!bg_fifo.can_pop())
+    return std::nullopt;
+  return bg_fifo.pop();
+}
+
+/* ======================================================================
+ * Core Pixel Processing Unit Behavior Implementation Below
+ * ====================================================================== */
+
 void PixelProcessingUnit::do_disabled() {
   if (flush_on_disable) {
     fe_.clear(); // This is slow
@@ -246,12 +259,11 @@ void PixelProcessingUnit::do_draw() {
   bg_fetcher->step();
 
   // Rendering step, try to pop pixels when ready from the fifo
-  if (bg_fifo.can_pop()) {
-    const pixel px = bg_fifo.pop();
-    if (!px.discard) {
+  if (auto px = get_next_pixel(); px.has_value()) {
+    if (!px->discard) {
       const auto x = row_pixels_rendered++;
       const auto y = ly_.read();
-      const auto c = get_rgb(px);
+      const auto c = get_rgb(px.value());
       fe_.put_pixel(x, y, c);
     }
 

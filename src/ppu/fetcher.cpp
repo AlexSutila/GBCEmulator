@@ -369,6 +369,19 @@ void ObjFetcher::do_read_data_hi() {
     state = STATE_READ_TILE;
     total_clks.reset();
     cur_clks = 0;
+
+    // TODO: This is temporary
+    do_push_data();
+  }
+}
+
+void ObjFetcher::do_push_data() {
+  for (std::size_t shift{0}; shift < 8; shift++) {
+    fifo_.push({
+        .color_idx = 3,
+        .palette_idx = 3,
+        .discard = false,
+    });
   }
 }
 
