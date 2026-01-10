@@ -32,6 +32,7 @@ public:
 
 private:
   void emulation_thread_fn(std::stop_token st, cart c);
+  void join_emu_thread_if_running();
   std::jthread emulation_thread{};
 
   // SDL3 display boilerplate

@@ -260,6 +260,12 @@ void SDL3Frontend::emulation_thread_fn(std::stop_token st, cart c) {
   }
 }
 
+
+void SDL3Frontend::join_emu_thread_if_running() {
+  if (emulation_thread.joinable())
+    emulation_thread.join();
+}
+
 void SDL3Frontend::start() {
   std::string rom_path{};
   clear(black);
@@ -268,10 +274,7 @@ void SDL3Frontend::start() {
 
     /* Handle cart re-insertion */
     if (consume_load_request(rom_path)) {
-      if (emulation_thread.joinable()) {
-        emulation_thread.request_stop();
-        emulation_thread.join();
-      }
+      join_emu_thread_if_running();
 
       /* Attempt to load cartridge, if it fails thread doesn't start */
       try {
@@ -288,4 +291,8 @@ void SDL3Frontend::start() {
     poll_events();
     present_ui();
   }
+
+  /* Kill emulation thread */
+  emulation_thread.request_stop();
+  join_emu_thread_if_running();
 }
