@@ -6,15 +6,15 @@
 #include <SDL3/SDL.h>
 #include <array>
 #include <atomic>
-#include <chrono>
 #include <memory>
 #include <mutex>
+#include <stop_token>
 #include <string>
 
-class SDL2Frontend final : public Frontend {
+class SDL3Frontend final : public Frontend {
 public:
-  SDL2Frontend();
-  ~SDL2Frontend();
+  SDL3Frontend();
+  ~SDL3Frontend();
 
   static constexpr int framebuf_width = 160;
   static constexpr int framebuf_height = 144;
@@ -24,13 +24,20 @@ public:
   void clear() override;
   void start() override;
 
-  bool get_running() const { return running.load(); }
   bool consume_load_request(std::string &rom_path);
   void set_status_message(std::string message);
   void poll_events();
-  void present();
+  void present_ui();
 
 private:
+  void emulation_thread_fn(std::stop_token st, cart c);
+  std::jthread emulation_thread;
+
+  // SDL3 display boilerplate
+  SDL_Renderer *renderer{};
+  SDL_Texture *texture{};
+  SDL_Window *window{};
+
   struct UiState {
     bool show_load_window{true};
     bool show_settings_window{false};
@@ -38,13 +45,8 @@ private:
     std::string rom_path{};
     std::string status_message{};
   };
-  void build_ui();
   const std::uint32_t *front_buffer() const;
-
-  std::chrono::time_point<std::chrono::steady_clock> elapsed_time;
-  SDL_Renderer *renderer{};
-  SDL_Texture *texture{};
-  SDL_Window *window{};
+  void build_ui();
 
   // Frame buffer and rendering control
   std::array<std::unique_ptr<std::uint32_t[]>, 2> framebuffers;

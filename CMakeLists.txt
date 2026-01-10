@@ -116,7 +116,7 @@ endif()
 
 # Emulator executable
 add_executable(gbc
-    src/frontend/sdl2_frontend.cpp
+    src/frontend/sdl3_frontend.cpp
     main.cpp
     ${GBC_CORE_SOURCES}
 )

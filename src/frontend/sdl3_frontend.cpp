@@ -1,18 +1,21 @@
-#include "frontend/frontend.hpp"
-#include "frontend/sdl2_renderer.hpp"
+#include "cart/cart.hpp"
+#include "frontend/sdl3_renderer.hpp"
 #include <SDL3/SDL.h>
 #include <backends/imgui_impl_sdl3.h>
 #include <backends/imgui_impl_sdlrenderer3.h>
 #include <chrono>
+#include <cstdint>
+#include <exception>
 #include <imgui.h>
 #include <memory>
 #include <misc/cpp/imgui_stdlib.h>
 #include <stdexcept>
+#include <thread>
 
 static const char *filters =
     "GBC ROM files (*.gb *.gbc){.gb,.gbc},All files (*.*){.*}";
 
-SDL2Frontend::SDL2Frontend() : Frontend() {
+SDL3Frontend::SDL3Frontend() : Frontend() {
   if (!SDL_Init(SDL_INIT_VIDEO))
     throw std::runtime_error(SDL_GetError());
 
@@ -39,7 +42,6 @@ SDL2Frontend::SDL2Frontend() : Frontend() {
   if (!ImGui_ImplSDLRenderer3_Init(renderer))
     throw std::runtime_error("Failed to initialize ImGui SDL renderer backend");
 
-  elapsed_time = std::chrono::steady_clock::now();
   config.path = ".";
   config.flags =
       ImGuiFileDialogFlags_Modal | ImGuiFileDialogFlags_ReadOnlyFileNameField;
@@ -52,7 +54,7 @@ SDL2Frontend::SDL2Frontend() : Frontend() {
   clear();
 }
 
-SDL2Frontend::~SDL2Frontend() {
+SDL3Frontend::~SDL3Frontend() {
   ImGui_ImplSDLRenderer3_Shutdown();
   ImGui_ImplSDL3_Shutdown();
   ImGui::DestroyContext();
@@ -62,9 +64,11 @@ SDL2Frontend::~SDL2Frontend() {
   SDL_Quit();
 }
 
-void SDL2Frontend::put_pixel(int x, int y, std::uint32_t c) {
+void SDL3Frontend::put_pixel(int x, int y, std::uint32_t c) {
   if (x < 0 || x >= framebuf_width || y < 0 || y >= framebuf_height)
     return;
+
+  /* We perform double buffering to prevent screen tearing */
   const int back_index = 1 - front_index.load(std::memory_order_relaxed);
   framebuffers[back_index][y * framebuf_width + x] = c;
   ++pixels_rendered;
@@ -76,7 +80,7 @@ void SDL2Frontend::put_pixel(int x, int y, std::uint32_t c) {
   }
 }
 
-void SDL2Frontend::poll_events() {
+void SDL3Frontend::poll_events() {
   SDL_Event e;
   while (SDL_PollEvent(&e)) {
     ImGui_ImplSDL3_ProcessEvent(&e);
@@ -91,7 +95,7 @@ inline auto calc_delta(const std::chrono::steady_clock::time_point &start) {
       .count();
 }
 
-void SDL2Frontend::present() {
+void SDL3Frontend::present_ui() {
   using namespace std::chrono;
 
   const std::uint32_t *pixels = front_buffer();
@@ -118,33 +122,32 @@ void SDL2Frontend::present() {
 
   SDL_RenderPresent(renderer);
   poll_events();
-
-  /* Sync to sixty herts */
-  elapsed_time = std::chrono::steady_clock::now();
 }
 
-void SDL2Frontend::clear() {
+void SDL3Frontend::clear() {
   constexpr std::uint32_t black = 0xFF000000;
   for (int i = 0; i < framebuf_width * framebuf_height; ++i)
     for (auto &buffer : framebuffers)
       buffer[i] = black;
 }
 
-bool SDL2Frontend::consume_load_request(std::string &rom_path) {
+bool SDL3Frontend::consume_load_request(std::string &rom_path) {
   std::lock_guard<std::mutex> lock(ui_mutex);
   if (!ui_state.request_load)
     return false;
+
+  /* Denote new cartridge path */
   ui_state.request_load = false;
   rom_path = ui_state.rom_path;
   return true;
 }
 
-void SDL2Frontend::set_status_message(std::string message) {
+void SDL3Frontend::set_status_message(std::string message) {
   std::lock_guard<std::mutex> lock(ui_mutex);
   ui_state.status_message = std::move(message);
 }
 
-void SDL2Frontend::build_ui() {
+void SDL3Frontend::build_ui() {
   std::lock_guard<std::mutex> lock(ui_mutex);
   ImGuiIO &io = ImGui::GetIO();
   float display_w = io.DisplaySize.x;
@@ -188,10 +191,44 @@ void SDL2Frontend::build_ui() {
   }
 }
 
-const std::uint32_t *SDL2Frontend::front_buffer() const {
+const std::uint32_t *SDL3Frontend::front_buffer() const {
   return framebuffers[front_index.load(std::memory_order_acquire)].get();
 }
 
-void SDL2Frontend::start() {
-  // TODO: Implement this
+void SDL3Frontend::emulation_thread_fn(std::stop_token st, cart c) {
+  clear();
+
+  /* Re-instantiate emulator instance */
+  gbc_ = std::make_unique<GameBoyColor>(*this);
+  gbc_->insert_cartridge(c);
+
+  /* Run emulation in real-time */
+  while (!st.stop_requested()) [[likely]]
+    gbc_->step();
+}
+
+void SDL3Frontend::start() {
+  std::string rom_path{};
+  while (running.load()) [[likely]] {
+
+    /* Handle cart re-insertion */
+    if (consume_load_request(rom_path)) {
+      if (emulation_thread.joinable()) {
+        emulation_thread.request_stop();
+        emulation_thread.join();
+      }
+
+      /* Attempt to load cartridge, if it fails thread doesn't start */
+      try {
+        cart loaded = load_cart_fs(rom_path.c_str());
+        emulation_thread =
+            std::jthread(&SDL3Frontend::emulation_thread_fn, this, loaded);
+      } catch (std::exception &e) {
+        set_status_message(std::format("Failed to load ROM: {}", e.what()));
+      }
+    }
+
+    /* Shows ui in what ever state it is currently in */
+    present_ui();
+  }
 }

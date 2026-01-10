@@ -230,7 +230,7 @@ void PixelProcessingUnit::do_draw() {
       const auto x = row_pixels_rendered++;
       const auto y = ly_.read();
       const auto c = get_rgb(px);
-      // TODO: Fix
+      fe_.put_pixel(x, y, c);
     }
 
     // Do we switch the fetcher into window rendering mode?

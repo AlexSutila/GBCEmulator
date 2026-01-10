@@ -9,22 +9,16 @@ set -e
 # This just records just the gbc window under X11
 # ===========================================================
 
-if [[ $# -lt 1 ]]; then
-  echo "Usage: $0 <rom>"
-  exit 1
-fi
-
-ROM="$1"
 FPS=60
 CRF=18
 DISPLAY="${DISPLAY:-:0}"
-OUTPUT="gbc_$(basename "$ROM" | sed 's/\.[^.]*$//')_$(date +%Y%m%d_%H%M%S).mp4"
+OUTPUT="gbc_$(basename | sed 's/\.[^.]*$//')_$(date +%Y%m%d_%H%M%S).mp4"
 
 run_gbc() {
-  if [[ -x "./build/gbc" ]]; then
-    exec ./build/gbc "$ROM"
-  elif [[ -x "./release/gbc" ]]; then
-    exec ./release/gbc "$ROM"
+  if [[ -x "./release/gbc" ]]; then
+    exec ./release/gbc
+  elif [[ -x "./build/gbc" ]]; then
+    exec ./build/gbc
   else
     echo "Error: gbc not found in ./build or ./release"
     exit 1

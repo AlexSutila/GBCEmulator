@@ -13,7 +13,7 @@ public:
   virtual void start() = 0;
   std::unique_ptr<GameBoyColor> &get() { return gbc_; }
 
-private:
+protected:
   std::unique_ptr<GameBoyColor> gbc_;
 };
 

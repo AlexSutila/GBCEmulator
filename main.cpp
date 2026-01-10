@@ -1,7 +1,7 @@
-#include "gbc.hpp"
-
-#include <iostream>
+#include "frontend/sdl3_renderer.hpp"
 
 int main(const int argc, const char **argv) {
+  auto emulator = SDL3Frontend();
+  emulator.start();
   return 0;
 }
