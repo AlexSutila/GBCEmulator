@@ -67,7 +67,7 @@ PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus, Frontend &fe,
   if_reg = init_mmio<InterruptBits>(bus, mmio::MMIO_INT_FLAGS);
 
   /* Initialize the background and object pixel FIFO fetching pipeline */
-  bg_fetcher = std::make_unique<BgWinFetcher>(
+  fetcher = std::make_unique<BgWinFetcher>(
       bus->get_vram(), // VRAM reference for fetching tile data
       lcdc_,           // Needs to know if certain control bits are set
       scy_,            // Needed to fetch correct background tile
@@ -77,10 +77,6 @@ PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus, Frontend &fe,
       ly_,             // Needed to fetch correct background tile
       bg_fifo,         // Fetcher must push rows of pixels into this FIFO
       sys_             // Fetcher behavior varies between DMG vs CGB mode
-  );
-  obj_fetcher = std::make_unique<ObjFetcher>(
-      obj_fifo, // Fetcher pushes rows of pixels into a seperate FIFO
-      sys_      // Fetcher behavrior also varies between DMG vs CGB mode
   );
 
   /* Initialize OAM search metadata */
@@ -140,7 +136,7 @@ std::uint32_t PixelProcessingUnit::get_rgb(const pixel &px) const {
 }
 
 std::optional<pixel> PixelProcessingUnit::get_next_pixel() {
-  bg_fetcher->step();
+  fetcher->step();
 
   // Simple background logic
   if (!bg_fifo.can_pop())
@@ -241,7 +237,7 @@ void PixelProcessingUnit::do_draw() {
    * features cause the rendering process to stall. This additional stalling
    * time lengthens the duration of this operation mode. */
   if (!total_mode_clks.has_value()) {
-    bg_fetcher->reset();
+    fetcher->reset();
     bg_fifo.flush();
     // Simply set to minimum, raise as quirks come up during rendering. We do
     // not use this to determine end of state.
@@ -256,7 +252,7 @@ void PixelProcessingUnit::do_draw() {
   // Step dot clock
   ++cur_scanline_clks;
   ++cur_mode_clks;
-  bg_fetcher->step();
+  fetcher->step();
 
   // Rendering step, try to pop pixels when ready from the fifo
   if (auto px = get_next_pixel(); px.has_value()) {
@@ -268,8 +264,8 @@ void PixelProcessingUnit::do_draw() {
     }
 
     // Do we switch the fetcher into window rendering mode?
-    if (bg_fetcher->is_window_visible(row_pixels_rendered))
-      bg_fetcher->render_window();
+    if (fetcher->is_window_visible(row_pixels_rendered))
+      fetcher->render_window();
   }
 
   // Rendering incomplete
@@ -280,9 +276,9 @@ void PixelProcessingUnit::do_draw() {
   // rendering progress. Determine if that counter is increased (or reset)
   // here, depending on where we are in the frame.
   if (ly_.read() >= 143)
-    bg_fetcher->reset_win_ly();
-  else if (bg_fetcher->was_window_visible())
-    bg_fetcher->inc_win_ly();
+    fetcher->reset_win_ly();
+  else if (fetcher->was_window_visible())
+    fetcher->inc_win_ly();
 
   // State transition logic
   state = modes::MODE_HBLANK;
@@ -369,7 +365,7 @@ void PixelProcessingUnit::update_stat() {
 void PixelProcessingUnit::reset() {
   using namespace PPU;
   flush_on_disable = true;
-  bg_fetcher->reset();
+  fetcher->reset();
   bg_fifo.flush();
 
   /* Configure FSM timing metadata */

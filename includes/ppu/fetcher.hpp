@@ -13,33 +13,7 @@
 struct runtime_sys_info;
 class PixelFifo;
 
-class Fetcher {
-public:
-  Fetcher(runtime_sys_info &sys) : sys_(sys) {}
-  virtual void reset() = 0;
-  virtual void step() = 0;
-
-protected:
-  /* Internal storage that is built up throughout the pixel pushing pipeline.
-   * Tile indices are read from memory, data is fetched, and the final data
-   * is pushed into the fifo once enough space is free. */
-  struct {
-    std::size_t tile_idx{};
-    byte_t tile_attr{};   // Tile attributes (CGB mode only)
-    byte_t data_lo{};     // Low bits of pixel indices
-    byte_t data_hi{};     // High bits of pixel indices
-    std::size_t x_coor{}; // In unit tiles
-  } data;
-
-  /* Internal timing metadata */
-  std::optional<std::size_t> total_clks{};
-  std::size_t cur_clks{};
-
-  /* Need to distinguish between DMG and CGB */
-  runtime_sys_info &sys_;
-};
-
-class BgWinFetcher final : public Fetcher {
+class BgWinFetcher {
 public:
   BgWinFetcher(std::array<std::unique_ptr<byte_t[]>, 2> &vram,
                PPU::LCDCtrl &lcdc, // The LCD control register
@@ -50,8 +24,8 @@ public:
                PPU::LY &ly,        // The current scanline register
                PixelFifo &fifo,    // The pixel fifo
                runtime_sys_info &sys);
-  void reset() override; // Enters background rendering mode
-  void step() override;
+  void reset(); // Enters background rendering mode
+  void step();
 
   /* The PPU will signal to clear the FIFO once the rendering of the window has
    * begun. All BG pixel data is flushed, and window rendering starts. */
@@ -109,33 +83,24 @@ private:
   const addr_t calc_tilemap_base() const;
   const byte_t fetch_tile_data(bool high) const;
   const addr_t calc_tile_metadata_addr() const;
-};
 
-class ObjFetcher final : public Fetcher {
-public:
-  ObjFetcher(PixelFifo &fifo, runtime_sys_info &sys);
-  void reset() override;
-  void step() override;
+  /* Internal storage that is built up throughout the pixel pushing pipeline.
+   * Tile indices are read from memory, data is fetched, and the final data
+   * is pushed into the fifo once enough space is free. */
+  struct {
+    std::size_t tile_idx{};
+    byte_t tile_attr{};   // Tile attributes (CGB mode only)
+    byte_t data_lo{};     // Low bits of pixel indices
+    byte_t data_hi{};     // High bits of pixel indices
+    std::size_t x_coor{}; // In unit tiles
+  } data;
 
-private:
-  enum FetcherState {
-    STATE_READ_TILE,
-    STATE_READ_DATA_LO,
-    STATE_READ_DATA_HI,
-    // Push will always happen instantly, it is slightly different for the
-    // object and sprite FIFO. It should never have to wait.
-  } state{};
+  /* Internal timing metadata */
+  std::optional<std::size_t> total_clks{};
+  std::size_t cur_clks{};
 
-  PixelFifo &fifo_;
-
-  /* Core fetcher logic */
-  void do_read_tile();
-  void do_read_data_lo();
-  void do_read_data_hi();
-
-  /* This is what actually pushes data into the FIFO, we just do this all this
-   * instantaneously at the end of `do_read_data_hi()` before next state. */
-  void do_push_data();
+  /* Need to distinguish between DMG and CGB */
+  runtime_sys_info &sys_;
 };
 
 #endif // __FETCHER_H

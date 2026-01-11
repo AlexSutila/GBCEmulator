@@ -22,15 +22,15 @@ BgWinFetcher::BgWinFetcher(std::array<std::unique_ptr<byte_t[]>, 2> &vram,
                            MMIORegister &scx, MMIORegister &wy,
                            MMIORegister &wx, PPU::LY &ly, PixelFifo &fifo,
                            runtime_sys_info &sys)
-    : Fetcher(sys), // Implements generic FSM logic
-      vram_(vram),  // For fetching tile data
+    : vram_(vram),  // For fetching tile data
       lcdc_(lcdc),  // LCD control register
       scy_(scy),    // Scroll Y (background)
       scx_(scx),    // Scroll X (background)
       wy_(wy),      // Window  Y (background)
       wx_(wx),      // Window  X (background)
       ly_(ly),      // Current scanline
-      fifo_(fifo)   // Pixel fifo
+      fifo_(fifo),  // Pixel fifo
+      sys_(sys)     // Behavior varies with DMG vs CGB
 {
   reset();
 }
@@ -288,113 +288,6 @@ void BgWinFetcher::step() {
     break;
   case STATE_PUSH_DATA:
     do_push_data();
-    break;
-  }
-}
-
-/* ======================================================================
- * Sprite (or object) and OAM tile data fetching and processing
- * ====================================================================== */
-
-ObjFetcher::ObjFetcher(PixelFifo &fifo, runtime_sys_info &sys)
-    : Fetcher(sys), // Implements generic FSM logic
-      fifo_(fifo)   // Maintains pixel color data
-{
-  reset();
-}
-
-void ObjFetcher::reset() {
-  state = STATE_READ_TILE;
-  data = {
-      .tile_idx = 0,
-      .tile_attr = 0,
-      .data_lo = 0,
-      .data_hi = 0,
-      .x_coor = 0,
-  };
-
-  // Reset timing metadata
-  total_clks.reset();
-  cur_clks = 0;
-}
-
-void ObjFetcher::do_read_tile() {
-  constexpr std::size_t max_state_clks = 2;
-
-  // State entry logic, false indicates high byte
-  if (!total_clks.has_value()) {
-    // TODO
-    total_clks = max_state_clks;
-  }
-  ++cur_clks;
-
-  // Read tile incomplete
-  if (cur_clks >= total_clks.value()) {
-    state = STATE_READ_DATA_LO;
-    total_clks.reset();
-    cur_clks = 0;
-  }
-}
-
-void ObjFetcher::do_read_data_lo() {
-  constexpr std::size_t max_state_clks = 2;
-
-  // State entry logic, false indicates high byte
-  if (!total_clks.has_value()) {
-    // TODO
-    total_clks = max_state_clks;
-  }
-  ++cur_clks;
-
-  // Read tile incomplete
-  if (cur_clks >= total_clks.value()) {
-    state = STATE_READ_DATA_HI;
-    total_clks.reset();
-    cur_clks = 0;
-  }
-}
-
-void ObjFetcher::do_read_data_hi() {
-  constexpr std::size_t max_state_clks = 2;
-
-  // State entry logic, false indicates high byte
-  if (!total_clks.has_value()) {
-    // TODO
-    total_clks = max_state_clks;
-  }
-  ++cur_clks;
-
-  // Read tile incomplete
-  if (cur_clks >= total_clks.value()) {
-    state = STATE_READ_TILE;
-    total_clks.reset();
-    cur_clks = 0;
-
-    // TODO: This is temporary
-    do_push_data();
-  }
-}
-
-void ObjFetcher::do_push_data() {
-  for (std::size_t shift{0}; shift < 8; shift++) {
-    fifo_.push({
-        .color_idx = 3,
-        .palette_idx = 3,
-        .discard = false,
-    });
-  }
-}
-
-void ObjFetcher::step() {
-  switch (state) {
-  case STATE_READ_TILE:
-    do_read_tile();
-    break;
-  case STATE_READ_DATA_LO:
-    do_read_data_lo();
-    break;
-  case STATE_READ_DATA_HI:
-    do_read_data_hi();
     break;
   }
 }
