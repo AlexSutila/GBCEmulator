@@ -111,7 +111,7 @@ public:
   void fill_transparent();
 
   /* Should have error checking for over pushing/popping */
-  void push(pixel px);
+  bool can_pop() const;
   pixel pop();
 
 private:

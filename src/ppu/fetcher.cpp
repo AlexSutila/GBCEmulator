@@ -68,8 +68,9 @@ bool Fetcher::is_window_visible(byte_t pixels_rendered) const {
 }
 
 void Fetcher::render_window() {
-  // Window is already being rendered
-  if (win_started)
+  // Window is already being rendered. Also, if a sprite fetch is in progress,
+  // do not interrupt it. This will take effect afterwards.
+  if (win_started || state == STATE_SPRITE_FETCH)
     return;
 
   // Flush BG fifo pixel data, incurs additional overhead to fetch the very

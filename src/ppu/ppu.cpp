@@ -136,15 +136,72 @@ std::uint32_t PixelProcessingUnit::get_rgb(const pixel &px) const {
   return cram->get_cgb_color(px.color_idx, px.palette_idx);
 }
 
+/* Determines if a sprite is visible on the current pixel being processed. This
+ * method will ultimately end up determining when sprites need to be fetched. */
+const bool PixelProcessingUnit::next_sprite_visible() const {
+  constexpr auto max_sprites = 10; // Per-scanline hardware limitation
+  if (sprites_fetched >= oam_data.size() || sprites_fetched >= max_sprites)
+    return false;
+
+  // We make the assumption that this sprite lies along the scanline vertically
+  const Sprite &next_sprite = oam_data.at(sprites_fetched);
+  return sprite_visible(next_sprite.x_pos, row_pixels_rendered);
+}
+
+/* Performs the fetcher stepping, FIFO popping, and all the logic behind what
+ * happens when regarding the pixel FIFO madness that confuses everyone. */
 std::optional<pixel> PixelProcessingUnit::get_next_pixel() {
-  // Do we switch the fetcher into window rendering mode?
+
+  // If the window becomes visible, we have to reset the fetcher so it starts
+  // fetching window data instead of BG data. Calling this repeatedly is safe,
+  // it wont take effect until ongoing sprite fetches have completed.
   if (fetcher->is_window_visible(row_pixels_rendered))
     fetcher->render_window();
-  fetcher->step();
 
-  if (bg_fifo.can_pop())
-    return bg_fifo.pop();
+  // Here we only focus on background pixels. We don't have to worry about
+  // sprite fetches because if a sprite was overlayed onto this pixel, it has
+  // already been fetched into the FIFO.
+  if (!next_sprite_visible()) {
+    fetcher->step(); // Ignore possibility of sprite fetch
+    return try_fifos_pop();
+  }
+
+  // At this point, we consider the next sprite in the pipeline. If there is
+  // an ongoing background or window fetch, let it finish. Otherwise, step the
+  // fetcher until the fetch for the next sprite has completed.
+  const Sprite &next_sprite = oam_data.at(sprites_fetched);
+  if (fetcher->step_and_try_sprite_fetch(next_sprite)) {
+    ++sprites_fetched;
+    return try_fifos_pop();
+  }
+
+  // Under any other circumstances where we haven't returned a pixel yet, this
+  // serves as a catch all that denotes the next pixel isn't quite ready yet.
   return std::nullopt;
+}
+
+std::optional<pixel> PixelProcessingUnit::try_fifos_pop() {
+  if (!bg_fifo.can_pop())
+    return std::nullopt;
+
+  // Pop the background pixel, try to pop the sprite FIFO. If the sprite FIFO
+  // is empty, just proceed. The sprtie FIFO will be populated on demand.
+  const pixel bg_px = bg_fifo.pop();
+  if (!obj_fifo.can_pop())
+    return bg_px;
+
+  // If we can pop a pixel from the sprite FIFO, we merge it with the background
+  // pixel in the background FIFO. This is why we must have a background pixel
+  // to accompany any pixels in the sprite FIFO, and not the other way around.
+  obj_fifo.pop();
+
+  // TODO: Return a properly merged pixel and not this nonsense lol
+  pixel px = {
+      .color_idx = 3,
+      .palette_idx = 3,
+      .discard = false,
+  };
+  return px;
 }
 
 /* ======================================================================
@@ -241,6 +298,7 @@ void PixelProcessingUnit::do_draw() {
    * time lengthens the duration of this operation mode. */
   if (!total_mode_clks.has_value()) {
     fetcher->reset();
+    obj_fifo.flush();
     bg_fifo.flush();
     // Simply set to minimum, raise as quirks come up during rendering. We do
     // not use this to determine end of state.

@@ -34,6 +34,9 @@ void ObjPixelFifo::fill_transparent() {
     fifo.push(invisible);
   assert(fifo.size() == fifo.capacity());
 }
+
+/* There is no minimum requirement for the sprite FIFO. It can be empty. */
+bool ObjPixelFifo::can_pop() const { return fifo.size() > 0; }
 pixel ObjPixelFifo::pop() { return fifo.pop(); }
 
 /* Lol #notafifo, poke the data in instead in transpatent locations */
