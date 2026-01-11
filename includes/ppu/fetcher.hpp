@@ -4,6 +4,7 @@
 #include "emu_types.hpp"
 #include "memory/mmio/dmg.hpp"
 #include "memory/mmio/mmio.hpp"
+#include "ppu/fifo.hpp"
 
 #include <array>
 #include <cstddef>
@@ -11,18 +12,19 @@
 #include <optional>
 
 struct runtime_sys_info;
-class PixelFifo;
+class BgPixelFifo;
 
 class BgWinFetcher {
 public:
   BgWinFetcher(std::array<std::unique_ptr<byte_t[]>, 2> &vram,
-               PPU::LCDCtrl &lcdc, // The LCD control register
-               MMIORegister &scy,  // The scroll Y register
-               MMIORegister &scx,  // The scroll X register
-               MMIORegister &wy,   // The window Y register
-               MMIORegister &wx,   // The window X register
-               PPU::LY &ly,        // The current scanline register
-               PixelFifo &fifo,    // The pixel fifo
+               PPU::LCDCtrl &lcdc,     // The LCD control register
+               MMIORegister &scy,      // The scroll Y register
+               MMIORegister &scx,      // The scroll X register
+               MMIORegister &wy,       // The window Y register
+               MMIORegister &wx,       // The window X register
+               PPU::LY &ly,            // The current scanline register
+               ObjPixelFifo &obj_fifo, // The sprite pixel fifo
+               BgPixelFifo &bg_fifo,   // The background pixel fifo
                runtime_sys_info &sys);
   void reset(); // Enters background rendering mode
   void step();
@@ -64,7 +66,10 @@ private:
   MMIORegister &wy_;
   MMIORegister &wx_;
   PPU::LY &ly_;
-  PixelFifo &fifo_;
+
+  /* Internal references to pixel FIFO queues */
+  ObjPixelFifo &obj_fifo_;
+  BgPixelFifo &bg_fifo_;
 
   /* Implements fine horizontal scrolling within an 8x8 pixel tile */
   bool should_discard() const;

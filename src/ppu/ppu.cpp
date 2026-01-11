@@ -39,8 +39,8 @@ PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus, Frontend &fe,
       wx_(),                 // Window scroll X
       ly_(),                 // Current scanline
       bgp_(),                // DMG background and window palette
+      obj_fifo(),            // Pushes object (or sprite) pixels
       bg_fifo(),             // Pushes background/window pixels
-      obj_fifo(),            // Pushes object (sprite) pixels
       cram(std::make_unique<ColorRam>()) {
   using mmio = IORegisterMapping;
   using namespace PPU;
@@ -75,6 +75,7 @@ PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus, Frontend &fe,
       wy_,             // Needed to fetch correct window tile
       wx_,             // Needed to fetch correct window tile
       ly_,             // Needed to fetch correct background tile
+      obj_fifo,        // Fetcher stalls BG fetch to populate this when needed
       bg_fifo,         // Fetcher must push rows of pixels into this FIFO
       sys_             // Fetcher behavior varies between DMG vs CGB mode
   );
@@ -252,7 +253,6 @@ void PixelProcessingUnit::do_draw() {
   // Step dot clock
   ++cur_scanline_clks;
   ++cur_mode_clks;
-  fetcher->step();
 
   // Rendering step, try to pop pixels when ready from the fifo
   if (auto px = get_next_pixel(); px.has_value()) {
@@ -366,6 +366,7 @@ void PixelProcessingUnit::reset() {
   using namespace PPU;
   flush_on_disable = true;
   fetcher->reset();
+  obj_fifo.flush();
   bg_fifo.flush();
 
   /* Configure FSM timing metadata */

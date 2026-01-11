@@ -93,7 +93,8 @@ private:
 
   /* Pixel FIFO renderers */
   std::unique_ptr<BgWinFetcher> fetcher{};
-  PixelFifo bg_fifo{}, obj_fifo{};
+  ObjPixelFifo obj_fifo{};
+  BgPixelFifo bg_fifo{};
 
   /* Color RAM adding RGB555 support for CGB models */
   std::unique_ptr<ColorRam> cram;

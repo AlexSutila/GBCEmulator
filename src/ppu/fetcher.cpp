@@ -13,24 +13,22 @@
 constexpr addr_t vram_base_addr = 0x8000;
 constexpr byte_t pixels_per_row = 8;
 
-/* ======================================================================
- * Background and window tile data fetching and processing
- * ====================================================================== */
-
 BgWinFetcher::BgWinFetcher(std::array<std::unique_ptr<byte_t[]>, 2> &vram,
                            PPU::LCDCtrl &lcdc, MMIORegister &scy,
                            MMIORegister &scx, MMIORegister &wy,
-                           MMIORegister &wx, PPU::LY &ly, PixelFifo &fifo,
+                           MMIORegister &wx, PPU::LY &ly,
+                           ObjPixelFifo &obj_fifo, BgPixelFifo &bg_fifo,
                            runtime_sys_info &sys)
-    : vram_(vram),  // For fetching tile data
-      lcdc_(lcdc),  // LCD control register
-      scy_(scy),    // Scroll Y (background)
-      scx_(scx),    // Scroll X (background)
-      wy_(wy),      // Window  Y (background)
-      wx_(wx),      // Window  X (background)
-      ly_(ly),      // Current scanline
-      fifo_(fifo),  // Pixel fifo
-      sys_(sys)     // Behavior varies with DMG vs CGB
+    : vram_(vram),         // For fetching tile data
+      lcdc_(lcdc),         // LCD control register
+      scy_(scy),           // Scroll Y (background)
+      scx_(scx),           // Scroll X (background)
+      wy_(wy),             // Window  Y (background)
+      wx_(wx),             // Window  X (background)
+      ly_(ly),             // Current scanline
+      obj_fifo_(obj_fifo), // Sprite pixel fifo
+      bg_fifo_(bg_fifo),   // Background pixel fifo
+      sys_(sys)            // Behavior varies with DMG vs CGB
 {
   reset();
 }
@@ -222,7 +220,7 @@ void BgWinFetcher::do_push_data() {
   ++cur_clks;
 
   // This takes two clock cycles at best, takes longer if fifo is packed
-  if (cur_clks < min_state_clks || !fifo_.can_push())
+  if (cur_clks < min_state_clks || !bg_fifo_.can_push())
     return;
 
   // Attempt to push pixels to the FIFO, eight are pushed per push operation
@@ -241,7 +239,7 @@ void BgWinFetcher::do_push_data() {
     const byte_t palette_idx = get_bg_attrib_palette(data.tile_attr);
 
     // Pushes a single pixel, may or may not be discarded depending on SCX
-    fifo_.push({
+    bg_fifo_.push({
         .color_idx = color_idx,
         .palette_idx = palette_idx,
         .discard = discard,
@@ -271,7 +269,7 @@ void BgWinFetcher::render_window() {
 
   // Flush BG fifo pixel data, incurs additional overhead to fetch the very
   // first window tile, but after that the rendering process is identical.
-  fifo_.flush();
+  bg_fifo_.flush();
   reset(true);
 }
 
