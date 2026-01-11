@@ -51,7 +51,8 @@ private:
   MMIORegister wx_{};
 
   /* For tracking where we currently are in the rendering process */
-  std::size_t row_pixels_rendered{};
+  std::size_t row_pixels_rendered{}, sprites_fetched{};
+  std::optional<pixel> get_next_pixel();
   bool should_advance_ly();
   bool scanline_153_bug{};
   PPU::LY ly_{};
@@ -62,7 +63,6 @@ private:
 
   /* Color palette configuration */
   std::uint32_t get_rgb(const pixel &px) const;
-  std::optional<pixel> get_next_pixel();
   PPU::BGP bgp_{};
 
   /* Pixel Processor operation modes */
@@ -92,7 +92,7 @@ private:
   PPU::StatModes state{};
 
   /* Pixel FIFO renderers */
-  std::unique_ptr<BgWinFetcher> fetcher{};
+  std::unique_ptr<Fetcher> fetcher{};
   ObjPixelFifo obj_fifo{};
   BgPixelFifo bg_fifo{};
 

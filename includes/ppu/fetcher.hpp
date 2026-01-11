@@ -5,6 +5,7 @@
 #include "memory/mmio/dmg.hpp"
 #include "memory/mmio/mmio.hpp"
 #include "ppu/fifo.hpp"
+#include "ppu/sprites.hpp"
 
 #include <array>
 #include <cstddef>
@@ -14,25 +15,30 @@
 struct runtime_sys_info;
 class BgPixelFifo;
 
-class BgWinFetcher {
+class Fetcher {
 public:
-  BgWinFetcher(std::array<std::unique_ptr<byte_t[]>, 2> &vram,
-               PPU::LCDCtrl &lcdc,     // The LCD control register
-               MMIORegister &scy,      // The scroll Y register
-               MMIORegister &scx,      // The scroll X register
-               MMIORegister &wy,       // The window Y register
-               MMIORegister &wx,       // The window X register
-               PPU::LY &ly,            // The current scanline register
-               ObjPixelFifo &obj_fifo, // The sprite pixel fifo
-               BgPixelFifo &bg_fifo,   // The background pixel fifo
-               runtime_sys_info &sys);
+  Fetcher(std::array<std::unique_ptr<byte_t[]>, 2> &vram,
+          PPU::LCDCtrl &lcdc,     // The LCD control register
+          MMIORegister &scy,      // The scroll Y register
+          MMIORegister &scx,      // The scroll X register
+          MMIORegister &wy,       // The window Y register
+          MMIORegister &wx,       // The window X register
+          PPU::LY &ly,            // The current scanline register
+          ObjPixelFifo &obj_fifo, // The sprite pixel fifo
+          BgPixelFifo &bg_fifo,   // The background pixel fifo
+          runtime_sys_info &sys);
   void reset(); // Enters background rendering mode
   void step();
 
   /* The PPU will signal to clear the FIFO once the rendering of the window has
    * begun. All BG pixel data is flushed, and window rendering starts. */
   bool is_window_visible(byte_t pixels_rendered) const;
-  void render_window(); // Makes the pixel begin fetching window tile data
+  void render_window(); // Makes the fetcher begin fetching window tile data
+
+  /* Tells the fetcher to start fetching data for a sprite as soon as possible.
+   * Sprite fetch does not overlap with BG/WIN fetch, so it can only start once
+   * any BG/WIN fetch has completed. */
+  void render_sprite(const Sprite &sprite);
 
   /* Lastly, the window is kind of strange in that it does not use the curernt
    * scanline register (LY) in the decision to fetch window tiles. It uses an
@@ -47,6 +53,8 @@ private:
     STATE_READ_DATA_LO,
     STATE_READ_DATA_HI,
     STATE_PUSH_DATA,
+    // Sprite fetch
+    STATE_SPRITE_FETCH,
   } state{};
 
   /* Core fetcher logic */
@@ -54,6 +62,7 @@ private:
   void do_read_data_lo();
   void do_read_data_hi();
   void do_push_data();
+  void do_sprite_fetch();
 
   /* VRAM tile data and metadata source */
   std::array<std::unique_ptr<byte_t[]>, 2> &vram_;
@@ -98,6 +107,9 @@ private:
     byte_t data_lo{};     // Low bits of pixel indices
     byte_t data_hi{};     // High bits of pixel indices
     std::size_t x_coor{}; // In unit tiles
+
+    // For sprites only
+    std::optional<Sprite> sprite{};
   } data;
 
   /* Internal timing metadata */

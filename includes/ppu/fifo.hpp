@@ -108,6 +108,7 @@ public:
    * run into such circumstances. */
   const pixel &at(std::size_t index) const;
   pixel &at(std::size_t index);
+  void fill_transparent();
 
   /* Should have error checking for over pushing/popping */
   void push(pixel px);
@@ -115,7 +116,6 @@ public:
 
 private:
   CircularFifo<pixel, 8> fifo; // Yeah, pandocs is wrong lol
-  void fill_transparent();
 };
 
 #endif // __FIFO_H

@@ -21,32 +21,20 @@ void BgPixelFifo::push(pixel px) { fifo.push(px); }
 pixel BgPixelFifo::pop() { return fifo.pop(); }
 
 /* Pandocs is wrong, object pixel fifo is only eight pixels wide */
-ObjPixelFifo::ObjPixelFifo() : fifo(CircularFifo<pixel, 8>()) {
-  fill_transparent();
-}
-void ObjPixelFifo::flush() {
-  fifo.clear();
-  fill_transparent();
-}
-void ObjPixelFifo::fill_transparent() {
-  while (fifo.size() < fifo.capacity())
-    fifo.push(invisible);
-  assert(fifo.size() == fifo.capacity());
-}
+ObjPixelFifo::ObjPixelFifo() : fifo(CircularFifo<pixel, 8>()) {}
+void ObjPixelFifo::flush() { fifo.clear(); }
 
 /* This FIFO is kinda bizzare, in that data pushed into it is sorta `overlayed`
  * rather than pushed into a circular FIFO. If a pixel has already been written,
  * the value will sustain but if it is transparent the new pixel is emplaced.
  * -----------------------------------------------------------------------------
  * Push omitted intentionally. Use `ObjPixelFifo::at()` instead. */
-pixel ObjPixelFifo::pop() {
-  auto ret = fifo.pop();
-  fifo.push(invisible);
-
-  /* Again, we have to maintain the size to match it's capacity. */
+void ObjPixelFifo::fill_transparent() {
+  while (fifo.size() < fifo.capacity())
+    fifo.push(invisible);
   assert(fifo.size() == fifo.capacity());
-  return ret;
 }
+pixel ObjPixelFifo::pop() { return fifo.pop(); }
 
 /* Lol #notafifo, poke the data in instead in transpatent locations */
 const pixel &ObjPixelFifo::at(std::size_t index) const {

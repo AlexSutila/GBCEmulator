@@ -13,12 +13,11 @@
 constexpr addr_t vram_base_addr = 0x8000;
 constexpr byte_t pixels_per_row = 8;
 
-BgWinFetcher::BgWinFetcher(std::array<std::unique_ptr<byte_t[]>, 2> &vram,
-                           PPU::LCDCtrl &lcdc, MMIORegister &scy,
-                           MMIORegister &scx, MMIORegister &wy,
-                           MMIORegister &wx, PPU::LY &ly,
-                           ObjPixelFifo &obj_fifo, BgPixelFifo &bg_fifo,
-                           runtime_sys_info &sys)
+Fetcher::Fetcher(std::array<std::unique_ptr<byte_t[]>, 2> &vram,
+                 PPU::LCDCtrl &lcdc, MMIORegister &scy, MMIORegister &scx,
+                 MMIORegister &wy, MMIORegister &wx, PPU::LY &ly,
+                 ObjPixelFifo &obj_fifo, BgPixelFifo &bg_fifo,
+                 runtime_sys_info &sys)
     : vram_(vram),         // For fetching tile data
       lcdc_(lcdc),         // LCD control register
       scy_(scy),           // Scroll Y (background)
@@ -33,7 +32,7 @@ BgWinFetcher::BgWinFetcher(std::array<std::unique_ptr<byte_t[]>, 2> &vram,
   reset();
 }
 
-void BgWinFetcher::reset(bool window_started) {
+void Fetcher::reset(bool window_started) {
   fine_scroll = scx_.read() & 0x7;
   state = STATE_READ_TILE;
   pixels_discarded = 0;
@@ -45,6 +44,7 @@ void BgWinFetcher::reset(bool window_started) {
       .data_lo = 0,
       .data_hi = 0,
       .x_coor = 0,
+      .sprite = std::nullopt,
   };
   win_started = window_started;
 
@@ -54,20 +54,40 @@ void BgWinFetcher::reset(bool window_started) {
 }
 
 // Always enters background rendering mode, unless window is rendered instantly
-void BgWinFetcher::reset() {
+void Fetcher::reset() {
   bool win_visible = is_window_visible(0);
   reset(win_visible);
 }
 
+bool Fetcher::is_window_visible(byte_t pixels_rendered) const {
+  if (!lcdc_.win_enabled())
+    return false;
+  const byte_t wx_px = wx_.read();
+  const byte_t wy_px = wy_.read();
+  const byte_t ly_px = ly_.read();
+  return (wx_px <= pixels_rendered + 7) && (ly_px >= wy_px);
+}
+
+void Fetcher::render_window() {
+  // Window is already being rendered
+  if (win_started)
+    return;
+
+  // Flush BG fifo pixel data, incurs additional overhead to fetch the very
+  // first window tile, but after that the rendering process is identical.
+  bg_fifo_.flush();
+  reset(true);
+}
+
 // The fetcher may need to read from banks which are not currently active to
 // fetch specific tile metadata (CGB mode BG map attributes, for example).
-byte_t BgWinFetcher::read_vram_byte(addr_t addr, byte_t bank) const {
+byte_t Fetcher::read_vram_byte(addr_t addr, byte_t bank) const {
   assert((addr >= 0x8000 && addr <= 0x9FFF) && (bank < 2));
   return vram_.at(bank)[addr - vram_base_addr];
 }
 
 /* We derive the Y-coordinate at a pixel level using the LY register. */
-const byte_t BgWinFetcher::calc_pixel_y() const {
+const byte_t Fetcher::calc_pixel_y() const {
   if (win_started)
     return win_internal_ly & 0xFF;
   return (ly_.read() + scy_.read()) & 0xFF;
@@ -76,14 +96,14 @@ const byte_t BgWinFetcher::calc_pixel_y() const {
 /* We derive the X-coordinate at a tile level, since the FIFO fetches eight
  * pixels at a time. As a result, we have to remember to divide the scroll
  * value by the size of a pixel to accomodate the change in units.  */
-const byte_t BgWinFetcher::calc_tile_x() const {
+const byte_t Fetcher::calc_tile_x() const {
   if (win_started)
     return data.x_coor & 0x1F;
   // Since returning unit tiles, can only be 32 max
   return (data.x_coor + (scx_.read() / pixels_per_row)) & 0x1F;
 }
 
-const addr_t BgWinFetcher::calc_tilemap_base() const {
+const addr_t Fetcher::calc_tilemap_base() const {
   const auto base_addr =
       win_started ? lcdc_.win_tilemap_base() : lcdc_.bg_tilemap_base();
   return static_cast<addr_t>(base_addr);
@@ -93,7 +113,7 @@ const addr_t BgWinFetcher::calc_tilemap_base() const {
  * the tile attributes actually lie at the same address. The difference between
  * the physical locations of both bytes is which bank they lie in. Hence, we can
  * leverage the same address calculation for tile indices and attributes. */
-const addr_t BgWinFetcher::calc_tile_metadata_addr() const {
+const addr_t Fetcher::calc_tile_metadata_addr() const {
   constexpr auto tile_shift = 5;
   const byte_t y_px = calc_pixel_y();
 
@@ -108,14 +128,14 @@ const addr_t BgWinFetcher::calc_tile_metadata_addr() const {
 }
 
 /* Implements fine horizontal scroll and initial tile skip */
-bool BgWinFetcher::should_discard() const {
+bool Fetcher::should_discard() const {
   if (win_started)
     return false;
   return pixels_discarded < fine_scroll;
 }
 
 /* Calculate the base address of the tilemap for bg/win */
-const byte_t BgWinFetcher::fetch_tile_data(bool high) const {
+const byte_t Fetcher::fetch_tile_data(bool high) const {
   constexpr auto tile_size_bytes = 16;
   constexpr auto tile_row_bytes = 2;
   const byte_t y_px_idx = calc_pixel_y();
@@ -152,7 +172,7 @@ const byte_t BgWinFetcher::fetch_tile_data(bool high) const {
   }
 }
 
-void BgWinFetcher::do_read_tile() {
+void Fetcher::do_read_tile() {
   constexpr std::size_t max_state_clks = 2;
 
   // State entry logic
@@ -167,7 +187,7 @@ void BgWinFetcher::do_read_tile() {
   }
   ++cur_clks;
 
-  // Read tile incomplete
+  // Read tile complete
   if (cur_clks >= total_clks.value()) {
     state = STATE_READ_DATA_LO;
     total_clks.reset();
@@ -175,7 +195,7 @@ void BgWinFetcher::do_read_tile() {
   }
 }
 
-void BgWinFetcher::do_read_data_lo() {
+void Fetcher::do_read_data_lo() {
   constexpr std::size_t max_state_clks = 2;
 
   // State entry logic, false indicates low byte
@@ -185,7 +205,7 @@ void BgWinFetcher::do_read_data_lo() {
   }
   ++cur_clks;
 
-  // Read tile incomplete
+  // Read tile complete
   if (cur_clks >= total_clks.value()) {
     state = STATE_READ_DATA_HI;
     total_clks.reset();
@@ -193,7 +213,7 @@ void BgWinFetcher::do_read_data_lo() {
   }
 }
 
-void BgWinFetcher::do_read_data_hi() {
+void Fetcher::do_read_data_hi() {
   constexpr std::size_t max_state_clks = 2;
 
   // State entry logic, false indicates high byte
@@ -203,7 +223,7 @@ void BgWinFetcher::do_read_data_hi() {
   }
   ++cur_clks;
 
-  // Read tile incomplete
+  // Read tile complete
   if (cur_clks >= total_clks.value()) {
     state = STATE_PUSH_DATA;
     total_clks.reset();
@@ -211,7 +231,7 @@ void BgWinFetcher::do_read_data_hi() {
   }
 }
 
-void BgWinFetcher::do_push_data() {
+void Fetcher::do_push_data() {
   constexpr std::size_t min_state_clks = 2;
   if (!total_clks.has_value()) {
 
@@ -249,27 +269,31 @@ void BgWinFetcher::do_push_data() {
   }
 }
 
-bool BgWinFetcher::is_window_visible(byte_t pixels_rendered) const {
-  if (!lcdc_.win_enabled())
-    return false;
-  const byte_t wx_px = wx_.read();
-  const byte_t wy_px = wy_.read();
-  const byte_t ly_px = ly_.read();
-  return (wx_px <= pixels_rendered + 7) && (ly_px >= wy_px);
-}
+void Fetcher::do_sprite_fetch() {
+  constexpr std::size_t max_state_clks = 6;
+  if (!total_clks.has_value())
+    total_clks = max_state_clks;
+  ++cur_clks;
 
-void BgWinFetcher::render_window() {
-  // Window is already being rendered
-  if (win_started)
+  // Sprite fetch incomplete
+  if (cur_clks < total_clks.value())
     return;
 
-  // Flush BG fifo pixel data, incurs additional overhead to fetch the very
-  // first window tile, but after that the rendering process is identical.
-  bg_fifo_.flush();
-  reset(true);
+  // TODO: Temporary
+  obj_fifo_.fill_transparent();
+
+  // Sprite fetch complete
+  state = STATE_READ_TILE;
+  total_clks.reset();
+  cur_clks = 0;
 }
 
-void BgWinFetcher::step() {
+void Fetcher::step() {
+  /* Was a sprite fetch requested? If so, stop the world and address it first.
+   * This should not interrupt any ongoing background or window fetches. */
+  if (state == STATE_READ_TILE && !total_clks && data.sprite)
+    state = STATE_SPRITE_FETCH;
+
   switch (state) {
   case STATE_READ_TILE:
     do_read_tile();
@@ -282,6 +306,9 @@ void BgWinFetcher::step() {
     break;
   case STATE_PUSH_DATA:
     do_push_data();
+    break;
+  case STATE_SPRITE_FETCH:
+    do_sprite_fetch();
     break;
   }
 }

@@ -67,7 +67,7 @@ PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus, Frontend &fe,
   if_reg = init_mmio<InterruptBits>(bus, mmio::MMIO_INT_FLAGS);
 
   /* Initialize the background and object pixel FIFO fetching pipeline */
-  fetcher = std::make_unique<BgWinFetcher>(
+  fetcher = std::make_unique<Fetcher>(
       bus->get_vram(), // VRAM reference for fetching tile data
       lcdc_,           // Needs to know if certain control bits are set
       scy_,            // Needed to fetch correct background tile
@@ -139,10 +139,9 @@ std::uint32_t PixelProcessingUnit::get_rgb(const pixel &px) const {
 std::optional<pixel> PixelProcessingUnit::get_next_pixel() {
   fetcher->step();
 
-  // Simple background logic
-  if (!bg_fifo.can_pop())
-    return std::nullopt;
-  return bg_fifo.pop();
+  if (bg_fifo.can_pop())
+    return bg_fifo.pop();
+  return std::nullopt;
 }
 
 /* ======================================================================
@@ -243,11 +242,10 @@ void PixelProcessingUnit::do_draw() {
     // Simply set to minimum, raise as quirks come up during rendering. We do
     // not use this to determine end of state.
     total_mode_clks = min_drawing_cycles;
-    // We are still mid-scanline, so do not touch `cur_scanline_clks`
     cur_mode_clks = 0;
-    // Counts how many pixels have been rendered on this row. This determines
-    // when rendering is complete.
-    row_pixels_rendered = 0;
+    // Counts how many pixels have been rendered on this row. The first var
+    // here determines when rendering is complete.
+    row_pixels_rendered = sprites_fetched = 0;
   }
 
   // Step dot clock
