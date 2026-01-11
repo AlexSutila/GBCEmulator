@@ -20,10 +20,10 @@ bus.write_byte(0xFF50, 0x00)  # Disable boot ROM
 bus.write_byte(0xFF40, 0x80)  # Enable PPU
 
 
-def run_scanline(cur_scanline):
+def run_scanline(cur_scanline, update=True):
     for dot in range(scanline_length):
-        # STAT mode is 0–3
-        fb[cur_scanline, dot] = bus.read_byte(0xFF41) & 0x3
+        if update:  # STAT mode is 0–3
+            fb[cur_scanline, dot] = bus.read_byte(0xFF41) & 0x3
         gbc.step()
 
 
@@ -34,6 +34,9 @@ if __name__ == "__main__":
         "yellow",  # Mode 2: OAM
         "orange",  # Mode 3: Transfer
     ])
+
+    for scanline in range(nr_scanlines):
+        run_scanline(scanline, update=False)  # run for one dummy frame
     for scanline in range(nr_scanlines):
         run_scanline(scanline)
 

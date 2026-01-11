@@ -217,40 +217,36 @@ void BgWinFetcher::do_push_data() {
   // State entry logic
   if (!total_clks.has_value())
     total_clks = min_state_clks;
-  ++cur_clks;
-
-  // This takes two clock cycles at best, takes longer if fifo is packed
-  if (cur_clks < min_state_clks || !bg_fifo_.can_push())
-    return;
 
   // Attempt to push pixels to the FIFO, eight are pushed per push operation
-  for (std::size_t shift{0}; shift < 8; shift++) {
-    const bool discard = should_discard();
+  if (cur_clks == 0 && bg_fifo_.can_push()) {
+    for (std::size_t shift{0}; shift < 8; shift++) {
+      const bool discard = should_discard();
+      if (discard)
+        ++pixels_discarded;
 
-    // Track number of pixels discarded to implement fine scroll
-    if (discard)
-      ++pixels_discarded;
-
-    // Use data bytes and attribute data to derive pixel information
-    const byte_t color_idx = calc_color_idx(data.data_lo,    // lsbs
-                                            data.data_hi,    // msbs
-                                            shift,           // which pixel
-                                            data.tile_attr); // flip?
-    const byte_t palette_idx = get_bg_attrib_palette(data.tile_attr);
-
-    // Pushes a single pixel, may or may not be discarded depending on SCX
-    bg_fifo_.push({
-        .color_idx = color_idx,
-        .palette_idx = palette_idx,
-        .discard = discard,
-    });
+      // Use data bytes and attribute data to derive pixel information
+      const byte_t color_idx = calc_color_idx(data.data_lo,    // lsbs
+                                              data.data_hi,    // msbs
+                                              shift,           // which pixel
+                                              data.tile_attr); // flip?
+      const byte_t palette_idx = get_bg_attrib_palette(data.tile_attr);
+      bg_fifo_.push({
+          .color_idx = color_idx,
+          .palette_idx = palette_idx,
+          .discard = discard, // Hide of SCX discard required
+      });
+    }
+    data.x_coor = (data.x_coor + 1) & 0x1F;
   }
-  data.x_coor = (data.x_coor + 1) & 0x1F;
+  ++cur_clks;
 
   // State transition after push to fetch next row
-  state = STATE_READ_TILE;
-  total_clks.reset();
-  cur_clks = 0;
+  if (cur_clks >= total_clks.value()) {
+    state = STATE_READ_TILE;
+    total_clks.reset();
+    cur_clks = 0;
+  }
 }
 
 bool BgWinFetcher::is_window_visible(byte_t pixels_rendered) const {
