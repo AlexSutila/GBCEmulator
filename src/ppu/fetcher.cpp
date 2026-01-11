@@ -213,31 +213,31 @@ void BgWinFetcher::do_read_data_hi() {
 
 void BgWinFetcher::do_push_data() {
   constexpr std::size_t min_state_clks = 2;
+  if (!total_clks.has_value()) {
 
-  // State entry logic
-  if (!total_clks.has_value())
-    total_clks = min_state_clks;
+    // Attempt to push pixels to the FIFO, eight are pushed per push operation
+    if (bg_fifo_.can_push()) {
+      for (std::size_t shift{0}; shift < 8; shift++) {
+        const bool discard = should_discard();
+        if (discard)
+          ++pixels_discarded;
 
-  // Attempt to push pixels to the FIFO, eight are pushed per push operation
-  if (cur_clks == 0 && bg_fifo_.can_push()) {
-    for (std::size_t shift{0}; shift < 8; shift++) {
-      const bool discard = should_discard();
-      if (discard)
-        ++pixels_discarded;
-
-      // Use data bytes and attribute data to derive pixel information
-      const byte_t color_idx = calc_color_idx(data.data_lo,    // lsbs
-                                              data.data_hi,    // msbs
-                                              shift,           // which pixel
-                                              data.tile_attr); // flip?
-      const byte_t palette_idx = get_bg_attrib_palette(data.tile_attr);
-      bg_fifo_.push({
-          .color_idx = color_idx,
-          .palette_idx = palette_idx,
-          .discard = discard, // Hide of SCX discard required
-      });
+        // Use data bytes and attribute data to derive pixel information
+        const byte_t color_idx = calc_color_idx(data.data_lo,    // lsbs
+                                                data.data_hi,    // msbs
+                                                shift,           // which pixel
+                                                data.tile_attr); // flip?
+        const byte_t palette_idx = get_bg_attrib_palette(data.tile_attr);
+        bg_fifo_.push({
+            .color_idx = color_idx,
+            .palette_idx = palette_idx,
+            .discard = discard, // Hide of SCX discard required
+        });
+      }
+      data.x_coor = (data.x_coor + 1) & 0x1F;
     }
-    data.x_coor = (data.x_coor + 1) & 0x1F;
+    // Setup timing after pushing the pixels, gets us to 174 clocks minumum
+    total_clks = min_state_clks;
   }
   ++cur_clks;
 
