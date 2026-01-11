@@ -1,9 +1,7 @@
 #include "ppu/sprites.hpp"
 
-bool sprite_visible(const byte_t x_pos, const byte_t y_pos,
-                    const byte_t cur_scanline, const byte_t cur_pixel) {
-  // TODO
-  return false;
+bool sprite_visible(const byte_t x_pos, const byte_t cur_pixel) {
+  return (cur_pixel + 8 >= x_pos) && (cur_pixel < x_pos);
 }
 
 /* Note, we still pass the X position here because AAAAAHGFDHGLSKHJG but also
@@ -21,6 +19,6 @@ bool sprite_visible(const byte_t x_pos, const byte_t y_pos,
 
   // Top of any sprite becomes visible at `y_pos == 16` to allow for sprites
   // being placed off screen, hidden away physically above the LCD viewport.
-  return (cur_scanline - 16 >= y_pos) &&
-         (cur_scanline - 16 < y_pos + sprite_size_px);
+  return (cur_scanline + 16 >= y_pos) &&
+         (cur_scanline + 16 < y_pos + sprite_size_px);
 }

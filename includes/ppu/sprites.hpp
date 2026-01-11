@@ -33,8 +33,6 @@ struct Sprite {
  * not. */
 [[nodiscard]] bool // Helper for exact pixel position during rendering phase
 sprite_visible(const byte_t x_pos,        // From object attribute memory
-               const byte_t y_pos,        // From object attribute memory
-               const byte_t cur_scanline, // Basically contents of LY register
                const byte_t cur_pixel);   // Where we're at in the scanline
 [[nodiscard]] bool // Helper for whole scanline checks during OAM memory scan
 sprite_visible(const byte_t x_pos,         // From object attribute memory
