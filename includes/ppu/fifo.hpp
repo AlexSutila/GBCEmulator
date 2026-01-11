@@ -115,6 +115,7 @@ public:
 
 private:
   CircularFifo<pixel, 8> fifo; // Yeah, pandocs is wrong lol
+  void fill_transparent();
 };
 
 #endif // __FIFO_H
