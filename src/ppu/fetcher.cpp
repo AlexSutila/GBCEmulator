@@ -44,7 +44,6 @@ void Fetcher::reset(bool window_started) {
       .data_lo = 0,
       .data_hi = 0,
       .x_coor = 0,
-      .sprite = std::nullopt,
   };
   win_started = window_started;
 
@@ -269,7 +268,7 @@ void Fetcher::do_push_data() {
   }
 }
 
-void Fetcher::do_sprite_fetch() {
+bool Fetcher::do_sprite_fetch() {
   constexpr std::size_t max_state_clks = 6;
   if (!total_clks.has_value())
     total_clks = max_state_clks;
@@ -277,7 +276,7 @@ void Fetcher::do_sprite_fetch() {
 
   // Sprite fetch incomplete
   if (cur_clks < total_clks.value())
-    return;
+    return false;
 
   // TODO: Temporary
   obj_fifo_.fill_transparent();
@@ -286,14 +285,29 @@ void Fetcher::do_sprite_fetch() {
   state = STATE_READ_TILE;
   total_clks.reset();
   cur_clks = 0;
+  return true;
+}
+
+bool Fetcher::step_and_try_sprite_fetch(const Sprite &sprite) {
+  /* Preempt the next background or window tile fetch, if possible. This will
+   * only preempt if the ongoing background or window tile fetch is done. */
+  if (state == STATE_READ_TILE && !total_clks.has_value())
+    state = STATE_SPRITE_FETCH;
+
+  /* If we have started performing a sprite fetch, step it until completion.
+   * Return true once it is complete and the sprite data is emplaced in the
+   * corresponding object FIFO. */
+  if (state == STATE_SPRITE_FETCH)
+    return do_sprite_fetch();
+
+  /* Otherwise, we continue fetching from the BG or window as normal. This
+   * happens until the next fetch is preempted, then we can perform a sprite
+   * fetch. Hence, this wait should last no more than five clock cycles. */
+  step();
+  return false;
 }
 
 void Fetcher::step() {
-  /* Was a sprite fetch requested? If so, stop the world and address it first.
-   * This should not interrupt any ongoing background or window fetches. */
-  if (state == STATE_READ_TILE && !total_clks && data.sprite)
-    state = STATE_SPRITE_FETCH;
-
   switch (state) {
   case STATE_READ_TILE:
     do_read_tile();
@@ -307,8 +321,7 @@ void Fetcher::step() {
   case STATE_PUSH_DATA:
     do_push_data();
     break;
-  case STATE_SPRITE_FETCH:
-    do_sprite_fetch();
-    break;
+  default:
+    throw std::runtime_error("Fetcher::step() bad state");
   }
 }

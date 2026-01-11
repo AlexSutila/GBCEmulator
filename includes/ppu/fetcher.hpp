@@ -13,7 +13,6 @@
 #include <optional>
 
 struct runtime_sys_info;
-class BgPixelFifo;
 
 class Fetcher {
 public:
@@ -28,7 +27,13 @@ public:
           BgPixelFifo &bg_fifo,   // The background pixel fifo
           runtime_sys_info &sys);
   void reset(); // Enters background rendering mode
-  void step();
+
+  /* Sprite fetching is tricky. It should take priority over both BG and window
+   * data fetches, but only occurs on demand. Since the two FIFOs share a single
+   * fetcher, sprite fetches will not occur until any ongoing BG or window fetch
+   * has run until completion. All this we try to portray accurately. */
+  bool step_and_try_sprite_fetch(const Sprite &sprite); // Do sprite fetch asap
+  void step(); // Ignores sprites, followes BG/WIN fetch procedures only
 
   /* The PPU will signal to clear the FIFO once the rendering of the window has
    * begun. All BG pixel data is flushed, and window rendering starts. */
@@ -53,7 +58,7 @@ private:
     STATE_READ_DATA_LO,
     STATE_READ_DATA_HI,
     STATE_PUSH_DATA,
-    // Sprite fetch
+    // Sprite fetch, only enterable from `step_and_try_sprite_fetch()`
     STATE_SPRITE_FETCH,
   } state{};
 
@@ -62,7 +67,9 @@ private:
   void do_read_data_lo();
   void do_read_data_hi();
   void do_push_data();
-  void do_sprite_fetch();
+
+  /* For sprite fetching specifically, returns true when completed */
+  bool do_sprite_fetch();
 
   /* VRAM tile data and metadata source */
   std::array<std::unique_ptr<byte_t[]>, 2> &vram_;
@@ -107,9 +114,6 @@ private:
     byte_t data_lo{};     // Low bits of pixel indices
     byte_t data_hi{};     // High bits of pixel indices
     std::size_t x_coor{}; // In unit tiles
-
-    // For sprites only
-    std::optional<Sprite> sprite{};
   } data;
 
   /* Internal timing metadata */

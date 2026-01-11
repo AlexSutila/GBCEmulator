@@ -137,6 +137,9 @@ std::uint32_t PixelProcessingUnit::get_rgb(const pixel &px) const {
 }
 
 std::optional<pixel> PixelProcessingUnit::get_next_pixel() {
+  // Do we switch the fetcher into window rendering mode?
+  if (fetcher->is_window_visible(row_pixels_rendered))
+    fetcher->render_window();
   fetcher->step();
 
   if (bg_fifo.can_pop())
@@ -253,17 +256,11 @@ void PixelProcessingUnit::do_draw() {
   ++cur_mode_clks;
 
   // Rendering step, try to pop pixels when ready from the fifo
-  if (auto px = get_next_pixel(); px.has_value()) {
-    if (!px->discard) {
-      const auto x = row_pixels_rendered++;
-      const auto y = ly_.read();
-      const auto c = get_rgb(px.value());
-      fe_.put_pixel(x, y, c);
-    }
-
-    // Do we switch the fetcher into window rendering mode?
-    if (fetcher->is_window_visible(row_pixels_rendered))
-      fetcher->render_window();
+  if (auto px = get_next_pixel(); px.has_value() && !px->discard) {
+    const auto x = row_pixels_rendered++;
+    const auto y = ly_.read();
+    const auto c = get_rgb(px.value());
+    fe_.put_pixel(x, y, c);
   }
 
   // Rendering incomplete
