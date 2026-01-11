@@ -54,7 +54,7 @@ private:
   std::size_t row_pixels_rendered{}, sprites_fetched{};
   const bool next_sprite_visible() const;
   std::optional<pixel> get_next_pixel();
-  std::optional<pixel> try_fifos_pop();
+  std::optional<pixel> try_fifo_pop();
 
   /* Tracks the scanline we are currently on, and related hardware bugs */
   bool should_advance_ly();
@@ -65,8 +65,9 @@ private:
   std::size_t sprites_searched{};
   std::vector<Sprite> oam_data{};
 
-  /* Color palette configuration */
-  std::uint32_t get_rgb(const pixel &px) const;
+  /* Coloring and palette configuration */
+  std::uint32_t get_bgwin_rgb(const pixel &px) const;
+  std::uint32_t get_obj_rgb(const pixel &px) const;
   PPU::BGP bgp_{};
 
   /* Pixel Processor operation modes */

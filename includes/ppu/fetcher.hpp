@@ -40,11 +40,6 @@ public:
   bool is_window_visible(byte_t pixels_rendered) const;
   void render_window(); // Makes the fetcher begin fetching window tile data
 
-  /* Tells the fetcher to start fetching data for a sprite as soon as possible.
-   * Sprite fetch does not overlap with BG/WIN fetch, so it can only start once
-   * any BG/WIN fetch has completed. */
-  void render_sprite(const Sprite &sprite);
-
   /* Lastly, the window is kind of strange in that it does not use the curernt
    * scanline register (LY) in the decision to fetch window tiles. It uses an
    * internal counter that only increments if the window was enabled. */
@@ -69,7 +64,7 @@ private:
   void do_push_data();
 
   /* For sprite fetching specifically, returns true when completed */
-  bool do_sprite_fetch();
+  bool do_sprite_fetch(const Sprite &sprite);
 
   /* VRAM tile data and metadata source */
   std::array<std::unique_ptr<byte_t[]>, 2> &vram_;
@@ -99,10 +94,12 @@ private:
   bool win_started{};
 
   /* Helpers */
-  const byte_t calc_pixel_y() const;
-  const byte_t calc_tile_x() const;
+  const byte_t calc_bgwin_pixel_y() const;
+  const byte_t calc_bgwin_tile_x() const;
+  const byte_t calc_obj_pixel_y(const Sprite &sprite) const;
   const addr_t calc_tilemap_base() const;
-  const byte_t fetch_tile_data(bool high) const;
+  const byte_t fetch_bgwin_tile_data(bool high) const;
+  const byte_t fetch_obj_tile_data(const Sprite &sprite, bool high) const;
   const addr_t calc_tile_metadata_addr() const;
 
   /* Internal storage that is built up throughout the pixel pushing pipeline.

@@ -4,6 +4,7 @@
 #include "memory/mmio/mmio.hpp"
 #include "ppu/attributes.hpp"
 #include "ppu/fifo.hpp"
+#include "ppu/pixel.hpp"
 
 #include <array>
 #include <cassert>
@@ -86,21 +87,21 @@ byte_t Fetcher::read_vram_byte(addr_t addr, byte_t bank) const {
   return vram_.at(bank)[addr - vram_base_addr];
 }
 
-/* We derive the Y-coordinate at a pixel level using the LY register. */
-const byte_t Fetcher::calc_pixel_y() const {
+const byte_t Fetcher::calc_bgwin_pixel_y() const {
   if (win_started)
     return win_internal_ly & 0xFF;
   return (ly_.read() + scy_.read()) & 0xFF;
 }
 
-/* We derive the X-coordinate at a tile level, since the FIFO fetches eight
- * pixels at a time. As a result, we have to remember to divide the scroll
- * value by the size of a pixel to accomodate the change in units.  */
-const byte_t Fetcher::calc_tile_x() const {
+const byte_t Fetcher::calc_bgwin_tile_x() const {
   if (win_started)
     return data.x_coor & 0x1F;
   // Since returning unit tiles, can only be 32 max
   return (data.x_coor + (scx_.read() / pixels_per_row)) & 0x1F;
+}
+
+const byte_t Fetcher::calc_obj_pixel_y(const Sprite &sprite) const {
+  return (ly_.read() - (sprite.y_pos - 16)) & 0xFF;
 }
 
 const addr_t Fetcher::calc_tilemap_base() const {
@@ -115,11 +116,11 @@ const addr_t Fetcher::calc_tilemap_base() const {
  * leverage the same address calculation for tile indices and attributes. */
 const addr_t Fetcher::calc_tile_metadata_addr() const {
   constexpr auto tile_shift = 5;
-  const byte_t y_px = calc_pixel_y();
+  const byte_t y_px = calc_bgwin_pixel_y();
 
   // Calculate X and Y coordinates of tile
   const std::size_t y_tile = (y_px / pixels_per_row);
-  const std::size_t x_tile = calc_tile_x();
+  const std::size_t x_tile = calc_bgwin_tile_x();
 
   // Base address changes depending on LCDC bits being set
   const addr_t tile_idx = (y_tile << tile_shift) | x_tile;
@@ -135,10 +136,10 @@ bool Fetcher::should_discard() const {
 }
 
 /* Calculate the base address of the tilemap for bg/win */
-const byte_t Fetcher::fetch_tile_data(bool high) const {
+const byte_t Fetcher::fetch_bgwin_tile_data(bool high) const {
   constexpr auto tile_size_bytes = 16;
   constexpr auto tile_row_bytes = 2;
-  const byte_t y_px_idx = calc_pixel_y();
+  const byte_t y_px_idx = calc_bgwin_pixel_y();
 
   // Get the current Y coordinate at a pixel granularity
   const byte_t y_px_idx_flipped = do_y_px_flip(y_px_idx, data.tile_attr);
@@ -172,6 +173,26 @@ const byte_t Fetcher::fetch_tile_data(bool high) const {
   }
 }
 
+const byte_t Fetcher::fetch_obj_tile_data(const Sprite &sprite,
+                                          bool high) const {
+  constexpr auto tile_size_bytes = 16;
+  constexpr auto tile_row_bytes = 2;
+
+  // Get the current Y coordinate at a pixel granularity
+  const byte_t y_px_idx = calc_obj_pixel_y(sprite); // TODO: flips
+  const addr_t y_offset = y_px_idx * tile_row_bytes;
+
+  // Need to consider y-offset based on LY register
+  addr_t data_offset = (sprite.tile_idx * tile_size_bytes) + y_offset;
+  if (high)
+    ++data_offset;
+
+  // If we are in CGB mode, we have the option to use the high or low bank
+  // based on the attribute flags. Otherwise, we always use zero in DMG.
+  const byte_t bank = sys_.cgb_mode ? get_obj_attrib_bank(sprite.tile_attr) : 0;
+  return read_vram_byte(0x8000 + data_offset, bank); // Always 0x8000
+}
+
 void Fetcher::do_read_tile() {
   constexpr std::size_t max_state_clks = 2;
 
@@ -200,7 +221,7 @@ void Fetcher::do_read_data_lo() {
 
   // State entry logic, false indicates low byte
   if (!total_clks.has_value()) {
-    data.data_lo = fetch_tile_data(false);
+    data.data_lo = fetch_bgwin_tile_data(false);
     total_clks = max_state_clks;
   }
   ++cur_clks;
@@ -218,7 +239,7 @@ void Fetcher::do_read_data_hi() {
 
   // State entry logic, false indicates high byte
   if (!total_clks.has_value()) {
-    data.data_hi = fetch_tile_data(true);
+    data.data_hi = fetch_bgwin_tile_data(true);
     total_clks = max_state_clks;
   }
   ++cur_clks;
@@ -234,6 +255,7 @@ void Fetcher::do_read_data_hi() {
 void Fetcher::do_push_data() {
   constexpr std::size_t min_state_clks = 2;
   if (!total_clks.has_value()) {
+    const bool flip = get_bg_attrib_x_flip(data.tile_attr);
 
     // Attempt to push pixels to the FIFO, eight are pushed per push operation
     if (bg_fifo_.can_push()) {
@@ -241,12 +263,9 @@ void Fetcher::do_push_data() {
         const bool discard = should_discard();
         if (discard)
           ++pixels_discarded;
-
-        // Use data bytes and attribute data to derive pixel information
-        const byte_t color_idx = calc_color_idx(data.data_lo,    // lsbs
-                                                data.data_hi,    // msbs
-                                                shift,           // which pixel
-                                                data.tile_attr); // flip?
+        const byte_t color_idx = calc_color_idx(data.data_lo, // lsbs
+                                                data.data_hi, // msbs
+                                                shift, flip); // Which pixel
         const byte_t palette_idx = get_bg_attrib_palette(data.tile_attr);
         bg_fifo_.push({
             .color_idx = color_idx,
@@ -269,7 +288,8 @@ void Fetcher::do_push_data() {
   }
 }
 
-bool Fetcher::do_sprite_fetch() {
+// TODO: Ideally, this won't happen all in a single clock cycle.
+bool Fetcher::do_sprite_fetch(const Sprite &sprite) {
   constexpr std::size_t max_state_clks = 6;
   if (!total_clks.has_value())
     total_clks = max_state_clks;
@@ -279,8 +299,35 @@ bool Fetcher::do_sprite_fetch() {
   if (cur_clks < total_clks.value())
     return false;
 
-  // TODO: Temporary
+  // Fetch tile data, both low and high bytes, from VRAM
+  const byte_t data_lo = fetch_obj_tile_data(sprite, false);
+  const byte_t data_hi = fetch_obj_tile_data(sprite, true);
+  const byte_t flip = get_obj_attrib_x_flip(sprite.tile_attr);
   obj_fifo_.fill_transparent();
+
+  // Never clear from the sprite FIFO, just poke into what is already there
+  for (std::size_t shift{0}; shift < 8; shift++) {
+    pixel &cur_px = obj_fifo_.at(shift);
+
+    // If the pixel is already written with a non-transparent pixel, leave it
+    if (!is_transparent(cur_px))
+      continue;
+
+    // Otherwise calculate the color palette data and push like usual
+    const byte_t color_idx = calc_color_idx(data_lo, // lsbs
+                                            data_hi, // msbs
+                                            shift, flip);
+    const byte_t palette_idx =
+        sys_.cgb_mode ? get_obj_attrib_cgb_palette(sprite.tile_attr)
+                      : get_obj_attrib_dmg_palette(sprite.tile_attr);
+
+    // Emplaces pixel into an already filled buffer
+    cur_px = {
+        .color_idx = color_idx,
+        .palette_idx = palette_idx,
+        .discard = false, // Never discard obj FIFO pixels
+    };
+  }
 
   // Sprite fetch complete
   state = STATE_READ_TILE;
@@ -299,7 +346,7 @@ bool Fetcher::step_and_try_sprite_fetch(const Sprite &sprite) {
    * Return true once it is complete and the sprite data is emplaced in the
    * corresponding object FIFO. */
   if (state == STATE_SPRITE_FETCH)
-    return do_sprite_fetch();
+    return do_sprite_fetch(sprite);
 
   /* Otherwise, we continue fetching from the BG or window as normal. This
    * happens until the next fetch is preempted, then we can perform a sprite

@@ -12,10 +12,10 @@ byte_t do_y_px_flip(const byte_t y_px, // Offset within tile
 byte_t calc_color_idx(const byte_t lo_byte,  // Low data byte
                       const byte_t hi_byte,  // High data byte
                       std::size_t pixel_idx, // Which pixel?
-                      const byte_t attr)     // Decides flip
+                      bool flip)             // Decides flip
 {
   byte_t hi_bit{}, lo_bit{};
-  if (get_bg_attrib_x_flip(attr)) {
+  if (flip) {
     hi_bit = (hi_byte & (0x01 << pixel_idx)) != 0 ? 1 : 0;
     lo_bit = (lo_byte & (0x01 << pixel_idx)) != 0 ? 1 : 0;
   } else {

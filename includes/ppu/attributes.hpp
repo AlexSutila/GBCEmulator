@@ -12,7 +12,7 @@
 [[nodiscard]] byte_t calc_color_idx(const byte_t lo_byte,  // Low data byte
                                     const byte_t hi_byte,  // High data byte
                                     std::size_t pixel_idx, // Which pixel?
-                                    const byte_t attr);    // Decides flip
+                                    bool flip);            // Decides flip
 
 /*
  * BG Map Attributes (CGB Mode only)

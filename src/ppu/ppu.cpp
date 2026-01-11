@@ -123,7 +123,7 @@ bool PixelProcessingUnit::should_advance_ly() {
  * To support both colored and monochrome modes in DMG mode, we abuse the alpha
  * bits here to save some storage space and store the index into a monochrome
  * palette in addition to the actual RGB color. */
-std::uint32_t PixelProcessingUnit::get_rgb(const pixel &px) const {
+std::uint32_t PixelProcessingUnit::get_bgwin_rgb(const pixel &px) const {
   /* If we are running in backwards compatability mode, we have to consult the
    * BGP register to translate the monochrome color index. On top of the extra
    * coloring offered with CGB hardware. */
@@ -134,6 +134,9 @@ std::uint32_t PixelProcessingUnit::get_rgb(const pixel &px) const {
     return (rgb & 0x00FFFFFF) | (true_color_idx << 24);
   }
   return cram->get_cgb_color(px.color_idx, px.palette_idx);
+}
+std::uint32_t PixelProcessingUnit::get_obj_rgb(const pixel &px) const {
+  return get_bgwin_rgb(px); // TODO: Implement this properly lol
 }
 
 /* Determines if a sprite is visible on the current pixel being processed. This
@@ -163,7 +166,7 @@ std::optional<pixel> PixelProcessingUnit::get_next_pixel() {
   // already been fetched into the FIFO.
   if (!next_sprite_visible()) {
     fetcher->step(); // Ignore possibility of sprite fetch
-    return try_fifos_pop();
+    return try_fifo_pop();
   }
 
   // At this point, we consider the next sprite in the pipeline. If there is
@@ -172,7 +175,7 @@ std::optional<pixel> PixelProcessingUnit::get_next_pixel() {
   const Sprite &next_sprite = oam_data.at(sprites_fetched);
   if (fetcher->step_and_try_sprite_fetch(next_sprite)) {
     ++sprites_fetched;
-    return try_fifos_pop();
+    return try_fifo_pop();
   }
 
   // Under any other circumstances where we haven't returned a pixel yet, this
@@ -180,7 +183,7 @@ std::optional<pixel> PixelProcessingUnit::get_next_pixel() {
   return std::nullopt;
 }
 
-std::optional<pixel> PixelProcessingUnit::try_fifos_pop() {
+std::optional<pixel> PixelProcessingUnit::try_fifo_pop() {
   if (!bg_fifo.can_pop())
     return std::nullopt;
 
@@ -193,15 +196,8 @@ std::optional<pixel> PixelProcessingUnit::try_fifos_pop() {
   // If we can pop a pixel from the sprite FIFO, we merge it with the background
   // pixel in the background FIFO. This is why we must have a background pixel
   // to accompany any pixels in the sprite FIFO, and not the other way around.
-  obj_fifo.pop();
-
-  // TODO: Return a properly merged pixel and not this nonsense lol
-  pixel px = {
-      .color_idx = 3,
-      .palette_idx = 3,
-      .discard = false,
-  };
-  return px;
+  const pixel obj_px = obj_fifo.pop();
+  return obj_px;
 }
 
 /* ======================================================================
@@ -317,7 +313,7 @@ void PixelProcessingUnit::do_draw() {
   if (auto px = get_next_pixel(); px.has_value() && !px->discard) {
     const auto x = row_pixels_rendered++;
     const auto y = ly_.read();
-    const auto c = get_rgb(px.value());
+    const auto c = get_bgwin_rgb(px.value());
     fe_.put_pixel(x, y, c);
   }
 
