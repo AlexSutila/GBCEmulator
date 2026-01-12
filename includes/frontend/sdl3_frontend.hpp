@@ -55,9 +55,14 @@ private:
     std::atomic<bool> is_cgb{};
   };
 
+  struct InputState {
+    std::atomic<byte_t> buttons{};
+  };
+
   const std::uint32_t format_pixel_data(std::uint32_t px) const;
   const std::uint32_t *front_buffer() const;
   void build_ui();
+  void update_button_state(SDL_Keycode key, bool pressed);
 
   // Frame buffer and rendering control
   std::array<std::unique_ptr<std::uint32_t[]>, 2> framebuffers;
@@ -69,6 +74,7 @@ private:
   std::atomic<bool> running{};
   EmulatorState emu_state{};
   UiState ui_state{};
+  InputState input_state{};
 
   IGFD::FileDialogConfig config;
   ImVec2 max_size, min_size;
