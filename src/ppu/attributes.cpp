@@ -1,10 +1,8 @@
 #include "ppu/attributes.hpp"
 
-byte_t do_y_px_flip(const byte_t y_px, // Offset within tile
-                    const byte_t attr) // Decides flip
-{
+byte_t do_y_px_flip(const byte_t y_px, bool flip) {
   constexpr byte_t max_pixel_idx = 7, pixel_mask = 0x7;
-  if (get_bg_attrib_y_flip(attr))
+  if (flip)
     return max_pixel_idx - (y_px & pixel_mask);
   return y_px & pixel_mask;
 }

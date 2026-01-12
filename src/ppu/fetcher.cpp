@@ -142,7 +142,8 @@ const byte_t Fetcher::fetch_bgwin_tile_data(bool high) const {
   const byte_t y_px_idx = calc_bgwin_pixel_y();
 
   // Get the current Y coordinate at a pixel granularity
-  const byte_t y_px_idx_flipped = do_y_px_flip(y_px_idx, data.tile_attr);
+  const bool flip = get_bg_attrib_y_flip(data.tile_attr);
+  const byte_t y_px_idx_flipped = do_y_px_flip(y_px_idx, flip);
   const addr_t y_offset = y_px_idx_flipped * tile_row_bytes;
 
   // Need to consider y-offset based on LY register
@@ -177,10 +178,12 @@ const byte_t Fetcher::fetch_obj_tile_data(const Sprite &sprite,
                                           bool high) const {
   constexpr auto tile_size_bytes = 16;
   constexpr auto tile_row_bytes = 2;
+  const byte_t y_px_idx = calc_obj_pixel_y(sprite);
 
   // Get the current Y coordinate at a pixel granularity
-  const byte_t y_px_idx = calc_obj_pixel_y(sprite); // TODO: flips
-  const addr_t y_offset = y_px_idx * tile_row_bytes;
+  const bool flip = get_obj_attrib_y_flip(sprite.tile_attr);
+  const byte_t y_px_idx_flipped = do_y_px_flip(y_px_idx, flip);
+  const addr_t y_offset = y_px_idx_flipped * tile_row_bytes;
 
   // Need to consider y-offset based on LY register
   addr_t data_offset = (sprite.tile_idx * tile_size_bytes) + y_offset;
