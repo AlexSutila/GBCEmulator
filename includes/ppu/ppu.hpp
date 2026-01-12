@@ -102,7 +102,8 @@ private:
   BgPixelFifo bg_fifo{};
 
   /* Color RAM adding RGB555 support for CGB models */
-  std::unique_ptr<ColorRam> cram;
+  std::unique_ptr<ColorRam> obj_cram;
+  std::unique_ptr<ColorRam> bg_cram;
 };
 
 #endif // __PPU_H

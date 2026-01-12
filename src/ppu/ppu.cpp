@@ -18,6 +18,9 @@
 #include <optional>
 #include <stdexcept>
 
+// Store DMG color index in alpha bits bc we're just based like that lmao
+#define DMG_COLOR_PRESERVE_HACK(rgb, idx) (rgb & 0x00FFFFFF) | (idx << 24)
+
 template <typename T> T *init_mmio(AddressBus *bus, IORegisterMapping reg_id) {
   auto *reg = bus->get_mmio(reg_id);
   if (auto *casted = dynamic_cast<T *>(reg))
@@ -42,14 +45,16 @@ PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus, Frontend &fe,
       bgp_(),                // DMG background and window palette
       obj_fifo(),            // Pushes object (or sprite) pixels
       bg_fifo(),             // Pushes background/window pixels
-      cram(std::make_unique<ColorRam>()) {
+      obj_cram(std::make_unique<ColorRam>()), // CGB sprite color RAM
+      bg_cram(std::make_unique<ColorRam>())   // CGB background color RAM
+{
   using mmio = IORegisterMapping;
   using namespace PPU;
 
   /* These registers are managed by our implementation of the RGB555 color
    * palette system, so grab the reference rq so we can hold onto them. */
-  auto bgpd = cram->get_data_reg();
-  auto bgpi = cram->get_idx_reg();
+  auto bgpd = bg_cram->get_data_reg(), obpd = obj_cram->get_data_reg();
+  auto bgpi = bg_cram->get_idx_reg(), obpi = obj_cram->get_idx_reg();
 
   /* Configure convenience MMIO register references */
   bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_CONTROL), &lcdc_);
@@ -63,6 +68,8 @@ PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus, Frontend &fe,
   bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_BGP), &bgp_);
   bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_BGPI), bgpi);
   bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_BGPD), bgpd);
+  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_OBPI), obpi);
+  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_OBPD), obpd);
 
   /* Not owned by the pixel processing unit, so have to fetch references */
   if_reg = init_mmio<InterruptBits>(bus, mmio::MMIO_INT_FLAGS);
@@ -126,18 +133,21 @@ bool PixelProcessingUnit::should_advance_ly() {
  * palette in addition to the actual RGB color. */
 std::uint32_t PixelProcessingUnit::get_bgwin_rgb(const pixel &px) const {
   /* If we are running in backwards compatability mode, we have to consult the
-   * BGP register to translate the monochrome color index. On top of the extra
-   * coloring offered with CGB hardware. */
+   * BGP register to translate the monochrome color index. */
   if (!sys_.cgb_mode) {
     byte_t true_color_idx = bgp_.get_color_idx(px.color_idx);
-    std::uint32_t rgb = cram->get_cgb_color(true_color_idx, 0);
-    // In CGB mode, we can just tie the alpha bits high lol
-    return (rgb & 0x00FFFFFF) | (true_color_idx << 24);
+    std::uint32_t rgb = bg_cram->get_cgb_color(true_color_idx, 0);
+    return DMG_COLOR_PRESERVE_HACK(rgb, true_color_idx);
   }
-  return cram->get_cgb_color(px.color_idx, px.palette_idx);
+  return bg_cram->get_cgb_color(px.color_idx, px.palette_idx);
 }
 std::uint32_t PixelProcessingUnit::get_obj_rgb(const pixel &px) const {
-  return get_bgwin_rgb(px); // TODO: Implement this properly lol
+  /* If we are running in backwards compatability mode, we have to consult one
+   * of the OBP0/OBP1 registers to translate the monochrome color index. */
+  if (!sys_.cgb_mode) {
+
+  }
+  return obj_cram->get_cgb_color(px.color_idx, px.palette_idx);
 }
 
 /* Determines if a sprite is visible on the current pixel being processed. This
@@ -473,3 +483,5 @@ void PixelProcessingUnit::step() {
   /* Update status register */
   update_stat();
 }
+
+#undef DMG_COLOR_PRESERVE_HACK
