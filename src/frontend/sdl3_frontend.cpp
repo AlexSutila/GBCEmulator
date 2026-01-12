@@ -98,6 +98,12 @@ void SDL3Frontend::poll_events() {
       running = false;
     if (e.type == SDL_EVENT_KEY_DOWN || e.type == SDL_EVENT_KEY_UP) {
       ImGuiIO &io = ImGui::GetIO();
+      if (e.type == SDL_EVENT_KEY_DOWN && ui_state.waiting_for_bind) {
+        if (e.key.key != SDLK_ESCAPE)
+          keybinds[*ui_state.waiting_for_bind] = e.key.key;
+        ui_state.waiting_for_bind.reset();
+        continue;
+      }
       if (io.WantCaptureKeyboard)
         continue;
       const bool pressed = (e.type == SDL_EVENT_KEY_DOWN);
@@ -215,6 +221,20 @@ void SDL3Frontend::build_ui() {
     ImGui::Begin("Settings", &ui_state.show_settings_window);
     ImGui::Checkbox("Fast forward", &ui_state.fast_forward);
     ImGui::Checkbox("Force DMG monochrome", &ui_state.force_mono_dmg);
+    ImGui::SeparatorText("Keybinds");
+    static constexpr std::array<const char *, 8> keybind_labels{
+      "Right", "Left", "Up", "Down", "A", "B", "Select", "Start"};
+    for (std::size_t i = 0; i < keybind_labels.size(); ++i) {
+      ImGui::Text("%s", keybind_labels[i]);
+      ImGui::SameLine(120.0f);
+      const bool waiting = ui_state.waiting_for_bind == i;
+      std::string button_label =
+          waiting ? "Press a key..." : std::string("Bind##") + keybind_labels[i];
+      if (ImGui::Button(button_label.c_str()))
+        ui_state.waiting_for_bind = i;
+      ImGui::SameLine(240.0f);
+      ImGui::Text("%s", SDL_GetKeyName(keybinds[i]));
+    }
     ImGui::End();
   }
 
@@ -281,36 +301,16 @@ void SDL3Frontend::join_emu_thread_if_running() {
   }
 }
 
-void SDL3Frontend::update_button_state(SDL_Keycode key, bool pressed) {
-  byte_t mask = 0;
-  switch (key) {
-  case SDLK_RIGHT:
-    mask = static_cast<byte_t>(JoypadButton::RIGHT);
-    break;
-  case SDLK_LEFT:
-    mask = static_cast<byte_t>(JoypadButton::LEFT);
-    break;
-  case SDLK_UP:
-    mask = static_cast<byte_t>(JoypadButton::UP);
-    break;
-  case SDLK_DOWN:
-    mask = static_cast<byte_t>(JoypadButton::DOWN);
-    break;
-  case SDLK_Z:
-    mask = static_cast<byte_t>(JoypadButton::A);
-    break;
-  case SDLK_X:
-    mask = static_cast<byte_t>(JoypadButton::B);
-    break;
-  case SDLK_RSHIFT:
-    mask = static_cast<byte_t>(JoypadButton::SELECT);
-    break;
-  case SDLK_RETURN:
-    mask = static_cast<byte_t>(JoypadButton::START);
-    break;
-  default:
-    break;
+byte_t SDL3Frontend::button_mask_for_key(const SDL_Keycode key) const {
+  for (std::size_t i = 0; i < keybinds.size(); ++i) {
+    if (keybinds[i] == key)
+      return static_cast<byte_t>(button_order[i]);
   }
+  return 0;
+}
+
+void SDL3Frontend::update_button_state(const SDL_Keycode key, const bool pressed) {
+  const byte_t mask = button_mask_for_key(key);
 
   if (mask == 0)
     return;
