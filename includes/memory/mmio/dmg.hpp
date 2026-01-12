@@ -211,12 +211,22 @@ enum class MonoPaletteColor {
  * Note:
  *   In CGB mode, this register is ignored. BG and Window colors are instead
  *   selected from CGB palette memory (BCPS / BCPD).
+ * ---------------------------------------------------------------------------
+ * FF48–FF49 — OBP0, OBP1 (Non-CGB Mode only)
+ * OBJ palette 0 and 1 data.
+ *
+ * These registers assign gray shades to the color indices of OBJs
+ * that use the corresponding palette. They behave exactly like BGP,
+ * except that the lower two bits are ignored, since OBJ color index 0
+ * is always transparent.
+ * ---------------------------------------------------------------------------
+ * NOTE: For the sake of code reuse, all of BGP, OBP0, OBP1
  */
-class BGP final : public MMIORegister {
+class DMGPalette final : public MMIORegister {
 public:
   void write(byte_t value) override;
   byte_t read() override;
-  BGP() : state(0) {}
+  DMGPalette() : state(0) {}
 
   /* Indexes the internal register state to obtain true color index */
   byte_t get_color_idx(byte_t idx) const;

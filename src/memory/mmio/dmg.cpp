@@ -82,10 +82,10 @@ bool LY::inc() {
   return false;
 }
 
-void BGP::write(byte_t value) { state = value; }
-byte_t BGP::read() { return state; }
+void DMGPalette::write(byte_t value) { state = value; }
+byte_t DMGPalette::read() { return state; }
 
-byte_t BGP::get_color_idx(byte_t idx) const {
+byte_t DMGPalette::get_color_idx(byte_t idx) const {
   // Each color index in the register uses two bits
   return (state >> (idx * 2)) & 0x3;
 }

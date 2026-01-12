@@ -68,7 +68,7 @@ private:
   /* Coloring and palette configuration */
   std::uint32_t get_bgwin_rgb(const pixel &px) const;
   std::uint32_t get_obj_rgb(const pixel &px) const;
-  PPU::BGP bgp_{};
+  PPU::DMGPalette bgp_{}, obp0_{}, obp1_{};
 
   /* Pixel Processor operation modes */
   void do_disabled();

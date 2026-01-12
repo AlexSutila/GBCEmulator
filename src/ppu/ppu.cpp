@@ -43,6 +43,8 @@ PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus, Frontend &fe,
       wx_(),                 // Window scroll X
       ly_(),                 // Current scanline
       bgp_(),                // DMG background and window palette
+      obp0_(),               // The first DMG sprite/object palette
+      obp1_(),               // The second DMG sprite/object palette
       obj_fifo(),            // Pushes object (or sprite) pixels
       bg_fifo(),             // Pushes background/window pixels
       obj_cram(std::make_unique<ColorRam>()), // CGB sprite color RAM
@@ -66,6 +68,8 @@ PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus, Frontend &fe,
   bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_WX), &wx_);
   bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_Y_COOR), &ly_);
   bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_BGP), &bgp_);
+  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_OBP0), &obp0_);
+  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_OBP1), &obp1_);
   bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_BGPI), bgpi);
   bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_BGPD), bgpd);
   bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_OBPI), obpi);
@@ -145,7 +149,12 @@ std::uint32_t PixelProcessingUnit::get_obj_rgb(const pixel &px) const {
   /* If we are running in backwards compatability mode, we have to consult one
    * of the OBP0/OBP1 registers to translate the monochrome color index. */
   if (!sys_.cgb_mode) {
-
+    const byte_t palette_idx = px.palette_idx & 0x1;
+    byte_t true_color_idx = (palette_idx == 0)
+                                ? obp0_.get_color_idx(px.color_idx)
+                                : obp1_.get_color_idx(px.color_idx);
+    std::uint32_t rgb = obj_cram->get_cgb_color(true_color_idx, palette_idx);
+    return DMG_COLOR_PRESERVE_HACK(rgb, true_color_idx);
   }
   return obj_cram->get_cgb_color(px.color_idx, px.palette_idx);
 }
