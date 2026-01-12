@@ -53,8 +53,8 @@ private:
   /* For tracking where we currently are in the rendering process */
   std::size_t row_pixels_rendered{}, sprites_fetched{};
   const bool next_sprite_visible() const;
-  std::optional<pixel> get_next_pixel();
-  std::optional<pixel> try_fifo_pop();
+  std::optional<std::uint32_t> get_next_pixel();
+  std::optional<std::uint32_t> try_fifo_pop();
 
   /* Tracks the scanline we are currently on, and related hardware bugs */
   bool should_advance_ly();

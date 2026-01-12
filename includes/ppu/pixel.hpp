@@ -18,7 +18,7 @@ struct pixel {
   }
 };
 
-[[nodiscard]] inline bool is_transparent(pixel &px) {
+[[nodiscard]] inline bool is_transparent(const pixel &px) {
   // NOTE: Only applicable to object/sprite pixels
   return px.color_idx == 0;
 }

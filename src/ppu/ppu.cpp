@@ -8,6 +8,7 @@
 #include "ppu/fetcher.hpp"
 #include "ppu/fifo.hpp"
 #include "ppu/palette.hpp"
+#include "ppu/pixel.hpp"
 #include "ppu/sprites.hpp"
 
 #include <algorithm>
@@ -153,7 +154,7 @@ const bool PixelProcessingUnit::next_sprite_visible() const {
 
 /* Performs the fetcher stepping, FIFO popping, and all the logic behind what
  * happens when regarding the pixel FIFO madness that confuses everyone. */
-std::optional<pixel> PixelProcessingUnit::get_next_pixel() {
+std::optional<std::uint32_t> PixelProcessingUnit::get_next_pixel() {
 
   // If the window becomes visible, we have to reset the fetcher so it starts
   // fetching window data instead of BG data. Calling this repeatedly is safe,
@@ -183,21 +184,32 @@ std::optional<pixel> PixelProcessingUnit::get_next_pixel() {
   return std::nullopt;
 }
 
-std::optional<pixel> PixelProcessingUnit::try_fifo_pop() {
+std::optional<std::uint32_t> PixelProcessingUnit::try_fifo_pop() {
   if (!bg_fifo.can_pop())
     return std::nullopt;
 
   // Pop the background pixel, try to pop the sprite FIFO. If the sprite FIFO
   // is empty, just proceed. The sprtie FIFO will be populated on demand.
   const pixel bg_px = bg_fifo.pop();
-  if (!obj_fifo.can_pop())
-    return bg_px;
+  if (!obj_fifo.can_pop()) {
+    if (bg_px.discard) // Don't render, for fine SCX scrolling
+      return std::nullopt;
+    else // Show actual color conversion
+      return get_bgwin_rgb(bg_px);
+  }
 
   // If we can pop a pixel from the sprite FIFO, we merge it with the background
   // pixel in the background FIFO. This is why we must have a background pixel
   // to accompany any pixels in the sprite FIFO, and not the other way around.
   const pixel obj_px = obj_fifo.pop();
-  return obj_px;
+
+  // May need to discard the pixel due to SCX fine scrolling
+  if (bg_px.discard || obj_px.discard)
+    return std::nullopt;
+  else if (is_transparent(obj_px)) // If object is transparent use BG
+    return get_bgwin_rgb(bg_px);
+  else
+    return get_obj_rgb(obj_px); // Otherwise render the object above BG
 }
 
 /* ======================================================================
@@ -310,10 +322,10 @@ void PixelProcessingUnit::do_draw() {
   ++cur_mode_clks;
 
   // Rendering step, try to pop pixels when ready from the fifo
-  if (auto px = get_next_pixel(); px.has_value() && !px->discard) {
+  if (auto px = get_next_pixel(); px.has_value()) {
     const auto x = row_pixels_rendered++;
     const auto y = ly_.read();
-    const auto c = get_bgwin_rgb(px.value());
+    const auto c = px.value();
     fe_.put_pixel(x, y, c);
   }
 
