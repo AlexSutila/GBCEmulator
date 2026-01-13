@@ -203,6 +203,20 @@ std::optional<std::uint32_t> PixelProcessingUnit::get_next_pixel() {
   return std::nullopt;
 }
 
+std::uint32_t
+PixelProcessingUnit::resolve_px_priority(const pixel &bg_px,
+                                         const pixel &obj_px) const {
+  const bool lcdc = lcdc_.bg_win_en_priority();
+  const bool oam = obj_px.take_priority;
+  const bool bg = bg_px.take_priority;
+
+  // This is the 'fighting over priority' that is mentioned numerous places
+  // throughout this codebase. It isn't acutally that bad, I was just lazy.
+  if (lcdc && (oam || bg))
+    return get_bgwin_rgb(bg_px);
+  return get_obj_rgb(obj_px);
+}
+
 std::optional<std::uint32_t> PixelProcessingUnit::try_fifo_pop() {
   if (!bg_fifo.can_pop())
     return std::nullopt;
@@ -227,8 +241,8 @@ std::optional<std::uint32_t> PixelProcessingUnit::try_fifo_pop() {
     return std::nullopt;
   else if (is_transparent(obj_px)) // If object is transparent use BG
     return get_bgwin_rgb(bg_px);
-  else
-    return get_obj_rgb(obj_px); // Otherwise render the object above BG
+  // Otherwise, render what ever, let the two pixels fight over priority.
+  return resolve_px_priority(bg_px, obj_px);
 }
 
 /* ======================================================================

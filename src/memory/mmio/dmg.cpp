@@ -24,6 +24,7 @@ const TileMapArea LCDCtrl::bg_tilemap_base() const {
   return (state & 0x08) != 0 ? TileMapArea::HI_TILEMAP_BASE
                              : TileMapArea::LO_TILEMAP_BASE;
 }
+const bool LCDCtrl::bg_win_en_priority() const { return (state & 0x1) != 0; }
 
 /* The return value here will always be in reference to the height (pixels) of
  * the sprites. Sprites will never not be 8 pixels wide. */

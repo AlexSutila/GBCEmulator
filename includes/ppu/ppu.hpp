@@ -54,6 +54,9 @@ private:
   std::size_t row_pixels_rendered{}, sprites_fetched{};
   const bool next_sprite_visible() const;
   std::optional<std::uint32_t> get_next_pixel();
+
+  /* For popping and combining pixel data from both fifos */
+  std::uint32_t resolve_px_priority(const pixel &bg_px, const pixel &obj_px) const;
   std::optional<std::uint32_t> try_fifo_pop();
 
   /* Tracks the scanline we are currently on, and related hardware bugs */

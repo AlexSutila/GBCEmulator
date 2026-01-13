@@ -73,6 +73,7 @@ public:
   const SpriteHeight obj_size() const;
   const bool obj_enable() const;
   const bool win_enabled() const;
+  const bool bg_win_en_priority() const;
 
 private:
   byte_t state{};

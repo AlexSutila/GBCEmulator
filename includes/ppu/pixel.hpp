@@ -6,16 +6,8 @@
 struct pixel {
   byte_t color_idx;   // A value between 0 and 3
   byte_t palette_idx; // A value between 0 and 7 (CGB mode only)
+  bool take_priority; // Was the priority bit set?
   bool discard;
-
-  pixel &operator=(const pixel &other) noexcept {
-    if (this != &other) {
-      color_idx = other.color_idx;
-      palette_idx = other.palette_idx;
-      discard = other.discard;
-    }
-    return *this;
-  }
 };
 
 [[nodiscard]] inline bool is_transparent(const pixel &px) {

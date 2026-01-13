@@ -258,6 +258,8 @@ void Fetcher::do_read_data_hi() {
 void Fetcher::do_push_data() {
   constexpr std::size_t min_state_clks = 2;
   if (!total_clks.has_value()) {
+    const bool take_priority = get_bg_attrib_priority(data.tile_attr);
+    const byte_t palette_idx = get_bg_attrib_palette(data.tile_attr);
     const bool flip = get_bg_attrib_x_flip(data.tile_attr);
 
     // Attempt to push pixels to the FIFO, eight are pushed per push operation
@@ -269,10 +271,10 @@ void Fetcher::do_push_data() {
         const byte_t color_idx = calc_color_idx(data.data_lo, // lsbs
                                                 data.data_hi, // msbs
                                                 shift, flip); // Which pixel
-        const byte_t palette_idx = get_bg_attrib_palette(data.tile_attr);
         bg_fifo_.push({
             .color_idx = color_idx,
             .palette_idx = palette_idx,
+            .take_priority = take_priority,
             .discard = discard, // Hide of SCX discard required
         });
       }
@@ -305,29 +307,30 @@ bool Fetcher::do_sprite_fetch(const Sprite &sprite) {
   // Fetch tile data, both low and high bytes, from VRAM
   const byte_t data_lo = fetch_obj_tile_data(sprite, false);
   const byte_t data_hi = fetch_obj_tile_data(sprite, true);
-  const byte_t flip = get_obj_attrib_x_flip(sprite.tile_attr);
-  obj_fifo_.fill_transparent();
 
-  // Never clear from the sprite FIFO, just poke into what is already there
+  // Lastly, determine the sprite attributes needed for rendering. Keep in mind
+  // that a cleared priority bit is what gives sprites higher priority over the
+  // background and window, not a set bit. Just be cautious moving forward lol.
+  const bool take_priority = get_obj_attrib_priority(sprite.tile_attr);
+  const byte_t palette_idx = sys_.cgb_mode
+                                 ? get_obj_attrib_cgb_palette(sprite.tile_attr)
+                                 : get_obj_attrib_dmg_palette(sprite.tile_attr);
+  const bool flip = get_obj_attrib_x_flip(sprite.tile_attr);
+
+  // When performing this, keep in mind that new data pushed into the obj FIFO
+  // is not overwritten, but only transparent pixels. Do not push data out!!!!
+  obj_fifo_.fill_transparent();
   for (std::size_t shift{0}; shift < 8; shift++) {
     pixel &cur_px = obj_fifo_.at(shift);
-
-    // If the pixel is already written with a non-transparent pixel, leave it
     if (!is_transparent(cur_px))
       continue;
 
-    // Otherwise calculate the color palette data and push like usual
-    const byte_t color_idx = calc_color_idx(data_lo, // lsbs
-                                            data_hi, // msbs
-                                            shift, flip);
-    const byte_t palette_idx =
-        sys_.cgb_mode ? get_obj_attrib_cgb_palette(sprite.tile_attr)
-                      : get_obj_attrib_dmg_palette(sprite.tile_attr);
-
-    // Emplaces pixel into an already filled buffer
+    // If non-transparent calculate the color palette data and push like usual
+    const byte_t color_idx = calc_color_idx(data_lo, data_hi, shift, flip);
     cur_px = {
         .color_idx = color_idx,
         .palette_idx = palette_idx,
+        .take_priority = take_priority,
         .discard = false, // Never discard obj FIFO pixels
     };
   }

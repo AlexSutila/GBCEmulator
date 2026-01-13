@@ -61,6 +61,7 @@
 [[nodiscard]] byte_t get_bg_attrib_bank(byte_t attrib);
 [[nodiscard]] bool get_bg_attrib_x_flip(byte_t attrib);
 [[nodiscard]] bool get_bg_attrib_y_flip(byte_t attrib);
+[[nodiscard]] bool get_bg_attrib_priority(byte_t attrib);
 
 /*
  * Object (Sprite) Attributes / Flags
@@ -97,5 +98,6 @@
 [[nodiscard]] byte_t get_obj_attrib_cgb_palette(byte_t attrib);
 [[nodiscard]] bool get_obj_attrib_x_flip(byte_t attrib);
 [[nodiscard]] bool get_obj_attrib_y_flip(byte_t attrib);
+[[nodiscard]] bool get_obj_attrib_priority(byte_t attrib);
 
 #endif // __ATTRIBUTES_H

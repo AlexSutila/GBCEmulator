@@ -43,6 +43,11 @@ bool get_bg_attrib_y_flip(byte_t attrib) {
   return ((attrib & 0x40) >> 6) & 0x1;
 }
 
+bool get_bg_attrib_priority(byte_t attrib) {
+  // CGB only: fight over priority, logic is convoluted lol
+  return ((attrib & 0x80) >> 7) & 0x1;
+}
+
 byte_t get_obj_attrib_dmg_palette(byte_t attrib) {
   // Non CGB only: Determiens between palette selection between OBJ0 and OBJ1
   return ((attrib & 0x10) >> 4) & 0x1;
@@ -66,4 +71,8 @@ bool get_obj_attrib_x_flip(byte_t attrib) {
 bool get_obj_attrib_y_flip(byte_t attrib) {
   // Determines if tiles are flipped vertically
   return ((attrib & 0x40) >> 6) & 0x1;
+}
+bool get_obj_attrib_priority(byte_t attrib) {
+  // Fight over render priority, logic is convoluted
+  return ((attrib & 0x80) >> 7) & 0x1;
 }
