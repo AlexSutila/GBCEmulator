@@ -74,6 +74,7 @@ AddressBus::AddressBus(runtime_sys_info &sys)
   oam = make_zeroed<byte_t>(oam_size);
 
   /* Connect memory mapped IO owned by address bus */
+  connect_mmio(static_cast<addr_t>(mmio::MMIO_JOYPAD), &joypad_);
   connect_mmio(static_cast<addr_t>(mmio::MMIO_BOOT_ROM_CTRL), &boot_rom_ctrl);
   connect_mmio(static_cast<addr_t>(mmio::MMIO_WRAM_BANK), &wram_bank_ctrl);
   connect_mmio(static_cast<addr_t>(mmio::MMIO_VRAM_BANK), &vram_bank_ctrl);

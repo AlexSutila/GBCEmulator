@@ -48,6 +48,7 @@ private:
     bool force_mono_dmg{false};
     std::string rom_path{};
     std::string status_message{};
+    std::optional<std::size_t> waiting_for_bind{};
   };
 
   struct EmulatorState {
@@ -55,9 +56,24 @@ private:
     std::atomic<bool> is_cgb{};
   };
 
+  struct InputState {
+    std::atomic<byte_t> buttons{};
+  };
+
+  static constexpr std::array<JoypadButton, 8> button_order{
+    JoypadButton::RIGHT, JoypadButton::LEFT, JoypadButton::UP,
+    JoypadButton::DOWN,  JoypadButton::A,    JoypadButton::B,
+    JoypadButton::SELECT, JoypadButton::START};
+  static constexpr std::array<SDL_Keycode, 8> default_keybinds{
+    SDLK_RIGHT, SDLK_LEFT,  SDLK_UP,    SDLK_DOWN,
+    SDLK_Z,     SDLK_X,     SDLK_RSHIFT, SDLK_RETURN};
+  std::array<SDL_Keycode, 8> keybinds{default_keybinds};
+
   const std::uint32_t format_pixel_data(std::uint32_t px) const;
   const std::uint32_t *front_buffer() const;
   void build_ui();
+  void update_button_state(SDL_Keycode key, bool pressed);
+  byte_t button_mask_for_key(SDL_Keycode key) const;
 
   // Frame buffer and rendering control
   std::array<std::unique_ptr<std::uint32_t[]>, 2> framebuffers;
@@ -69,6 +85,7 @@ private:
   std::atomic<bool> running{};
   EmulatorState emu_state{};
   UiState ui_state{};
+  InputState input_state{};
 
   IGFD::FileDialogConfig config;
   ImVec2 max_size, min_size;

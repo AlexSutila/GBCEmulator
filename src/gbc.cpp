@@ -6,6 +6,8 @@
 #include "timer/timer.hpp"
 #include <memory>
 
+#include "memory/mmio/joypad.hpp"
+
 GameBoyColor::GameBoyColor(Frontend &frontend) : fe_(frontend) {
   /* General system operation info */
   sys_ = {
@@ -20,6 +22,14 @@ GameBoyColor::GameBoyColor(Frontend &frontend) : fe_(frontend) {
   ppu = std::make_unique<PixelProcessingUnit>(bus.get(), fe_, sys_);
   timer = std::make_unique<TimerUnit>(bus.get(), sys_);
   has_cartridge = false;
+
+  auto *joypad_reg =
+    dynamic_cast<Joypad *>(bus->get_mmio(IORegisterMapping::MMIO_JOYPAD));
+  auto *if_reg =
+      dynamic_cast<InterruptBits *>(bus->get_mmio(IORegisterMapping::MMIO_INT_FLAGS));
+  if (!joypad_reg || !if_reg)
+    throw std::logic_error("Failed to configure joypad MMIO");
+  joypad_reg->set_interrupt_reg(if_reg);
 }
 
 void GameBoyColor::insert_cartridge(cart c) {

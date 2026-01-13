@@ -96,6 +96,19 @@ void SDL3Frontend::poll_events() {
     ImGui_ImplSDL3_ProcessEvent(&e);
     if (e.type == SDL_EVENT_QUIT)
       running = false;
+    if (e.type == SDL_EVENT_KEY_DOWN || e.type == SDL_EVENT_KEY_UP) {
+      ImGuiIO &io = ImGui::GetIO();
+      if (e.type == SDL_EVENT_KEY_DOWN && ui_state.waiting_for_bind) {
+        if (e.key.key != SDLK_ESCAPE)
+          keybinds[*ui_state.waiting_for_bind] = e.key.key;
+        ui_state.waiting_for_bind.reset();
+        continue;
+      }
+      if (io.WantCaptureKeyboard)
+        continue;
+      const bool pressed = (e.type == SDL_EVENT_KEY_DOWN);
+      update_button_state(e.key.key, pressed);
+    }
   }
 }
 
@@ -208,6 +221,20 @@ void SDL3Frontend::build_ui() {
     ImGui::Begin("Settings", &ui_state.show_settings_window);
     ImGui::Checkbox("Fast forward", &ui_state.fast_forward);
     ImGui::Checkbox("Force DMG monochrome", &ui_state.force_mono_dmg);
+    ImGui::SeparatorText("Keybinds");
+    static constexpr std::array<const char *, 8> keybind_labels{
+      "Right", "Left", "Up", "Down", "A", "B", "Select", "Start"};
+    for (std::size_t i = 0; i < keybind_labels.size(); ++i) {
+      ImGui::Text("%s", keybind_labels[i]);
+      ImGui::SameLine(120.0f);
+      const bool waiting = ui_state.waiting_for_bind == i;
+      std::string button_label =
+          waiting ? "Press a key..." : std::string("Bind##") + keybind_labels[i];
+      if (ImGui::Button(button_label.c_str()))
+        ui_state.waiting_for_bind = i;
+      ImGui::SameLine(240.0f);
+      ImGui::Text("%s", SDL_GetKeyName(keybinds[i]));
+    }
     ImGui::End();
   }
 
@@ -243,9 +270,15 @@ void SDL3Frontend::emulation_thread_fn(std::stop_token st, cart c) {
   gbc_ = std::make_unique<GameBoyColor>(*this);
   gbc_->insert_cartridge(c);
 
+  auto *joypad = dynamic_cast<Joypad *>(
+    gbc_->get_bus()->get_mmio(IORegisterMapping::MMIO_JOYPAD));
+  if (!joypad)
+    throw std::logic_error("Failed to configure joypad input");
+
   /* Run emulation in real-time */
   while (!st.stop_requested()) [[likely]] {
     const auto beg = steady_clk::now();
+    joypad->set_state(input_state.buttons.load(std::memory_order_relaxed));
     for (unsigned i = 0; i < sync_cycles; i++)
       gbc_->step();
 
@@ -266,6 +299,28 @@ void SDL3Frontend::join_emu_thread_if_running() {
     emulation_thread.request_stop();
     emulation_thread.join();
   }
+}
+
+byte_t SDL3Frontend::button_mask_for_key(const SDL_Keycode key) const {
+  for (std::size_t i = 0; i < keybinds.size(); ++i) {
+    if (keybinds[i] == key)
+      return static_cast<byte_t>(button_order[i]);
+  }
+  return 0;
+}
+
+void SDL3Frontend::update_button_state(const SDL_Keycode key, const bool pressed) {
+  const byte_t mask = button_mask_for_key(key);
+
+  if (mask == 0)
+    return;
+
+  byte_t current = input_state.buttons.load(std::memory_order_relaxed);
+  if (pressed)
+    current |= mask;
+  else
+    current &= static_cast<byte_t>(~mask);
+  input_state.buttons.store(current, std::memory_order_relaxed);
 }
 
 void SDL3Frontend::start() {

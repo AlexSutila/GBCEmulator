@@ -90,6 +90,7 @@ set(GBC_CORE_SOURCES
     src/cart/mbc/mbc5.cpp
     src/cart/mbc/test_mbc.cpp
     src/cart/mbc/mbc_factory.cpp
+        src/memory/mmio/joypad.cpp
 )
 set(GBC_INCLUDE_DIR
     ${CMAKE_CURRENT_SOURCE_DIR}/includes
