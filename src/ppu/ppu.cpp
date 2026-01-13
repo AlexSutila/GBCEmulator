@@ -166,6 +166,10 @@ const bool PixelProcessingUnit::next_sprite_visible() const {
   if (sprites_fetched >= oam_data.size() || sprites_fetched >= max_sprites)
     return false;
 
+  // Sprites will not appear if the obj enable bit is cleared
+  if (!lcdc_.obj_enable())
+    return false;
+
   // We make the assumption that this sprite lies along the scanline vertically
   const Sprite &next_sprite = oam_data.at(sprites_fetched);
   return sprite_visible(next_sprite.x_pos, row_pixels_rendered);
