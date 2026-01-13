@@ -60,13 +60,15 @@ private:
     std::atomic<byte_t> buttons{};
   };
 
-  static constexpr std::array<JoypadButton, 8> button_order{
-    JoypadButton::RIGHT, JoypadButton::LEFT, JoypadButton::UP,
-    JoypadButton::DOWN,  JoypadButton::A,    JoypadButton::B,
-    JoypadButton::SELECT, JoypadButton::START};
+  /* Default keybind configuration */
+  static constexpr std::array<Joypad::JoypadButton, 8> button_order{
+      Joypad::JoypadButton::RIGHT,  Joypad::JoypadButton::LEFT,
+      Joypad::JoypadButton::UP,     Joypad::JoypadButton::DOWN,
+      Joypad::JoypadButton::A,      Joypad::JoypadButton::B,
+      Joypad::JoypadButton::SELECT, Joypad::JoypadButton::START};
   static constexpr std::array<SDL_Keycode, 8> default_keybinds{
-    SDLK_RIGHT, SDLK_LEFT,  SDLK_UP,    SDLK_DOWN,
-    SDLK_Z,     SDLK_X,     SDLK_RSHIFT, SDLK_RETURN};
+      SDLK_D, SDLK_A, SDLK_W,         SDLK_S,
+      SDLK_J, SDLK_K, SDLK_BACKSPACE, SDLK_ESCAPE};
   std::array<SDL_Keycode, 8> keybinds{default_keybinds};
 
   const std::uint32_t format_pixel_data(std::uint32_t px) const;

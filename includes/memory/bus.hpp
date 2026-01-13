@@ -63,7 +63,7 @@ private:
   std::unique_ptr<byte_t[]> hram{};
   std::unique_ptr<byte_t[]> oam{};
   std::unique_ptr<Cartridge> cart_;
-  Joypad joypad_;
+  Joypad::JOYP joypad_;
 
   /* System control registers: (speed mode, backwards compatability, etc) */
   SYS::KEY0 key0; // Controls DMG backwards compatability

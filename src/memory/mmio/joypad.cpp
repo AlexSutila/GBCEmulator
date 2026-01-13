@@ -4,11 +4,13 @@
 constexpr byte_t select_mask = 0x30;
 constexpr byte_t high_bits = 0xC0;
 
-Joypad::Joypad() : select_bits(select_mask), button_state(0), last_low(0x0F) {}
+namespace Joypad {
 
-void Joypad::set_interrupt_reg(InterruptBits *reg) { if_reg = reg; }
+JOYP::JOYP() : select_bits(select_mask), button_state(0), last_low(0x0F) {}
 
-void Joypad::set_button(JoypadButton button, const bool pressed) {
+void JOYP::set_interrupt_reg(InterruptBits *reg) { if_reg = reg; }
+
+void JOYP::set_button(JoypadButton button, const bool pressed) {
   const byte_t mask = static_cast<byte_t>(button);
   if (pressed)
     button_state |= mask;
@@ -17,22 +19,22 @@ void Joypad::set_button(JoypadButton button, const bool pressed) {
   update_output(compute_low_bits());
 }
 
-void Joypad::set_state(byte_t mask) {
+void JOYP::set_state(byte_t mask) {
   button_state = mask;
   update_output(compute_low_bits());
 }
 
-void Joypad::write(byte_t value) {
+void JOYP::write(byte_t value) {
   select_bits = value & select_mask;
   update_output(compute_low_bits());
 }
 
-byte_t Joypad::read() {
+byte_t JOYP::read() {
   const byte_t low = compute_low_bits();
   return static_cast<byte_t>(high_bits | select_bits | low);
 }
 
-byte_t Joypad::compute_low_bits() const {
+byte_t JOYP::compute_low_bits() const {
   byte_t low = 0x0F;
 
   if ((select_bits & 0x10) == 0) {
@@ -64,7 +66,7 @@ byte_t Joypad::compute_low_bits() const {
   return low;
 }
 
-void Joypad::update_output(const byte_t next_low) {
+void JOYP::update_output(const byte_t next_low) {
   if (if_reg) {
     const byte_t pressed = static_cast<byte_t>(last_low & ~next_low);
     if (pressed != 0)
@@ -72,3 +74,5 @@ void Joypad::update_output(const byte_t next_low) {
   }
   last_low = next_low;
 }
+
+} // namespace Joypad

@@ -1,6 +1,7 @@
 #include "frontend/sdl3_frontend.hpp"
 #include "SDL3/SDL_video.h"
 #include "cart/cart.hpp"
+#include "memory/mmio/joypad.hpp"
 #include "ppu/palette.hpp"
 #include <SDL3/SDL.h>
 #include <backends/imgui_impl_sdl3.h>
@@ -270,7 +271,7 @@ void SDL3Frontend::emulation_thread_fn(std::stop_token st, cart c) {
   gbc_ = std::make_unique<GameBoyColor>(*this);
   gbc_->insert_cartridge(c);
 
-  auto *joypad = dynamic_cast<Joypad *>(
+  auto *joypad = dynamic_cast<Joypad::JOYP *>(
     gbc_->get_bus()->get_mmio(IORegisterMapping::MMIO_JOYPAD));
   if (!joypad)
     throw std::logic_error("Failed to configure joypad input");

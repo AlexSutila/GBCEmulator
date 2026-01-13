@@ -6,6 +6,8 @@
 
 class InterruptBits;
 
+namespace Joypad {
+
 enum class JoypadButton : byte_t {
   RIGHT = 1 << 0,
   LEFT = 1 << 1,
@@ -17,9 +19,9 @@ enum class JoypadButton : byte_t {
   START = 1 << 7,
 };
 
-class Joypad final : public MMIORegister {
+class JOYP final : public MMIORegister {
 public:
-  Joypad();
+  JOYP();
   void write(byte_t value) override;
   byte_t read() override;
 
@@ -37,4 +39,6 @@ private:
   InterruptBits *if_reg{};
 };
 
-#endif //GBC_JOYPAD_HPP
+} // namespace Joypad
+
+#endif // GBC_JOYPAD_HPP

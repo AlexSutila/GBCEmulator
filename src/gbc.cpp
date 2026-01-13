@@ -23,12 +23,17 @@ GameBoyColor::GameBoyColor(Frontend &frontend) : fe_(frontend) {
   timer = std::make_unique<TimerUnit>(bus.get(), sys_);
   has_cartridge = false;
 
-  auto *joypad_reg =
-    dynamic_cast<Joypad *>(bus->get_mmio(IORegisterMapping::MMIO_JOYPAD));
-  auto *if_reg =
-      dynamic_cast<InterruptBits *>(bus->get_mmio(IORegisterMapping::MMIO_INT_FLAGS));
+  /* Joypad initialization */
+  auto *joypad_reg = dynamic_cast<Joypad::JOYP *>(
+      bus->get_mmio(IORegisterMapping::MMIO_JOYPAD));
+  auto *if_reg = dynamic_cast<InterruptBits *>(
+      bus->get_mmio(IORegisterMapping::MMIO_INT_FLAGS));
   if (!joypad_reg || !if_reg)
     throw std::logic_error("Failed to configure joypad MMIO");
+
+  /* To avoid running into problems with other registers it depends on in time,
+   * we have to invoke this method to configure the dependencies it needs after
+   * we can garuntee they have been instantiated. */
   joypad_reg->set_interrupt_reg(if_reg);
 }
 
