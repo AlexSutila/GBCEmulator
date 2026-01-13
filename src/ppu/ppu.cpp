@@ -382,6 +382,10 @@ void PixelProcessingUnit::do_draw() {
   else if (fetcher->was_window_visible())
     fetcher->inc_win_ly();
 
+  // TODO: I am not 100% sure about the sample timing of this, but I do know
+  // with a high degree of certainty that it is only sampled once per scanline
+  fetcher->sample_window_enable();
+
   // State transition logic
   state = modes::MODE_HBLANK;
   total_mode_clks.reset();

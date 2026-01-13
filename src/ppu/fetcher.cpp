@@ -60,12 +60,16 @@ void Fetcher::reset() {
 }
 
 bool Fetcher::is_window_visible(byte_t pixels_rendered) const {
-  if (!lcdc_.win_enabled())
+  if (!win_enable_sample)
     return false;
   const byte_t wx_px = wx_.read();
   const byte_t wy_px = wy_.read();
   const byte_t ly_px = ly_.read();
   return (wx_px <= pixels_rendered + 7) && (ly_px >= wy_px);
+}
+
+void Fetcher::sample_window_enable() {
+  win_enable_sample = lcdc_.win_enabled();
 }
 
 void Fetcher::render_window() {

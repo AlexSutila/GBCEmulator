@@ -38,6 +38,7 @@ public:
   /* The PPU will signal to clear the FIFO once the rendering of the window has
    * begun. All BG pixel data is flushed, and window rendering starts. */
   bool is_window_visible(byte_t pixels_rendered) const;
+  void sample_window_enable(); // Window enable bit is sampled at end of mode 2
   void render_window(); // Makes the fetcher begin fetching window tile data
 
   /* Lastly, the window is kind of strange in that it does not use the curernt
@@ -91,6 +92,7 @@ private:
    * until the end of the scanline. */
   void reset(bool window_started);
   byte_t win_internal_ly{};
+  bool win_enable_sample{};
   bool win_started{};
 
   /* Helpers */
