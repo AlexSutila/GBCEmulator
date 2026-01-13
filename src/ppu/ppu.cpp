@@ -210,6 +210,10 @@ PixelProcessingUnit::resolve_px_priority(const pixel &bg_px,
   const bool oam = obj_px.take_priority;
   const bool bg = bg_px.take_priority;
 
+  // If background color index is zero, sprites always have priority
+  if (bg_px.color_idx == 0)
+    return get_obj_rgb(obj_px);
+
   // This is the 'fighting over priority' that is mentioned numerous places
   // throughout this codebase. It isn't acutally that bad, I was just lazy.
   if (lcdc && (oam || bg))

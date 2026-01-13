@@ -268,9 +268,11 @@ void Fetcher::do_push_data() {
         const bool discard = should_discard();
         if (discard)
           ++pixels_discarded;
-        const byte_t color_idx = calc_color_idx(data.data_lo, // lsbs
-                                                data.data_hi, // msbs
-                                                shift, flip); // Which pixel
+
+        // If we are rendering the background, we should only push a pixel if
+        // the background enable bit is set. Otherwise, just show color zero.
+        const byte_t color_idx =
+            calc_color_idx(data.data_lo, data.data_hi, shift, flip);
         bg_fifo_.push({
             .color_idx = color_idx,
             .palette_idx = palette_idx,
