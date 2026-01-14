@@ -2,6 +2,7 @@
 #define __FETCHER_H
 
 #include "emu_types.hpp"
+#include "memory/mmio/cgb.hpp"
 #include "memory/mmio/dmg.hpp"
 #include "memory/mmio/mmio.hpp"
 #include "ppu/fifo.hpp"
@@ -22,6 +23,7 @@ public:
           MMIORegister &scx,      // The scroll X register
           MMIORegister &wy,       // The window Y register
           MMIORegister &wx,       // The window X register
+          PPU::OPRI &opri,        // The CGB object priority register
           PPU::LY &ly,            // The current scanline register
           ObjPixelFifo &obj_fifo, // The sprite pixel fifo
           BgPixelFifo &bg_fifo,   // The background pixel fifo
@@ -77,6 +79,7 @@ private:
   MMIORegister &scx_;
   MMIORegister &wy_;
   MMIORegister &wx_;
+  PPU::OPRI &opri_;
   PPU::LY &ly_;
 
   /* Internal references to pixel FIFO queues */
@@ -103,6 +106,7 @@ private:
   const byte_t fetch_bgwin_tile_data(bool high) const;
   const byte_t fetch_obj_tile_data(const Sprite &sprite, bool high) const;
   const addr_t calc_tile_metadata_addr() const;
+  bool has_priority(const pixel &old_px, const byte_t new_oam_idx) const;
 
   /* Internal storage that is built up throughout the pixel pushing pipeline.
    * Tile indices are read from memory, data is fetched, and the final data

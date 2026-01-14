@@ -5,7 +5,9 @@
 constexpr pixel invisible = {
     .color_idx = 0, // Must be zero for transparent
     .palette_idx = 0,
+    .oam_index = 0,
     .discard = false,
+    .take_priority = false,
 };
 
 /* We can only push and pop to this under specific conditions. The hardware

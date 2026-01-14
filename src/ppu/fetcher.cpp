@@ -1,6 +1,7 @@
 #include "ppu/fetcher.hpp"
 #include "gbc.hpp"
 #include "memory/bus.hpp"
+#include "memory/mmio/cgb.hpp"
 #include "memory/mmio/mmio.hpp"
 #include "ppu/attributes.hpp"
 #include "ppu/fifo.hpp"
@@ -16,8 +17,8 @@ constexpr byte_t pixels_per_row = 8;
 
 Fetcher::Fetcher(std::array<std::unique_ptr<byte_t[]>, 2> &vram,
                  PPU::LCDCtrl &lcdc, MMIORegister &scy, MMIORegister &scx,
-                 MMIORegister &wy, MMIORegister &wx, PPU::LY &ly,
-                 ObjPixelFifo &obj_fifo, BgPixelFifo &bg_fifo,
+                 MMIORegister &wy, MMIORegister &wx, PPU::OPRI &opri,
+                 PPU::LY &ly, ObjPixelFifo &obj_fifo, BgPixelFifo &bg_fifo,
                  runtime_sys_info &sys)
     : vram_(vram),         // For fetching tile data
       lcdc_(lcdc),         // LCD control register
@@ -25,6 +26,7 @@ Fetcher::Fetcher(std::array<std::unique_ptr<byte_t[]>, 2> &vram,
       scx_(scx),           // Scroll X (background)
       wy_(wy),             // Window  Y (background)
       wx_(wx),             // Window  X (background)
+      opri_(opri),         // CGB object priority
       ly_(ly),             // Current scanline
       obj_fifo_(obj_fifo), // Sprite pixel fifo
       bg_fifo_(bg_fifo),   // Background pixel fifo
@@ -130,6 +132,20 @@ const addr_t Fetcher::calc_tile_metadata_addr() const {
   const addr_t tile_idx = (y_tile << tile_shift) | x_tile;
   const addr_t tilemap_base = calc_tilemap_base();
   return tilemap_base + tile_idx;
+}
+
+/* In DMG mode, the priority is always resolved by simply prioritizing the one
+ * sprite which appears earliest in the scanline based on x-pos. In other words
+ * we only write over 'transparent' pixels in the FIFO. In CGB mode, this can be
+ * done as well but you can also choose based on OAM index optionally. */
+bool Fetcher::has_priority(const pixel &old_px,
+                           const byte_t new_oam_idx) const {
+  using prioMode = PPU::ObjectPriorityMode;
+  const prioMode prio = opri_.get_prio_mode();
+
+  return is_transparent(old_px) ||
+         (sys_.cgb_mode && prio != prioMode::OPRI_DMG_STYLE &&
+          new_oam_idx < old_px.oam_index);
 }
 
 /* Implements fine horizontal scroll and initial tile skip */
@@ -280,8 +296,9 @@ void Fetcher::do_push_data() {
         bg_fifo_.push({
             .color_idx = color_idx,
             .palette_idx = palette_idx,
-            .take_priority = take_priority,
+            .oam_index = 0,     // Unused by the background
             .discard = discard, // Hide of SCX discard required
+            .take_priority = take_priority,
         });
       }
       data.x_coor = (data.x_coor + 1) & 0x1F;
@@ -299,7 +316,8 @@ void Fetcher::do_push_data() {
   }
 }
 
-// TODO: Ideally, this won't happen all in a single clock cycle.
+// TODO: Ideally, this won't happen all in a single clock cycle. This is also
+// preventing us from implementing sprite fetch cancelling. Research timings.
 bool Fetcher::do_sprite_fetch(const Sprite &sprite) {
   constexpr std::size_t max_state_clks = 6;
   if (!total_clks.has_value())
@@ -314,21 +332,27 @@ bool Fetcher::do_sprite_fetch(const Sprite &sprite) {
   const byte_t data_lo = fetch_obj_tile_data(sprite, false);
   const byte_t data_hi = fetch_obj_tile_data(sprite, true);
 
+  // Potentially needed for sprite pixel priority resolution, NOT BG priority!
+  const byte_t oam_idx = sprite.obj_no;
+
   // Lastly, determine the sprite attributes needed for rendering. Keep in mind
   // that a cleared priority bit is what gives sprites higher priority over the
-  // background and window, not a set bit. Just be cautious moving forward lol.
+  // background and window, not a set bit. This is NOT THE SAME as object prio!
   const bool take_priority = get_obj_attrib_priority(sprite.tile_attr);
   const byte_t palette_idx = sys_.cgb_mode
                                  ? get_obj_attrib_cgb_palette(sprite.tile_attr)
                                  : get_obj_attrib_dmg_palette(sprite.tile_attr);
   const bool flip = get_obj_attrib_x_flip(sprite.tile_attr);
-
-  // When performing this, keep in mind that new data pushed into the obj FIFO
-  // is not overwritten, but only transparent pixels. Do not push data out!!!!
   obj_fifo_.fill_transparent();
+
   for (std::size_t shift{0}; shift < 8; shift++) {
     pixel &cur_px = obj_fifo_.at(shift);
-    if (!is_transparent(cur_px))
+
+    // Implements the logic behind the object pixel priority resolution. If the
+    // new pixel has priority over the old one, the data is simply updated in
+    // place. This is why we fill the FIFO with transparent pixels before doing
+    // any pushes. The pandocs is wrong as well, OBJ FIFO is only 8 pixels wide.
+    if (!has_priority(cur_px, oam_idx))
       continue;
 
     // If non-transparent calculate the color palette data and push like usual
@@ -336,8 +360,9 @@ bool Fetcher::do_sprite_fetch(const Sprite &sprite) {
     cur_px = {
         .color_idx = color_idx,
         .palette_idx = palette_idx,
-        .take_priority = take_priority,
+        .oam_index = oam_idx,
         .discard = false, // Never discard obj FIFO pixels
+        .take_priority = take_priority,
     };
   }
 
@@ -348,6 +373,9 @@ bool Fetcher::do_sprite_fetch(const Sprite &sprite) {
   return true;
 }
 
+/* This is only to be called when one of the two conditions hold ---------- *
+ *  1. We are waiting for a sprite fetch to start, no pixels should be popped
+ *  2. A sprite fetch has started and we are waiting for it to complete */
 bool Fetcher::step_and_try_sprite_fetch(const Sprite &sprite) {
   /* Preempt the next background or window tile fetch, if possible. This will
    * only preempt if the ongoing background or window tile fetch is done. */
@@ -367,6 +395,8 @@ bool Fetcher::step_and_try_sprite_fetch(const Sprite &sprite) {
   return false;
 }
 
+/* Call when doing any regular BG/WIN fetches. If a sprite is in the midst of
+ * being rendered, this can (and should) be called safely. */
 void Fetcher::step() {
   switch (state) {
   case STATE_READ_TILE:

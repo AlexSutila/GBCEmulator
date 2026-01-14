@@ -87,6 +87,7 @@ PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus, Frontend &fe,
       scx_,            // Needed to fetch correct background tile
       wy_,             // Needed to fetch correct window tile
       wx_,             // Needed to fetch correct window tile
+      opri_,           // Pixel overwrite in OBJ FIFO is determined by priority
       ly_,             // Needed to fetch correct background tile
       obj_fifo,        // Fetcher stalls BG fetch to populate this when needed
       bg_fifo,         // Fetcher must push rows of pixels into this FIFO
