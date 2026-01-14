@@ -33,6 +33,9 @@ public:
 private:
   void emulation_thread_fn(std::stop_token st, cart c);
   void join_emu_thread_if_running();
+  void init_audio();
+  void shutdown_audio();
+  static void SDLCALL audio_callback(void *userdata, Uint8 *stream, int len);
   std::jthread emulation_thread{};
 
   // SDL3 display boilerplate
@@ -58,6 +61,15 @@ private:
 
   struct InputState {
     std::atomic<byte_t> buttons{};
+  };
+
+  struct AudioState {
+    SDL_AudioDeviceID device{};
+    SDL_AudioSpec spec{};
+    std::atomic<std::uint32_t> sync_cycles{};
+    std::atomic<bool> active{};
+    double phase{};
+    double cycle_remainder{};
   };
 
   /* Default keybind configuration */
@@ -88,6 +100,7 @@ private:
   EmulatorState emu_state{};
   UiState ui_state{};
   InputState input_state{};
+  AudioState audio_state{};
 
   IGFD::FileDialogConfig config;
   ImVec2 max_size, min_size;

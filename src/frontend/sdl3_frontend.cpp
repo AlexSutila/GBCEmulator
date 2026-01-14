@@ -7,28 +7,54 @@
 #include <backends/imgui_impl_sdl3.h>
 #include <backends/imgui_impl_sdlrenderer3.h>
 #include <chrono>
-#include <cstdint>
+#include <cmath>
 #include <exception>
 #include <imgui.h>
 #include <memory>
-#include <misc/cpp/imgui_stdlib.h>
 #include <stdexcept>
 #include <thread>
 
 static const char *filters =
     "GBC ROM files (*.gb *.gbc){.gb,.gbc},All files (*.*){.*}";
 static constexpr std::uint32_t black = 0xFF000000;
+static constexpr std::uint64_t t_cycle_hz = 4'194'304;
+static constexpr double two_pi = 6.28318530717958647692;
 
 constexpr std::chrono::nanoseconds wait_sync_time_ns(unsigned sync_cycles) {
-  constexpr std::uint64_t t_cycle_hz = 4'194'304;
-
   // ns = cycles * 1e9 / Hz
   return std::chrono::nanoseconds{(sync_cycles * 1'000'000'000ull) /
                                   t_cycle_hz};
 }
 
+void SDLCALL SDL3Frontend::audio_callback(void *userdata, Uint8 *stream, int len) {
+  auto *audio = static_cast<AudioState *>(userdata);
+  if (!audio || len <= 0)
+    return;
+
+  const auto sample_count = static_cast<int>(len / sizeof(float));
+  auto *out = reinterpret_cast<float *>(stream);
+  const double sample_rate = static_cast<double>(audio->spec.freq);
+  const double phase_inc = two_pi * 440.0 / sample_rate;
+
+  for (int i = 0; i < sample_count; ++i) {
+    out[i] = static_cast<float>(std::sin(audio->phase)) * 0.1f;
+    audio->phase += phase_inc;
+    if (audio->phase >= two_pi)
+      audio->phase -= two_pi;
+  }
+
+  const double cycles_per_sample = static_cast<double>(t_cycle_hz) / sample_rate;
+  const double total_cycles =
+      cycles_per_sample * static_cast<double>(sample_count) +
+      audio->cycle_remainder;
+  const auto cycles = static_cast<std::uint32_t>(total_cycles);
+  audio->cycle_remainder = total_cycles - static_cast<double>(cycles);
+  audio->sync_cycles.store(cycles, std::memory_order_release);
+  audio->active.store(true, std::memory_order_release);
+}
+
 SDL3Frontend::SDL3Frontend() : Frontend() {
-  if (!SDL_Init(SDL_INIT_VIDEO))
+  if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO))
     throw std::runtime_error(SDL_GetError());
 
   window = SDL_CreateWindow("GBC", framebuf_width * scale,
@@ -53,6 +79,8 @@ SDL3Frontend::SDL3Frontend() : Frontend() {
   if (!ImGui_ImplSDLRenderer3_Init(renderer))
     throw std::runtime_error("Failed to initialize ImGui SDL renderer backend");
 
+  init_audio();
+
   config.path = ".";
   config.flags =
       ImGuiFileDialogFlags_Modal | ImGuiFileDialogFlags_ReadOnlyFileNameField;
@@ -66,6 +94,7 @@ SDL3Frontend::SDL3Frontend() : Frontend() {
 }
 
 SDL3Frontend::~SDL3Frontend() {
+  shutdown_audio();
   ImGui_ImplSDLRenderer3_Shutdown();
   ImGui_ImplSDL3_Shutdown();
   ImGui::DestroyContext();
@@ -263,8 +292,7 @@ void SDL3Frontend::emulation_thread_fn(std::stop_token st, cart c) {
   using ns = std::chrono::nanoseconds;
   bool ff = false;
 
-  constexpr unsigned sync_cycles = 10'000; // T-cycles
-  constexpr ns target_step_time = wait_sync_time_ns(sync_cycles);
+  constexpr unsigned fallback_sync_cycles = 10'000; // T-cycles
   clear(black);
 
   /* Re-instantiate emulator instance */
@@ -279,12 +307,18 @@ void SDL3Frontend::emulation_thread_fn(std::stop_token st, cart c) {
   /* Run emulation in real-time */
   while (!st.stop_requested()) [[likely]] {
     const auto beg = steady_clk::now();
+    unsigned sync_cycles = fallback_sync_cycles;
+    const auto audio_cycles =
+        audio_state.sync_cycles.exchange(0, std::memory_order_acq_rel);
+    if (audio_cycles > 0)
+      sync_cycles = audio_cycles;
     joypad->set_state(input_state.buttons.load(std::memory_order_relaxed));
     for (unsigned i = 0; i < sync_cycles; i++)
       gbc_->step();
 
     /* Synchronize with real-time */
     const auto elapsed = steady_clk::now() - beg;
+    const ns target_step_time = wait_sync_time_ns(sync_cycles);
     if (elapsed < target_step_time && !ff)
       std::this_thread::sleep_for(target_step_time - elapsed);
 
@@ -294,6 +328,27 @@ void SDL3Frontend::emulation_thread_fn(std::stop_token st, cart c) {
   }
 }
 
+
+void SDL3Frontend::init_audio() {
+  SDL_AudioSpec desired{};
+  desired.freq = 48000;
+  desired.format = SDL_AUDIO_F32;
+  desired.channels = 1;
+
+  audio_state.spec = desired;
+  audio_state.device = SDL_OpenAudioDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &audio_state.spec);
+  if (!audio_state.device)
+    throw std::runtime_error(SDL_GetError());
+
+  SDL_PauseAudioDevice(audio_state.device);
+}
+
+void SDL3Frontend::shutdown_audio() {
+  if (audio_state.device) {
+    SDL_CloseAudioDevice(audio_state.device);
+    audio_state.device = 0;
+  }
+}
 
 void SDL3Frontend::join_emu_thread_if_running() {
   if (emulation_thread.joinable()) {
