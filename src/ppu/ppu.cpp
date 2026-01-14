@@ -136,19 +136,22 @@ bool PixelProcessingUnit::should_advance_ly() {
  * bits here to save some storage space and store the index into a monochrome
  * palette in addition to the actual RGB color. */
 std::uint32_t PixelProcessingUnit::get_bgwin_rgb(const pixel &px) const {
-  /* If we are running in backwards compatability mode, we have to consult the
-   * BGP register to translate the monochrome color index. */
   if (!sys_.cgb_mode) {
+    if (!lcdc_.bg_win_en_priority()) // DMG renders white when bg enable is off
+      return DMG_COLOR_PRESERVE_HACK(0x00FFFFFFFF, 0);
+    /* Otherwise if we are running in backwards compatability mode, we have to
+     * consult the BGP register to translate the monochrome color index. */
     byte_t true_color_idx = bgp_.get_color_idx(px.color_idx);
     std::uint32_t rgb = bg_cram->get_cgb_color(true_color_idx, 0);
     return DMG_COLOR_PRESERVE_HACK(rgb, true_color_idx);
   }
+  // CGB palette is denoted directly by the attributes themselves
   return bg_cram->get_cgb_color(px.color_idx, px.palette_idx);
 }
 std::uint32_t PixelProcessingUnit::get_obj_rgb(const pixel &px) const {
-  /* If we are running in backwards compatability mode, we have to consult one
-   * of the OBP0/OBP1 registers to translate the monochrome color index. */
   if (!sys_.cgb_mode) {
+    /* If we are running in backwards compatability mode, we have to consult one
+     * of the OBP0/OBP1 registers to translate the monochrome color index. */
     const byte_t palette_idx = px.palette_idx & 0x1;
     byte_t true_color_idx = (palette_idx == 0)
                                 ? obp0_.get_color_idx(px.color_idx)
@@ -156,6 +159,7 @@ std::uint32_t PixelProcessingUnit::get_obj_rgb(const pixel &px) const {
     std::uint32_t rgb = obj_cram->get_cgb_color(true_color_idx, palette_idx);
     return DMG_COLOR_PRESERVE_HACK(rgb, true_color_idx);
   }
+  // CGB palette is denoted directly by the attributes themselves
   return obj_cram->get_cgb_color(px.color_idx, px.palette_idx);
 }
 
