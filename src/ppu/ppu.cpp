@@ -45,6 +45,7 @@ PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus, Frontend &fe,
       bgp_(),                // DMG background and window palette
       obp0_(),               // The first DMG sprite/object palette
       obp1_(),               // The second DMG sprite/object palette
+      opri_(),               // CGB object priority resolution
       obj_fifo(),            // Pushes object (or sprite) pixels
       bg_fifo(),             // Pushes background/window pixels
       obj_cram(std::make_unique<ColorRam>()), // CGB sprite color RAM

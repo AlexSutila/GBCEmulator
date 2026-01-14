@@ -53,6 +53,7 @@ enum class IORegisterMapping : addr_t {
   MMIO_LCD_BGPD = 0xFF69,
   MMIO_LCD_OBPI = 0xFF6A,
   MMIO_LCD_OBPD = 0xFF6B,
+  MMIO_LCD_OPRI = 0xFF6C,
   MMIO_WRAM_BANK = 0xFF70,
   MMIO_INT_ENABLE = 0xFFFF,
 };

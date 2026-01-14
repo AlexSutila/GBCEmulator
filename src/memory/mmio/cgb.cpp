@@ -77,6 +77,14 @@ byte_t PaletteData::read() {
   return mem_.at(addr);
 }
 
+/* All bits of OPRI are unused except the first bit */
+void OPRI::write(const byte_t value) { state = value | unused_mask; }
+byte_t OPRI::read() { return state | unused_mask; }
+const ObjectPriorityMode OPRI::get_prio_mode() const {
+  byte_t prio_mode = state & ~unused_mask;
+  return static_cast<ObjectPriorityMode>(prio_mode);
+}
+
 } // namespace PPU
 
 void WramBank::write(const byte_t value) { state = value | 0xF8; }

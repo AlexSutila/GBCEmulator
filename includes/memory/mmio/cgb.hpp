@@ -128,6 +128,36 @@ private:
   byte_t state{};
 };
 
+/*
+ * FF6C — OPRI (CGB Mode only): Object Priority Mode
+ *
+ * Bit layout:
+ *   7   6   5   4   3   2   1   0
+ *   OPRI                  Priority mode
+ *
+ * Priority mode (Read/Write):
+ *   0 = CGB-style priority
+ *   1 = DMG-style priority
+ */
+enum class ObjectPriorityMode {
+  OPRI_CGB_STYLE = 0,
+  OPRI_DMG_STYLE = 1,
+};
+
+class OPRI final : public MMIORegister {
+public:
+  void write(const byte_t value) override;
+  byte_t read() override;
+  OPRI() : state(0) {}
+
+  /* Resolves sprite ordering in OAM search */
+  const ObjectPriorityMode get_prio_mode() const;
+  static constexpr byte_t unused_mask = 0xFE;
+
+private:
+  byte_t state{};
+};
+
 } // namespace PPU
 
 /*

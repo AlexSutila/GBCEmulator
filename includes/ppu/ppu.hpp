@@ -3,6 +3,7 @@
 
 #include "cpu/interrupts.hpp"
 #include "memory/bus.hpp"
+#include "memory/mmio/cgb.hpp"
 #include "memory/mmio/dmg.hpp"
 #include "memory/mmio/mmio.hpp"
 #include "ppu/fetcher.hpp"
@@ -72,6 +73,9 @@ private:
   std::uint32_t get_bgwin_rgb(const pixel &px) const;
   std::uint32_t get_obj_rgb(const pixel &px) const;
   PPU::DMGPalette bgp_{}, obp0_{}, obp1_{};
+
+  /* CGB mode object priority resolution */
+  PPU::OPRI opri_{};
 
   /* Pixel Processor operation modes */
   void do_disabled();
