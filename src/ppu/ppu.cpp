@@ -166,10 +166,6 @@ const bool PixelProcessingUnit::next_sprite_visible() const {
   if (sprites_fetched >= oam_data.size() || sprites_fetched >= max_sprites)
     return false;
 
-  // Sprites will not appear if the obj enable bit is cleared
-  if (!lcdc_.obj_enable())
-    return false;
-
   // We make the assumption that this sprite lies along the scanline vertically
   const Sprite &next_sprite = oam_data.at(sprites_fetched);
   return sprite_visible(next_sprite.x_pos, row_pixels_rendered);
@@ -242,7 +238,9 @@ std::optional<std::uint32_t> PixelProcessingUnit::try_fifo_pop() {
   // If we can pop a pixel from the sprite FIFO, we merge it with the background
   // pixel in the background FIFO. This is why we must have a background pixel
   // to accompany any pixels in the sprite FIFO, and not the other way around.
-  const pixel obj_px = obj_fifo.pop();
+  pixel obj_px = obj_fifo.pop();
+  if (!lcdc_.obj_enable())
+    obj_px.color_idx = 0;
 
   // May need to discard the pixel due to SCX fine scrolling
   if (bg_px.discard || obj_px.discard)
