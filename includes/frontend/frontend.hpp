@@ -4,13 +4,16 @@
 #include "gbc.hpp"
 #include <cstdint>
 #include <memory>
+#include <array>
 
 class Frontend {
 public:
   explicit Frontend() : gbc_(std::make_unique<GameBoyColor>(*this)) {}
+  virtual std::array<std::uint32_t, 160 * 144> get_frame() = 0;
   virtual void put_pixel(int x, int y, std::uint32_t c) = 0;
   virtual void clear(std::uint32_t c = 0x00FFFFFF) = 0;
   virtual void start() = 0;
+
   std::unique_ptr<GameBoyColor> &get() { return gbc_; }
 
 protected:

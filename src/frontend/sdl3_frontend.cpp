@@ -75,6 +75,14 @@ SDL3Frontend::~SDL3Frontend() {
   SDL_Quit();
 }
 
+std::array<std::uint32_t, 160 * 144> SDL3Frontend::get_frame() {
+  const int idx = front_index.load(std::memory_order_relaxed);
+  std::array<std::uint32_t, 160 * 144> arr{};
+  for (auto i{0}; i < framebuf_width * framebuf_height; i++)
+    arr[idx] = framebuffers[idx][i];
+  return arr;
+}
+
 void SDL3Frontend::put_pixel(int x, int y, std::uint32_t c) {
   if (x < 0 || x >= framebuf_width || y < 0 || y >= framebuf_height)
     return;
