@@ -7,6 +7,7 @@
 #include <backends/imgui_impl_sdl3.h>
 #include <backends/imgui_impl_sdlrenderer3.h>
 #include <chrono>
+#include <algorithm>
 #include <cmath>
 #include <exception>
 #include <imgui.h>
@@ -24,33 +25,6 @@ constexpr std::chrono::nanoseconds wait_sync_time_ns(unsigned sync_cycles) {
   // ns = cycles * 1e9 / Hz
   return std::chrono::nanoseconds{(sync_cycles * 1'000'000'000ull) /
                                   t_cycle_hz};
-}
-
-void SDLCALL SDL3Frontend::audio_callback(void *userdata, Uint8 *stream, int len) {
-  auto *audio = static_cast<AudioState *>(userdata);
-  if (!audio || len <= 0)
-    return;
-
-  const auto sample_count = static_cast<int>(len / sizeof(float));
-  auto *out = reinterpret_cast<float *>(stream);
-  const double sample_rate = static_cast<double>(audio->spec.freq);
-  const double phase_inc = two_pi * 440.0 / sample_rate;
-
-  for (int i = 0; i < sample_count; ++i) {
-    out[i] = static_cast<float>(std::sin(audio->phase)) * 0.1f;
-    audio->phase += phase_inc;
-    if (audio->phase >= two_pi)
-      audio->phase -= two_pi;
-  }
-
-  const double cycles_per_sample = static_cast<double>(t_cycle_hz) / sample_rate;
-  const double total_cycles =
-      cycles_per_sample * static_cast<double>(sample_count) +
-      audio->cycle_remainder;
-  const auto cycles = static_cast<std::uint32_t>(total_cycles);
-  audio->cycle_remainder = total_cycles - static_cast<double>(cycles);
-  audio->sync_cycles.store(cycles, std::memory_order_release);
-  audio->active.store(true, std::memory_order_release);
 }
 
 SDL3Frontend::SDL3Frontend() : Frontend() {
@@ -71,6 +45,22 @@ SDL3Frontend::SDL3Frontend() : Frontend() {
   if (!texture)
     throw std::runtime_error(SDL_GetError());
 
+  SDL_Init(SDL_INIT_AUDIO);
+  SDL_zero(audio_spec);
+  audio_spec.freq = 48000;
+  audio_spec.format = SDL_AUDIO_F32;
+  audio_spec.channels = 2;
+  audio_device = SDL_OpenAudioDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK,
+                                     &audio_spec);
+  if (!audio_device)
+    throw std::runtime_error(SDL_GetError());
+  audio_stream = SDL_CreateAudioStream(&audio_spec, &audio_spec);
+  if (!audio_stream)
+    throw std::runtime_error(SDL_GetError());
+  if (!SDL_BindAudioStream(audio_device, audio_stream))
+    throw std::runtime_error(SDL_GetError());
+  // SDL_PauseAudioDevice(audio_device);
+
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
   ImGui::StyleColorsDark();
@@ -79,7 +69,6 @@ SDL3Frontend::SDL3Frontend() : Frontend() {
   if (!ImGui_ImplSDLRenderer3_Init(renderer))
     throw std::runtime_error("Failed to initialize ImGui SDL renderer backend");
 
-  init_audio();
 
   config.path = ".";
   config.flags =
@@ -94,10 +83,15 @@ SDL3Frontend::SDL3Frontend() : Frontend() {
 }
 
 SDL3Frontend::~SDL3Frontend() {
-  shutdown_audio();
   ImGui_ImplSDLRenderer3_Shutdown();
   ImGui_ImplSDL3_Shutdown();
   ImGui::DestroyContext();
+  if (audio_stream) {
+    SDL_UnbindAudioStream(audio_stream);
+    SDL_DestroyAudioStream(audio_stream);
+  }
+  if (audio_device)
+    SDL_CloseAudioDevice(audio_device);
   SDL_DestroyTexture(texture);
   SDL_DestroyRenderer(renderer);
   SDL_DestroyWindow(window);
@@ -190,6 +184,26 @@ void SDL3Frontend::clear(std::uint32_t c) {
   for (int i = 0; i < framebuf_width * framebuf_height; ++i)
     for (auto &buffer : framebuffers)
       buffer[i] = c;
+}
+
+void SDL3Frontend::queue_audio_samples(const float *samples,
+                                       std::size_t sample_count) {
+  if (!audio_device || !audio_stream || !samples || sample_count == 0)
+    return;
+
+  constexpr std::size_t max_queue_bytes = 48000 * 2 * sizeof(float); // ~1s
+  const int queued = SDL_GetAudioStreamQueued(audio_stream);
+  if (queued < 0) {
+    SDL_ClearAudioStream(audio_stream);
+    return;
+  }
+  if (static_cast<std::size_t>(queued) > max_queue_bytes)
+    return;
+
+  const int byte_count = static_cast<int>(sample_count * sizeof(float));
+  if (!SDL_PutAudioStreamData(audio_stream, samples, byte_count)) {
+    SDL_ClearAudioStream(audio_stream);
+  }
 }
 
 bool SDL3Frontend::consume_load_request(std::string &rom_path) {
@@ -308,10 +322,6 @@ void SDL3Frontend::emulation_thread_fn(std::stop_token st, cart c) {
   while (!st.stop_requested()) [[likely]] {
     const auto beg = steady_clk::now();
     unsigned sync_cycles = fallback_sync_cycles;
-    const auto audio_cycles =
-        audio_state.sync_cycles.exchange(0, std::memory_order_acq_rel);
-    if (audio_cycles > 0)
-      sync_cycles = audio_cycles;
     joypad->set_state(input_state.buttons.load(std::memory_order_relaxed));
     for (unsigned i = 0; i < sync_cycles; i++)
       gbc_->step();
@@ -329,26 +339,7 @@ void SDL3Frontend::emulation_thread_fn(std::stop_token st, cart c) {
 }
 
 
-void SDL3Frontend::init_audio() {
-  SDL_AudioSpec desired{};
-  desired.freq = 48000;
-  desired.format = SDL_AUDIO_F32;
-  desired.channels = 1;
 
-  audio_state.spec = desired;
-  audio_state.device = SDL_OpenAudioDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &audio_state.spec);
-  if (!audio_state.device)
-    throw std::runtime_error(SDL_GetError());
-
-  SDL_PauseAudioDevice(audio_state.device);
-}
-
-void SDL3Frontend::shutdown_audio() {
-  if (audio_state.device) {
-    SDL_CloseAudioDevice(audio_state.device);
-    audio_state.device = 0;
-  }
-}
 
 void SDL3Frontend::join_emu_thread_if_running() {
   if (emulation_thread.joinable()) {

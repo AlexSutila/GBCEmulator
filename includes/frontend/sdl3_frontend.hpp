@@ -6,7 +6,7 @@
 #include <SDL3/SDL.h>
 #include <array>
 #include <atomic>
-#include <cstdint>
+#include <cstddef>
 #include <memory>
 #include <mutex>
 #include <stop_token>
@@ -23,6 +23,8 @@ public:
 
   void put_pixel(int x, int y, std::uint32_t c) override;
   void clear(std::uint32_t c = 0x00FFFFFF) override;
+  void queue_audio_samples(const float *samples,
+                         std::size_t sample_count) override;
   void start() override;
 
   bool consume_load_request(std::string &rom_path);
@@ -33,15 +35,15 @@ public:
 private:
   void emulation_thread_fn(std::stop_token st, cart c);
   void join_emu_thread_if_running();
-  void init_audio();
-  void shutdown_audio();
-  static void SDLCALL audio_callback(void *userdata, Uint8 *stream, int len);
   std::jthread emulation_thread{};
 
   // SDL3 display boilerplate
   SDL_Renderer *renderer{};
   SDL_Texture *texture{};
   SDL_Window *window{};
+  SDL_AudioDeviceID audio_device{};
+  SDL_AudioSpec audio_spec{};
+  SDL_AudioStream *audio_stream{};
 
   struct UiState {
     bool show_load_window{true};
@@ -61,15 +63,6 @@ private:
 
   struct InputState {
     std::atomic<byte_t> buttons{};
-  };
-
-  struct AudioState {
-    SDL_AudioDeviceID device{};
-    SDL_AudioSpec spec{};
-    std::atomic<std::uint32_t> sync_cycles{};
-    std::atomic<bool> active{};
-    double phase{};
-    double cycle_remainder{};
   };
 
   /* Default keybind configuration */
@@ -100,7 +93,6 @@ private:
   EmulatorState emu_state{};
   UiState ui_state{};
   InputState input_state{};
-  AudioState audio_state{};
 
   IGFD::FileDialogConfig config;
   ImVec2 max_size, min_size;
