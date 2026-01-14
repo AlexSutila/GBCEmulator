@@ -1,7 +1,8 @@
 #include "ppu/attributes.hpp"
 
-byte_t do_y_px_flip(const byte_t y_px, bool flip) {
-  constexpr byte_t max_pixel_idx = 7, pixel_mask = 0x7;
+byte_t do_y_px_flip(const byte_t y_px, bool flip, bool tall_sprites) {
+  const byte_t max_pixel_idx = tall_sprites ? 15 : 7;
+  const byte_t pixel_mask = tall_sprites ? 0xF : 0x7;
   if (flip)
     return max_pixel_idx - (y_px & pixel_mask);
   return y_px & pixel_mask;

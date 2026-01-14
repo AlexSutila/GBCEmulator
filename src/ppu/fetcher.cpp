@@ -2,6 +2,7 @@
 #include "gbc.hpp"
 #include "memory/bus.hpp"
 #include "memory/mmio/cgb.hpp"
+#include "memory/mmio/dmg.hpp"
 #include "memory/mmio/mmio.hpp"
 #include "ppu/attributes.hpp"
 #include "ppu/fifo.hpp"
@@ -148,6 +149,17 @@ bool Fetcher::has_priority(const pixel &old_px,
           new_oam_idx < old_px.oam_index);
 }
 
+const byte_t Fetcher::calc_sprite_tile_idx(const Sprite &sprite,
+                                           bool flip) const {
+  const bool tall = lcdc_.obj_size() == PPU::SpriteHeight::TALL_SPRITES;
+  if (!tall) // Regular 8x8 sprites do not have their LSB set by hardware
+    return sprite.tile_idx;
+
+  // But tall sprites do to make up for the fact that the total number of
+  // sprites is cut in half since sprite require two tiles each.
+  return sprite.tile_idx & ~0x1;
+}
+
 /* Implements fine horizontal scroll and initial tile skip */
 bool Fetcher::should_discard() const {
   if (win_started)
@@ -163,7 +175,7 @@ const byte_t Fetcher::fetch_bgwin_tile_data(bool high) const {
 
   // Get the current Y coordinate at a pixel granularity
   const bool flip = get_bg_attrib_y_flip(data.tile_attr);
-  const byte_t y_px_idx_flipped = do_y_px_flip(y_px_idx, flip);
+  const byte_t y_px_idx_flipped = do_y_px_flip(y_px_idx, flip, false);
   const addr_t y_offset = y_px_idx_flipped * tile_row_bytes;
 
   // Need to consider y-offset based on LY register
@@ -199,14 +211,16 @@ const byte_t Fetcher::fetch_obj_tile_data(const Sprite &sprite,
   constexpr auto tile_size_bytes = 16;
   constexpr auto tile_row_bytes = 2;
   const byte_t y_px_idx = calc_obj_pixel_y(sprite);
+  const bool tall = lcdc_.obj_size() == PPU::SpriteHeight::TALL_SPRITES;
+  const bool flip = get_obj_attrib_y_flip(sprite.tile_attr);
 
   // Get the current Y coordinate at a pixel granularity
-  const bool flip = get_obj_attrib_y_flip(sprite.tile_attr);
-  const byte_t y_px_idx_flipped = do_y_px_flip(y_px_idx, flip);
+  const byte_t y_px_idx_flipped = do_y_px_flip(y_px_idx, flip, tall);
   const addr_t y_offset = y_px_idx_flipped * tile_row_bytes;
+  const byte_t tile_idx = calc_sprite_tile_idx(sprite, flip);
 
   // Need to consider y-offset based on LY register
-  addr_t data_offset = (sprite.tile_idx * tile_size_bytes) + y_offset;
+  addr_t data_offset = (tile_idx * tile_size_bytes) + y_offset;
   if (high)
     ++data_offset;
 
@@ -331,8 +345,6 @@ bool Fetcher::do_sprite_fetch(const Sprite &sprite) {
   // Fetch tile data, both low and high bytes, from VRAM
   const byte_t data_lo = fetch_obj_tile_data(sprite, false);
   const byte_t data_hi = fetch_obj_tile_data(sprite, true);
-
-  // Potentially needed for sprite pixel priority resolution, NOT BG priority!
   const byte_t oam_idx = sprite.obj_no;
 
   // Lastly, determine the sprite attributes needed for rendering. Keep in mind

@@ -292,6 +292,9 @@ void PixelProcessingUnit::do_oam_scan() {
     oam_data.clear();
   }
 
+  // TODO: Unsure about if this is sampled here or not. Research needed.
+  const bool tall = lcdc_.obj_size() == PPU::SpriteHeight::TALL_SPRITES;
+
   /* Linear object attribute memory scanning begins here!!!!!
    * ---------------------------------------------------------------------------
    * Check one sprite every two clocks. Because we are indexing object attribute
@@ -307,7 +310,7 @@ void PixelProcessingUnit::do_oam_scan() {
     // Worry about ordering later, enough space is reserved ahead of time such
     // that no unnecessary memory copies occur when the vector fills up. I am
     // not 100% sure, but I am pretty sure obj enable bit impacts OAM scan.
-    if (lcdc_.obj_enable() && sprite_visible(x_pos, y_pos, ly_.read()))
+    if (lcdc_.obj_enable() && sprite_visible(x_pos, y_pos, ly_.read(), tall))
       oam_data.push_back({
           .y_pos = y_pos,
           .x_pos = x_pos,

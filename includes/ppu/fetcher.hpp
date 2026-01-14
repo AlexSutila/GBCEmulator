@@ -106,6 +106,7 @@ private:
   const byte_t fetch_bgwin_tile_data(bool high) const;
   const byte_t fetch_obj_tile_data(const Sprite &sprite, bool high) const;
   const addr_t calc_tile_metadata_addr() const;
+  const byte_t calc_sprite_tile_idx(const Sprite &sprite, bool flip) const;
   bool has_priority(const pixel &old_px, const byte_t new_oam_idx) const;
 
   /* Internal storage that is built up throughout the pixel pushing pipeline.
