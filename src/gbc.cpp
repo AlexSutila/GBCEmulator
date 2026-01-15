@@ -12,9 +12,10 @@ GameBoyColor::GameBoyColor(Frontend &frontend) : fe_(frontend) {
   /* General system operation info */
   sys_ = {
       .elapsed_clocks = 0,
-      .double_speed = false,
       .cgb_mode = true,
       .halted = false,
+      .speed_switch_armed = false,
+      .double_speed = false,
   };
 
   /* Component initializaiton */
@@ -56,14 +57,17 @@ void GameBoyColor::init_test_bed() {
 
 void GameBoyColor::step() {
   cpu->step();
-
-  // Drives any DMA along that may be currently active
   bus->step_dma();
-
-  // Step remaning components
   ppu->step();
   timer->step();
 
   // System clocks are maintained in unit `t-cycles`
   ++sys_.elapsed_clocks;
+
+  // If we are in double speed mode, step affected components again
+  if (sys_.double_speed) {
+    cpu->step();
+    bus->step_dma();
+    timer->step();
+  }
 }

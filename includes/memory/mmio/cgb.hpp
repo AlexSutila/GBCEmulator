@@ -49,12 +49,8 @@ public:
   byte_t read() override;
   KEY1(runtime_sys_info &sys) : sys_(sys), state(0) {}
 
-  /* Speed mode is actually set  */
-  bool switch_armed() const;
-
 private:
-  static constexpr byte_t cur_speed_mask = 0x80;
-  static constexpr byte_t used_bits_mask = 0x81;
+  static constexpr byte_t unused_bits_mask = 0x7E;
   runtime_sys_info &sys_;
   byte_t state{};
 };

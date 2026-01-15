@@ -107,7 +107,7 @@ private:
 };
 
 /*
- * TODO: Halt processor
+ * Halt processor
  */
 class HALT final : public Instruction {
 public:
@@ -124,13 +124,22 @@ private:
 };
 
 /*
- * TODO: Who knows honestly lmao. Need to research this instruction
+ * This instruction is... bizzare. The most important thing is that it is used
+ * to switch into double speed mode.
+ *
+ * TODO: Implement bizzare behavior from that flow chart... it sucks lol
  */
 class STOP final : public Instruction {
 public:
   STOP(RegisterFile *reg_file_ptr, AddressBus *bus_ptr, runtime_sys_info &sys)
       : Instruction(reg_file_ptr, bus_ptr), sys_(sys) {}
-  std::size_t exec() override { return 4; }
+  std::size_t exec() override {
+    if (sys_.speed_switch_armed) {
+      sys_.double_speed = !sys_.double_speed;
+      sys_.speed_switch_armed = false;
+    }
+    return 4;
+  }
   std::string describe() override { return std::format("STOP"); }
 
 private:
