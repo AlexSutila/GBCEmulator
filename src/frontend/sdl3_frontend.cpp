@@ -1,7 +1,7 @@
 #include "frontend/sdl3_frontend.hpp"
 #include "SDL3/SDL_video.h"
 #include "cart/cart.hpp"
-#include "memory/mmio/joypad.hpp"
+#include "memory/mmio/dmg.hpp"
 #include "ppu/palette.hpp"
 #include <SDL3/SDL.h>
 #include <backends/imgui_impl_sdl3.h>

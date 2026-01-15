@@ -1,12 +1,15 @@
 #include "apu/apu.hpp"
 #include "frontend/frontend.hpp"
 #include "memory/bus.hpp"
+#include "memory/mmio/mmio.hpp"
 #include <algorithm>
 #include <cmath>
 
 namespace {
-constexpr addr_t audio_base = 0xFF10;
-constexpr addr_t wave_ram_base = 0xFF30;
+  constexpr addr_t audio_base =
+      static_cast<addr_t>(IORegisterMapping::MMIO_AUDIO_BASE);
+  constexpr addr_t wave_ram_base =
+      static_cast<addr_t>(IORegisterMapping::MMIO_WAVE_RAM_BASE);
 constexpr std::size_t audio_register_count = 0x17;
 constexpr std::size_t wave_ram_size = 0x10;
 constexpr float master_gain = 0.25f;
@@ -21,20 +24,20 @@ float clamp_sample(float v) {
 }
 } // namespace
 
-void APU::AudioRegister::configure(byte_t initial, WriteCallback on_write_cb,
+void Audio::AudioRegister::configure(byte_t initial, WriteCallback on_write_cb,
                                    ReadCallback on_read_cb) {
   state = initial;
   on_write = std::move(on_write_cb);
   on_read = std::move(on_read_cb);
 }
 
-void APU::AudioRegister::write(byte_t value) {
+void Audio::AudioRegister::write(byte_t value) {
   state = value;
   if (on_write)
     on_write(value);
 }
 
-byte_t APU::AudioRegister::read() {
+byte_t Audio::AudioRegister::read() {
   if (on_read)
     return on_read(state);
   return state;

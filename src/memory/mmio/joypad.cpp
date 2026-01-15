@@ -1,4 +1,4 @@
-#include "memory/mmio/joypad.hpp"
+#include "memory/mmio/dmg.hpp"
 #include "cpu/interrupts.hpp"
 
 constexpr byte_t select_mask = 0x30;

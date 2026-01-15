@@ -12,8 +12,6 @@
 #include <map>
 #include <memory>
 
-#include "mmio/joypad.hpp"
-
 struct runtime_sys_info;
 
 /*

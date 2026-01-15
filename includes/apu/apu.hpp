@@ -2,11 +2,9 @@
 #define __APU_H
 
 #include "emu_types.hpp"
-#include "memory/mmio/mmio.hpp"
+#include "memory/mmio/dmg.hpp"
 #include <array>
 #include <cstddef>
-#include <cstdint>
-#include <functional>
 #include <vector>
 
 class AddressBus;
@@ -18,22 +16,6 @@ public:
   void step();
 
 private:
-  class AudioRegister final : public MMIORegister {
-  public:
-    using WriteCallback = std::function<void(byte_t)>;
-    using ReadCallback = std::function<byte_t(byte_t)>;
-
-    void configure(byte_t initial, WriteCallback on_write,
-                   ReadCallback on_read = {});
-    void write(byte_t value) override;
-    byte_t read() override;
-
-  private:
-    byte_t state{};
-    WriteCallback on_write{};
-    ReadCallback on_read{};
-  };
-
   void register_mmio();
   void trigger_channel1();
   void generate_sample();
@@ -45,7 +27,7 @@ private:
 
   AddressBus &bus_;
   Frontend &frontend_;
-  std::array<AudioRegister, 0x17> audio_registers{};
+  std::array<Audio::AudioRegister, 0x17> audio_registers{};
   std::array<MMIORegister, 0x10> wave_ram{};
 
   std::vector<float> mix_buffer{};

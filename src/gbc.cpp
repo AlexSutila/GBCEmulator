@@ -4,9 +4,8 @@
 #include "memory/bus.hpp"
 #include "ppu/ppu.hpp"
 #include "timer/timer.hpp"
+#include "memory/mmio/dmg.hpp"
 #include <memory>
-
-#include "memory/mmio/joypad.hpp"
 
 GameBoyColor::GameBoyColor(Frontend &frontend) : fe_(frontend) {
   /* General system operation info */
