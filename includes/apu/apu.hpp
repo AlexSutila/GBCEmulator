@@ -18,7 +18,9 @@ public:
 private:
   void register_mmio();
   void trigger_channel1();
+  bool ch1_dac_enabled() const;
   void generate_sample();
+  std::uint16_t ch1_frequency() const;
   float channel1_sample() const;
 
   static constexpr int sample_rate_hz = 48000;

@@ -59,37 +59,6 @@ void APU::register_mmio() {
                       &audio_registers[i]);
   for (std::size_t i = 0; i < wave_ram_size; ++i)
     bus_.connect_mmio(static_cast<addr_t>(wave_ram_base + i), &wave_ram[i]);
-
-  audio_registers[0].configure(0x00, [this](byte_t value) { nr10 = value; });
-  audio_registers[1].configure(0x00, [this](byte_t value) { nr11 = value; });
-  audio_registers[2].configure(0x00, [this](byte_t value) { nr12 = value; });
-  audio_registers[3].configure(0x00, [this](byte_t value) { nr13 = value; });
-  audio_registers[4].configure(
-      0x00,
-      [this](byte_t value) {
-        nr14 = value;
-        if (value & 0x80)
-          trigger_channel1();
-      },
-      [this](byte_t) {
-        return static_cast<byte_t>(nr14 & 0xBF);
-      });
-
-  audio_registers[20].configure(power_on_nr50,
-                                [this](byte_t value) { nr50 = value; });
-  audio_registers[21].configure(power_on_nr51,
-                                [this](byte_t value) { nr51 = value; });
-  audio_registers[22].configure(
-      power_on_nr52,
-      [this](byte_t value) {
-        nr52 = static_cast<byte_t>(value & 0x80);
-        if ((nr52 & 0x80) == 0)
-          channel1_enabled = false;
-      },
-      [this](byte_t) {
-        return static_cast<byte_t>((nr52 & 0x80) |
-                                   (channel1_enabled ? 0x01 : 0x00));
-      });
 }
 
 void APU::trigger_channel1() {
@@ -97,8 +66,17 @@ void APU::trigger_channel1() {
   channel1_phase = 0.0;
 }
 
+bool APU::ch1_dac_enabled() const {
+  // Channel 1 DAC enabled if any of NR12[7:3] is set
+  // (If disabled, output is forced to 0 and channel is turned off)
+  return (nr12 & 0xF8) != 0;
+}
+
 float APU::channel1_sample() const {
   if (!(nr52 & 0x80) || !channel1_enabled)
+    return 0.0f;
+
+  if (!ch1_dac_enabled())
     return 0.0f;
 
   const byte_t volume = static_cast<byte_t>((nr12 >> 4) & 0x0F);
@@ -123,8 +101,10 @@ float APU::channel1_sample() const {
 
 void APU::generate_sample() {
   const float raw = channel1_sample();
+
   const float master_left = ((nr50 >> 4) & 0x07) / 7.0f;
   const float master_right = (nr50 & 0x07) / 7.0f;
+
   const bool left_enable = (nr51 & 0x10) != 0;
   const bool right_enable = (nr51 & 0x01) != 0;
 
@@ -144,16 +124,19 @@ void APU::generate_sample() {
   }
 }
 
+std::uint16_t APU::ch1_frequency() const {
+  return static_cast<std::uint16_t>(((nr14 & 0x07) << 8) | nr13);
+}
+
 void APU::step() {
-  const double cycles_per_sample = cpu_clock_hz / sample_rate_hz;
+  constexpr double cycles_per_sample = cpu_clock_hz / sample_rate_hz;
   cycle_accumulator += 1.0;
   if (cycle_accumulator < cycles_per_sample)
     return;
 
   cycle_accumulator -= cycles_per_sample;
 
-  const std::uint16_t frequency =
-      static_cast<std::uint16_t>(((nr14 & 0x07) << 8) | nr13);
+  const std::uint16_t frequency = ch1_frequency();
   if (frequency < 2048) {
     const double freq_hz = 131072.0 / (2048.0 - frequency);
     channel1_phase += freq_hz / sample_rate_hz;
