@@ -139,14 +139,27 @@ const addr_t Fetcher::calc_tile_metadata_addr() const {
  * sprite which appears earliest in the scanline based on x-pos. In other words
  * we only write over 'transparent' pixels in the FIFO. In CGB mode, this can be
  * done as well but you can also choose based on OAM index optionally. */
-bool Fetcher::has_priority(const pixel &old_px,
-                           const byte_t new_oam_idx) const {
+const bool Fetcher::has_priority(const pixel &old_px, const byte_t new_oam_idx,
+                                 const byte_t new_color_idx) const {
   using prioMode = PPU::ObjectPriorityMode;
   const prioMode prio = opri_.get_prio_mode();
+  const bool old_transparent = is_transparent(old_px);
+  const bool new_transparent = is_transparent(new_color_idx);
 
-  return is_transparent(old_px) ||
-         (sys_.cgb_mode && prio != prioMode::OPRI_DMG_STYLE &&
-          new_oam_idx < old_px.oam_index);
+  // Rule 1: new pixel transparent -> never wins
+  if (new_transparent)
+    return false;
+
+  // Rule 2: old pixel transparent -> always wins
+  if (old_transparent)
+    return true;
+
+  // Rule 3: DMG or DMG-style priority
+  if (!sys_.cgb_mode || prio == prioMode::OPRI_DMG_STYLE)
+    return false;
+
+  // Rule 4: CGB priority -> lower OAM index wins
+  return new_oam_idx < old_px.oam_index;
 }
 
 const byte_t Fetcher::calc_sprite_tile_idx(const Sprite &sprite,
@@ -360,22 +373,20 @@ bool Fetcher::do_sprite_fetch(const Sprite &sprite) {
   for (std::size_t shift{0}; shift < 8; shift++) {
     pixel &cur_px = obj_fifo_.at(shift);
 
+    // Color idx calculation needs to consider horizontal flip attribute bit
+    const byte_t color_idx = calc_color_idx(data_lo, data_hi, shift, flip);
     // Implements the logic behind the object pixel priority resolution. If the
     // new pixel has priority over the old one, the data is simply updated in
     // place. This is why we fill the FIFO with transparent pixels before doing
     // any pushes. The pandocs is wrong as well, OBJ FIFO is only 8 pixels wide.
-    if (!has_priority(cur_px, oam_idx))
-      continue;
-
-    // If non-transparent calculate the color palette data and push like usual
-    const byte_t color_idx = calc_color_idx(data_lo, data_hi, shift, flip);
-    cur_px = {
-        .color_idx = color_idx,
-        .palette_idx = palette_idx,
-        .oam_index = oam_idx,
-        .discard = false, // Never discard obj FIFO pixels
-        .take_priority = take_priority,
-    };
+    if (has_priority(cur_px, oam_idx, color_idx))
+      cur_px = {
+          .color_idx = color_idx,
+          .palette_idx = palette_idx,
+          .oam_index = oam_idx,
+          .discard = false, // Never discard obj FIFO pixels
+          .take_priority = take_priority,
+      };
   }
 
   // Sprite fetch complete
