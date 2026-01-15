@@ -11,9 +11,10 @@
 GameBoyColor::GameBoyColor(Frontend &frontend) : fe_(frontend) {
   /* General system operation info */
   sys_ = {
+      .elapsed_clocks = 0,
       .double_speed = false,
       .cgb_mode = true,
-      .elapsed_clocks = 0,
+      .halted = false,
   };
 
   /* Component initializaiton */

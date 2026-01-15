@@ -4,6 +4,7 @@
 #include "cpu/registers/flags.hpp"
 #include "cpu/registers/register.hpp"
 #include "memory/mmio/mmio.hpp"
+#include "gbc.hpp"
 
 #include <cassert>
 #include <iomanip>
@@ -18,8 +19,7 @@ LR35902::LR35902(AddressBus *bus_ptr, runtime_sys_info &sys)
       sys_(sys),     // General operating mode info
       ime(),         // Acts as interrupt master enable
       ie_reg(false), // Enables individual interrupts
-      if_reg(true),  // Requests individual interrupts
-      halted(false)  // Halts execution until interrupted
+      if_reg(true)   // Requests individual interrupts
 {
   using flags = InterruptFlagMask;
   using mmio = IORegisterMapping;
@@ -43,7 +43,7 @@ LR35902::LR35902(AddressBus *bus_ptr, runtime_sys_info &sys)
   init_alu(lookup);
   init_bitops(lookup);
   init_branch(lookup);
-  init_control(lookup, &halted);
+  init_control(lookup, sys);
   init_moves(lookup);
 
   /* Configure interrupts */
@@ -161,7 +161,7 @@ void LR35902::do_execute() {
   /* If the instruction executed was `HALT`, the processor suspends its
    * execution until it is awaken by some interrupt source. The exact behavior
    * is conditional depending on whether IME is enabled or not. */
-  else if (halted) [[unlikely]]
+  else if (sys_.halted) [[unlikely]]
     state = CpuStates::STATE_HALTED;
 
   /* Otherwise, continue fetch/parse/execute pipeline as usual. */
@@ -181,7 +181,7 @@ void LR35902::do_halt() {
    * interrupt is serviced and execution resumes as normal. */
   if (ime.is_enabled() && isr.has_value()) {
     state = CpuStates::STATE_DECODE;
-    halted = false;
+    sys_.halted = false;
     ins_ = isr.value();
   }
 
@@ -190,7 +190,7 @@ void LR35902::do_halt() {
    * instruction following `HALT`. */
   else if (isr.has_value()) {
     state = CpuStates::STATE_FETCH;
-    halted = false;
+    sys_.halted = false;
   }
 }
 

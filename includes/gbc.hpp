@@ -16,9 +16,10 @@ class Frontend;
  * various MMIO registers that need to know about things like backwards
  * compatability and current operating mode. */
 struct runtime_sys_info {
+  std::uint64_t elapsed_clocks{};
   bool double_speed{};
   bool cgb_mode{};
-  std::uint64_t elapsed_clocks{};
+  bool halted{};
 };
 
 class GameBoyColor {
