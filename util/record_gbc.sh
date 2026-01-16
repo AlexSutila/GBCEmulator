@@ -66,9 +66,15 @@ ffmpeg \
   -framerate "$FPS" \
   -video_size "${W}x${H}" \
   -i "${DISPLAY}+${X},${Y}" \
+  -f pulse \
+  -i "$(pactl list short source | head -n 1 | awk '{print $2}')" \
+  -map 0:v:0 \
+  -map 1:a:0 \
   -c:v libx264 \
   -preset veryfast \
   -crf "$CRF" \
+  -c:a aac \
+  -b:a 192k \
   "$OUTPUT" &
 FFMPEG_PID=$!
 
