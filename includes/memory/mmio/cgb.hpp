@@ -156,6 +156,61 @@ private:
 
 } // namespace PPU
 
+class VramDMA;
+namespace DMA {
+
+/*
+ * FF51–FF55 — CGB VRAM DMA (HDMA)
+ *
+ * FF51–FF52 (HDMA1/2): Source address (write-only)
+ *   - Transfer source in ROM, SRAM, or WRAM:
+ *       0000–7FF0 or A000–DFF0
+ *   - Lower 4 bits are ignored (aligned to 0x10)
+ *   - Using VRAM as a source results in garbage data
+ *
+ * FF53–FF54 (HDMA3/4): Destination address (write-only)
+ *   - Destination in VRAM: 8000–9FF0
+ *   - Only bits 12–4 are used; lower 4 bits ignored (aligned to 0x10)
+ *   - Upper bits are ignored (always VRAM)
+ *
+ * FF55 (HDMA5): Length / Mode / Start
+ *   - Writing starts the DMA transfer
+ *   - Bits 0–6: Transfer length = (value + 1) * 0x10 bytes (0x10–0x800)
+ *   - Bit 7:
+ *       0 = General DMA
+ *           * Transfers all data at once
+ *           * CPU halted until completion
+ *           * Must be used with LCD off, VBlank, or short HBlank-safe blocks
+ *           * FF55 reads as 0xFF when complete
+ *       1 = HBlank DMA
+ *           * Transfers 0x10 bytes per HBlank (LY 0–143)
+ *           * Pauses during VBlank, resumes at LY=0
+ *           * CPU halted only during each block
+ *           * Source/destination banks must not change during transfer
+ *           * Writing Bit 7 = 0 aborts transfer (remaining blocks preserved)
+ *
+ *   - Reading FF55:
+ *       * Lower 7 bits: remaining blocks minus 1
+ *       * 0xFF indicates transfer complete
+ */
+
+enum class HDMATransferMode {
+  GENERAL_PURPOSE_DMA = 0,
+  HBLANK_DMA = 1,
+};
+
+class HDMA_MODE_LEN final : public MMIORegister {
+public:
+  void write(const byte_t value) override;
+  byte_t read() override;
+  HDMA_MODE_LEN(VramDMA &dma) : state(0), dma_(dma) {}
+
+private:
+  byte_t state{};
+  VramDMA &dma_;
+};
+
+} // namespace DMA
 /*
  * FF70 - SVBK/WBK: WRAM Bank
  *

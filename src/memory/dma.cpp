@@ -39,7 +39,22 @@ void ObjAttrDMA::step() {
  * VRAM DMA Transfer, applicable to only CGB
  * ====================================================================== */
 
-VramDMA::VramDMA(AddressBus &bus) : DirectMemoryAccess(bus) {
-  // TODO: Initialize registers and stuff once they actually exist
+const addr_t VramDMA::get_addr(MMIORegister &lo, MMIORegister &hi) {
+  const byte_t hi_byte = hi.read(), lo_byte = lo.read();
+  return (static_cast<addr_t>(hi_byte) << 8) | static_cast<addr_t>(lo_byte);
 }
 
+void VramDMA::set_addr(MMIORegister &lo, MMIORegister &hi, const addr_t addr) {
+  hi.write(static_cast<byte_t>((addr >> 8) & 0xFF));
+  lo.write(static_cast<byte_t>(addr & 0xFF));
+}
+
+void VramDMA::set_dest_addr(const addr_t addr) {
+  set_addr(hdma4_, hdma3_, addr);
+}
+const addr_t VramDMA::get_dest_addr() { return get_addr(hdma4_, hdma3_); }
+
+void VramDMA::set_src_addr(const addr_t addr) {
+  set_addr(hdma2_, hdma1_, addr);
+}
+const addr_t VramDMA::get_src_addr() { return get_addr(hdma2_, hdma1_); }

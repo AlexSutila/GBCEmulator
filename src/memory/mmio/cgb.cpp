@@ -85,6 +85,13 @@ const ObjectPriorityMode OPRI::get_prio_mode() const {
 
 } // namespace PPU
 
+namespace DMA {
+
+void HDMA_MODE_LEN::write(const byte_t value) { state = value; }
+byte_t HDMA_MODE_LEN::read() { return state; }
+
+} // namespace DMA
+
 void WramBank::write(const byte_t value) { state = value | 0xF8; }
 byte_t WramBank::read() { return state | 0xF8; }
 

@@ -61,6 +61,7 @@ void GameBoyColor::step() {
   ppu->step();
   timer->step();
   apu->step();
+
   // System clocks are maintained in unit `t-cycles`
   ++sys_.elapsed_clocks;
 

@@ -2,6 +2,8 @@
 #define __DMA_H
 
 #include "emu_types.hpp"
+#include "memory/mmio/mmio.hpp"
+#include "mmio/cgb.hpp"
 #include "mmio/dmg.hpp"
 #include <cstddef>
 #include <optional>
@@ -45,11 +47,28 @@ private:
  */
 class VramDMA : public DirectMemoryAccess {
 public:
-  VramDMA(AddressBus &bus);
+  VramDMA(AddressBus &bus)
+      : DirectMemoryAccess(bus), // To provide bus reading capabilities
+        hdma1_(), hdma2_(),      // Source low and high registers
+        hdma3_(), hdma4_(),      // Destination low and high registers
+        hdma5_(*this)            // The Vram DMA length/mode/start register
+  {}
+
+  /* Getters and setters for both source and destination addresses involve
+   * consulting a pair of two 8-bit MMIORegisters to form a 16-bit address. */
+  void set_dest_addr(const addr_t addr);
+  void set_src_addr(const addr_t addr);
+  const addr_t get_dest_addr();
+  const addr_t get_src_addr();
 
 private:
   /* See details about these registers under their definitions in `cgb.hpp` */
-  // TODO: HDMA io-registers
+  MMIORegister hdma1_, hdma2_; // Source low and high registers
+  MMIORegister hdma3_, hdma4_; // Destination low and high registers
+  DMA::HDMA_MODE_LEN hdma5_;
+
+  void set_addr(MMIORegister &lo, MMIORegister &hi, const addr_t addr);
+  const addr_t get_addr(MMIORegister &lo, MMIORegister &hi);
 };
 
 #endif //__DMA_H
