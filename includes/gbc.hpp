@@ -3,6 +3,7 @@
 
 #include "cart/cart.hpp"
 #include "cpu/lr35902.hpp"
+#include "apu/apu.hpp"
 #include "memory/bus.hpp"
 #include "ppu/ppu.hpp"
 #include "timer/timer.hpp"
@@ -44,6 +45,7 @@ public:
 private:
   std::unique_ptr<AddressBus> bus{};
   std::unique_ptr<LR35902> cpu{};
+  std::unique_ptr<APU> apu{};
   std::unique_ptr<PixelProcessingUnit> ppu{};
   std::unique_ptr<TimerUnit> timer{};
 

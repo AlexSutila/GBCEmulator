@@ -1,34 +1,34 @@
 #include "frontend/sdl3_frontend.hpp"
 #include "SDL3/SDL_video.h"
 #include "cart/cart.hpp"
-#include "memory/mmio/joypad.hpp"
+#include "memory/mmio/dmg.hpp"
 #include "ppu/palette.hpp"
 #include <SDL3/SDL.h>
 #include <backends/imgui_impl_sdl3.h>
 #include <backends/imgui_impl_sdlrenderer3.h>
 #include <chrono>
-#include <cstdint>
+#include <algorithm>
+#include <cmath>
 #include <exception>
 #include <imgui.h>
 #include <memory>
-#include <misc/cpp/imgui_stdlib.h>
 #include <stdexcept>
 #include <thread>
 
 static const char *filters =
     "GBC ROM files (*.gb *.gbc){.gb,.gbc},All files (*.*){.*}";
 static constexpr std::uint32_t black = 0xFF000000;
+static constexpr std::uint64_t t_cycle_hz = 4'194'304;
+static constexpr double two_pi = 6.28318530717958647692;
 
 constexpr std::chrono::nanoseconds wait_sync_time_ns(unsigned sync_cycles) {
-  constexpr std::uint64_t t_cycle_hz = 4'194'304;
-
   // ns = cycles * 1e9 / Hz
   return std::chrono::nanoseconds{(sync_cycles * 1'000'000'000ull) /
                                   t_cycle_hz};
 }
 
 SDL3Frontend::SDL3Frontend() : Frontend() {
-  if (!SDL_Init(SDL_INIT_VIDEO))
+  if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO))
     throw std::runtime_error(SDL_GetError());
 
   window = SDL_CreateWindow("GBC", framebuf_width * scale,
@@ -45,6 +45,22 @@ SDL3Frontend::SDL3Frontend() : Frontend() {
   if (!texture)
     throw std::runtime_error(SDL_GetError());
 
+  SDL_Init(SDL_INIT_AUDIO);
+  SDL_zero(audio_spec);
+  audio_spec.freq = 48000;
+  audio_spec.format = SDL_AUDIO_F32;
+  audio_spec.channels = 2;
+  audio_device = SDL_OpenAudioDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK,
+                                     &audio_spec);
+  if (!audio_device)
+    throw std::runtime_error(SDL_GetError());
+  audio_stream = SDL_CreateAudioStream(&audio_spec, &audio_spec);
+  if (!audio_stream)
+    throw std::runtime_error(SDL_GetError());
+  if (!SDL_BindAudioStream(audio_device, audio_stream))
+    throw std::runtime_error(SDL_GetError());
+  // SDL_PauseAudioDevice(audio_device);
+
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
   ImGui::StyleColorsDark();
@@ -52,6 +68,7 @@ SDL3Frontend::SDL3Frontend() : Frontend() {
     throw std::runtime_error("Failed to initialize ImGui SDL3 backend");
   if (!ImGui_ImplSDLRenderer3_Init(renderer))
     throw std::runtime_error("Failed to initialize ImGui SDL renderer backend");
+
 
   config.path = ".";
   config.flags =
@@ -69,6 +86,12 @@ SDL3Frontend::~SDL3Frontend() {
   ImGui_ImplSDLRenderer3_Shutdown();
   ImGui_ImplSDL3_Shutdown();
   ImGui::DestroyContext();
+  if (audio_stream) {
+    SDL_UnbindAudioStream(audio_stream);
+    SDL_DestroyAudioStream(audio_stream);
+  }
+  if (audio_device)
+    SDL_CloseAudioDevice(audio_device);
   SDL_DestroyTexture(texture);
   SDL_DestroyRenderer(renderer);
   SDL_DestroyWindow(window);
@@ -171,6 +194,26 @@ void SDL3Frontend::clear(std::uint32_t c) {
       buffer[i] = c;
 }
 
+void SDL3Frontend::queue_audio_samples(const float *samples,
+                                       std::size_t sample_count) {
+  if (!audio_device || !audio_stream || !samples || sample_count == 0)
+    return;
+
+  constexpr std::size_t max_queue_bytes = 48000 * 2 * sizeof(float); // ~1s
+  const int queued = SDL_GetAudioStreamQueued(audio_stream);
+  if (queued < 0) {
+    SDL_ClearAudioStream(audio_stream);
+    return;
+  }
+  if (static_cast<std::size_t>(queued) > max_queue_bytes)
+    return;
+
+  const int byte_count = static_cast<int>(sample_count * sizeof(float));
+  if (!SDL_PutAudioStreamData(audio_stream, samples, byte_count)) {
+    SDL_ClearAudioStream(audio_stream);
+  }
+}
+
 bool SDL3Frontend::consume_load_request(std::string &rom_path) {
   std::lock_guard<std::mutex> lock(ui_mutex);
   if (!ui_state.request_load)
@@ -271,8 +314,7 @@ void SDL3Frontend::emulation_thread_fn(std::stop_token st, cart c) {
   using ns = std::chrono::nanoseconds;
   bool ff = false;
 
-  constexpr unsigned sync_cycles = 10'000; // T-cycles
-  constexpr ns target_step_time = wait_sync_time_ns(sync_cycles);
+  constexpr unsigned fallback_sync_cycles = 10'000; // T-cycles
   clear(black);
 
   /* Re-instantiate emulator instance */
@@ -287,12 +329,14 @@ void SDL3Frontend::emulation_thread_fn(std::stop_token st, cart c) {
   /* Run emulation in real-time */
   while (!st.stop_requested()) [[likely]] {
     const auto beg = steady_clk::now();
+    unsigned sync_cycles = fallback_sync_cycles;
     joypad->set_state(input_state.buttons.load(std::memory_order_relaxed));
     for (unsigned i = 0; i < sync_cycles; i++)
       gbc_->step();
 
     /* Synchronize with real-time */
     const auto elapsed = steady_clk::now() - beg;
+    const ns target_step_time = wait_sync_time_ns(sync_cycles);
     if (elapsed < target_step_time && !ff)
       std::this_thread::sleep_for(target_step_time - elapsed);
 
@@ -301,6 +345,8 @@ void SDL3Frontend::emulation_thread_fn(std::stop_token st, cart c) {
     ff = emu_state.fast_forward.load();
   }
 }
+
+
 
 
 void SDL3Frontend::join_emu_thread_if_running() {

@@ -1,6 +1,5 @@
-#include <cstdint>
+#include <cstddef>
 #include <memory>
-#include <pybind11/functional.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/stl/filesystem.h>
@@ -30,6 +29,7 @@ public:
     frame_data[y * frame_width + x] = c;
   }
   void clear(std::uint32_t c) override {}
+  void queue_audio_samples(const float *, std::size_t) override {}
   void start() override {}
 
 private:

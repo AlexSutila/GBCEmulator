@@ -6,7 +6,7 @@
 #include <SDL3/SDL.h>
 #include <array>
 #include <atomic>
-#include <cstdint>
+#include <cstddef>
 #include <memory>
 #include <mutex>
 #include <stop_token>
@@ -24,6 +24,8 @@ public:
   std::array<std::uint32_t, framebuf_height * framebuf_width> get_frame() override;
   void put_pixel(int x, int y, std::uint32_t c) override;
   void clear(std::uint32_t c = 0x00FFFFFF) override;
+  void queue_audio_samples(const float *samples,
+                         std::size_t sample_count) override;
   void start() override;
 
   bool consume_load_request(std::string &rom_path);
@@ -40,6 +42,9 @@ private:
   SDL_Renderer *renderer{};
   SDL_Texture *texture{};
   SDL_Window *window{};
+  SDL_AudioDeviceID audio_device{};
+  SDL_AudioSpec audio_spec{};
+  SDL_AudioStream *audio_stream{};
 
   struct UiState {
     bool show_load_window{true};
