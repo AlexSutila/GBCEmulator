@@ -59,17 +59,121 @@ void APU::register_mmio() {
                       &audio_registers[i]);
   for (std::size_t i = 0; i < wave_ram_size; ++i)
     bus_.connect_mmio(static_cast<addr_t>(wave_ram_base + i), &wave_ram[i]);
+
+  // --- Channel 1 ---
+  audio_registers[0].configure(0x00, [this](byte_t value) {
+    nr10 = value;
+  });
+
+  audio_registers[1].configure(0x00, [this](byte_t value) {
+    nr11 = value;
+    // length load: 64 - N (N in low 6 bits)
+    ch1_length_counter = static_cast<std::uint8_t>(64 - (value & 0x3F));
+  });
+
+  audio_registers[2].configure(0x00, [this](byte_t value) {
+    nr12 = value;
+    // If DAC is disabled, channel is forced off
+    if (!ch1_dac_enabled())
+      disable_channel1();
+  });
+
+  audio_registers[3].configure(
+      0x00,
+      [this](byte_t value) { nr13 = value; },
+      // treat as readable shadow to keep internal freq updates visible
+      [this](byte_t) { return nr13; });
+
+  audio_registers[4].configure(
+      0x00,
+      [this](byte_t value) {
+        nr14 = value;
+        if (value & 0x80)
+          trigger_channel1();
+      },
+      [this](byte_t) { return static_cast<byte_t>(nr14 & 0xBF); });
+
+  // --- Mixer / power ---
+  audio_registers[20].configure(power_on_nr50,
+                                [this](byte_t value) { nr50 = value; });
+  audio_registers[21].configure(power_on_nr51,
+                                [this](byte_t value) { nr51 = value; });
+  audio_registers[22].configure(
+      power_on_nr52,
+      [this](byte_t value) {
+        // Only bit 7 is writable
+        const bool want_on = (value & 0x80) != 0;
+        nr52 = static_cast<byte_t>(want_on ? 0x80 : 0x00);
+
+        if (!want_on) {
+          // Power off: disable channels and reset sequencer state
+          disable_channel1();
+          frame_seq_accum_tcycles = 0;
+          frame_seq_step = 0;
+        }
+      },
+      [this](byte_t) {
+        return static_cast<byte_t>((nr52 & 0x80) |
+                                   (channel1_enabled ? 0x01 : 0x00));
+      });
 }
 
 void APU::trigger_channel1() {
-  channel1_enabled = (nr52 & 0x80) != 0;
+  // If APU powered off, ignore triggers
+  if ((nr52 & 0x80) == 0) {
+    disable_channel1();
+    return;
+  }
+
+  // If DAC disabled, hardware immediately disables the channel
+  if (!ch1_dac_enabled()) {
+    disable_channel1();
+    return;
+  }
+
+  channel1_enabled = true;
   channel1_phase = 0.0;
+
+  // Length: if zero on trigger, load max (64)
+  if (ch1_length_counter == 0)
+    ch1_length_counter = 64;
+
+  // Envelope
+  ch1_env_volume = static_cast<std::uint8_t>((nr12 >> 4) & 0x0F);
+  ch1_env_increase = (nr12 & 0x08) != 0;
+  ch1_env_period = static_cast<std::uint8_t>(nr12 & 0x07);
+  ch1_env_timer = (ch1_env_period == 0) ? 8 : ch1_env_period;
+  ch1_env_enabled = (ch1_env_period != 0);
+
+  // Sweep
+  ch1_sweep_shadow_freq = ch1_frequency();
+  ch1_sweep_period = static_cast<std::uint8_t>((nr10 >> 4) & 0x07);
+  ch1_sweep_shift = static_cast<std::uint8_t>(nr10 & 0x07);
+  ch1_sweep_negate = (nr10 & 0x08) != 0;
+  ch1_sweep_timer = (ch1_sweep_period == 0) ? 8 : ch1_sweep_period;
+  ch1_sweep_enabled = (ch1_sweep_period != 0) || (ch1_sweep_shift != 0);
+  ch1_sweep_negate_used = false;
+
+  // Overflow check on trigger
+  (void)ch1_sweep_overflow_check();
+}
+
+void APU::disable_channel1() {
+  channel1_enabled = false;
+  ch1_sweep_enabled = false;
+  ch1_env_enabled = false;
 }
 
 bool APU::ch1_dac_enabled() const {
   // Channel 1 DAC enabled if any of NR12[7:3] is set
   // (If disabled, output is forced to 0 and channel is turned off)
   return (nr12 & 0xF8) != 0;
+}
+
+void APU::ch1_set_frequency(std::uint16_t freq) {
+  freq &= 0x7FF;
+  nr13 = static_cast<byte_t>(freq & 0xFF);
+  nr14 = static_cast<byte_t>((nr14 & 0xF8) | ((freq >> 8) & 0x07));
 }
 
 float APU::channel1_sample() const {
@@ -128,7 +232,146 @@ std::uint16_t APU::ch1_frequency() const {
   return static_cast<std::uint16_t>(((nr14 & 0x07) << 8) | nr13);
 }
 
+bool APU::ch1_sweep_overflow_check() {
+  if (!ch1_sweep_enabled || ch1_sweep_shift == 0)
+    return false;
+
+  bool overflow = false;
+  (void)ch1_sweep_calculate(overflow);
+  if (overflow) {
+    disable_channel1();
+    return true;
+  }
+  return false;
+}
+
+std::uint16_t APU::ch1_sweep_calculate(bool &overflow) {
+  overflow = false;
+  const std::uint16_t shadow = ch1_sweep_shadow_freq;
+  const std::uint16_t delta =
+      static_cast<std::uint16_t>(shadow >> ch1_sweep_shift);
+
+  std::int32_t next = static_cast<std::int32_t>(shadow);
+  if (ch1_sweep_negate) {
+    next -= delta;
+    ch1_sweep_negate_used = true;
+  } else {
+    next += delta;
+  }
+
+  if (next >= 2048) {
+    overflow = true;
+    return 2048;
+  }
+
+  if (next < 0)
+    next = 0;
+
+  return static_cast<std::uint16_t>(next);
+}
+
+void APU::clock_ch1_length() {
+  // length enabled if NR14 bit 6
+  const bool length_enabled = (nr14 & 0x40) != 0;
+  if (!length_enabled || ch1_length_counter == 0)
+    return;
+
+  --ch1_length_counter;
+  if (ch1_length_counter == 0)
+    disable_channel1();
+}
+
+void APU::clock_ch1_envelope() {
+  if (!ch1_env_enabled)
+    return;
+
+  if (ch1_env_timer > 0)
+    --ch1_env_timer;
+
+  if (ch1_env_timer != 0)
+    return;
+
+  ch1_env_timer = (ch1_env_period == 0) ? 8 : ch1_env_period;
+
+  if (ch1_env_increase) {
+    if (ch1_env_volume < 15)
+      ++ch1_env_volume;
+    else
+      ch1_env_enabled = false;
+  } else {
+    if (ch1_env_volume > 0)
+      --ch1_env_volume;
+    else
+      ch1_env_enabled = false;
+  }
+}
+
+void APU::clock_ch1_sweep() {
+  if (!ch1_sweep_enabled)
+    return;
+
+  if (ch1_sweep_timer > 0)
+    --ch1_sweep_timer;
+
+  if (ch1_sweep_timer != 0)
+    return;
+
+  ch1_sweep_timer = (ch1_sweep_period == 0) ? 8 : ch1_sweep_period;
+
+  if (ch1_sweep_shift == 0)
+    return;
+
+  bool overflow = false;
+  const std::uint16_t new_freq = ch1_sweep_calculate(overflow);
+  if (overflow) {
+    disable_channel1();
+    return;
+  }
+
+  // Apply frequency and update shadow
+  ch1_sweep_shadow_freq = new_freq;
+  ch1_set_frequency(new_freq);
+
+  // Second overflow check (hardware does a second calc after applying)
+  (void)ch1_sweep_overflow_check();
+}
+
+void APU::step_frame_sequencer() {
+  if ((nr52 & 0x80) == 0)
+    return;
+
+  frame_seq_accum_tcycles += 1;
+  while (frame_seq_accum_tcycles >= frame_sequencer_period_tcycles) {
+    frame_seq_accum_tcycles -= frame_sequencer_period_tcycles;
+    frame_seq_step = static_cast<std::uint8_t>((frame_seq_step + 1) & 0x07);
+
+    // Frame sequencer schedule:
+    // 0,2,4,6: length
+    // 2,6: sweep
+    // 7: envelope
+    switch (frame_seq_step) {
+    case 0:
+    case 2:
+    case 4:
+    case 6:
+      clock_ch1_length();
+      break;
+    default:
+      break;
+    }
+
+    if (frame_seq_step == 2 || frame_seq_step == 6)
+      clock_ch1_sweep();
+
+    if (frame_seq_step == 7)
+      clock_ch1_envelope();
+  }
+}
+
+
 void APU::step() {
+  step_frame_sequencer();
+
   constexpr double cycles_per_sample = cpu_clock_hz / sample_rate_hz;
   cycle_accumulator += 1.0;
   if (cycle_accumulator < cycles_per_sample)
