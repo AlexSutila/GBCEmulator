@@ -101,7 +101,6 @@ void VDMA::do_gdma_tran() {
   // State entry logic
   if (!clocks_remaining.has_value())
     clocks_remaining = byte_transfer_clks * transfer_size;
-  --clocks_remaining.value();
 
   // Data transfer
   if (clocks_remaining.value() % byte_transfer_clks == 0) {
@@ -109,6 +108,7 @@ void VDMA::do_gdma_tran() {
     bus_.write_byte(dest_base_addr + data_offset, data);
     ++data_offset;
   }
+  --clocks_remaining.value();
 
   // State transition logic
   if (clocks_remaining.value() == 0) {
