@@ -66,8 +66,11 @@ enum class IORegisterMapping : addr_t {
  */
 class MMIORegister {
 public:
+  // Note that read() is meant for address bus which may alter internal state
+  // peak() can be used by other components to read state
   virtual void write(const byte_t value);
   virtual byte_t read(); // Not const, reads could alter internal state
+  virtual byte_t peek() const { return state; } // Non-state altering read
   MMIORegister(const byte_t init_state) : state(init_state) {}
   MMIORegister() : state(0) {}
 
