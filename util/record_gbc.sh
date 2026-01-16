@@ -67,7 +67,7 @@ ffmpeg \
   -video_size "${W}x${H}" \
   -i "${DISPLAY}+${X},${Y}" \
   -f pulse \
-  -i "$(pactl list short source | head -n 1 | awk '{print $2}')" \
+  -i "$(pactl list short sources | head -n 1 | awk '{print $2}')" \
   -map 0:v:0 \
   -map 1:a:0 \
   -c:v libx264 \
