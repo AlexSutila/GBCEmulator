@@ -66,7 +66,7 @@ private:
   void ch4_clock_lfsr();
 
   static constexpr int sample_rate_hz = 48000;
-  static constexpr int frames_per_buffer = 512;
+  static constexpr int frames_per_buffer = 128;
   static constexpr double cpu_clock_hz = 4'194'304.0;
   static constexpr unsigned frame_sequencer_period_tcycles = 8192;
 
@@ -121,7 +121,6 @@ private:
   bool channel4_enabled{};
   double ch4_phase{};       // fractional clocks accumulator
 
-
   // Length (0..64)
   std::uint8_t ch1_length_counter{};
   std::uint8_t ch2_length_counter{};
@@ -159,6 +158,10 @@ private:
 
   // LFSR
   std::uint16_t ch4_lfsr{0x7FFF};
+
+  // Highpass filter
+  float dc_x1_l{}, dc_y1_l{};
+  float dc_x1_r{}, dc_y1_r{};
 };
 
 #endif // __APU_H

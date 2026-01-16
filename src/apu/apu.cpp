@@ -24,6 +24,15 @@ float clamp_sample(float v) {
 }
 } // namespace
 
+static inline float dc_block(float x, float &x1, float &y1) {
+  constexpr float R = 0.995f;
+  const float y = x - x1 + R * y1;
+  x1 = x;
+  y1 = y;
+  return y;
+}
+
+
 void Audio::AudioRegister::configure(byte_t initial, WriteCallback on_write_cb,
                                    ReadCallback on_read_cb) {
   state = initial;
@@ -671,6 +680,9 @@ void APU::generate_sample() {
 
   left = clamp_sample(left * master_gain);
   right = clamp_sample(right * master_gain);
+
+  left  = dc_block(left,  dc_x1_l, dc_y1_l);
+  right = dc_block(right, dc_x1_r, dc_y1_r);
 
   mix_buffer[frame_cursor * 2] = left;
   mix_buffer[frame_cursor * 2 + 1] = right;

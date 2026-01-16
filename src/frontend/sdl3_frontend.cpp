@@ -11,6 +11,7 @@
 #include <cmath>
 #include <exception>
 #include <imgui.h>
+#include <iostream>
 #include <memory>
 #include <stdexcept>
 #include <thread>
@@ -20,6 +21,9 @@ static const char *filters =
 static constexpr std::uint32_t black = 0xFF000000;
 static constexpr std::uint64_t t_cycle_hz = 4'194'304;
 static constexpr double two_pi = 6.28318530717958647692;
+constexpr int target_queue_ms = 70;
+constexpr int max_extra_cycles = 70'224 * 2; // cap extra work (2 frames)
+constexpr double cycles_per_audio_frame = 4'194'304.0 / 48'000.0; // ~87.38
 
 constexpr std::chrono::nanoseconds wait_sync_time_ns(unsigned sync_cycles) {
   // ns = cycles * 1e9 / Hz
@@ -201,6 +205,11 @@ void SDL3Frontend::queue_audio_samples(const float *samples,
 
   constexpr std::size_t max_queue_bytes = 48000 * 2 * sizeof(float); // ~1s
   const int queued = SDL_GetAudioStreamQueued(audio_stream);
+
+  // if (queued >= 0 && queued < 48000 * 2 * sizeof(float) / 50) { // < ~20ms
+  //   std::cout << "queue low at " << queued << std::endl;
+  // }
+
   if (queued < 0) {
     SDL_ClearAudioStream(audio_stream);
     return;
@@ -314,7 +323,7 @@ void SDL3Frontend::emulation_thread_fn(std::stop_token st, cart c) {
   using ns = std::chrono::nanoseconds;
   bool ff = false;
 
-  constexpr unsigned fallback_sync_cycles = 10'000; // T-cycles
+  constexpr unsigned fallback_sync_cycles = 70'224; // T-cycles (1 frame) / 41943 is also good value for 10ms
   clear(black);
 
   /* Re-instantiate emulator instance */
@@ -326,23 +335,53 @@ void SDL3Frontend::emulation_thread_fn(std::stop_token st, cart c) {
   if (!joypad)
     throw std::logic_error("Failed to configure joypad input");
 
+  auto next_deadline = steady_clk::now();
   /* Run emulation in real-time */
   while (!st.stop_requested()) [[likely]] {
-    const auto beg = steady_clk::now();
-    unsigned sync_cycles = fallback_sync_cycles;
+    // const auto beg = steady_clk::now();
+    // unsigned sync_cycles = fallback_sync_cycles;
+    int queued_bytes = SDL_GetAudioStreamQueued(audio_stream);
+    if (queued_bytes < 0) queued_bytes = 0;
+
+    const int bytes_per_frame = int(sizeof(float) * 2); // stereo float
+    const int queued_frames = queued_bytes / bytes_per_frame;
+    const int target_frames = (audio_spec.freq * target_queue_ms) / 1000;
+
+    int missing_frames = target_frames - queued_frames;
+    int extra_cycles = 0;
+    if (missing_frames > 0) {
+      extra_cycles = int(missing_frames * cycles_per_audio_frame);
+      if (extra_cycles > max_extra_cycles) extra_cycles = max_extra_cycles;
+    }
+
+    unsigned sync_cycles = fallback_sync_cycles + unsigned(std::max(0, extra_cycles));
+
     joypad->set_state(input_state.buttons.load(std::memory_order_relaxed));
     for (unsigned i = 0; i < sync_cycles; i++)
       gbc_->step();
+    next_deadline += wait_sync_time_ns(sync_cycles);
 
-    /* Synchronize with real-time */
-    const auto elapsed = steady_clk::now() - beg;
-    const ns target_step_time = wait_sync_time_ns(sync_cycles);
-    if (elapsed < target_step_time && !ff)
-      std::this_thread::sleep_for(target_step_time - elapsed);
+    if (!ff) {
+      // sleep_until is much steadier than sleep_for(elapsed delta)
+      std::this_thread::sleep_until(next_deadline);
+    } else {
+      // if fast-forward, don’t sleep, but also don’t let next_deadline explode
+      next_deadline = steady_clk::now();
+    }
 
     /* Update additional meta-data, avoid mutex acquisition */
     emu_state.is_cgb.store(gbc_->is_cgb_mode());
     ff = emu_state.fast_forward.load();
+
+    /* Synchronize with real-time */
+    // const auto elapsed = steady_clk::now() - beg;
+    // const ns target_step_time = wait_sync_time_ns(sync_cycles);
+    // if (elapsed < target_step_time && !ff)
+    //   std::this_thread::sleep_for(target_step_time - elapsed);
+    //
+    // /* Update additional meta-data, avoid mutex acquisition */
+    // emu_state.is_cgb.store(gbc_->is_cgb_mode());
+    // ff = emu_state.fast_forward.load();
   }
 }
 
