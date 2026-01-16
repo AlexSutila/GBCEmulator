@@ -17,15 +17,28 @@ public:
 
 private:
   void register_mmio();
+  void generate_sample();
 
   // Ch1 helpers
   void trigger_channel1();
   void disable_channel1();
-  void generate_sample();
   float channel1_sample() const;
+  // Ch2 helpers
+  void trigger_channel2();
+  void disable_channel2();
+  float channel2_sample() const;
+  // Ch3 helpers
+  void trigger_channel3();
+  void disable_channel3();
+  float channel3_sample() const;
+  // Ch4 helpers
+  void trigger_channel4();
+  void disable_channel4();
+  float channel4_sample() const;
 
   // APU frame sequencer
   void step_frame_sequencer();
+  // --> Ch1
   void clock_ch1_length();
   void clock_ch1_envelope();
   void clock_ch1_sweep();
@@ -34,9 +47,26 @@ private:
   void ch1_set_frequency(std::uint16_t freq);
   bool ch1_sweep_overflow_check();
   std::uint16_t ch1_sweep_calculate(bool &overflow);
+  // --> Ch2
+  void clock_ch2_length();
+  void clock_ch2_envelope();
+  bool ch2_dac_enabled() const;
+  std::uint16_t ch2_frequency() const;
+  void ch2_set_frequency(std::uint16_t freq);
+  // --> Ch3
+  void clock_ch3_length();
+  std::uint16_t ch3_frequency() const;
+  void ch3_set_frequency(std::uint16_t f);
+  bool ch3_dac_enabled() const;
+  // --> Ch4
+  void clock_ch4_length();
+  void clock_ch4_envelope();
+  bool ch4_dac_enabled() const;
+  double ch4_clock_hz() const;
+  void ch4_clock_lfsr();
 
   static constexpr int sample_rate_hz = 48000;
-  static constexpr int frames_per_buffer = 512;
+  static constexpr int frames_per_buffer = 128;
   static constexpr double cpu_clock_hz = 4'194'304.0;
   static constexpr unsigned frame_sequencer_period_tcycles = 8192;
 
@@ -53,28 +83,69 @@ private:
   unsigned frame_seq_accum_tcycles{};
   std::uint8_t frame_seq_step{}; // 0..7
 
+  // Shadow audio registers
+  // NR10-NR14: Channel 1
   byte_t nr10{};
   byte_t nr11{};
   byte_t nr12{};
   byte_t nr13{};
   byte_t nr14{};
+  // NR20-NR24: Channel 2
+  byte_t nr21{};
+  byte_t nr22{};
+  byte_t nr23{};
+  byte_t nr24{};
+  // NR30-NR34: Channel 3
+  byte_t nr30{};
+  byte_t nr31{};
+  byte_t nr32{};
+  byte_t nr33{};
+  byte_t nr34{};
+  // NR40-NR44: Channel 4
+  byte_t nr41{};
+  byte_t nr42{};
+  byte_t nr43{};
+  byte_t nr44{};
+  // NR50-NR52: Control
   byte_t nr50{};
   byte_t nr51{};
   byte_t nr52{};
 
-  // Ch 1 state
+  // Channel state
   bool channel1_enabled{};
   double channel1_phase{};
+  bool channel2_enabled{};
+  double channel2_phase{};
+  bool channel3_enabled{};
+  double channel3_pos{};    // 0..32
+  bool channel4_enabled{};
+  double ch4_phase{};       // fractional clocks accumulator
 
   // Length (0..64)
   std::uint8_t ch1_length_counter{};
+  std::uint8_t ch2_length_counter{};
+  std::uint16_t ch3_length_counter{}; // 0..256
+  std::uint8_t ch4_length_counter{};
 
   // Envelope
+  // Ch1
   std::uint8_t ch1_env_volume{};
   std::uint8_t ch1_env_period{};
   std::uint8_t ch1_env_timer{};
   bool ch1_env_increase{};
   bool ch1_env_enabled{};
+  // Ch2
+  std::uint8_t ch2_env_volume{};
+  std::uint8_t ch2_env_period{};
+  std::uint8_t ch2_env_timer{};
+  bool ch2_env_increase{};
+  bool ch2_env_enabled{};
+  // Ch4
+  std::uint8_t ch4_env_volume{};
+  std::uint8_t ch4_env_period{};
+  std::uint8_t ch4_env_timer{};
+  bool ch4_env_increase{};
+  bool ch4_env_enabled{};
 
   // Sweep
   std::uint16_t ch1_sweep_shadow_freq{};
@@ -84,6 +155,13 @@ private:
   bool ch1_sweep_negate{};
   bool ch1_sweep_enabled{};
   bool ch1_sweep_negate_used{};
+
+  // LFSR
+  std::uint16_t ch4_lfsr{0x7FFF};
+
+  // Highpass filter
+  float dc_x1_l{}, dc_y1_l{};
+  float dc_x1_r{}, dc_y1_r{};
 };
 
 #endif // __APU_H
