@@ -61,16 +61,20 @@ void APU::register_mmio() {
     bus_.connect_mmio(static_cast<addr_t>(wave_ram_base + i), &wave_ram[i]);
 
   // --- Channel 1 (NR10-NR14 / FF10-FF14) ---
+  // Index mapping: FF10 - FF10 = 0x00
+  // NR10: sweep
   audio_registers[0x00].configure(0x00, [this](byte_t value) {
     nr10 = value;
   });
 
+  // NR11: length + duty
   audio_registers[0x01].configure(0x00, [this](byte_t value) {
     nr11 = value;
     // length load: 64 - N (N in low 6 bits)
     ch1_length_counter = static_cast<std::uint8_t>(64 - (value & 0x3F));
   });
 
+  // NR12: envelope
   audio_registers[0x02].configure(0x00, [this](byte_t value) {
     nr12 = value;
     // If DAC is disabled, channel is forced off
@@ -78,12 +82,14 @@ void APU::register_mmio() {
       disable_channel1();
   });
 
+  // NR13: frequency low
   audio_registers[0x03].configure(
       0x00,
       [this](byte_t value) { nr13 = value; },
       // treat as readable shadow to keep internal freq updates visible
       [this](byte_t) { return nr13; });
 
+  // NR14: frequency high + length enable + trigger
   audio_registers[0x04].configure(
       0x00,
       [this](byte_t value) {
@@ -95,20 +101,24 @@ void APU::register_mmio() {
 
   // --- Channel 2 (NR21-NR24 / FF16-FF19) ---
   // Index mapping: FF16 - FF10 = 0x06
+  // NR21: length + duty
   audio_registers[0x06].configure(0x00, [this](byte_t value) {
     nr21 = value;
     ch2_length_counter = static_cast<std::uint8_t>(64 - (value & 0x3F));
   });
 
+  // NR22: envelope
   audio_registers[0x07].configure(0x00, [this](byte_t value) {
     nr22 = value;
     if (!ch2_dac_enabled())
       disable_channel2();
   });
 
+  // NR23: freq low
   audio_registers[0x08].configure(0x00, [this](byte_t value) { nr23 = value; },
                                [this](byte_t) { return nr23; });
 
+  // NR24: freq high + length enable + trigger
   audio_registers[0x09].configure(
       0x00,
       [this](byte_t value) {
@@ -147,6 +157,32 @@ void APU::register_mmio() {
     if (v & 0x80) trigger_channel3();
   }, [this](byte_t){ return (nr34 & 0xBF); });
 
+  // --- Channel 4 (NR40-NR44 / FF20-FF23) ---
+  // NR41 (FF20): length (6 bits)
+  audio_registers[0x10].configure(0x00, [this](byte_t v){
+    nr41 = v;
+    ch4_length_counter = static_cast<std::uint8_t>(64 - (v & 0x3F));
+  });
+
+  // NR42 (FF21): envelope + DAC gate
+  audio_registers[0x11].configure(0x00, [this](byte_t v){
+    nr42 = v;
+    if (!ch4_dac_enabled()) disable_channel4();
+  });
+
+  // NR43 (FF22): polynomial counter (shift/divisor/width)
+  audio_registers[0x12].configure(0x00, [this](byte_t v){
+    nr43 = v;
+  });
+
+  // NR44 (FF23): trigger + length enable
+  audio_registers[0x13].configure(0x00, [this](byte_t v){
+    nr44 = v;
+    if (v & 0x80) trigger_channel4();
+  }, [this](byte_t){
+    return static_cast<byte_t>(nr44 & 0xBF);
+  });
+
   // --- Mixer / power (NR50-NR52 / FF24-FF26) ---
   // Index mapping: FF24 - FF10 = 0x14
   audio_registers[0x14].configure(power_on_nr50,
@@ -164,6 +200,8 @@ void APU::register_mmio() {
           // Power off: disable channels and reset sequencer state
           disable_channel1();
           disable_channel2();
+          disable_channel3();
+          disable_channel4();
           frame_seq_accum_tcycles = 0;
           frame_seq_step = 0;
         }
@@ -172,7 +210,8 @@ void APU::register_mmio() {
         return static_cast<byte_t>((nr52 & 0x80) |
                                    (channel1_enabled ? 0x01 : 0x00) |
                                    (channel2_enabled ? 0x02 : 0x00) |
-                                   (channel3_enabled ? 0x04 : 0x00));
+                                   (channel3_enabled ? 0x04 : 0x00) |
+                                   (channel4_enabled ? 0x08 : 0x00));
       });
 }
 
@@ -447,6 +486,73 @@ void APU::trigger_channel3() {
   if (ch3_length_counter == 0) ch3_length_counter = 256;
 }
 
+// ----------- Channel 4 Helpers -----------
+void APU::clock_ch4_length() {
+  const bool length_enabled = (nr44 & 0x40) != 0;
+  if (!length_enabled || ch4_length_counter == 0) return;
+  --ch4_length_counter;
+  if (ch4_length_counter == 0) disable_channel4();
+}
+
+void APU::clock_ch4_envelope() {
+  if (!ch4_env_enabled) return;
+
+  if (ch4_env_timer > 0) --ch4_env_timer;
+  if (ch4_env_timer != 0) return;
+
+  ch4_env_timer = (ch4_env_period == 0) ? 8 : ch4_env_period;
+
+  if (ch4_env_increase) {
+    if (ch4_env_volume < 15) ++ch4_env_volume;
+    else ch4_env_enabled = false;
+  } else {
+    if (ch4_env_volume > 0) --ch4_env_volume;
+    else ch4_env_enabled = false;
+  }
+}
+bool APU::ch4_dac_enabled() const { return (nr42 & 0xF8) != 0; }
+
+void APU::disable_channel4() {
+  channel4_enabled = false;
+  ch4_env_enabled = false;
+}
+
+void APU::trigger_channel4() {
+  if ((nr52 & 0x80) == 0) { disable_channel4(); return; }
+  if (!ch4_dac_enabled()) { disable_channel4(); return; }
+
+  channel4_enabled = true;
+  ch4_phase = 0.0;
+  ch4_lfsr = 0x7FFF; // reset all 1s
+
+  if (ch4_length_counter == 0) ch4_length_counter = 64;
+
+  // Envelope from NR42
+  ch4_env_volume   = (nr42 >> 4) & 0x0F;
+  ch4_env_increase = (nr42 & 0x08) != 0;
+  ch4_env_period   = (nr42 & 0x07);
+  ch4_env_timer    = (ch4_env_period == 0) ? 8 : ch4_env_period;
+  ch4_env_enabled  = (ch4_env_period != 0);
+}
+
+double APU::ch4_clock_hz() const {
+  static constexpr int divisors[8] = {8,16,32,48,64,80,96,112};
+  const int r = divisors[nr43 & 0x07];
+  const int s = (nr43 >> 4) & 0x0F;
+  // 524288 / r / 2^(s+1)
+  return 524288.0 / double(r) / double(1u << (s + 1));
+}
+
+void APU::ch4_clock_lfsr() {
+  const std::uint16_t xor_bit = (ch4_lfsr ^ (ch4_lfsr >> 1)) & 0x0001;
+  ch4_lfsr = (ch4_lfsr >> 1) | (xor_bit << 14);
+
+  // width mode: also copy into bit 6 (7-bit LFSR)
+  if (nr43 & 0x08) {
+    ch4_lfsr = (ch4_lfsr & ~(1u << 6)) | (xor_bit << 6);
+  }
+}
+
 // ------------ Sample Generation -----------
 float APU::channel1_sample() const {
   if (!(nr52 & 0x80) || !channel1_enabled)
@@ -514,11 +620,24 @@ float APU::channel3_sample() const {
   return s;
 }
 
+float APU::channel4_sample() const {
+  if ((nr52 & 0x80) == 0 || !channel4_enabled || !ch4_dac_enabled())
+    return 0.0f;
+
+  const float amp = float(ch4_env_volume) / 15.0f;
+  if (amp <= 0.0f) return 0.0f;
+
+  // Output is (inverted) bit0 in many emulator conventions:
+  const bool bit0 = (ch4_lfsr & 0x01) != 0;
+  const float s = bit0 ? -1.0f : 1.0f;
+  return s * amp;
+}
 
 void APU::generate_sample() {
   const float ch1 = channel1_sample();
   const float ch2 = channel2_sample();
   const float ch3 = channel3_sample();
+  const float ch4 = channel4_sample();
 
   const float master_left = ((nr50 >> 4) & 0x07) / 7.0f;
   const float master_right = (nr50 & 0x07) / 7.0f;
@@ -535,6 +654,8 @@ void APU::generate_sample() {
     left_raw += ch2;
   if (nr51 & 0x40)
     left_raw += ch3;
+  if (nr51 & 0x80)
+    left_raw += ch4;
 
   if (nr51 & 0x01)
     right_raw += ch1;
@@ -542,6 +663,8 @@ void APU::generate_sample() {
     right_raw += ch2;
   if (nr51 & 0x04)
     right_raw += ch3;
+  if (nr51 & 0x08)
+    right_raw += ch4;
 
   float left = left_raw * master_left;
   float right = right_raw * master_right;
@@ -580,6 +703,7 @@ void APU::step_frame_sequencer() {
       clock_ch1_length();
       clock_ch2_length();
       clock_ch3_length();
+      clock_ch4_length();
       break;
     default:
       break;
@@ -591,6 +715,7 @@ void APU::step_frame_sequencer() {
     if (frame_seq_step == 7) {
       clock_ch1_envelope();
       clock_ch2_envelope();
+      clock_ch4_envelope();
     }
   }
 }
@@ -617,7 +742,6 @@ void APU::step() {
           channel1_phase -= 1.0;
       }
     }
-
     // CH2 phase
     if (channel2_enabled) {
       const std::uint16_t f = ch2_frequency();
@@ -636,6 +760,17 @@ void APU::step() {
         const double step_hz = 2097152.0 / (2048.0 - f);
         channel3_pos += step_hz / sample_rate_hz;
         while (channel3_pos >= 32.0) channel3_pos -= 32.0;
+      }
+    }
+    // CH4 phase
+    if (channel4_enabled) {
+      const double hz = ch4_clock_hz();
+      if (hz > 0.0) {
+        ch4_phase += hz / sample_rate_hz;
+        while (ch4_phase >= 1.0) {
+          ch4_phase -= 1.0;
+          ch4_clock_lfsr();
+        }
       }
     }
   }

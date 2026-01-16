@@ -31,6 +31,10 @@ private:
   void trigger_channel3();
   void disable_channel3();
   float channel3_sample() const;
+  // Ch4 helpers
+  void trigger_channel4();
+  void disable_channel4();
+  float channel4_sample() const;
 
   // APU frame sequencer
   void step_frame_sequencer();
@@ -54,6 +58,12 @@ private:
   std::uint16_t ch3_frequency() const;
   void ch3_set_frequency(std::uint16_t f);
   bool ch3_dac_enabled() const;
+  // --> Ch4
+  void clock_ch4_length();
+  void clock_ch4_envelope();
+  bool ch4_dac_enabled() const;
+  double ch4_clock_hz() const;
+  void ch4_clock_lfsr();
 
   static constexpr int sample_rate_hz = 48000;
   static constexpr int frames_per_buffer = 512;
@@ -73,7 +83,7 @@ private:
   unsigned frame_seq_accum_tcycles{};
   std::uint8_t frame_seq_step{}; // 0..7
 
-  // Internal audio registers
+  // Shadow audio registers
   // NR10-NR14: Channel 1
   byte_t nr10{};
   byte_t nr11{};
@@ -91,6 +101,11 @@ private:
   byte_t nr32{};
   byte_t nr33{};
   byte_t nr34{};
+  // NR40-NR44: Channel 4
+  byte_t nr41{};
+  byte_t nr42{};
+  byte_t nr43{};
+  byte_t nr44{};
   // NR50-NR52: Control
   byte_t nr50{};
   byte_t nr51{};
@@ -103,11 +118,15 @@ private:
   double channel2_phase{};
   bool channel3_enabled{};
   double channel3_pos{};    // 0..32
+  bool channel4_enabled{};
+  double ch4_phase{};       // fractional clocks accumulator
+
 
   // Length (0..64)
   std::uint8_t ch1_length_counter{};
   std::uint8_t ch2_length_counter{};
   std::uint16_t ch3_length_counter{}; // 0..256
+  std::uint8_t ch4_length_counter{};
 
   // Envelope
   // Ch1
@@ -122,6 +141,12 @@ private:
   std::uint8_t ch2_env_timer{};
   bool ch2_env_increase{};
   bool ch2_env_enabled{};
+  // Ch4
+  std::uint8_t ch4_env_volume{};
+  std::uint8_t ch4_env_period{};
+  std::uint8_t ch4_env_timer{};
+  bool ch4_env_increase{};
+  bool ch4_env_enabled{};
 
   // Sweep
   std::uint16_t ch1_sweep_shadow_freq{};
@@ -132,7 +157,8 @@ private:
   bool ch1_sweep_enabled{};
   bool ch1_sweep_negate_used{};
 
-
+  // LFSR
+  std::uint16_t ch4_lfsr{0x7FFF};
 };
 
 #endif // __APU_H
