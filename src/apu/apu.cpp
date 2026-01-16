@@ -60,7 +60,7 @@ void APU::register_mmio() {
   for (std::size_t i = 0; i < wave_ram_size; ++i)
     bus_.connect_mmio(static_cast<addr_t>(wave_ram_base + i), &wave_ram[i]);
 
-  // --- Channel 1 ---
+  // --- Channel 1 (NR10-NR14 / FF10-FF14) ---
   audio_registers[0].configure(0x00, [this](byte_t value) {
     nr10 = value;
   });
@@ -93,7 +93,32 @@ void APU::register_mmio() {
       },
       [this](byte_t) { return static_cast<byte_t>(nr14 & 0xBF); });
 
-  // --- Mixer / power ---
+  // --- Channel 2 (NR21-NR24 / FF16-FF19) ---
+  // Index mapping: FF16 - FF10 = 0x06
+  audio_registers[6].configure(0x00, [this](byte_t value) {
+    nr21 = value;
+    ch2_length_counter = static_cast<std::uint8_t>(64 - (value & 0x3F));
+  });
+
+  audio_registers[7].configure(0x00, [this](byte_t value) {
+    nr22 = value;
+    if (!ch2_dac_enabled())
+      disable_channel2();
+  });
+
+  audio_registers[8].configure(0x00, [this](byte_t value) { nr23 = value; },
+                               [this](byte_t) { return nr23; });
+
+  audio_registers[9].configure(
+      0x00,
+      [this](byte_t value) {
+        nr24 = value;
+        if (value & 0x80)
+          trigger_channel2();
+      },
+      [this](byte_t) { return static_cast<byte_t>(nr24 & 0xBF); });
+
+  // --- Mixer / power (NR50-NR52 / FF24-FF26) ---
   audio_registers[20].configure(power_on_nr50,
                                 [this](byte_t value) { nr50 = value; });
   audio_registers[21].configure(power_on_nr51,
@@ -118,6 +143,8 @@ void APU::register_mmio() {
       });
 }
 
+
+// ------------ Channel 1 Helpers ------------
 void APU::trigger_channel1() {
   // If APU powered off, ignore triggers
   if ((nr52 & 0x80) == 0) {
@@ -174,58 +201,6 @@ void APU::ch1_set_frequency(std::uint16_t freq) {
   freq &= 0x7FF;
   nr13 = static_cast<byte_t>(freq & 0xFF);
   nr14 = static_cast<byte_t>((nr14 & 0xF8) | ((freq >> 8) & 0x07));
-}
-
-float APU::channel1_sample() const {
-  if (!(nr52 & 0x80) || !channel1_enabled)
-    return 0.0f;
-
-  if (!ch1_dac_enabled())
-    return 0.0f;
-
-  const byte_t volume = static_cast<byte_t>((nr12 >> 4) & 0x0F);
-  if (volume == 0)
-    return 0.0f;
-
-  const std::uint16_t frequency =
-      static_cast<std::uint16_t>(((nr14 & 0x07) << 8) | nr13);
-  if (frequency >= 2048)
-    return 0.0f;
-
-  const double freq_hz = 131072.0 / (2048.0 - frequency);
-  if (freq_hz <= 0.0)
-    return 0.0f;
-
-  const std::uint8_t duty_index = static_cast<std::uint8_t>((nr11 >> 6) & 0x03);
-  const float duty = duty_table[duty_index];
-  const float sample =
-      (channel1_phase < duty ? 1.0f : -1.0f) * (volume / 15.0f);
-  return sample;
-}
-
-void APU::generate_sample() {
-  const float raw = channel1_sample();
-
-  const float master_left = ((nr50 >> 4) & 0x07) / 7.0f;
-  const float master_right = (nr50 & 0x07) / 7.0f;
-
-  const bool left_enable = (nr51 & 0x10) != 0;
-  const bool right_enable = (nr51 & 0x01) != 0;
-
-  float left = left_enable ? raw * master_left : 0.0f;
-  float right = right_enable ? raw * master_right : 0.0f;
-
-  left = clamp_sample(left * master_gain);
-  right = clamp_sample(right * master_gain);
-
-  mix_buffer[frame_cursor * 2] = left;
-  mix_buffer[frame_cursor * 2 + 1] = right;
-  ++frame_cursor;
-
-  if (frame_cursor >= frames_per_buffer) {
-    frontend_.queue_audio_samples(mix_buffer.data(), mix_buffer.size());
-    frame_cursor = 0;
-  }
 }
 
 std::uint16_t APU::ch1_frequency() const {
@@ -336,6 +311,168 @@ void APU::clock_ch1_sweep() {
   (void)ch1_sweep_overflow_check();
 }
 
+// --------- Channel 2 Helpers -----------
+bool APU::ch2_dac_enabled() const { return (nr22 & 0xF8) != 0; }
+
+std::uint16_t APU::ch2_frequency() const {
+  return static_cast<std::uint16_t>(((nr24 & 0x07) << 8) | nr23);
+}
+
+void APU::ch2_set_frequency(std::uint16_t freq) {
+  freq &= 0x7FF;
+  nr23 = static_cast<byte_t>(freq & 0xFF);
+  nr24 = static_cast<byte_t>((nr24 & 0xF8) | ((freq >> 8) & 0x07));
+}
+
+void APU::disable_channel2() {
+  channel2_enabled = false;
+  ch2_env_enabled = false;
+}
+
+void APU::trigger_channel2() {
+  if ((nr52 & 0x80) == 0) {
+    disable_channel2();
+    return;
+  }
+  if (!ch2_dac_enabled()) {
+    disable_channel2();
+    return;
+  }
+
+  channel2_enabled = true;
+  channel2_phase = 0.0;
+
+  if (ch2_length_counter == 0)
+    ch2_length_counter = 64;
+
+  // Envelope (NR22)
+  ch2_env_volume = static_cast<std::uint8_t>((nr22 >> 4) & 0x0F);
+  ch2_env_increase = (nr22 & 0x08) != 0;
+  ch2_env_period = static_cast<std::uint8_t>(nr22 & 0x07);
+  ch2_env_timer = (ch2_env_period == 0) ? 8 : ch2_env_period;
+  ch2_env_enabled = (ch2_env_period != 0);
+}
+
+void APU::clock_ch2_length() {
+  const bool length_enabled = (nr24 & 0x40) != 0;
+  if (!length_enabled || ch2_length_counter == 0)
+    return;
+
+  --ch2_length_counter;
+  if (ch2_length_counter == 0)
+    disable_channel2();
+}
+
+void APU::clock_ch2_envelope() {
+  if (!ch2_env_enabled)
+    return;
+
+  if (ch2_env_timer > 0)
+    --ch2_env_timer;
+
+  if (ch2_env_timer != 0)
+    return;
+
+  ch2_env_timer = (ch2_env_period == 0) ? 8 : ch2_env_period;
+
+  if (ch2_env_increase) {
+    if (ch2_env_volume < 15)
+      ++ch2_env_volume;
+    else
+      ch2_env_enabled = false;
+  } else {
+    if (ch2_env_volume > 0)
+      --ch2_env_volume;
+    else
+      ch2_env_enabled = false;
+  }
+}
+
+// ------------ Sample Generation -----------
+float APU::channel1_sample() const {
+  if (!(nr52 & 0x80) || !channel1_enabled)
+    return 0.0f;
+
+  if (!ch1_dac_enabled())
+    return 0.0f;
+
+  const byte_t volume = static_cast<byte_t>((nr12 >> 4) & 0x0F);
+  if (volume == 0)
+    return 0.0f;
+
+  const std::uint16_t frequency =
+      static_cast<std::uint16_t>(((nr14 & 0x07) << 8) | nr13);
+  if (frequency >= 2048)
+    return 0.0f;
+
+  const double freq_hz = 131072.0 / (2048.0 - frequency);
+  if (freq_hz <= 0.0)
+    return 0.0f;
+
+  const std::uint8_t duty_index = static_cast<std::uint8_t>((nr11 >> 6) & 0x03);
+  const float duty = duty_table[duty_index];
+  const float sample =
+      (channel1_phase < duty ? 1.0f : -1.0f) * (volume / 15.0f);
+  return sample;
+}
+
+float APU::channel2_sample() const {
+  if ((nr52 & 0x80) == 0 || !channel2_enabled || !ch2_dac_enabled())
+    return 0.0f;
+
+  const std::uint16_t frequency = ch2_frequency();
+  if (frequency >= 2048)
+    return 0.0f;
+
+  const std::uint8_t duty_index = static_cast<std::uint8_t>((nr21 >> 6) & 0x03);
+  const float duty = duty_table[duty_index];
+
+  const float amp = static_cast<float>(ch2_env_volume) / 15.0f;
+  if (amp <= 0.0f)
+    return 0.0f;
+
+  return (channel2_phase < duty ? 1.0f : -1.0f) * amp;
+}
+
+void APU::generate_sample() {
+  const float ch1 = channel1_sample();
+  const float ch2 = channel2_sample();
+
+  const float master_left = ((nr50 >> 4) & 0x07) / 7.0f;
+  const float master_right = (nr50 & 0x07) / 7.0f;
+
+  // NR51 routing:
+  // Right: bit0=CH1, bit1=CH2
+  // Left : bit4=CH1, bit5=CH2
+  float left_raw = 0.0f;
+  float right_raw = 0.0f;
+
+  if (nr51 & 0x10)
+    left_raw += ch1;
+  if (nr51 & 0x20)
+    left_raw += ch2;
+
+  if (nr51 & 0x01)
+    right_raw += ch1;
+  if (nr51 & 0x02)
+    right_raw += ch2;
+
+  float left = left_raw * master_left;
+  float right = right_raw * master_right;
+
+  left = clamp_sample(left * master_gain);
+  right = clamp_sample(right * master_gain);
+
+  mix_buffer[frame_cursor * 2] = left;
+  mix_buffer[frame_cursor * 2 + 1] = right;
+  ++frame_cursor;
+
+  if (frame_cursor >= frames_per_buffer) {
+    frontend_.queue_audio_samples(mix_buffer.data(), mix_buffer.size());
+    frame_cursor = 0;
+  }
+}
+
 void APU::step_frame_sequencer() {
   if ((nr52 & 0x80) == 0)
     return;
@@ -347,7 +484,7 @@ void APU::step_frame_sequencer() {
 
     // Frame sequencer schedule:
     // 0,2,4,6: length
-    // 2,6: sweep
+    // 2,6: sweep (ch1 only)
     // 7: envelope
     switch (frame_seq_step) {
     case 0:
@@ -355,6 +492,7 @@ void APU::step_frame_sequencer() {
     case 4:
     case 6:
       clock_ch1_length();
+      clock_ch2_length();
       break;
     default:
       break;
@@ -363,8 +501,10 @@ void APU::step_frame_sequencer() {
     if (frame_seq_step == 2 || frame_seq_step == 6)
       clock_ch1_sweep();
 
-    if (frame_seq_step == 7)
+    if (frame_seq_step == 7) {
       clock_ch1_envelope();
+      clock_ch2_envelope();
+    }
   }
 }
 
@@ -379,12 +519,28 @@ void APU::step() {
 
   cycle_accumulator -= cycles_per_sample;
 
-  const std::uint16_t frequency = ch1_frequency();
-  if (frequency < 2048) {
-    const double freq_hz = 131072.0 / (2048.0 - frequency);
-    channel1_phase += freq_hz / sample_rate_hz;
-    if (channel1_phase >= 1.0)
-      channel1_phase -= 1.0;
+  if ((nr52 & 0x80) != 0) {
+    // CH1 phase
+    if (channel1_enabled) {
+      const std::uint16_t f = ch1_frequency();
+      if (f < 2048) {
+        const double hz = 131072.0 / (2048.0 - f);
+        channel1_phase += hz / sample_rate_hz;
+        if (channel1_phase >= 1.0)
+          channel1_phase -= 1.0;
+      }
+    }
+
+    // CH2 phase
+    if (channel2_enabled) {
+      const std::uint16_t f = ch2_frequency();
+      if (f < 2048) {
+        const double hz = 131072.0 / (2048.0 - f);
+        channel2_phase += hz / sample_rate_hz;
+        if (channel2_phase >= 1.0)
+          channel2_phase -= 1.0;
+      }
+    }
   }
 
   generate_sample();

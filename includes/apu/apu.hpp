@@ -17,15 +17,20 @@ public:
 
 private:
   void register_mmio();
+  void generate_sample();
 
   // Ch1 helpers
   void trigger_channel1();
   void disable_channel1();
-  void generate_sample();
   float channel1_sample() const;
+  // Ch2 helpers
+  void trigger_channel2();
+  void disable_channel2();
+  float channel2_sample() const;
 
   // APU frame sequencer
   void step_frame_sequencer();
+  // --> Ch1
   void clock_ch1_length();
   void clock_ch1_envelope();
   void clock_ch1_sweep();
@@ -34,6 +39,12 @@ private:
   void ch1_set_frequency(std::uint16_t freq);
   bool ch1_sweep_overflow_check();
   std::uint16_t ch1_sweep_calculate(bool &overflow);
+  // --> Ch2
+  void clock_ch2_length();
+  void clock_ch2_envelope();
+  bool ch2_dac_enabled() const;
+  std::uint16_t ch2_frequency() const;
+  void ch2_set_frequency(std::uint16_t freq);
 
   static constexpr int sample_rate_hz = 48000;
   static constexpr int frames_per_buffer = 512;
@@ -53,28 +64,46 @@ private:
   unsigned frame_seq_accum_tcycles{};
   std::uint8_t frame_seq_step{}; // 0..7
 
+  // Internal audio registers
+  // NR10-NR14: Channel 1
   byte_t nr10{};
   byte_t nr11{};
   byte_t nr12{};
   byte_t nr13{};
   byte_t nr14{};
+  // NR20-NR24: Channel 2
+  byte_t nr21{};
+  byte_t nr22{};
+  byte_t nr23{};
+  byte_t nr24{};
+  // NR50-NR52: Control
   byte_t nr50{};
   byte_t nr51{};
   byte_t nr52{};
 
-  // Ch 1 state
+  // Channel state
   bool channel1_enabled{};
   double channel1_phase{};
+  bool channel2_enabled{};
+  double channel2_phase{};
 
   // Length (0..64)
   std::uint8_t ch1_length_counter{};
+  std::uint8_t ch2_length_counter{};
 
   // Envelope
+  // Ch1
   std::uint8_t ch1_env_volume{};
   std::uint8_t ch1_env_period{};
   std::uint8_t ch1_env_timer{};
   bool ch1_env_increase{};
   bool ch1_env_enabled{};
+  // Ch2
+  std::uint8_t ch2_env_volume{};
+  std::uint8_t ch2_env_period{};
+  std::uint8_t ch2_env_timer{};
+  bool ch2_env_increase{};
+  bool ch2_env_enabled{};
 
   // Sweep
   std::uint16_t ch1_sweep_shadow_freq{};
