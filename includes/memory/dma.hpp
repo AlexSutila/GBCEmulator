@@ -53,6 +53,8 @@ public:
         hdma3_(), hdma4_(),      // Destination low and high registers
         hdma5_(*this)            // The Vram DMA length/mode/start register
   {}
+  void step_fast_cycle();
+  void step() override;
 
   /* Getters and setters for both source and destination addresses involve
    * consulting a pair of two 8-bit MMIORegisters to form a 16-bit address. */

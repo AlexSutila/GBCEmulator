@@ -37,10 +37,9 @@ class AddressBus {
 public:
   void write_byte(const addr_t addr, const byte_t value);
   const byte_t read_byte(const addr_t addr);
+  ObjAttrDMA &get_oam_dma() { return oam_dma; };
+  VramDMA &get_vram_dma() { return vdma; }
   AddressBus(runtime_sys_info &sys);
-
-  /* Responsible for DMA transfer when DMA routines are active */
-  void step_dma();
 
   /* For attaching MMIO component interface registers */
   void connect_mmio(const addr_t addr, MMIORegister *const reg);
@@ -69,6 +68,7 @@ private:
 
   /* Direct memory access routine modules */
   ObjAttrDMA oam_dma;
+  VramDMA vdma;
 
   /* MMIO refs maintained for convenience */
   PPU::VramBank vram_bank_ctrl{};

@@ -48,6 +48,7 @@ private:
   std::unique_ptr<APU> apu{};
   std::unique_ptr<PixelProcessingUnit> ppu{};
   std::unique_ptr<TimerUnit> timer{};
+  void step_dma(bool fast_cycle);
 
   runtime_sys_info sys_{};
   bool has_cartridge{};

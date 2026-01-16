@@ -58,3 +58,7 @@ void VramDMA::set_src_addr(const addr_t addr) {
   set_addr(hdma2_, hdma1_, addr);
 }
 const addr_t VramDMA::get_src_addr() { return get_addr(hdma2_, hdma1_); }
+
+void VramDMA::step_fast_cycle() {}
+
+void VramDMA::step() {}

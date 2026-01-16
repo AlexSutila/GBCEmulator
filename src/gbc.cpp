@@ -2,9 +2,10 @@
 #include "cart/cart.hpp"
 #include "cpu/lr35902.hpp"
 #include "memory/bus.hpp"
+#include "memory/dma.hpp"
+#include "memory/mmio/dmg.hpp"
 #include "ppu/ppu.hpp"
 #include "timer/timer.hpp"
-#include "memory/mmio/dmg.hpp"
 #include <memory>
 
 GameBoyColor::GameBoyColor(Frontend &frontend) : fe_(frontend) {
@@ -55,9 +56,17 @@ void GameBoyColor::init_test_bed() {
   has_cartridge = true;
 }
 
+void GameBoyColor::step_dma(bool fast_cycle) {
+  bus->get_oam_dma().step();
+  if (fast_cycle)
+    bus->get_vram_dma().step_fast_cycle();
+  else
+    bus->get_vram_dma().step();
+}
+
 void GameBoyColor::step() {
   cpu->step();
-  bus->step_dma();
+  step_dma(false);
   ppu->step();
   timer->step();
   apu->step();
@@ -68,7 +77,7 @@ void GameBoyColor::step() {
   // If we are in double speed mode, step affected components again
   if (sys_.double_speed) {
     cpu->step();
-    bus->step_dma();
+    step_dma(true);
     timer->step();
   }
 }
