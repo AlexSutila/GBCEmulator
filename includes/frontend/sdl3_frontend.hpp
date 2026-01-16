@@ -21,6 +21,7 @@ public:
   static constexpr int framebuf_height = 144;
   static constexpr int scale = 4;
 
+  std::array<std::uint32_t, framebuf_height * framebuf_width> get_frame() override;
   void put_pixel(int x, int y, std::uint32_t c) override;
   void clear(std::uint32_t c = 0x00FFFFFF) override;
   void queue_audio_samples(const float *samples,

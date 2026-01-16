@@ -4,10 +4,9 @@
 #include <cassert>
 #include <optional>
 
-ObjAttrDMA::ObjAttrDMA(AddressBus &bus) : bus_(bus), dma_(*this) {
-  src_base_addr = data_offset = 0;
-  clocks_remaining = std::nullopt;
-}
+/* ======================================================================
+ * OAM DMA Transfer, applicable to both DMG and CGB
+ * ====================================================================== */
 DMA::DMA *const ObjAttrDMA::get_dma_reg() { return &dma_; }
 
 void ObjAttrDMA::start(const byte_t addr_high) {
@@ -35,3 +34,12 @@ void ObjAttrDMA::step() {
   if (clocks_remaining.value() == 0)
     clocks_remaining.reset();
 }
+
+/* ======================================================================
+ * VRAM DMA Transfer, applicable to only CGB
+ * ====================================================================== */
+
+VramDMA::VramDMA(AddressBus &bus) : DirectMemoryAccess(bus) {
+  // TODO: Initialize registers and stuff once they actually exist
+}
+

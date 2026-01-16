@@ -18,20 +18,33 @@
 
 namespace py = pybind11;
 
-/* Hack front end just to get the compiler to shut up */
 class PyFrontend final : public Frontend {
 public:
   PyFrontend() : Frontend() {}
-  void put_pixel(int x, int y, std::uint32_t c) override {}
+  std::array<std::uint32_t, 160 * 144> get_frame() override {
+    return frame_data;
+  }
+  void put_pixel(int x, int y, std::uint32_t c) override {
+    static constexpr int frame_width = 160;
+    frame_data[y * frame_width + x] = c;
+  }
   void clear(std::uint32_t c) override {}
   void queue_audio_samples(const float *, std::size_t) override {}
   void start() override {}
+
+private:
+  std::array<std::uint32_t, 160 * 144> frame_data{};
 };
 class PyGameBoyColor {
 public:
   PyGameBoyColor() : fe_() {}
+  std::array<std::uint32_t, 160 * 144> get_frame() { return fe_.get_frame(); }
   void insert_cartridge(cart c) { fe_.get()->insert_cartridge(c); }
   void init_test_bed() { fe_.get()->init_test_bed(); }
+  void step_cycles(int cycles) {
+    for (int i{0}; i < cycles; i++)
+      step();
+  }
   void step() { fe_.get()->step(); }
 
   AddressBus *get_bus() { return fe_.get()->get_bus(); };
@@ -280,8 +293,8 @@ PYBIND11_MODULE(gbc_py, m) {
 
   // Pixel Processor class
   py::class_<PixelProcessingUnit>(m, "PixelProcessor")
-      .def(py::init<AddressBus *, Frontend &, runtime_sys_info &>(), py::arg("bus"),
-           py::arg("fe"), py::arg("sys"),
+      .def(py::init<AddressBus *, Frontend &, runtime_sys_info &>(),
+           py::arg("bus"), py::arg("fe"), py::arg("sys"),
            py::keep_alive<1, 2>()) // PixelProcessor keeps AddressBus alive
       .def("step", &PixelProcessingUnit::step);
 
@@ -290,7 +303,9 @@ PYBIND11_MODULE(gbc_py, m) {
       .def(py::init<>())
       .def("insert_cartridge", &PyGameBoyColor::insert_cartridge)
       .def("init_test_bed", &PyGameBoyColor::init_test_bed)
+      .def("step_cycles", &PyGameBoyColor::step_cycles)
       .def("step", &PyGameBoyColor::step)
+      .def("get_frame", &PyGameBoyColor::get_frame)
       .def("get_bus", &PyGameBoyColor::get_bus,
            py::return_value_policy::reference_internal)
       .def("get_cpu", &PyGameBoyColor::get_cpu,

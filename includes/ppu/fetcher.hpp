@@ -106,7 +106,9 @@ private:
   const byte_t fetch_bgwin_tile_data(bool high) const;
   const byte_t fetch_obj_tile_data(const Sprite &sprite, bool high) const;
   const addr_t calc_tile_metadata_addr() const;
-  bool has_priority(const pixel &old_px, const byte_t new_oam_idx) const;
+  const byte_t calc_sprite_tile_idx(const Sprite &sprite, bool flip) const;
+  const bool has_priority(const pixel &old_px, byte_t new_oam_idx,
+                    byte_t new_color_idx) const;
 
   /* Internal storage that is built up throughout the pixel pushing pipeline.
    * Tile indices are read from memory, data is fetched, and the final data

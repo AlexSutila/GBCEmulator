@@ -10,7 +10,6 @@
 #include <cstddef>
 #include <memory>
 #include <optional>
-#include <tuple>
 
 struct runtime_sys_info;
 
@@ -52,14 +51,13 @@ private:
   InterruptMasterEnable ime;
   InterruptBits ie_reg;
   InterruptBits if_reg;
-  bool halted;
 
   /* Opcode decoding configuration */
   using lookup_table_t = std::array<std::unique_ptr<Instruction>, 256>;
   void init_alu(lookup_table_t &lookup);
   void init_bitops(lookup_table_t &lookup);
   void init_branch(lookup_table_t &lookup);
-  void init_control(lookup_table_t &lookup, bool *halted);
+  void init_control(lookup_table_t &lookup, runtime_sys_info &sys);
   void init_moves(lookup_table_t &lookup);
   lookup_table_t lookup{};
 

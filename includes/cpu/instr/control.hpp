@@ -5,6 +5,7 @@
 #include "cpu/interrupts.hpp"
 #include "cpu/registers/regfile.hpp"
 #include "emu_types.hpp"
+#include "gbc.hpp"
 #include "memory/bus.hpp"
 #include <format>
 
@@ -106,31 +107,43 @@ private:
 };
 
 /*
- * TODO: Halt processor
+ * Halt processor
  */
 class HALT final : public Instruction {
 public:
-  HALT(RegisterFile *reg_file_ptr, AddressBus *bus_ptr, bool *halted_ptr)
-      : Instruction(reg_file_ptr, bus_ptr), halted(halted_ptr) {}
+  HALT(RegisterFile *reg_file_ptr, AddressBus *bus_ptr, runtime_sys_info &sys)
+      : Instruction(reg_file_ptr, bus_ptr), sys_(sys) {}
   std::size_t exec() override {
-    *halted = true;
+    sys_.halted = true;
     return 4;
   }
   std::string describe() override { return std::format("HALT"); }
 
 private:
-  bool *const halted{};
+  runtime_sys_info &sys_;
 };
 
 /*
- * TODO: Who knows honestly lmao. Need to research this instruction
+ * This instruction is... bizzare. The most important thing is that it is used
+ * to switch into double speed mode.
+ *
+ * TODO: Implement bizzare behavior from that flow chart... it sucks lol
  */
 class STOP final : public Instruction {
 public:
-  STOP(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
-  std::size_t exec() override { return 4; }
+  STOP(RegisterFile *reg_file_ptr, AddressBus *bus_ptr, runtime_sys_info &sys)
+      : Instruction(reg_file_ptr, bus_ptr), sys_(sys) {}
+  std::size_t exec() override {
+    if (sys_.speed_switch_armed) {
+      sys_.double_speed = !sys_.double_speed;
+      sys_.speed_switch_armed = false;
+    }
+    return 4;
+  }
   std::string describe() override { return std::format("STOP"); }
+
+private:
+  runtime_sys_info &sys_;
 };
 
 #endif // __CONTROL_H

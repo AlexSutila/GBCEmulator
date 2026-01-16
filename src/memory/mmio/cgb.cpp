@@ -16,20 +16,18 @@ void KEY0::write(const byte_t value) {
 byte_t KEY0::read() { return state | ~dmg_mode_mask; }
 
 void KEY1::write(const byte_t value) {
-  /* The actual meaning of bit 7 in this state is meaningless, differentiation
-   * between modes will be accomplished through the `sys_` member. */
-  state = (value & 0x01) | ~used_bits_mask;
+  // Speed mode is then activated by executing `STOP`
+  sys_.speed_switch_armed = ((value & 0x1) != 0);
+  state = value & unused_bits_mask;
 }
 byte_t KEY1::read() {
-  byte_t value = state | ~used_bits_mask;
+  byte_t value = state & unused_bits_mask;
+  if (sys_.speed_switch_armed)
+    value = value | 0x01;
   if (sys_.double_speed)
-    value = value | cur_speed_mask;
+    value = value | 0x80;
   return value;
 }
-
-/* Switch to the `other` mode will be made on execution of the next STOP
- * instruction. I'm assuming it just toggles? */
-bool KEY1::switch_armed() const { return (state & 0x1) != 0; }
 
 } // namespace SYS
 

@@ -4,8 +4,9 @@
 #include "emu_types.hpp"
 #include <cstddef>
 
-[[nodiscard]] byte_t do_y_px_flip(const byte_t y_px, // Offset within tile
-                                  bool flip);        // Decides flip
+[[nodiscard]] byte_t do_y_px_flip(const byte_t y_px,  // Offset within tile
+                                  bool flip,          // Decides flip
+                                  bool tall_sprites); // Using 8x16 sprites
 
 /* Extracts the color index from the data bytes based on the index itself
  * and whether or not the tile is flipped */

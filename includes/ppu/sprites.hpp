@@ -37,6 +37,7 @@ sprite_visible(const byte_t x_pos,      // From object attribute memory
 [[nodiscard]] bool // Helper for whole scanline checks during OAM memory scan
 sprite_visible(const byte_t x_pos,         // From object attribute memory
                const byte_t y_pos,         // From object attribute memory
-               const byte_t cur_scanline); // Basically contents of LY register
+               const byte_t cur_scanline,  // Basically contents of LY register
+               const bool tall_sprites);   // Is 8x16 sprite mode enabled
 
 #endif // __SPRITE_H

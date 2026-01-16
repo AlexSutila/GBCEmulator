@@ -8,9 +8,8 @@ bool sprite_visible(const byte_t x_pos, const byte_t cur_pixel) {
  * because it's placed off super far right or left the sprite won't be rendered
  * and therefore doesn't need to be tracked during OAM search. */
 bool sprite_visible(const byte_t x_pos, const byte_t y_pos,
-                    const byte_t cur_scanline) {
-  // TODO: Consider variable height sprites
-  constexpr auto sprite_size_px = 8;
+                    const byte_t cur_scanline, const bool tall_sprites) {
+  const auto sprite_size_px = tall_sprites ? 16 : 8;
 
   // The edges of either sprite cut off at these values, there needs to be room
   // for them to be hidden off screen. These values come straight off pandocs.
