@@ -1,5 +1,6 @@
 #include "memory/dma.hpp"
 #include "memory/bus.hpp"
+#include "memory/mmio/cgb.hpp"
 #include "memory/mmio/dmg.hpp"
 #include <cassert>
 #include <optional>
@@ -39,26 +40,98 @@ void ObjAttrDMA::step() {
  * VRAM DMA Transfer, applicable to only CGB
  * ====================================================================== */
 
-const addr_t VramDMA::get_addr(MMIORegister &lo, MMIORegister &hi) {
+const addr_t VDMA::get_addr(MMIORegister &lo, MMIORegister &hi) {
   const byte_t hi_byte = hi.read(), lo_byte = lo.read();
   return (static_cast<addr_t>(hi_byte) << 8) | static_cast<addr_t>(lo_byte);
 }
 
-void VramDMA::set_addr(MMIORegister &lo, MMIORegister &hi, const addr_t addr) {
+void VDMA::set_addr(MMIORegister &lo, MMIORegister &hi, const addr_t addr) {
   hi.write(static_cast<byte_t>((addr >> 8) & 0xFF));
   lo.write(static_cast<byte_t>(addr & 0xFF));
 }
 
-void VramDMA::set_dest_addr(const addr_t addr) {
-  set_addr(hdma4_, hdma3_, addr);
+const addr_t VDMA::get_dest_addr() {
+  constexpr addr_t vram_base = 0x8000;
+  const addr_t addr_true = get_addr(vdma4_, vdma3_);
+  return vram_base | (addr_true & 0x1FF0);
 }
-const addr_t VramDMA::get_dest_addr() { return get_addr(hdma4_, hdma3_); }
+void VDMA::set_dest_addr(const addr_t addr) { set_addr(vdma4_, vdma3_, addr); }
 
-void VramDMA::set_src_addr(const addr_t addr) {
-  set_addr(hdma2_, hdma1_, addr);
+const addr_t VDMA::get_src_addr() {
+  const addr_t addr_true = get_addr(vdma2_, vdma1_);
+  return addr_true & 0xFFF0;
 }
-const addr_t VramDMA::get_src_addr() { return get_addr(hdma2_, hdma1_); }
+void VDMA::set_src_addr(const addr_t addr) { set_addr(vdma2_, vdma1_, addr); }
 
-void VramDMA::step_fast_cycle() {}
+void VDMA::enable(DMA::VDMATransferMode mode) {
+  using modes = DMA::VDMATransferMode;
+  if (mode == modes::GENERAL_PURPOSE_DMA)
+    state = STATE_GDMA_INIT;
 
-void VramDMA::step() {}
+  else {
+    // TOOD: HDMA
+  }
+}
+
+void VDMA::do_gdma_init() {
+  constexpr auto total_init_clks = 4;
+
+  // State entry logic
+  if (!clocks_remaining.has_value()) {
+    clocks_remaining = total_init_clks;
+    data_offset = 0;
+
+    // Sample address values and size
+    dest_base_addr = get_dest_addr();
+    src_base_addr = get_src_addr();
+    transfer_size = vdma5_.get_size_bytes();
+  }
+  --clocks_remaining.value();
+
+  // State transition logic
+  if (clocks_remaining.value() == 0) {
+    clocks_remaining.reset();
+    state = STATE_GDMA_TRAN;
+  }
+}
+
+void VDMA::do_gdma_tran() {
+  constexpr auto byte_transfer_clks = 2;
+
+  // State entry logic
+  if (!clocks_remaining.has_value())
+    clocks_remaining = byte_transfer_clks * transfer_size;
+  --clocks_remaining.value();
+
+  // Data transfer
+  if (clocks_remaining.value() % byte_transfer_clks == 0) {
+    const byte_t data = bus_.read_byte(src_base_addr + data_offset);
+    bus_.write_byte(dest_base_addr + data_offset, data);
+    ++data_offset;
+  }
+
+  // State transition logic
+  if (clocks_remaining.value() == 0) {
+    clocks_remaining.reset();
+    vdma5_.signal_complete();
+    state = STATE_DISABLED;
+  }
+}
+
+void VDMA::step_fast_cycle() {
+  if (state == STATE_GDMA_INIT)
+    do_gdma_init();
+}
+
+void VDMA::step() {
+  switch (state) {
+  case STATE_GDMA_INIT:
+    do_gdma_init();
+    break;
+  case STATE_GDMA_TRAN:
+    do_gdma_tran();
+    break;
+  default:
+    break;
+  }
+}

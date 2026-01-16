@@ -4,6 +4,7 @@
 #include "emu_types.hpp"
 #include "memory/mmio/mmio.hpp"
 #include <array>
+#include <cstddef>
 
 struct runtime_sys_info;
 
@@ -156,7 +157,7 @@ private:
 
 } // namespace PPU
 
-class VramDMA;
+class VDMA;
 namespace DMA {
 
 /*
@@ -194,20 +195,26 @@ namespace DMA {
  *       * 0xFF indicates transfer complete
  */
 
-enum class HDMATransferMode {
+enum class VDMATransferMode {
   GENERAL_PURPOSE_DMA = 0,
   HBLANK_DMA = 1,
 };
 
-class HDMA_MODE_LEN final : public MMIORegister {
+// AKA: VDMA5
+class VDMA_MODE_LEN final : public MMIORegister {
 public:
   void write(const byte_t value) override;
   byte_t read() override;
-  HDMA_MODE_LEN(VramDMA &dma) : state(0), dma_(dma) {}
+  VDMA_MODE_LEN(VDMA &dma) : state(0), dma_(dma) {}
+  void signal_complete() { state = 0xFF; }
+
+  const VDMATransferMode get_mode() const;
+  const std::size_t get_size_bytes() const;
+  const std::size_t get_size_blks() const;
 
 private:
   byte_t state{};
-  VramDMA &dma_;
+  VDMA &dma_;
 };
 
 } // namespace DMA

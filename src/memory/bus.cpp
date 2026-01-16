@@ -84,6 +84,11 @@ AddressBus::AddressBus(runtime_sys_info &sys)
 
   /* Connect memory mapped IO owned by DMA modules */
   connect_mmio(static_cast<addr_t>(mmio::MMIO_OAM_DMA), oam_dma.get_dma_reg());
+  connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA1), vdma.get_vdma1());
+  connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA2), vdma.get_vdma2());
+  connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA3), vdma.get_vdma3());
+  connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA4), vdma.get_vdma4());
+  connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA5), vdma.get_vdma5());
 }
 
 void AddressBus::connect_mmio(const addr_t addr, MMIORegister *const reg) {

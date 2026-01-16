@@ -57,15 +57,25 @@ void GameBoyColor::init_test_bed() {
 }
 
 void GameBoyColor::step_dma(bool fast_cycle) {
-  bus->get_oam_dma().step();
+  bus->get_oam_dma().step(); // Runs 2X in double speed
+
+  /* As described elsewhere, HDMA and GDMA have an initialization phase that
+   * does run fast in double speed mode, but the transfers themselves don't */
   if (fast_cycle)
-    bus->get_vram_dma().step_fast_cycle();
+    bus->get_vdma().step_fast_cycle();
   else
-    bus->get_vram_dma().step();
+    bus->get_vdma().step();
+}
+bool GameBoyColor::vdma_enabled() const { return bus->get_vdma().enabled(); }
+
+void GameBoyColor::step_processor() {
+  const auto &vdma = bus->get_vdma();
+  if (!vdma.enabled()) // CPU is halted until VDMA is complete
+    cpu->step();
 }
 
 void GameBoyColor::step() {
-  cpu->step();
+  step_processor();
   step_dma(false);
   ppu->step();
   timer->step();
@@ -76,7 +86,7 @@ void GameBoyColor::step() {
 
   // If we are in double speed mode, step affected components again
   if (sys_.double_speed) {
-    cpu->step();
+    step_processor();
     step_dma(true);
     timer->step();
   }

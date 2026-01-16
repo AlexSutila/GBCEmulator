@@ -87,8 +87,27 @@ const ObjectPriorityMode OPRI::get_prio_mode() const {
 
 namespace DMA {
 
-void HDMA_MODE_LEN::write(const byte_t value) { state = value; }
-byte_t HDMA_MODE_LEN::read() { return state; }
+void VDMA_MODE_LEN::write(const byte_t value) {
+  const auto mode = get_mode();
+  dma_.enable(mode);
+  state = value;
+}
+byte_t VDMA_MODE_LEN::read() { return state; }
+
+const VDMATransferMode VDMA_MODE_LEN::get_mode() const {
+  const byte_t mode_bit = (state & 0x80) >> 7;
+  return static_cast<VDMATransferMode>(mode_bit);
+}
+
+const std::size_t VDMA_MODE_LEN::get_size_bytes() const {
+  const byte_t size_blocks = get_size_blks();
+  return (size_blocks * 0x10) + 0x10;
+}
+
+const std::size_t VDMA_MODE_LEN::get_size_blks() const {
+  constexpr byte_t size_mask = 0x7F;
+  return state & size_mask;
+}
 
 } // namespace DMA
 
