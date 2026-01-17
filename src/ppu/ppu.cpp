@@ -105,7 +105,7 @@ PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus, Frontend &fe,
 
 bool PixelProcessingUnit::should_advance_ly() {
   constexpr std::size_t total_scanline_cycles = 456; // Fixed
-  const byte_t cur_ly = ly_.read();
+  const byte_t cur_ly = ly_.peek();
 
   /* First, perform a check to make sure we do not accidentally re-increment the
    * LY before moving onto the next frame from scanline 153, `scanline_153_bug`
@@ -310,7 +310,7 @@ void PixelProcessingUnit::do_oam_scan() {
     // Worry about ordering later, enough space is reserved ahead of time such
     // that no unnecessary memory copies occur when the vector fills up. I am
     // not 100% sure, but I am pretty sure obj enable bit impacts OAM scan.
-    if (lcdc_.obj_enable() && sprite_visible(x_pos, y_pos, ly_.read(), tall))
+    if (lcdc_.obj_enable() && sprite_visible(x_pos, y_pos, ly_.peek(), tall))
       oam_data.push_back({
           .y_pos = y_pos,
           .x_pos = x_pos,
@@ -373,7 +373,7 @@ void PixelProcessingUnit::do_draw() {
   // Rendering step, try to pop pixels when ready from the fifo
   if (auto px = get_next_pixel(); px.has_value()) {
     const auto x = row_pixels_rendered++;
-    const auto y = ly_.read();
+    const auto y = ly_.peek();
     const auto c = px.value();
     fe_.put_pixel(x, y, c);
   }
@@ -385,7 +385,7 @@ void PixelProcessingUnit::do_draw() {
   // The window uses an internal scanline counter to track it's verticle
   // rendering progress. Determine if that counter is increased (or reset)
   // here, depending on where we are in the frame.
-  if (ly_.read() >= 143)
+  if (ly_.peek() >= 143)
     fetcher->reset_win_ly();
   else if (fetcher->was_window_visible())
     fetcher->inc_win_ly();
@@ -409,7 +409,7 @@ void PixelProcessingUnit::do_hblank() {
 void PixelProcessingUnit::do_vblank() {
   // VBlank will only ever occur during invisible scanlines - duh
   assert(state == PPU::StatModes::MODE_VBLANK);
-  assert(!ly_.is_visible() || ly_.read() == 0);
+  assert(!ly_.is_visible() || ly_.peek() == 0);
   blank();
 }
 
@@ -432,7 +432,7 @@ void PixelProcessingUnit::blank() {
     return;
 
   // Request VBlank interrupt
-  if (ly_.read() == 144)
+  if (ly_.peek() == 144)
     request_vblank_irq();
 
   // End of scanline logic
@@ -452,7 +452,7 @@ void PixelProcessingUnit::update_stat() {
   stat_.set_mode(state);
 
   /* Condition 1: The LY register is equal to the LYC register */
-  const bool cond_a = (ly_.read() == lyc_.read()) &&
+  const bool cond_a = (ly_.peek() == lyc_.peek()) &&
                       stat_.int_enabled(PPU::StatIntFlags::LYC_EQ_LY);
 
   /* Condition 2: We are in HBLANK and the STAT source bit is set */
@@ -473,7 +473,7 @@ void PixelProcessingUnit::update_stat() {
   stat_irq_signal_edge = cond_a || cond_b || cond_c || cond_d;
   if (!old && stat_irq_signal_edge)
     request_lcd_irq();
-  stat_.set_ly_eq_lyc(ly_.read() == lyc_.read());
+  stat_.set_ly_eq_lyc(ly_.peek() == lyc_.peek());
 }
 
 void PixelProcessingUnit::reset() {

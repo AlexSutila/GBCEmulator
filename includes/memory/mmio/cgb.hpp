@@ -21,13 +21,13 @@ namespace SYS {
 class KEY0 final : public MMIORegister {
 public:
   void write(const byte_t value) override;
+  byte_t peek() const override;
   byte_t read() override;
-  KEY0(runtime_sys_info &sys) : sys_(sys), state(0) {}
+  KEY0(runtime_sys_info &sys) : MMIORegister(0), sys_(sys) {}
 
 private:
   static constexpr byte_t dmg_mode_mask = 0x04;
   runtime_sys_info &sys_;
-  byte_t state{};
 };
 
 /*
@@ -47,13 +47,13 @@ private:
 class KEY1 final : public MMIORegister {
 public:
   void write(const byte_t value) override;
+  byte_t peek() const override;
   byte_t read() override;
-  KEY1(runtime_sys_info &sys) : sys_(sys), state(0) {}
+  KEY1(runtime_sys_info &sys) : MMIORegister(0), sys_(sys) {}
 
 private:
   static constexpr byte_t unused_bits_mask = 0x7E;
   runtime_sys_info &sys_;
-  byte_t state{};
 };
 
 } // namespace SYS
@@ -69,12 +69,10 @@ namespace PPU {
 class VramBank final : public MMIORegister {
 public:
   void write(const byte_t value) override;
+  byte_t peek() const override;
   byte_t read() override;
-  VramBank() : MMIORegister(0), state(0) {}
+  VramBank() : MMIORegister(0) {}
   const byte_t get_bank() const;
-
-private:
-  byte_t state{};
 };
 
 /**
@@ -100,29 +98,28 @@ private:
 class PaletteIdx final : public MMIORegister {
 public:
   void write(const byte_t value) override;
+  byte_t peek() const override;
   byte_t read() override;
-  PaletteIdx() : state(0) {}
+  PaletteIdx() : MMIORegister(0) {}
 
   // Writes to color RAM can increase register value
   bool auto_inc_enabled() const;
   void inc();
+
   // Index color RAM contents
   addr_t get_address() const;
-
-private:
-  byte_t state{};
 };
 
 class PaletteData final : public MMIORegister {
 public:
   void write(const byte_t value) override;
+  byte_t peek() const override;
   byte_t read() override;
   PaletteData(std::array<byte_t, 64> &mem, PaletteIdx &idx);
 
 private:
   std::array<byte_t, 64> &mem_;
   PaletteIdx &idx_;
-  byte_t state{};
 };
 
 /*
@@ -144,15 +141,13 @@ enum class ObjectPriorityMode {
 class OPRI final : public MMIORegister {
 public:
   void write(const byte_t value) override;
+  byte_t peek() const override;
   byte_t read() override;
-  OPRI() : state(0) {}
+  OPRI() : MMIORegister(0) {}
 
   /* Resolves sprite ordering in OAM search */
   const ObjectPriorityMode get_prio_mode() const;
   static constexpr byte_t unused_mask = 0xFE;
-
-private:
-  byte_t state{};
 };
 
 } // namespace PPU
@@ -204,8 +199,8 @@ enum class VDMATransferMode {
 class VDMA_MODE_LEN final : public MMIORegister {
 public:
   void write(const byte_t value) override;
-  byte_t read() override;
-  VDMA_MODE_LEN(VDMA &dma) : state(0), dma_(dma) {}
+
+  VDMA_MODE_LEN(VDMA &dma) : MMIORegister(0), dma_(dma) {}
   void signal_complete() { state = 0xFF; }
 
   const VDMATransferMode get_mode() const;
@@ -213,7 +208,6 @@ public:
   const std::size_t get_size_blks() const;
 
 private:
-  byte_t state{};
   VDMA &dma_;
 };
 
@@ -228,12 +222,11 @@ private:
 class WramBank final : public MMIORegister {
 public:
   void write(const byte_t value) override;
+  byte_t peek() const override;
   byte_t read() override;
-  WramBank() : MMIORegister(0), state(1) {}
-  const byte_t get_bank() const;
 
-private:
-  byte_t state{};
+  WramBank() : MMIORegister(1) {}
+  const byte_t get_bank() const;
 };
 
 #endif // __MMIO_CGB_H

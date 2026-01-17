@@ -37,7 +37,7 @@ Fetcher::Fetcher(std::array<std::unique_ptr<byte_t[]>, 2> &vram,
 }
 
 void Fetcher::reset(bool window_started) {
-  fine_scroll = scx_.read() & 0x7;
+  fine_scroll = scx_.peek() & 0x7;
   state = STATE_READ_TILE;
   pixels_discarded = 0;
 
@@ -65,9 +65,9 @@ void Fetcher::reset() {
 bool Fetcher::is_window_visible(byte_t pixels_rendered) const {
   if (!win_enable_sample)
     return false;
-  const byte_t wx_px = wx_.read();
-  const byte_t wy_px = wy_.read();
-  const byte_t ly_px = ly_.read();
+  const byte_t wx_px = wx_.peek();
+  const byte_t wy_px = wy_.peek();
+  const byte_t ly_px = ly_.peek();
   return (wx_px <= pixels_rendered + 7) && (ly_px >= wy_px);
 }
 
@@ -97,18 +97,18 @@ byte_t Fetcher::read_vram_byte(addr_t addr, byte_t bank) const {
 const byte_t Fetcher::calc_bgwin_pixel_y() const {
   if (win_started)
     return win_internal_ly & 0xFF;
-  return (ly_.read() + scy_.read()) & 0xFF;
+  return (ly_.peek() + scy_.peek()) & 0xFF;
 }
 
 const byte_t Fetcher::calc_bgwin_tile_x() const {
   if (win_started)
     return data.x_coor & 0x1F;
   // Since returning unit tiles, can only be 32 max
-  return (data.x_coor + (scx_.read() / pixels_per_row)) & 0x1F;
+  return (data.x_coor + (scx_.peek() / pixels_per_row)) & 0x1F;
 }
 
 const byte_t Fetcher::calc_obj_pixel_y(const Sprite &sprite) const {
-  return (ly_.read() - (sprite.y_pos - 16)) & 0xFF;
+  return (ly_.peek() - (sprite.y_pos - 16)) & 0xFF;
 }
 
 const addr_t Fetcher::calc_tilemap_base() const {

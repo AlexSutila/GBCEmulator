@@ -13,14 +13,15 @@ void KEY0::write(const byte_t value) {
    * speed mode the system is operating in. */
   sys_.cgb_mode = (state & dmg_mode_mask) == 0;
 }
-byte_t KEY0::read() { return state | ~dmg_mode_mask; }
+byte_t KEY0::peek() const { return state | ~dmg_mode_mask; }
+byte_t KEY0::read() { return peek(); }
 
 void KEY1::write(const byte_t value) {
   // Speed mode is then activated by executing `STOP`
   sys_.speed_switch_armed = ((value & 0x1) != 0);
   state = value & unused_bits_mask;
 }
-byte_t KEY1::read() {
+byte_t KEY1::peek() const {
   byte_t value = state & unused_bits_mask;
   if (sys_.speed_switch_armed)
     value = value | 0x01;
@@ -28,13 +29,15 @@ byte_t KEY1::read() {
     value = value | 0x80;
   return value;
 }
+byte_t KEY1::read() { return peek(); }
 
 } // namespace SYS
 
 namespace PPU {
 
 void VramBank::write(const byte_t value) { state = value | 0xFE; }
-byte_t VramBank::read() { return state | 0xFE; }
+byte_t VramBank::peek() const { return state | 0xFE; }
+byte_t VramBank::read() { return peek(); }
 
 /* Only bit 0 matters, all other bits are ignored. Pandoc claims that unused
  * MMIO bits (mostly) read 1 unless specified otherwise. */
@@ -44,7 +47,8 @@ void PaletteIdx::write(const byte_t value) {
   // Fourth bit is unused
   state = value | 0x40;
 }
-byte_t PaletteIdx::read() { return state; }
+byte_t PaletteIdx::peek() const { return state; }
+byte_t PaletteIdx::read() { return peek(); }
 
 /* Writes to color RAM can increase the value stored in this register */
 void PaletteIdx::inc() {
@@ -70,14 +74,17 @@ void PaletteData::write(const byte_t value) {
     idx_.inc();
   mem_.at(addr) = value;
 }
-byte_t PaletteData::read() {
+byte_t PaletteData::peek() const {
   const addr_t addr = idx_.get_address() & 0x3F;
   return mem_.at(addr);
 }
+byte_t PaletteData::read() { return peek(); }
 
 /* All bits of OPRI are unused except the first bit */
 void OPRI::write(const byte_t value) { state = value | unused_mask; }
-byte_t OPRI::read() { return state | unused_mask; }
+byte_t OPRI::peek() const { return state | unused_mask; }
+byte_t OPRI::read() { return peek(); }
+
 const ObjectPriorityMode OPRI::get_prio_mode() const {
   byte_t prio_mode = state & ~unused_mask;
   return static_cast<ObjectPriorityMode>(prio_mode);
@@ -92,7 +99,6 @@ void VDMA_MODE_LEN::write(const byte_t value) {
   dma_.enable(mode);
   state = value;
 }
-byte_t VDMA_MODE_LEN::read() { return state; }
 
 const VDMATransferMode VDMA_MODE_LEN::get_mode() const {
   const byte_t mode_bit = (state & 0x80) >> 7;
@@ -112,7 +118,8 @@ const std::size_t VDMA_MODE_LEN::get_size_blks() const {
 } // namespace DMA
 
 void WramBank::write(const byte_t value) { state = value | 0xF8; }
-byte_t WramBank::read() { return state | 0xF8; }
+byte_t WramBank::peek() const { return state | 0xF8; }
+byte_t WramBank::read() { return peek(); }
 
 /* Only bits 0-2 matter, and only values 1-7 actually map to their respective
  * banks. If zero is written, it will map to bank 1, as bank 0 can always be

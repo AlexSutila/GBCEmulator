@@ -71,11 +71,11 @@ enum class IORegisterMapping : addr_t {
  */
 class MMIORegister {
 public:
-  // Note that read() is meant for address bus which may alter internal state
-  // peak() can be used by other components to read state
+  /* Note that read() is meant for address bus which may alter internal state
+   * peak() can be used by other components to read state. */
   virtual void write(const byte_t value);
-  virtual byte_t read(); // Not const, reads could alter internal state
-  virtual byte_t peek() const { return state; } // Non-state altering read
+  virtual byte_t peek() const; // Non-state altering read
+  virtual byte_t read();       // Not const, reads could alter internal state
   MMIORegister(const byte_t init_state) : state(init_state) {}
   MMIORegister() : state(0) {}
 
@@ -88,7 +88,7 @@ public:
    * gameboy color, we leave the option here regardless. */
   virtual constexpr bool cgb() { return false; }
 
-private:
+protected:
   byte_t state{}; // Internal state
 };
 

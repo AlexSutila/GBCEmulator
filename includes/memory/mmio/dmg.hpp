@@ -9,62 +9,62 @@ class InterruptBits;
 
 namespace Joypad {
 
-  enum class JoypadButton : byte_t {
-    RIGHT = 1 << 0,
-    LEFT = 1 << 1,
-    UP = 1 << 2,
-    DOWN = 1 << 3,
-    A = 1 << 4,
-    B = 1 << 5,
-    SELECT = 1 << 6,
-    START = 1 << 7,
-  };
+enum class JoypadButton : byte_t {
+  RIGHT = 1 << 0,
+  LEFT = 1 << 1,
+  UP = 1 << 2,
+  DOWN = 1 << 3,
+  A = 1 << 4,
+  B = 1 << 5,
+  SELECT = 1 << 6,
+  START = 1 << 7,
+};
 
-  /*
-   * FF00 — JOYP: Joypad input register
-   */
-  class JOYP final : public MMIORegister {
-  public:
-    JOYP();
-    void write(byte_t value) override;
-    byte_t read() override;
+/*
+ * FF00 — JOYP: Joypad input register
+ */
+class JOYP final : public MMIORegister {
+public:
+  JOYP();
+  void write(byte_t value) override;
+  byte_t peek() const override;
+  byte_t read() override;
 
-    void set_button(JoypadButton button, bool pressed);
-    void set_state(byte_t mask);
-    void set_interrupt_reg(InterruptBits *reg);
+  void set_button(JoypadButton button, bool pressed);
+  void set_state(byte_t mask);
+  void set_interrupt_reg(InterruptBits *reg);
 
-  private:
-    byte_t compute_low_bits() const;
-    void update_output(byte_t next_low);
+private:
+  byte_t compute_low_bits() const;
+  void update_output(byte_t next_low);
 
-    byte_t select_bits{};
-    byte_t button_state{};
-    byte_t last_low{};
-    InterruptBits *if_reg{};
-  };
+  byte_t select_bits{};
+  byte_t last_low{};
+  InterruptBits *if_reg{};
+};
 
 } // namespace Joypad
 
 namespace Audio {
 
-  /*
-   * FF10–FF26 — Audio registers (DMG)
-   */
-  class AudioRegister final : public MMIORegister {
-  public:
-    using WriteCallback = std::function<void(byte_t)>;
-    using ReadCallback = std::function<byte_t(byte_t)>;
+/*
+ * FF10–FF26 — Audio registers (DMG)
+ */
+class AudioRegister final : public MMIORegister {
+public:
+  using WriteCallback = std::function<void(byte_t)>;
+  using ReadCallback = std::function<byte_t(byte_t)>;
 
-    void configure(byte_t initial, WriteCallback on_write,
-                   ReadCallback on_read = {});
-    void write(byte_t value) override;
-    byte_t read() override;
+  void configure(byte_t initial, WriteCallback on_write,
+                 ReadCallback on_read = {});
+  void write(byte_t value) override;
+  byte_t read() override;
 
-  private:
-    byte_t state{};
-    WriteCallback on_write{};
-    ReadCallback on_read{};
-  };
+private:
+  byte_t state{};
+  WriteCallback on_write{};
+  ReadCallback on_read{};
+};
 
 } // namespace Audio
 
@@ -125,9 +125,7 @@ enum class SpriteHeight : byte_t {
 
 class LCDCtrl final : public MMIORegister {
 public:
-  void write(byte_t value) override;
-  byte_t read() override;
-  LCDCtrl() : state(0) {}
+  LCDCtrl() : MMIORegister(0) {}
 
   /* Helpers */
   const bool lcd_enabled() const;
@@ -138,9 +136,6 @@ public:
   const bool obj_enable() const;
   const bool win_enabled() const;
   const bool bg_win_en_priority() const;
-
-private:
-  byte_t state{};
 };
 
 /*
@@ -190,8 +185,9 @@ enum class StatModes : byte_t {
 class STAT final : public MMIORegister {
 public:
   void write(byte_t value) override;
+  byte_t peek() const override;
   byte_t read() override;
-  STAT() : state(0) {}
+  STAT() : MMIORegister(0) {}
 
   /* PPU needs to check these flags to generate interrupts, but does not set
    * them itself afaik. Hence, we don't need a setter. */
@@ -202,9 +198,6 @@ public:
   void set_ly_eq_lyc(bool value);
   const StatModes get_mode() const;
   void set_mode(StatModes mode);
-
-private:
-  byte_t state{};
 };
 
 /*
@@ -222,8 +215,9 @@ private:
 class LY final : public MMIORegister {
 public:
   void write(byte_t) override;
+  byte_t peek() const override;
   byte_t read() override;
-  LY() : state(0) {}
+  LY() : MMIORegister(0) {}
 
   const bool is_visible() const { return state <= 143; }
   const bool is_vblank() const { return state >= 144; }
@@ -232,8 +226,7 @@ public:
   bool inc(); // Returns true during LY wrap around
 
 private:
-  constexpr byte_t max_ly() { return 153; }
-  byte_t state{};
+  constexpr byte_t max_ly() const { return 153; }
 };
 
 /*
@@ -289,15 +282,10 @@ enum class MonoPaletteColor {
  */
 class DMGPalette final : public MMIORegister {
 public:
-  void write(byte_t value) override;
-  byte_t read() override;
-  DMGPalette() : state(0) {}
+  DMGPalette() : MMIORegister(0) {}
 
   /* Indexes the internal register state to obtain true color index */
   byte_t get_color_idx(byte_t idx) const;
-
-private:
-  byte_t state{};
 };
 
 } // namespace PPU
@@ -327,11 +315,9 @@ namespace DMA {
 class DMA final : public MMIORegister {
 public:
   void write(const byte_t value) override;
-  byte_t read() override;
-  DMA(ObjAttrDMA &dma) : addr_high(0), dma_(dma) {}
+  DMA(ObjAttrDMA &dma) : MMIORegister(0), dma_(dma) {}
 
 private:
-  byte_t addr_high{};
   ObjAttrDMA &dma_;
 };
 
@@ -343,7 +329,6 @@ private:
 class BootROMCtrl final : public MMIORegister {
 public:
   void write(const byte_t value) override;
-  byte_t read() override;
 
   /* Determine if the boot ROM is currently mapped */
   bool boot_rom_enabled() const;
@@ -360,6 +345,7 @@ class DIV final : public MMIORegister {
 public:
   explicit DIV(TimerUnit &t);
   void write(byte_t v) override;
+  byte_t peek() const override;
   byte_t read() override;
 
 private:
@@ -370,6 +356,7 @@ class TIMA final : public MMIORegister {
 public:
   explicit TIMA(TimerUnit &t);
   void write(byte_t v) override;
+  byte_t peek() const override;
   byte_t read() override;
 
 private:
@@ -380,6 +367,7 @@ class TMA final : public MMIORegister {
 public:
   explicit TMA(TimerUnit &t);
   void write(byte_t v) override;
+  byte_t peek() const override;
   byte_t read() override;
 
 private:
@@ -390,6 +378,7 @@ class TAC final : public MMIORegister {
 public:
   explicit TAC(TimerUnit &t);
   void write(byte_t v) override;
+  byte_t peek() const override;
   byte_t read() override;
 
 private:

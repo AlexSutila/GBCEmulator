@@ -5,10 +5,6 @@
 
 namespace PPU {
 
-/* All bytes are used so this logic isn't too convoluted */
-void LCDCtrl::write(byte_t value) { state = value; }
-byte_t LCDCtrl::read() { return state; }
-
 /* LCD Control helpers */
 const bool LCDCtrl::lcd_enabled() const { return (state & 0x80) != 0; }
 const TileMapArea LCDCtrl::win_tilemap_base() const {
@@ -39,10 +35,12 @@ void STAT::write(byte_t value) {
   state = (state & 0x03) | (value & 0x7C) | 0x80;
 }
 
-byte_t STAT::read() {
+byte_t STAT::peek() const {
   // Most significant bit is un-mapped
   return state | 0x80;
 }
+
+byte_t STAT::read() { return peek(); }
 
 /* This bit must be set and cleared by the pixel processor, as this register
  * does not have visibility into the values of LY and LYC to perform the updates
@@ -69,10 +67,12 @@ void STAT::set_mode(StatModes mode) {
 
 void LY::write(byte_t) { /* Read only */ }
 
-byte_t LY::read() {
+byte_t LY::peek() const {
   assert(state >= 0 && state <= max_ly());
   return state;
 }
+
+byte_t LY::read() { return peek(); }
 
 bool LY::inc() {
   if (state == max_ly()) {
@@ -82,9 +82,6 @@ bool LY::inc() {
   ++state;
   return false;
 }
-
-void DMGPalette::write(byte_t value) { state = value; }
-byte_t DMGPalette::read() { return state; }
 
 byte_t DMGPalette::get_color_idx(byte_t idx) const {
   // Each color index in the register uses two bits
@@ -97,9 +94,8 @@ namespace DMA {
 
 void DMA::write(const byte_t value) {
   dma_.start(value);
-  addr_high = value;
+  state = value;
 }
-byte_t DMA::read() { return addr_high; }
 
 } // namespace DMA
 
@@ -112,26 +108,28 @@ void BootROMCtrl::write(const byte_t value) {
   map_boot_rom = false;
 }
 
-byte_t BootROMCtrl::read() { return MMIORegister::read(); }
-
 bool BootROMCtrl::boot_rom_enabled() const { return map_boot_rom; }
 
 namespace Timer {
 
 DIV::DIV(TimerUnit &t) : MMIORegister{}, t_(t) {}
 void DIV::write(byte_t) { t_.write_div(); }
+byte_t DIV::peek() const { return t_.read_div(); }
 byte_t DIV::read() { return t_.read_div(); }
 
 TIMA::TIMA(TimerUnit &t) : MMIORegister{}, t_(t) {}
 void TIMA::write(byte_t v) { t_.write_tima(v); }
+byte_t TIMA::peek() const { return t_.read_tima(); }
 byte_t TIMA::read() { return t_.read_tima(); }
 
 TMA::TMA(TimerUnit &t) : MMIORegister{}, t_(t) {}
 void TMA::write(byte_t v) { t_.write_tma(v); }
+byte_t TMA::peek() const { return t_.read_tma(); }
 byte_t TMA::read() { return t_.read_tma(); }
 
 TAC::TAC(TimerUnit &t) : MMIORegister{}, t_(t) {}
 void TAC::write(byte_t v) { t_.write_tac(v); }
+byte_t TAC::peek() const { return t_.read_tac(); }
 byte_t TAC::read() { return t_.read_tac(); }
 
 } // namespace Timer

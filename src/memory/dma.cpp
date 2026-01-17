@@ -41,7 +41,7 @@ void ObjAttrDMA::step() {
  * ====================================================================== */
 
 const addr_t VDMA::get_addr(MMIORegister &lo, MMIORegister &hi) {
-  const byte_t hi_byte = hi.read(), lo_byte = lo.read();
+  const byte_t hi_byte = hi.peek(), lo_byte = lo.peek();
   return (static_cast<addr_t>(hi_byte) << 8) | static_cast<addr_t>(lo_byte);
 }
 
