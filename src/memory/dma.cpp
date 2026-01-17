@@ -74,7 +74,7 @@ void VDMA::enable(DMA::VDMATransferMode mode) {
 }
 
 void VDMA::do_gdma_init() {
-  constexpr auto total_init_clks = 4;
+  constexpr auto total_init_clks = 4 * 4; // 4 M-cycles, 8 T-cycles
 
   // State entry logic
   if (!clocks_remaining.has_value()) {
@@ -96,7 +96,7 @@ void VDMA::do_gdma_init() {
 }
 
 void VDMA::do_gdma_tran() {
-  constexpr auto byte_transfer_clks = 2;
+  constexpr auto byte_transfer_clks = 2 * 4; // 2 M-cycles, 8 T-cycles
 
   // State entry logic
   if (!clocks_remaining.has_value())
