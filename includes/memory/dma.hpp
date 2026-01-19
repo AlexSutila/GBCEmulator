@@ -8,10 +8,11 @@
 #include <cstddef>
 #include <optional>
 
+struct runtime_sys_info;
+class AddressBus;
+
 [[nodiscard]] inline byte_t vdma_bytes_to_blks(std::size_t bytes);
 [[nodiscard]] inline std::size_t vdma_blks_to_bytes(byte_t blks);
-
-class AddressBus;
 
 class DirectMemoryAccess {
 public:
@@ -47,12 +48,12 @@ private:
  */
 class VDMA : public DirectMemoryAccess {
 public:
+  explicit VDMA(AddressBus &bus, runtime_sys_info &sys);
   MMIORegister *const get_vdma1() { return &vdma1_; }
   MMIORegister *const get_vdma2() { return &vdma2_; }
   MMIORegister *const get_vdma3() { return &vdma3_; }
   MMIORegister *const get_vdma4() { return &vdma4_; }
   MMIORegister *const get_vdma5() { return &vdma5_; }
-  explicit VDMA(AddressBus &bus);
 
   /* The initialization phase of DMA is impacted by double speed mode, but the
    * acutal transfer itself is not. Hence, `step_fast_cycle()` exists to run the
@@ -118,6 +119,7 @@ private:
   /* Helpers for working with source and destination address registers. */
   void set_addr(MMIORegister &lo, MMIORegister &hi, const addr_t addr);
   const addr_t get_addr(MMIORegister &lo, MMIORegister &hi);
+  runtime_sys_info &sys_;
 };
 
 #endif //__DMA_H

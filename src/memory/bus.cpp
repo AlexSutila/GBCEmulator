@@ -54,11 +54,11 @@ static constexpr bool is_hram_range(const addr_t a) noexcept {
 }
 
 AddressBus::AddressBus(runtime_sys_info &sys)
-    : key0(sys),      // Controls backwards compatability
-      key1(sys),      // Controls clock speed mode
-      oam_dma(*this), // Performs object attribute DMA (DMG and CGB)
-      vdma(*this),    // Performs GDMA and HDMA (CGB only)
-      sys_(sys)       // Generic system information
+    : key0(sys),        // Controls backwards compatability
+      key1(sys),        // Controls clock speed mode
+      oam_dma(*this),   // Performs object attribute DMA (DMG and CGB)
+      vdma(*this, sys), // Performs GDMA and HDMA (CGB only)
+      sys_(sys)         // Generic system information
 {
   constexpr std::size_t vram_bank_size = 0x2000;
   constexpr std::size_t wram_bank_size = 0x1000;

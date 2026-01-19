@@ -1,4 +1,5 @@
 #include "memory/dma.hpp"
+#include "gbc.hpp"
 #include "memory/bus.hpp"
 #include "memory/mmio/cgb.hpp"
 #include "memory/mmio/dmg.hpp"
@@ -59,11 +60,12 @@ void ObjAttrDMA::step() {
  * VRAM DMA Transfer, applicable to only CGB
  * ====================================================================== */
 
-VDMA::VDMA(AddressBus &bus)
+VDMA::VDMA(AddressBus &bus, runtime_sys_info &sys)
     : DirectMemoryAccess(bus), // To provide bus reading capabilities
       vdma1_(), vdma2_(),      // Source low and high registers
       vdma3_(), vdma4_(),      // Destination low and high registers
-      vdma5_(*this) {          // The Vram DMA length/mode/start register
+      vdma5_(*this),           // The Vram DMA length/mode/start register
+      sys_(sys) {              // HDMA is paused in halt mode
   src_base_addr = dest_base_addr = data_offset = transfer_size = 0;
   state = STATE_DISABLED;
 }
@@ -146,12 +148,13 @@ void VDMA::do_init(State next_state) {
 
 void VDMA::do_gdma_init() {
   const auto next_state = STATE_GDMA_TRAN;
-  do_init(next_state); // Helper
+  do_init(next_state);
 }
 
 void VDMA::do_hdma_init() {
   const auto next_state = STATE_HDMA_TRAN;
-  do_init(next_state); // Helper
+  if (!sys_.halted) // HDMA is paused when halted
+    do_init(next_state);
 }
 
 void VDMA::do_gdma_tran() {
@@ -176,6 +179,8 @@ void VDMA::do_gdma_tran() {
 void VDMA::do_hdma_tran() {
   constexpr auto byte_transfer_clks = 2 * 4; // 2 M-cycles, 8 T-cycles
   constexpr auto blk_size_bytes = 0x10;      // Fixed transfer size
+  if (sys_.halted) // HDMA is paused when halted
+    return;
 
   // State entry logic, always transfers exactly one block
   if (!clocks_remaining.has_value())
@@ -198,7 +203,7 @@ void VDMA::do_hdma_tran() {
 }
 
 void VDMA::do_hdma_wait() {
-  if (can_start_hdma)
+  if (!sys_.halted && can_start_hdma)
     state = STATE_HDMA_INIT;
 }
 
