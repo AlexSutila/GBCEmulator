@@ -8,6 +8,9 @@
 #include <cstddef>
 #include <optional>
 
+[[nodiscard]] inline byte_t vdma_bytes_to_blks(std::size_t bytes);
+[[nodiscard]] inline std::size_t vdma_blks_to_bytes(byte_t blks);
+
 class AddressBus;
 
 class DirectMemoryAccess {
@@ -59,7 +62,12 @@ public:
 
   /* For enabling and observing the state of both HDMA and GDMA procedures. */
   bool enabled() const { return gdma_enabled() || hdma_enabled(); }
-  void enable(DMA::VDMATransferMode mode);
+  void enable(DMA::VDMATransferMode mode, const byte_t blks);
+
+  /* To be used by the VDMA5 register to interrogate the progress of HDMA */
+  bool waiting_on_hblank() const { return state == STATE_HDMA_WAIT; }
+  bool complete() const { return state == STATE_DISABLED; }
+  byte_t get_blks_remaining() const;
 
   /* For the pixel processor to signal that it is in HBLANK, allowing queued up
    * HDMA transfers to execute. */
@@ -76,10 +84,6 @@ private:
   addr_t src_base_addr{}, dest_base_addr{}, data_offset{}, transfer_size{};
   bool can_start_hdma{}; // True when PPU is in HBLANK
 
-  bool gdma_enabled() const { return state == STATE_GDMA_TRAN; }
-  bool hdma_enabled() const { return false; } // TODO
-  void transfer_byte(const addr_t offset);
-
   enum State {
     STATE_DISABLED, // DMA is not active
 
@@ -93,13 +97,18 @@ private:
     STATE_HDMA_TRAN, // Data Transfer
   } state;
 
+  /* Generic helper methods */
+  bool gdma_enabled() const { return state == STATE_GDMA_TRAN; }
+  bool hdma_enabled() const { return state == STATE_HDMA_TRAN; }
+  void transfer_byte(const addr_t offset);
+  void do_init(State next_state);
+
   /* See details about these registers under their definitions in `cgb.hpp` */
   MMIORegister vdma1_, vdma2_; // Source low and high registers
   MMIORegister vdma3_, vdma4_; // Destination low and high registers
   DMA::VDMA_MODE_LEN vdma5_;
 
   /* Core VDMA logic implementation */
-  void do_init(State next_state, addr_t offset_bytes, addr_t size_bytes);
   void do_gdma_init();
   void do_gdma_tran();
   void do_hdma_init();

@@ -1,6 +1,7 @@
 #include "memory/mmio/cgb.hpp"
 #include "emu_types.hpp"
 #include "gbc.hpp"
+#include "memory/dma.hpp"
 #include <cassert>
 
 namespace SYS {
@@ -95,31 +96,27 @@ const ObjectPriorityMode OPRI::get_prio_mode() const {
 namespace DMA {
 
 void VDMA_MODE_LEN::write(const byte_t value) {
-  const auto mode = get_mode();
-  dma_.enable(mode);
-  state = value;
-}
+  const byte_t mode_bit = (value & 0x80) >> 7;
+  const auto mode = static_cast<VDMATransferMode>(mode_bit);
 
-const VDMATransferMode VDMA_MODE_LEN::get_mode() const {
-  const byte_t mode_bit = (state & 0x80) >> 7;
-  return static_cast<VDMATransferMode>(mode_bit);
-}
-
-void VDMA_MODE_LEN::update_size(const byte_t bytes_transfered) {
   constexpr byte_t size_mask = 0x7F;
-  byte_t size_blocks = (bytes_transfered - 0x10) / 0x10;
-  state = (state & ~size_mask) | (size_blocks & size_mask);
+  const byte_t blks = value & size_mask;
+
+  // All logic revolving around HDMA cancel and bizzare behavior is implemented
+  // within the VDMA unit itself, so calling this was is completely intentional.
+  dma_.enable(mode, blks);
 }
 
-const std::size_t VDMA_MODE_LEN::get_size_bytes() const {
-  const byte_t size_blocks = get_size_blks();
-  return (size_blocks * 0x10) + 0x10;
-}
+byte_t VDMA_MODE_LEN::peek() const {
+  if (dma_.complete())
+    return 0xFF; // TODO: This is still not entirely correct (HDMA cancels)
 
-const std::size_t VDMA_MODE_LEN::get_size_blks() const {
+  // If the DMA is still in progress, it just shows the size. The seventh
+  // bit indicates that the full data transfer is complete.
   constexpr byte_t size_mask = 0x7F;
-  return state & size_mask;
+  return dma_.get_blks_remaining() & size_mask;
 }
+byte_t VDMA_MODE_LEN::read() { return peek(); }
 
 } // namespace DMA
 

@@ -5,6 +5,16 @@
 #include <cassert>
 #include <optional>
 
+inline byte_t vdma_bytes_to_blks(std::size_t bytes) {
+  constexpr auto blk_size_bytes = 0x10;
+  return (bytes - blk_size_bytes) / blk_size_bytes;
+}
+
+inline std::size_t vdma_blks_to_bytes(byte_t blks) {
+  constexpr auto blk_size_bytes = 0x10;
+  return (blks * blk_size_bytes) + blk_size_bytes;
+}
+
 DirectMemoryAccess::DirectMemoryAccess(AddressBus &bus) : bus_(bus) {
   clocks_remaining = std::nullopt;
 }
@@ -85,14 +95,28 @@ void VDMA::set_ppu_hblank_signal(bool hblank_enabled) {
   can_start_hdma = hblank_enabled;
 }
 
-void VDMA::enable(DMA::VDMATransferMode mode) {
+void VDMA::enable(DMA::VDMATransferMode mode, const byte_t blks) {
   using modes = DMA::VDMATransferMode;
-  if (mode == modes::GENERAL_PURPOSE_DMA)
-    state = STATE_GDMA_INIT;
+  transfer_size = vdma_blks_to_bytes(blks);
+  data_offset = 0;
 
-  else {
-    // TOOD: HDMA
-  }
+  /* If the mode bit was written zero, it should start GDMA. However, if we are
+   * already performing an ongoing HDMA transfer, then it will be cancelled and
+   * no DMA happens. */
+  if (mode == modes::GENERAL_PURPOSE_DMA)
+    state = (state == STATE_HDMA_WAIT) ? STATE_DISABLED : STATE_GDMA_INIT;
+
+  /* Otherwise, we start an HDMA data transfer. This can only happen if we are
+   * not already performing or waiting on HDMA. If the pixel processor already
+   * is in HBLANK, then it can begin the transfer right away. Otherwise, must
+   * wait until the pixel processor is performing HBLANK. */
+  else if (mode == modes::HBLANK_DMA && state == STATE_DISABLED)
+    state = (can_start_hdma) ? STATE_HDMA_INIT : STATE_HDMA_WAIT;
+}
+
+byte_t VDMA::get_blks_remaining() const {
+  const std::size_t bytes_remaining = transfer_size - data_offset;
+  return vdma_bytes_to_blks(bytes_remaining);
 }
 
 void VDMA::transfer_byte(const addr_t offset) {
@@ -100,18 +124,16 @@ void VDMA::transfer_byte(const addr_t offset) {
   bus_.write_byte(dest_base_addr + offset, data);
 }
 
-void VDMA::do_init(State next_state, addr_t offset_bytes, addr_t size_bytes) {
+void VDMA::do_init(State next_state) {
   constexpr auto total_init_clks = 4 * 4; // 4 M-cycles, 8 T-cycles
 
   // State entry logic
   if (!clocks_remaining.has_value()) {
     clocks_remaining = total_init_clks;
-    data_offset = offset_bytes;
 
     // Sample address values and size
     dest_base_addr = get_dest_addr();
     src_base_addr = get_src_addr();
-    transfer_size = size_bytes;
   }
   --clocks_remaining.value();
 
@@ -123,21 +145,13 @@ void VDMA::do_init(State next_state, addr_t offset_bytes, addr_t size_bytes) {
 }
 
 void VDMA::do_gdma_init() {
-  const auto size_bytes = vdma5_.get_size_bytes();
   const auto next_state = STATE_GDMA_TRAN;
-  const auto offset_bytes = 0;
-
-  // Does one large data transfer in one go, prime for the entire transfer
-  do_init(next_state, offset_bytes, size_bytes);
+  do_init(next_state); // Helper
 }
 
 void VDMA::do_hdma_init() {
   const auto next_state = STATE_HDMA_TRAN;
-  const auto blk_size_bytes = 0x10;
-  const auto offset_bytes = 0;
-
-  // Does multiple small transfers during blanking, so use blksize
-  do_init(next_state, offset_bytes, blk_size_bytes);
+  do_init(next_state); // Helper
 }
 
 void VDMA::do_gdma_tran() {
@@ -155,17 +169,17 @@ void VDMA::do_gdma_tran() {
   // State transition logic
   if (clocks_remaining.value() == 0) {
     clocks_remaining.reset();
-    vdma5_.signal_complete();
     state = STATE_DISABLED;
   }
 }
 
 void VDMA::do_hdma_tran() {
   constexpr auto byte_transfer_clks = 2 * 4; // 2 M-cycles, 8 T-cycles
+  constexpr auto blk_size_bytes = 0x10;      // Fixed transfer size
 
-  // State entry logic
+  // State entry logic, always transfers exactly one block
   if (!clocks_remaining.has_value())
-    clocks_remaining = byte_transfer_clks * transfer_size;
+    clocks_remaining = byte_transfer_clks * blk_size_bytes;
 
   // Data transfer
   if (clocks_remaining.value() % byte_transfer_clks == 0)
@@ -179,15 +193,20 @@ void VDMA::do_hdma_tran() {
 
   // If the full transfer is complete, we are done. Otherwise, we have to wait
   // for the PPU to signal that we can begin the transfer of the next data block
+  state = (transfer_size == data_offset) ? STATE_DISABLED : STATE_HDMA_WAIT;
+  can_start_hdma = false; // Do not rapid fire HDMA transfers
 }
 
 void VDMA::do_hdma_wait() {
-  // TODO
+  if (can_start_hdma)
+    state = STATE_HDMA_INIT;
 }
 
 void VDMA::step_fast_cycle() {
   if (state == STATE_GDMA_INIT)
     do_gdma_init();
+  else if (state == STATE_HDMA_INIT)
+    do_hdma_init();
 }
 
 void VDMA::step() {
@@ -197,6 +216,15 @@ void VDMA::step() {
     break;
   case STATE_GDMA_TRAN:
     do_gdma_tran();
+    break;
+  case STATE_HDMA_WAIT:
+    do_hdma_wait();
+    break;
+  case STATE_HDMA_INIT:
+    do_hdma_init();
+    break;
+  case STATE_HDMA_TRAN:
+    do_hdma_tran();
     break;
   default:
     break;

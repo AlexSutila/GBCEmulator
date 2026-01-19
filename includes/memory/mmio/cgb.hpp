@@ -199,14 +199,11 @@ enum class VDMATransferMode {
 class VDMA_MODE_LEN final : public MMIORegister {
 public:
   void write(const byte_t value) override;
+  byte_t peek() const override;
+  byte_t read() override;
 
   VDMA_MODE_LEN(VDMA &dma) : MMIORegister(0), dma_(dma) {}
   void update_size(const byte_t bytes_transfered);
-  void signal_complete() { state = 0xFF; }
-
-  const VDMATransferMode get_mode() const;
-  const std::size_t get_size_bytes() const;
-  const std::size_t get_size_blks() const;
 
 private:
   VDMA &dma_;
