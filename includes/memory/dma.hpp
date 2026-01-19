@@ -12,9 +12,7 @@ class AddressBus;
 
 class DirectMemoryAccess {
 public:
-  DirectMemoryAccess(AddressBus &bus) : bus_(bus) {
-    clocks_remaining = std::nullopt;
-  }
+  explicit DirectMemoryAccess(AddressBus &bus);
   virtual void step() = 0; // Drives data transfer if active
 
 protected:
@@ -27,10 +25,8 @@ protected:
  */
 class ObjAttrDMA : public DirectMemoryAccess {
 public:
-  ObjAttrDMA(AddressBus &bus) : DirectMemoryAccess(bus), dma_(*this) {
-    src_base_addr = data_offset = 0;
-  }
   DMA::DMA *const get_dma_reg();
+  explicit ObjAttrDMA(AddressBus &bus);
 
   void start(const byte_t addr_high); // Begins the actual data transfer
   void step() override;
@@ -48,19 +44,12 @@ private:
  */
 class VDMA : public DirectMemoryAccess {
 public:
-  VDMA(AddressBus &bus)
-      : DirectMemoryAccess(bus), // To provide bus reading capabilities
-        vdma1_(), vdma2_(),      // Source low and high registers
-        vdma3_(), vdma4_(),      // Destination low and high registers
-        vdma5_(*this) {          // The Vram DMA length/mode/start register
-    src_base_addr = dest_base_addr = data_offset = transfer_size = 0;
-    state = STATE_DISABLED;
-  }
   MMIORegister *const get_vdma1() { return &vdma1_; }
   MMIORegister *const get_vdma2() { return &vdma2_; }
   MMIORegister *const get_vdma3() { return &vdma3_; }
   MMIORegister *const get_vdma4() { return &vdma4_; }
   MMIORegister *const get_vdma5() { return &vdma5_; }
+  explicit VDMA(AddressBus &bus);
 
   /* The initialization phase of DMA is impacted by double speed mode, but the
    * acutal transfer itself is not. Hence, `step_fast_cycle()` exists to run the
@@ -72,6 +61,10 @@ public:
   bool enabled() const { return gdma_enabled() || hdma_enabled(); }
   void enable(DMA::VDMATransferMode mode);
 
+  /* For the pixel processor to signal that it is in HBLANK, allowing queued up
+   * HDMA transfers to execute. */
+  void set_ppu_hblank_signal(bool hblank_enabled);
+
   /* Getters and setters for both source and destination addresses involve
    * consulting a pair of two 8-bit MMIORegisters to form a 16-bit address. */
   void set_dest_addr(const addr_t addr);
@@ -81,6 +74,8 @@ public:
 
 private:
   addr_t src_base_addr{}, dest_base_addr{}, data_offset{}, transfer_size{};
+  bool can_start_hdma{}; // True when PPU is in HBLANK
+
   bool gdma_enabled() const { return state == STATE_GDMA_TRAN; }
   bool hdma_enabled() const { return false; } // TODO
 

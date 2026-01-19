@@ -3,6 +3,7 @@
 
 #include "cpu/interrupts.hpp"
 #include "memory/bus.hpp"
+#include "memory/dma.hpp"
 #include "memory/mmio/cgb.hpp"
 #include "memory/mmio/dmg.hpp"
 #include "memory/mmio/mmio.hpp"
@@ -57,7 +58,8 @@ private:
   std::optional<std::uint32_t> get_next_pixel();
 
   /* For popping and combining pixel data from both fifos */
-  std::uint32_t resolve_px_priority(const pixel &bg_px, const pixel &obj_px) const;
+  std::uint32_t resolve_px_priority(const pixel &bg_px,
+                                    const pixel &obj_px) const;
   std::optional<std::uint32_t> try_fifo_pop();
 
   /* Tracks the scanline we are currently on, and related hardware bugs */
@@ -77,6 +79,9 @@ private:
   /* CGB mode object priority resolution */
   PPU::OPRI opri_{};
 
+  /* CGB mode only, VRAM direct memory access */
+  VDMA &vdma_;
+
   /* Pixel Processor operation modes */
   void do_disabled();
   void do_oam_scan();
@@ -85,7 +90,7 @@ private:
   /* Blanking periods */
   void do_hblank();
   void do_vblank();
-  void blank();
+  bool blank(); // Returns true when blakning period is complete
 
   /* Interrupt helpers */
   void request_vblank_irq() {

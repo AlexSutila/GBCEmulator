@@ -5,9 +5,18 @@
 #include <cassert>
 #include <optional>
 
+DirectMemoryAccess::DirectMemoryAccess(AddressBus &bus) : bus_(bus) {
+  clocks_remaining = std::nullopt;
+}
+
 /* ======================================================================
  * OAM DMA Transfer, applicable to both DMG and CGB
  * ====================================================================== */
+
+ObjAttrDMA::ObjAttrDMA(AddressBus &bus) : DirectMemoryAccess(bus), dma_(*this) {
+  src_base_addr = data_offset = 0;
+}
+
 DMA::DMA *const ObjAttrDMA::get_dma_reg() { return &dma_; }
 
 void ObjAttrDMA::start(const byte_t addr_high) {
@@ -40,6 +49,15 @@ void ObjAttrDMA::step() {
  * VRAM DMA Transfer, applicable to only CGB
  * ====================================================================== */
 
+VDMA::VDMA(AddressBus &bus)
+    : DirectMemoryAccess(bus), // To provide bus reading capabilities
+      vdma1_(), vdma2_(),      // Source low and high registers
+      vdma3_(), vdma4_(),      // Destination low and high registers
+      vdma5_(*this) {          // The Vram DMA length/mode/start register
+  src_base_addr = dest_base_addr = data_offset = transfer_size = 0;
+  state = STATE_DISABLED;
+}
+
 const addr_t VDMA::get_addr(MMIORegister &lo, MMIORegister &hi) {
   const byte_t hi_byte = hi.peek(), lo_byte = lo.peek();
   return (static_cast<addr_t>(hi_byte) << 8) | static_cast<addr_t>(lo_byte);
@@ -62,6 +80,10 @@ const addr_t VDMA::get_src_addr() {
   return addr_true & 0xFFF0;
 }
 void VDMA::set_src_addr(const addr_t addr) { set_addr(vdma2_, vdma1_, addr); }
+
+void VDMA::set_ppu_hblank_signal(bool hblank_enabled) {
+  can_start_hdma = hblank_enabled;
+}
 
 void VDMA::enable(DMA::VDMATransferMode mode) {
   using modes = DMA::VDMATransferMode;

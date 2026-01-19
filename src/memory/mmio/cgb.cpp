@@ -105,6 +105,12 @@ const VDMATransferMode VDMA_MODE_LEN::get_mode() const {
   return static_cast<VDMATransferMode>(mode_bit);
 }
 
+void VDMA_MODE_LEN::update_size(const byte_t bytes_transfered) {
+  constexpr byte_t size_mask = 0x7F;
+  byte_t size_blocks = (bytes_transfered - 0x10) / 0x10;
+  state = (state & ~size_mask) | (size_blocks & size_mask);
+}
+
 const std::size_t VDMA_MODE_LEN::get_size_bytes() const {
   const byte_t size_blocks = get_size_blks();
   return (size_blocks * 0x10) + 0x10;

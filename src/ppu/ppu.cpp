@@ -30,24 +30,25 @@ template <typename T> T *init_mmio(AddressBus *bus, IORegisterMapping reg_id) {
 
 PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus, Frontend &fe,
                                          runtime_sys_info &sys)
-    : sys_(sys),             // General operating mode info
-      fe_(fe),               // To access frame buffer(s)
-      vram(bus->get_vram()), // Tile data/map/attribute content
-      oam(bus->get_oam()),   // Object (sprite) attribute memory
-      lcdc_(),               // LCD control
-      stat_(),               // PPU status
-      lyc_(),                // Current scanline compare
-      scy_(),                // BG scroll Y
-      scx_(),                // BG scroll X
-      wy_(),                 // Window scroll Y
-      wx_(),                 // Window scroll X
-      ly_(),                 // Current scanline
-      bgp_(),                // DMG background and window palette
-      obp0_(),               // The first DMG sprite/object palette
-      obp1_(),               // The second DMG sprite/object palette
-      opri_(),               // CGB object priority resolution
-      obj_fifo(),            // Pushes object (or sprite) pixels
-      bg_fifo(),             // Pushes background/window pixels
+    : sys_(sys),              // General operating mode info
+      fe_(fe),                // To access frame buffer(s)
+      vram(bus->get_vram()),  // Tile data/map/attribute content
+      oam(bus->get_oam()),    // Object (sprite) attribute memory
+      lcdc_(),                // LCD control
+      stat_(),                // PPU status
+      lyc_(),                 // Current scanline compare
+      scy_(),                 // BG scroll Y
+      scx_(),                 // BG scroll X
+      wy_(),                  // Window scroll Y
+      wx_(),                  // Window scroll X
+      ly_(),                  // Current scanline
+      bgp_(),                 // DMG background and window palette
+      obp0_(),                // The first DMG sprite/object palette
+      obp1_(),                // The second DMG sprite/object palette
+      opri_(),                // CGB object priority resolution
+      vdma_(bus->get_vdma()), // Performs GDMA and HDMA in CGB mode
+      obj_fifo(),             // Pushes object (or sprite) pixels
+      bg_fifo(),              // Pushes background/window pixels
       obj_cram(std::make_unique<ColorRam>()), // CGB sprite color RAM
       bg_cram(std::make_unique<ColorRam>())   // CGB background color RAM
 {
@@ -336,6 +337,10 @@ void PixelProcessingUnit::do_oam_scan() {
   std::sort(oam_data.begin(), oam_data.end(),
             [](const Sprite &a, const Sprite &b) { return a.x_pos < b.x_pos; });
 
+  /* Signal that HDMA can start running if it is has been requested or started
+   * previously. If HBLANK is partially complete, it can also be triggered. */
+  vdma_.set_ppu_hblank_signal(true);
+
   // State transition logic
   state = modes::MODE_DRAWING;
   total_mode_clks.reset();
@@ -403,7 +408,12 @@ void PixelProcessingUnit::do_hblank() {
   // HBlank will only ever occur during visible scanlines
   assert(state == PPU::StatModes::MODE_HBLANK);
   assert(ly_.is_visible());
-  blank();
+  const bool complete = blank();
+
+  /* Signal that HDMA is no longer allowed to kick in. Note, that it can still
+   * start running last minute and bleed into OAM scan. This is intentional. */
+  if (complete)
+    vdma_.set_ppu_hblank_signal(false);
 }
 
 void PixelProcessingUnit::do_vblank() {
@@ -413,7 +423,7 @@ void PixelProcessingUnit::do_vblank() {
   blank();
 }
 
-void PixelProcessingUnit::blank() {
+bool PixelProcessingUnit::blank() {
   constexpr std::size_t total_scanline_cycles = 456;
   using modes = PPU::StatModes;
 
@@ -429,7 +439,7 @@ void PixelProcessingUnit::blank() {
 
   // Blanking incomplete
   if (cur_scanline_clks < total_mode_clks.value())
-    return;
+    return false;
 
   // Request VBlank interrupt
   if (ly_.peek() == 144)
@@ -443,6 +453,7 @@ void PixelProcessingUnit::blank() {
 
   total_mode_clks.reset();
   cur_scanline_clks = 0;
+  return true;
 }
 
 void PixelProcessingUnit::update_stat() {

@@ -201,6 +201,7 @@ public:
   void write(const byte_t value) override;
 
   VDMA_MODE_LEN(VDMA &dma) : MMIORegister(0), dma_(dma) {}
+  void update_size(const byte_t bytes_transfered);
   void signal_complete() { state = 0xFF; }
 
   const VDMATransferMode get_mode() const;
