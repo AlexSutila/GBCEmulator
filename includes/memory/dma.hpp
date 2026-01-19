@@ -78,11 +78,19 @@ private:
 
   bool gdma_enabled() const { return state == STATE_GDMA_TRAN; }
   bool hdma_enabled() const { return false; } // TODO
+  void transfer_byte(const addr_t offset);
 
   enum State {
-    STATE_DISABLED,  // DMA is not active
-    STATE_GDMA_INIT, // Four clock cycle initialization phase
-    STATE_GDMA_TRAN, // GDMA data transfer
+    STATE_DISABLED, // DMA is not active
+
+    /* GDMA - General purpose DMA */
+    STATE_GDMA_INIT, // Initialization
+    STATE_GDMA_TRAN, // Data Transfer
+
+    /* HDMA - HBLANK DMA */
+    STATE_HDMA_WAIT, // HDMA is enabled, but we are waiting for HBLANK
+    STATE_HDMA_INIT, // Initialization
+    STATE_HDMA_TRAN, // Data Transfer
   } state;
 
   /* See details about these registers under their definitions in `cgb.hpp` */
@@ -91,8 +99,12 @@ private:
   DMA::VDMA_MODE_LEN vdma5_;
 
   /* Core VDMA logic implementation */
-  void do_gdma_init(); // Initialization phase
-  void do_gdma_tran(); // Data transfer
+  void do_init(State next_state, addr_t offset_bytes, addr_t size_bytes);
+  void do_gdma_init();
+  void do_gdma_tran();
+  void do_hdma_init();
+  void do_hdma_tran();
+  void do_hdma_wait();
 
   /* Helpers for working with source and destination address registers. */
   void set_addr(MMIORegister &lo, MMIORegister &hi, const addr_t addr);
