@@ -108,12 +108,13 @@ void VDMA_MODE_LEN::write(const byte_t value) {
 }
 
 byte_t VDMA_MODE_LEN::peek() const {
+  constexpr byte_t complete_mask = 0x80;
+  constexpr byte_t size_mask = 0x7F;
   if (dma_.complete())
-    return 0xFF; // TODO: This is still not entirely correct (HDMA cancels)
+    return complete_mask | dma_.get_blks_remaining();
 
   // If the DMA is still in progress, it just shows the size. The seventh
   // bit indicates that the full data transfer is complete.
-  constexpr byte_t size_mask = 0x7F;
   return dma_.get_blks_remaining() & size_mask;
 }
 byte_t VDMA_MODE_LEN::read() { return peek(); }

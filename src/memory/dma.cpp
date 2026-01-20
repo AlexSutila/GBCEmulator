@@ -146,6 +146,15 @@ void VDMA::do_init(State next_state) {
   }
 }
 
+/* In some circumstances, when DMA has completed VDMA5 will return 0xFF when
+ * read, meaning we have to update the size to reflect this value. That is all
+ * this method is intended to do. */
+void VDMA::signal_complete() {
+  constexpr auto max_blks = 0x7F;
+  transfer_size = vdma_blks_to_bytes(max_blks);
+  data_offset = 0;
+}
+
 void VDMA::do_gdma_init() {
   const auto next_state = STATE_GDMA_TRAN;
   do_init(next_state);
@@ -173,13 +182,14 @@ void VDMA::do_gdma_tran() {
   if (clocks_remaining.value() == 0) {
     clocks_remaining.reset();
     state = STATE_DISABLED;
+    signal_complete(); // VDMA5 reads 0xFF
   }
 }
 
 void VDMA::do_hdma_tran() {
   constexpr auto byte_transfer_clks = 2 * 4; // 2 M-cycles, 8 T-cycles
   constexpr auto blk_size_bytes = 0x10;      // Fixed transfer size
-  if (sys_.halted) // HDMA is paused when halted
+  if (sys_.halted)                           // HDMA is paused when halted
     return;
 
   // State entry logic, always transfers exactly one block
@@ -198,8 +208,13 @@ void VDMA::do_hdma_tran() {
 
   // If the full transfer is complete, we are done. Otherwise, we have to wait
   // for the PPU to signal that we can begin the transfer of the next data block
-  state = (transfer_size == data_offset) ? STATE_DISABLED : STATE_HDMA_WAIT;
   can_start_hdma = false; // Do not rapid fire HDMA transfers
+  if (transfer_size != data_offset)
+    state = STATE_HDMA_WAIT;
+  else {
+    state = STATE_DISABLED;
+    signal_complete();
+  }
 }
 
 void VDMA::do_hdma_wait() {

@@ -110,6 +110,7 @@ private:
   DMA::VDMA_MODE_LEN vdma5_;
 
   /* Core VDMA logic implementation */
+  void signal_complete();
   void do_gdma_init();
   void do_gdma_tran();
   void do_hdma_init();
