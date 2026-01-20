@@ -96,8 +96,8 @@ PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus, Frontend &fe,
   );
 
   /* Initialize OAM search metadata */
-  constexpr auto oam_sprite_count = 40;
-  oam_data.reserve(oam_sprite_count);
+  constexpr auto max_oam_sprite_count = 10;
+  oam_data.reserve(max_oam_sprite_count);
 
   /* Configure PPU to initial state, doesn't technically happen until PPU is
    * enabled but we do it anyway just because. */
@@ -274,6 +274,7 @@ void PixelProcessingUnit::do_disabled() {
 
 void PixelProcessingUnit::do_oam_scan() {
   constexpr std::size_t oam_t_cycles = 80; // Fixed
+  constexpr auto max_sprites = 10;         // Per-scanline hardware limitation
   using modes = PPU::StatModes;
 
   // OAM scan always happens on visible scanlines
@@ -311,7 +312,9 @@ void PixelProcessingUnit::do_oam_scan() {
     // Worry about ordering later, enough space is reserved ahead of time such
     // that no unnecessary memory copies occur when the vector fills up. I am
     // not 100% sure, but I am pretty sure obj enable bit impacts OAM scan.
-    if (lcdc_.obj_enable() && sprite_visible(x_pos, y_pos, ly_.peek(), tall))
+    if (lcdc_.obj_enable() &&                           // Are sprites enabled?
+        oam_data.size() < max_sprites &&                // Is OAM cache full?
+        sprite_visible(x_pos, y_pos, ly_.peek(), tall)) // Sprite is visible?
       oam_data.push_back({
           .y_pos = y_pos,
           .x_pos = x_pos,
@@ -334,8 +337,12 @@ void PixelProcessingUnit::do_oam_scan() {
    * on the current scanline. Since the renderer goes from left to right, any
    * sprites are also rendered in that order during the drawing state as pixels
    * are pushed onto the LCD. Hence, sort by `x_pos`. */
-  std::sort(oam_data.begin(), oam_data.end(),
-            [](const Sprite &a, const Sprite &b) { return a.x_pos < b.x_pos; });
+  auto selection_priority = [](const Sprite &a, const Sprite &b) {
+    return (a.x_pos == b.x_pos)
+               ? a.obj_no < b.obj_no // OAM index is used to break any ties
+               : a.x_pos < b.x_pos;  // Otherwise sort based on X-position
+  };
+  std::sort(oam_data.begin(), oam_data.end(), selection_priority);
 
   /* Signal that HDMA can start running if it is has been requested or started
    * previously. If HBLANK is partially complete, it can also be triggered. */
