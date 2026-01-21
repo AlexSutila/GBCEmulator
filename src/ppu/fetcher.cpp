@@ -37,7 +37,8 @@ Fetcher::Fetcher(std::array<std::unique_ptr<byte_t[]>, 2> &vram,
 }
 
 void Fetcher::reset(bool window_started) {
-  fine_scroll = scx_.peek() & 0x7;
+  coarse_scroll = scx_.peek();
+  fine_scroll = coarse_scroll & 0x7;
   state = STATE_READ_TILE;
   pixels_discarded = 0;
 
@@ -104,7 +105,7 @@ const byte_t Fetcher::calc_bgwin_tile_x() const {
   if (win_started)
     return data.x_coor & 0x1F;
   // Since returning unit tiles, can only be 32 max
-  return (data.x_coor + (scx_.peek() / pixels_per_row)) & 0x1F;
+  return (data.x_coor + (coarse_scroll / pixels_per_row)) & 0x1F;
 }
 
 const byte_t Fetcher::calc_obj_pixel_y(const Sprite &sprite) const {
