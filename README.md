@@ -44,7 +44,7 @@ TODO: We're passing a handful of them, we just need a fancy visualizer lol
 
 ## Multiple Frontends
 This emulator currently supports two frontends:
-1. [A generic SDL3 + ImGUI frontend](https://github.com/AlexSutila/GBCEmulator/blob/develop/src/frontend/sdl3_frontend.cpp), which is designed to be user friendly. You can do what you would normally expect of a traditional emulator, such as repap controls, change settings, etc.
+1. [A generic SDL3 + ImGUI frontend](https://github.com/AlexSutila/GBCEmulator/blob/develop/src/frontend/sdl3_frontend.cpp), which is designed to be user friendly. You can do what you would normally expect of a traditional emulator, such as remap controls, change settings, etc.
 2. [A comprehensive Python binding](https://github.com/AlexSutila/GBCEmulator/blob/develop/src/python/bindings.cpp), which can be used to step the emulation and interrogate the state of the system on a per-clock cycle basis. The python bindings were also used to generate the images we display above by loading the ROM programatically, stepping the thing for a couple seconds, and rendering the pixeldata after a set amount of time using [matplotlib](https://matplotlib.org/).
 
 This codebase was designed intentionally to make writing new frontends and ports extremely easy.
