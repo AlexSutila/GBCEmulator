@@ -93,7 +93,7 @@ def run_acid_test_suite():
             'dmg-acid',
             'cgb-acid'
         ],
-        out_path='acid_tests.png'
+        out_path='assets/acid_tests.png'
     )
 
 
@@ -109,7 +109,7 @@ def run_blargg_cpu_tests():
             'mem_timing',
             'mem_timing2'
         ],
-        out_path='blargg_cpu_mem.png'
+        out_path='assets/blargg_cpu_mem.png'
     )
 
 

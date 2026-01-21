@@ -150,6 +150,12 @@ PYBIND11_MODULE(gbc_py, m) {
         return load_cart_raw(std::move(rom));
       },
       py::arg("rom_bytes"), "Load a Game Boy cartridge from raw ROM bytes");
+  m.def(
+      "load_cart_fs",
+      [](const fs::path &rom_path) {
+        return load_cart_fs(rom_path);
+      },
+      py::arg("rom_path"), "Load a Game Boy cartridge from filesystem");
 
   // CPU Regsiter class
   py::class_<CpuRegister, PyCpuRegister>(m, "CpuRegister")
