@@ -134,6 +134,8 @@ void SDL3Frontend::poll_events() {
         if (e.key.key != SDLK_ESCAPE)
           keybinds[*ui_state.waiting_for_bind] = e.key.key;
         ui_state.waiting_for_bind.reset();
+        // Any manual change -> Custom
+        ui_state.keybind_preset_index = kCustomPresetIndex;
         continue;
       }
       if (io.WantCaptureKeyboard)
@@ -304,6 +306,7 @@ void SDL3Frontend::build_ui() {
       }
 
       int old_idx = ui_state.keybind_preset_index;
+      ImGui::SetNextItemWidth(100.0f);
       if (ImGui::Combo("Preset", &ui_state.keybind_preset_index,
                        preset_names.data(), preset_names.size())) {
         // Only apply immediately if not currently rebinding
@@ -312,13 +315,6 @@ void SDL3Frontend::build_ui() {
         } else {
           // revert change while waiting for bind
           ui_state.keybind_preset_index = old_idx;
-        }
-      }
-
-      if (ui_state.keybind_preset_index != kCustomPresetIndex) {
-        ImGui::SameLine();
-        if (ImGui::Button("Re-apply")) {
-          ApplyPreset(keybinds, ui_state.keybind_preset_index);
         }
       }
     }
