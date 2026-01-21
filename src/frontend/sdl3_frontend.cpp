@@ -78,6 +78,8 @@ SDL3Frontend::SDL3Frontend() : Frontend() {
   pixels_rendered = 0;
   running = true;
   clear();
+
+  ApplyPreset(keybinds, ui_state.keybind_preset_index);
 }
 
 SDL3Frontend::~SDL3Frontend() {
@@ -289,21 +291,58 @@ void SDL3Frontend::build_ui() {
     ImGui::Begin("Settings", &ui_state.show_settings_window);
     ImGui::Checkbox("Fast forward", &ui_state.fast_forward);
     ImGui::Checkbox("Force DMG monochrome", &ui_state.force_mono_dmg);
+
     ImGui::SeparatorText("Keybinds");
-    static constexpr std::array<const char *, 8> keybind_labels{
-        "Right", "Left", "Up", "Down", "A", "B", "Select", "Start"};
+    // --- Preset dropdown ---
+    {
+      // Build an array of names for ImGui::Combo
+      static std::array<const char*, kPresets.size()> preset_names{};
+      static bool preset_names_init = false;
+      if (!preset_names_init) {
+        for (size_t i = 0; i < kPresets.size(); ++i) preset_names[i] = kPresets[i].name;
+        preset_names_init = true;
+      }
+
+      int old_idx = ui_state.keybind_preset_index;
+      if (ImGui::Combo("Preset", &ui_state.keybind_preset_index,
+                       preset_names.data(), preset_names.size())) {
+        // Only apply immediately if not currently rebinding
+        if (ui_state.waiting_for_bind < 0) {
+          ApplyPreset(keybinds, ui_state.keybind_preset_index);
+        } else {
+          // revert change while waiting for bind
+          ui_state.keybind_preset_index = old_idx;
+        }
+      }
+
+      if (ui_state.keybind_preset_index != kCustomPresetIndex) {
+        ImGui::SameLine();
+        if (ImGui::Button("Re-apply")) {
+          ApplyPreset(keybinds, ui_state.keybind_preset_index);
+        }
+      }
+    }
+
+    ImGui::Spacing();
+
+    static constexpr std::array<const char*, KCount> keybind_labels{
+      "Right","Left","Up","Down","A","B","Select","Start"
+    };
+
     for (std::size_t i = 0; i < keybind_labels.size(); ++i) {
       ImGui::Text("%s", keybind_labels[i]);
       ImGui::SameLine(120.0f);
-      const bool waiting = ui_state.waiting_for_bind == i;
-      std::string button_label =
-          waiting ? "Press a key..."
-                  : std::string("Bind##") + keybind_labels[i];
+
+      const bool waiting = (ui_state.waiting_for_bind == static_cast<int>(i));
+      std::string button_label = waiting ? "Press a key..." : (std::string("Bind##") + keybind_labels[i]);
+
       if (ImGui::Button(button_label.c_str()))
-        ui_state.waiting_for_bind = i;
+        ui_state.waiting_for_bind = static_cast<int>(i);
+
       ImGui::SameLine(240.0f);
       ImGui::Text("%s", SDL_GetKeyName(keybinds[i]));
     }
+
     ImGui::End();
   }
 
