@@ -8,7 +8,7 @@ Lolyep. This repo presents yet another GameBoy Color emulator written entirely f
  - **Note:** For those with a keen eye. Yes, we do show prehistorik man intentionally. We know emulating it is a nightmare :)
 
 ## Compatability
-This emulator is designed to be compatible with **GameBoy Color (CGB)** games (obviously), and also implements the backwards compatability features CGB models provide. As such, this emulator can be used to emulate original DMG GameBoy games as well. The games shown in the screenshot below do not define the compatability limitations of this emulator, but they are known to play reasonably well.
+This emulator is designed to be compatible with **GameBoy Color (CGB)** games (obviously), and also implements the backwards compatability features CGB models provide. As such, this emulator can be used to emulate **original DMG GameBoy** games as well. The games shown in the screenshot below do not define the compatability limitations of this emulator, but they are known to play reasonably well.
 
 ### GameBoy Color Compatability
 ![CGB Compatability](assets/cgb_demo.png)
