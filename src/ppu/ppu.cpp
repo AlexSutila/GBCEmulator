@@ -183,30 +183,32 @@ const bool PixelProcessingUnit::next_sprite_visible() const {
 std::optional<std::uint32_t> PixelProcessingUnit::get_next_pixel() {
 
   // If the window becomes visible, we have to reset the fetcher so it starts
-  // fetching window data instead of BG data. Calling this repeatedly is safe,
-  // it wont take effect until ongoing sprite fetches have completed.
+  // fetching window data instead of BG data.
   if (fetcher->is_window_visible(row_pixels_rendered))
     fetcher->render_window();
 
-  // Here we only focus on background pixels. We don't have to worry about
-  // sprite fetches because if a sprite was overlayed onto this pixel, it has
-  // already been fetched into the FIFO.
+  // No sprite interaction occurs with this pixel, so ignore OAM data.
   if (!next_sprite_visible()) {
-    fetcher->step(); // Ignore possibility of sprite fetch
+    fetcher->step();
     return try_fifo_pop();
   }
 
-  // At this point, we consider the next sprite in the pipeline. If there is
-  // an ongoing background or window fetch, let it finish. Otherwise, step the
-  // fetcher until the fetch for the next sprite has completed.
+  // The remaining code path is now sprite-aware. Pixel data for the next pixel
+  // for both sprites and BG must be fetched before we can pop again.
   const Sprite &next_sprite = oam_data.at(sprites_fetched);
+
+  // Here, the BG and sprites fight over fetch time until we have both a sprite
+  // pixel and a background or window pixel to combine. Stall if not done.
   if (fetcher->step_and_try_sprite_fetch(next_sprite)) {
     ++sprites_fetched;
-    return try_fifo_pop();
+
+    // If no further sprite is to be rendered with this pixel, we can emit it.
+    // There is still a change a sprite overlaps the same starting pixel.
+    if (!next_sprite_visible()) [[unlikely]]
+      return try_fifo_pop();
   }
 
-  // Under any other circumstances where we haven't returned a pixel yet, this
-  // serves as a catch all that denotes the next pixel isn't quite ready yet.
+  // Catch all scenario, pixel just isn't ready yet
   return std::nullopt;
 }
 
@@ -254,6 +256,7 @@ std::optional<std::uint32_t> PixelProcessingUnit::try_fifo_pop() {
     return std::nullopt;
   else if (is_transparent(obj_px)) // If object is transparent use BG
     return get_bgwin_rgb(bg_px);
+
   // Otherwise, render what ever, let the two pixels fight over priority.
   return resolve_px_priority(bg_px, obj_px);
 }
