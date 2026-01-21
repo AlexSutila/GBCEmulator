@@ -16,7 +16,7 @@ This emulator is designed to be compatible with **GameBoy Color (CGB)** games (o
 
 ### DMG GameBoy Backwards Compatability
 ![DMG Compatability](assets/dmg_demo.png)
- - Fulll support for authentic re-coloring of original monochrome games through a configurable BIOS.
+ - Full support for authentic re-coloring of original monochrome games through a configurable BIOS.
  - That re-coloring of DMG games can be optionally disabled (since it looks hideous for some games).
 
 ### Memory Bank Circuitry Support
@@ -40,7 +40,7 @@ To evaluate the accuracy of any emulator, the homebrew community has released a 
 - **Note:** An accurate pixel FIFO is not necessary for passing these tests, in fact [this emulator](https://github.com/AlexSutila/GBEmulator) manages to pass DMG acid with a rudimentary scanline renderer. This emulator goes a step further and implements a full pixel FIFO, just because :)
 
 ### Mooneye Test Suite
-TODO: We're passing a handful of them, we just need a fancy visualizer lol
+We cannot realistically expect to pass every single one of these tests, as not all of them are designed to pass on CGB hardware. The tests we actually evaluate and their pass/fail status can be seen [here](assets/test_results.md).
 
 ## Multiple Frontends
 This emulator currently supports two frontends:
