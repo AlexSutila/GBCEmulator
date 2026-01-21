@@ -37,10 +37,13 @@ Fetcher::Fetcher(std::array<std::unique_ptr<byte_t[]>, 2> &vram,
 }
 
 void Fetcher::reset(bool window_started) {
-  coarse_scroll = scx_.peek();
-  fine_scroll = coarse_scroll & 0x7;
+  coarse_scroll_x = scx_.peek();
+  fine_scroll_x = coarse_scroll_x & 0x7;
   state = STATE_READ_TILE;
   pixels_discarded = 0;
+
+  // Capture the entire scroll value here since full rows are fetched at once
+  fine_scroll_y = scy_.peek();
 
   // Reset fetcher data, x_coor most important
   data = {
@@ -98,14 +101,14 @@ byte_t Fetcher::read_vram_byte(addr_t addr, byte_t bank) const {
 const byte_t Fetcher::calc_bgwin_pixel_y() const {
   if (win_started)
     return win_internal_ly & 0xFF;
-  return (ly_.peek() + scy_.peek()) & 0xFF;
+  return (ly_.peek() + fine_scroll_y) & 0xFF;
 }
 
 const byte_t Fetcher::calc_bgwin_tile_x() const {
   if (win_started)
     return data.x_coor & 0x1F;
   // Since returning unit tiles, can only be 32 max
-  return (data.x_coor + (coarse_scroll / pixels_per_row)) & 0x1F;
+  return (data.x_coor + (coarse_scroll_x / pixels_per_row)) & 0x1F;
 }
 
 const byte_t Fetcher::calc_obj_pixel_y(const Sprite &sprite) const {
@@ -178,7 +181,7 @@ const byte_t Fetcher::calc_sprite_tile_idx(const Sprite &sprite,
 bool Fetcher::should_discard() const {
   if (win_started)
     return false;
-  return pixels_discarded < fine_scroll;
+  return pixels_discarded < fine_scroll_x;
 }
 
 /* Calculate the base address of the tilemap for bg/win */

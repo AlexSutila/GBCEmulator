@@ -89,8 +89,9 @@ private:
   /* Implements fine horizontal scrolling within an 8x8 pixel tile */
   bool should_discard() const;
   byte_t pixels_discarded{};
-  byte_t coarse_scroll{};
-  byte_t fine_scroll{};
+  byte_t coarse_scroll_x{};
+  byte_t fine_scroll_x{};
+  byte_t fine_scroll_y{};
 
   /* Implements window behavior. If the window is enabled, then it is rendered
    * until the end of the scanline. */
