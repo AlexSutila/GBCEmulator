@@ -16,7 +16,6 @@ class SDL3Frontend final : public Frontend {
 public:
   SDL3Frontend();
   ~SDL3Frontend();
-
   static constexpr int framebuf_width = 160;
   static constexpr int framebuf_height = 144;
   static constexpr int scale = 4;
@@ -26,6 +25,8 @@ public:
   void clear(std::uint32_t c = 0x00FFFFFF) override;
   void queue_audio_samples(const float *samples,
                          std::size_t sample_count) override;
+  void refresh_output_devices();
+  bool switch_output_device_by_index(int idx);
   void start() override;
 
   bool consume_load_request(std::string &rom_path);
@@ -54,8 +55,14 @@ private:
     bool force_mono_dmg{false};
     std::string rom_path{};
     std::string status_message{};
+    // Keybinding
     std::optional<std::size_t> waiting_for_bind{};
-    int  keybind_preset_index{};          // default preset selected
+    int  keybind_preset_index{};          // default preset at index 0
+    // Sound / volume control
+    float volume = 0.5f;                 // >1.0 for boost
+    int output_device_index = 0;         // 0 = system default, 1..N = physical device ids
+    std::vector<SDL_AudioDeviceID> output_device_ids;
+    std::vector<std::string> output_device_names;
   };
 
   struct EmulatorState {
@@ -67,7 +74,6 @@ private:
     std::atomic<byte_t> buttons{};
   };
 
-  // enum KeyIndex : int { KRight, KLeft, KUp, KDown, KA, KB, KSelect, KStart, KCount };
   static constexpr std::array<Joypad::JoypadButton, 8> button_order{
     Joypad::JoypadButton::RIGHT,  Joypad::JoypadButton::LEFT,
     Joypad::JoypadButton::UP,     Joypad::JoypadButton::DOWN,
@@ -94,6 +100,8 @@ private:
     { "Custom", { SDLK_UNKNOWN, SDLK_UNKNOWN, SDLK_UNKNOWN, SDLK_UNKNOWN,
                   SDLK_UNKNOWN, SDLK_UNKNOWN, SDLK_UNKNOWN, SDLK_UNKNOWN } },
   }};
+
+  mutable std::mutex audio_mutex;
 
   static constexpr int kCustomPresetIndex = static_cast<int>(kPresets.size()) - 1;
 

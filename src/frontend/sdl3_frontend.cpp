@@ -18,7 +18,7 @@
 #include <thread>
 
 static const char *filters =
-    "GBC ROM files (*.gb *.gbc){.gb,.gbc},All files (*.*){.*}";
+    "ROM files (*.gb *.gbc){.gb,.gbc},All files (*.*){.*}";
 static constexpr double cycles_per_audio_frame = 4'194'304.0 / 48'000.0;
 static constexpr unsigned max_catchup_cycles = 70'224 / 4;
 static constexpr unsigned target_queue_ms = 20;
@@ -198,28 +198,86 @@ void SDL3Frontend::clear(std::uint32_t c) {
 
 void SDL3Frontend::queue_audio_samples(const float *samples,
                                        std::size_t sample_count) {
-  if (!audio_device || !audio_stream || !samples || sample_count == 0)
-    return;
+  if (!samples || sample_count == 0) return;
+
+  std::scoped_lock lock(audio_mutex);
+  if (!audio_device || !audio_stream) return;
 
   constexpr std::size_t max_queue_bytes = 48000 * 2 * sizeof(float); // ~1s
   const int queued = SDL_GetAudioStreamQueued(audio_stream);
 
-  // if (queued >= 0 && queued < 48000 * 2 * sizeof(float) / 50) { // < ~20ms
-  //   std::cout << "queue low at " << queued << std::endl;
-  // }
+  if (queued < 0) { SDL_ClearAudioStream(audio_stream); return; }
+  if ((std::size_t)queued > max_queue_bytes) return;
 
-  if (queued < 0) {
-    SDL_ClearAudioStream(audio_stream);
-    return;
-  }
-  if (static_cast<std::size_t>(queued) > max_queue_bytes)
-    return;
-
-  const int byte_count = static_cast<int>(sample_count * sizeof(float));
+  const int byte_count = (int)(sample_count * sizeof(float));
   if (!SDL_PutAudioStreamData(audio_stream, samples, byte_count)) {
     SDL_ClearAudioStream(audio_stream);
   }
 }
+
+void SDL3Frontend::refresh_output_devices() {
+  ui_state.output_device_ids.clear();
+  ui_state.output_device_names.clear();
+
+  // Slot 0: System default
+  ui_state.output_device_ids.push_back(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK);
+  ui_state.output_device_names.emplace_back("System default");
+
+  int count = 0;
+  SDL_AudioDeviceID* devs = SDL_GetAudioPlaybackDevices(&count);
+  if (!devs) {
+    set_status_message(SDL_GetError());
+    return;
+  }
+
+  // SDL docs: returns a 0-terminated array; also provides count
+  for (int i = 0; devs[i] != 0; ++i) {
+    const SDL_AudioDeviceID id = devs[i];
+    const char* name = SDL_GetAudioDeviceName(id); // human-readable name
+    ui_state.output_device_ids.push_back(id);
+    ui_state.output_device_names.emplace_back(name ? name : "(unknown device)");
+  }
+
+  SDL_free(devs);
+}
+
+bool SDL3Frontend::switch_output_device_by_index(int idx) {
+  if (idx < 0 || idx >= static_cast<int>(ui_state.output_device_ids.size())) return false;
+
+  const SDL_AudioDeviceID desired = ui_state.output_device_ids[idx];
+
+  std::scoped_lock lock(audio_mutex);
+
+  if (!audio_stream) return false;
+
+  // Stop audio on old device
+  SDL_ClearAudioStream(audio_stream);
+
+  if (audio_device) {
+    SDL_UnbindAudioStream(audio_stream);
+    SDL_CloseAudioDevice(audio_device);
+    audio_device = 0;
+  }
+
+  // Open new device (can be a physical device id or SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK)
+  audio_device = SDL_OpenAudioDevice(desired, &audio_spec);
+  if (!audio_device) {
+    set_status_message(SDL_GetError());
+    return false;
+  }
+
+  if (!SDL_BindAudioStream(audio_device, audio_stream)) {
+    set_status_message(SDL_GetError());
+    SDL_CloseAudioDevice(audio_device);
+    audio_device = 0;
+    return false;
+  }
+
+  // Re-apply gain after rebinding
+  SDL_SetAudioStreamGain(audio_stream, ui_state.volume);
+  return true;
+}
+
 
 bool SDL3Frontend::consume_load_request(std::string &rom_path) {
   std::lock_guard<std::mutex> lock(ui_mutex);
@@ -293,6 +351,46 @@ void SDL3Frontend::build_ui() {
     ImGui::Begin("Settings", &ui_state.show_settings_window);
     ImGui::Checkbox("Fast forward", &ui_state.fast_forward);
     ImGui::Checkbox("Force DMG monochrome", &ui_state.force_mono_dmg);
+
+    ImGui::SeparatorText("Audio");
+
+    // Volume slider
+    ImGui::SetNextItemWidth(200.0f);
+    if (ImGui::SliderFloat("Volume", &ui_state.volume, 0.0f, 1.0f, "%.2f")) {
+      std::scoped_lock audio_lock(audio_mutex);
+      if (audio_stream) {
+        SDL_SetAudioStreamGain(audio_stream, ui_state.volume);
+      }
+    }
+
+    // Output device dropdown
+    if (ui_state.output_device_names.empty()) {
+      refresh_output_devices();
+      ui_state.output_device_index = 0;
+    }
+
+    ImGui::SetNextItemWidth(260.0f);
+
+    std::vector<const char*> items;
+    items.reserve(ui_state.output_device_names.size());
+    for (auto& s : ui_state.output_device_names) items.push_back(s.c_str());
+
+    int old_audio_idx = ui_state.output_device_index;
+    if (ImGui::Combo("Output device", &ui_state.output_device_index,
+                     items.data(), static_cast<int>(items.size()))) {
+      if (!switch_output_device_by_index(ui_state.output_device_index)) {
+        ui_state.output_device_index = old_audio_idx; // revert on failure
+        switch_output_device_by_index(old_audio_idx);
+      }
+                     }
+
+    ImGui::SameLine();
+    if (ImGui::Button("Refresh")) {
+      refresh_output_devices();
+      ui_state.output_device_index = std::min(ui_state.output_device_index,
+                                             static_cast<int>(ui_state.output_device_names.size()) - 1);
+    }
+
 
     ImGui::SeparatorText("Keybinds");
     // --- Preset dropdown ---
