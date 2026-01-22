@@ -356,7 +356,7 @@ void SDL3Frontend::build_ui() {
 
     // Volume slider
     ImGui::SetNextItemWidth(200.0f);
-    if (ImGui::SliderFloat("Volume", &ui_state.volume, 0.0f, 1.0f, "%.2f")) {
+    if (ImGui::SliderFloat("Volume", &ui_state.volume, 0.0f, 1.5f, "%.2f")) {
       std::scoped_lock audio_lock(audio_mutex);
       if (audio_stream) {
         SDL_SetAudioStreamGain(audio_stream, ui_state.volume);
