@@ -16,7 +16,6 @@ class SDL3Frontend final : public Frontend {
 public:
   SDL3Frontend();
   ~SDL3Frontend();
-
   static constexpr int framebuf_width = 160;
   static constexpr int framebuf_height = 144;
   static constexpr int scale = 4;
@@ -26,6 +25,8 @@ public:
   void clear(std::uint32_t c = 0x00FFFFFF) override;
   void queue_audio_samples(const float *samples,
                          std::size_t sample_count) override;
+  void refresh_output_devices();
+  bool switch_output_device_by_index(int idx);
   void start() override;
 
   bool consume_load_request(std::string &rom_path);
@@ -54,7 +55,14 @@ private:
     bool force_mono_dmg{false};
     std::string rom_path{};
     std::string status_message{};
+    // Keybinding
     std::optional<std::size_t> waiting_for_bind{};
+    int  keybind_preset_index{};          // default preset at index 0
+    // Sound / volume control
+    float volume = 0.5f;                 // >1.0 for boost
+    int output_device_index = 0;         // 0 = system default, 1..N = physical device ids
+    std::vector<SDL_AudioDeviceID> output_device_ids;
+    std::vector<std::string> output_device_names;
   };
 
   struct EmulatorState {
@@ -66,16 +74,43 @@ private:
     std::atomic<byte_t> buttons{};
   };
 
-  /* Default keybind configuration */
   static constexpr std::array<Joypad::JoypadButton, 8> button_order{
-      Joypad::JoypadButton::RIGHT,  Joypad::JoypadButton::LEFT,
-      Joypad::JoypadButton::UP,     Joypad::JoypadButton::DOWN,
-      Joypad::JoypadButton::A,      Joypad::JoypadButton::B,
-      Joypad::JoypadButton::SELECT, Joypad::JoypadButton::START};
-  static constexpr std::array<SDL_Keycode, 8> default_keybinds{
-      SDLK_D, SDLK_A, SDLK_W,         SDLK_S,
-      SDLK_J, SDLK_K, SDLK_BACKSPACE, SDLK_ESCAPE};
-  std::array<SDL_Keycode, 8> keybinds{default_keybinds};
+    Joypad::JoypadButton::RIGHT,  Joypad::JoypadButton::LEFT,
+    Joypad::JoypadButton::UP,     Joypad::JoypadButton::DOWN,
+    Joypad::JoypadButton::A,      Joypad::JoypadButton::B,
+    Joypad::JoypadButton::SELECT, Joypad::JoypadButton::START};
+  static constexpr int KCount = 8;
+  std::array<SDL_Keycode, KCount> keybinds{};
+  struct KeybindPreset {
+    const char* name;
+    std::array<SDL_Keycode, KCount> keys;
+  };
+
+  static constexpr std::array<KeybindPreset, 4> kPresets{{
+    { "WASD",
+    { SDLK_D, SDLK_A, SDLK_W, SDLK_S, SDLK_J, SDLK_K, SDLK_BACKSPACE, SDLK_RETURN } },
+
+    { "Arrows",
+      { SDLK_RIGHT, SDLK_LEFT, SDLK_UP, SDLK_DOWN, SDLK_Z, SDLK_X, SDLK_RSHIFT, SDLK_RETURN } },
+
+    { "IJKL",
+      { SDLK_L, SDLK_J, SDLK_I, SDLK_K, SDLK_Z, SDLK_X, SDLK_BACKSPACE, SDLK_RETURN } },
+
+    // Just a placeholder for custom bindings
+    { "Custom", { SDLK_UNKNOWN, SDLK_UNKNOWN, SDLK_UNKNOWN, SDLK_UNKNOWN,
+                  SDLK_UNKNOWN, SDLK_UNKNOWN, SDLK_UNKNOWN, SDLK_UNKNOWN } },
+  }};
+
+  mutable std::mutex audio_mutex;
+
+  static constexpr int kCustomPresetIndex = static_cast<int>(kPresets.size()) - 1;
+
+  // Helper: apply preset -> keybinds
+  static void ApplyPreset(std::array<SDL_Keycode, KCount>& keybinds, int preset_index) {
+    if (preset_index < 0 || preset_index >= static_cast<int>(kPresets.size())) return;
+    if (preset_index == kCustomPresetIndex) return; // don't clobber custom
+    keybinds = kPresets[preset_index].keys;
+  }
 
   const std::uint32_t format_pixel_data(std::uint32_t px) const;
   const std::uint32_t *front_buffer() const;

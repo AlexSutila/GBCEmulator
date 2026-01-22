@@ -6,6 +6,10 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS ON)
 
+set(SDL_SHARED OFF CACHE BOOL "" FORCE)
+set(SDL_STATIC ON  CACHE BOOL "" FORCE)
+set(SDL_TEST   OFF CACHE BOOL "" FORCE)
+
 # Dependencies
 include(FetchContent)
 FetchContent_Declare(
@@ -102,10 +106,6 @@ set(GBC_RELEASE_OPTIONS
     -fvisibility=hidden
 )
 
-if(NOT MINGW)
-    list(APPEND GBC_RELEASE_OPTIONS -flto)
-endif()
-
 set(GBC_COMPILE_OPTIONS
     -Wall
     $<$<CONFIG:Debug>:-g;-O0>
@@ -148,3 +148,14 @@ target_include_directories(gbc_py
 target_compile_options(gbc_py
     PRIVATE ${GBC_COMPILE_OPTIONS}
 )
+
+include(CheckIPOSupported)
+check_ipo_supported(RESULT ipo_ok OUTPUT ipo_err LANGUAGES CXX)
+
+if(ipo_ok)
+  set_property(TARGET imgui  PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
+  set_property(TARGET gbc    PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
+  set_property(TARGET gbc_py PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
+else()
+  message(WARNING "IPO/LTO not supported: ${ipo_err}")
+endif()
