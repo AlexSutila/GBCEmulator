@@ -51,6 +51,11 @@ public:
   LR35902 *get_cpu() { return fe_.get()->get_cpu(); };
   PixelProcessingUnit *get_ppu() { return fe_.get()->get_ppu(); }
   TimerUnit *get_timer() { return fe_.get()->get_timer(); }
+  void put_joyp_state(std::uint8_t state) {
+    auto *joypad = dynamic_cast<Joypad::JOYP *>(
+            fe_.get()->get_bus()->get_mmio(IORegisterMapping::MMIO_JOYPAD));
+    joypad->set_state(state);
+  }
 
 private:
   PyFrontend fe_;
@@ -319,6 +324,8 @@ PYBIND11_MODULE(gbc_py, m) {
       .def("get_ppu", &PyGameBoyColor::get_ppu,
            py::return_value_policy::reference_internal)
       .def("get_timer", &PyGameBoyColor::get_timer,
+           py::return_value_policy::reference_internal)
+      .def("put_joyp_state", &PyGameBoyColor::put_joyp_state,
            py::return_value_policy::reference_internal);
 
   // For testing
