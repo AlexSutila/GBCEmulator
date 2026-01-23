@@ -314,19 +314,6 @@ void SDL3Frontend::set_status_message(std::string message) {
   ui_state.status_message = std::move(message);
 }
 
-// const int SDL3Frontend::calc_sync_cycles() const {
-//   int queued_bytes = SDL_GetAudioStreamQueued(audio_stream);
-//   queued_bytes = std::max(queued_bytes, 0); // Clamp to be non-negative
-//
-//   const int bytes_per_frame = int(sizeof(float) * 2); // stereo float
-//   const int queued_frames = queued_bytes / bytes_per_frame;
-//   const int target_frames = (audio_spec.freq * target_queue_ms) / 1000;
-//
-//   int delta_frames = target_frames - queued_frames;
-//   int cycles = delta_frames * cycles_per_audio_frame;
-//   return std::clamp(cycles, 0, int(max_catchup_cycles));
-// }
-
 void SDL3Frontend::build_ui() {
   std::lock_guard<std::mutex> lock(ui_mutex);
   ImGuiIO &io = ImGui::GetIO();
@@ -520,7 +507,6 @@ void SDL3Frontend::emulation_thread_fn(std::stop_token st, cart c,
 
     // If we are ahead of the target (and not fast-forwarding), sleep briefly.
     // 1ms should be short enough to prevent underruns
-    // std::cout << "Queued ms: " << queued_ms << "\n";
     if (!ff && queued_ms > target_queue_ms) {
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
       continue;
@@ -536,8 +522,6 @@ void SDL3Frontend::emulation_thread_fn(std::stop_token st, cart c,
      * claculating a sleep period and explicitly making this thread sleep bc
      * it is possible (and more likely) to introduce jitter which will cause
      * small breaks in the audio that sound like pops and cracks. */
-    // if (!ff && sync_cycles == 0)
-    //   std::this_thread::yield();
 
     /* Update additional meta-data, avoid mutex acquisition */
     emu_state.is_cgb.store(gbc_->is_cgb_mode());
