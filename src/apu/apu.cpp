@@ -545,11 +545,14 @@ void APU::trigger_channel4() {
 }
 
 double APU::ch4_clock_hz() const {
-  static constexpr int divisors[8] = {8,16,32,48,64,80,96,112};
-  const int r = divisors[nr43 & 0x07];
+  double r = nr43 & 0x07;
   const int s = (nr43 >> 4) & 0x0F;
-  // 524288 / r / 2^(s+1)
-  return 524288.0 / double(r) / double(1u << (s + 1));
+
+  if (r == 0) {
+    r = 0.5;
+  }
+  // 262144 / r / 2^s
+  return 262144.0 / r / double(1u << s);
 }
 
 void APU::ch4_clock_lfsr() {
