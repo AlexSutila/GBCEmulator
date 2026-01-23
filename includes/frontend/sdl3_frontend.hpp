@@ -131,7 +131,7 @@ private:
   const std::uint32_t *front_buffer() const;
   void update_button_state(SDL_Keycode key, bool pressed);
   byte_t button_mask_for_key(SDL_Keycode key) const;
-  const int calc_sync_cycles() const;
+  // const int calc_sync_cycles() const;
   void build_ui();
 
   // Frame buffer and rendering control

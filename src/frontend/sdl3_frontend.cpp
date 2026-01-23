@@ -14,6 +14,7 @@
 #include <chrono>
 #include <exception>
 #include <imgui.h>
+#include <iostream>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -27,7 +28,7 @@ static const char *bios_filters =
 
 static constexpr double cycles_per_audio_frame = 4'194'304.0 / 48'000.0;
 static constexpr unsigned max_catchup_cycles = 70'224 / 4;
-static constexpr unsigned target_queue_ms = 50;
+static constexpr unsigned target_queue_ms = 20;
 static constexpr std::uint32_t black = 0xFF000000;
 
 SDL3Frontend::SDL3Frontend() : Frontend() {
@@ -313,18 +314,18 @@ void SDL3Frontend::set_status_message(std::string message) {
   ui_state.status_message = std::move(message);
 }
 
-const int SDL3Frontend::calc_sync_cycles() const {
-  int queued_bytes = SDL_GetAudioStreamQueued(audio_stream);
-  queued_bytes = std::max(queued_bytes, 0); // Clamp to be non-negative
-
-  const int bytes_per_frame = int(sizeof(float) * 2); // stereo float
-  const int queued_frames = queued_bytes / bytes_per_frame;
-  const int target_frames = (audio_spec.freq * target_queue_ms) / 1000;
-
-  int delta_frames = target_frames - queued_frames;
-  int cycles = delta_frames * cycles_per_audio_frame;
-  return std::clamp(cycles, 0, int(max_catchup_cycles));
-}
+// const int SDL3Frontend::calc_sync_cycles() const {
+//   int queued_bytes = SDL_GetAudioStreamQueued(audio_stream);
+//   queued_bytes = std::max(queued_bytes, 0); // Clamp to be non-negative
+//
+//   const int bytes_per_frame = int(sizeof(float) * 2); // stereo float
+//   const int queued_frames = queued_bytes / bytes_per_frame;
+//   const int target_frames = (audio_spec.freq * target_queue_ms) / 1000;
+//
+//   int delta_frames = target_frames - queued_frames;
+//   int cycles = delta_frames * cycles_per_audio_frame;
+//   return std::clamp(cycles, 0, int(max_catchup_cycles));
+// }
 
 void SDL3Frontend::build_ui() {
   std::lock_guard<std::mutex> lock(ui_mutex);
@@ -512,19 +513,31 @@ void SDL3Frontend::emulation_thread_fn(std::stop_token st, cart c,
 
   /* Run emulation in real-time */
   while (!st.stop_requested()) [[likely]] {
-    const int sync_cycles = calc_sync_cycles();
+    // Audio sync logic
+    // Check how much audio is currently buffered
+    const int queued_bytes = SDL_GetAudioStreamQueued(audio_stream);
+    int queued_ms = (queued_bytes * 1000) / (sizeof(float) * 2 * 48000);
+
+    // If we are ahead of the target (and not fast-forwarding), sleep briefly.
+    // 1ms should be short enough to prevent underruns
+    // std::cout << "Queued ms: " << queued_ms << "\n";
+    if (!ff && queued_ms > target_queue_ms) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      continue;
+    }
 
     /* Read input state and catch up with audio stream */
+    // max_catchup_cycles is ~17556 cycles (~4ms of emulated time)
     joypad->set_state(input_state.buttons.load(std::memory_order_relaxed));
-    for (auto i{0}; i < sync_cycles; i++)
+    for (auto i{0}; i < max_catchup_cycles; i++)
       gbc_->step();
 
     /* Hint to the OS to let this thread sleep. This is better than manually
      * claculating a sleep period and explicitly making this thread sleep bc
      * it is possible (and more likely) to introduce jitter which will cause
      * small breaks in the audio that sound like pops and cracks. */
-    if (!ff && sync_cycles == 0)
-      std::this_thread::yield();
+    // if (!ff && sync_cycles == 0)
+    //   std::this_thread::yield();
 
     /* Update additional meta-data, avoid mutex acquisition */
     emu_state.is_cgb.store(gbc_->is_cgb_mode());
