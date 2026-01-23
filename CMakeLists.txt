@@ -79,6 +79,8 @@ set(GBC_CORE_SOURCES
     src/memory/dma.cpp
 
     src/timer/timer.cpp
+    src/serial/serial.cpp
+
     src/ppu/ppu.cpp
     src/ppu/attributes.cpp
     src/ppu/palette.cpp
@@ -95,8 +97,8 @@ set(GBC_CORE_SOURCES
     src/cart/mbc/mbc5.cpp
     src/cart/mbc/test_mbc.cpp
     src/cart/mbc/mbc_factory.cpp
-        src/memory/mmio/joypad.cpp
-        src/apu/apu.cpp
+    src/memory/mmio/joypad.cpp
+    src/apu/apu.cpp
 )
 set(GBC_INCLUDE_DIR
     ${CMAKE_CURRENT_SOURCE_DIR}/includes

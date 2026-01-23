@@ -45,6 +45,23 @@ private:
 
 } // namespace Joypad
 
+namespace Serial {
+
+class SerialCtrl final : public MMIORegister {
+public:
+  void write(const byte_t value) override;
+  byte_t peek() const override;
+  byte_t read() override;
+  SerialCtrl(MMIORegister &serial_data);
+  void set_interrupt_reg(InterruptBits *reg);
+
+private:
+  InterruptBits *if_reg{};
+  MMIORegister &sd;
+};
+
+};
+
 namespace Audio {
 
 /*

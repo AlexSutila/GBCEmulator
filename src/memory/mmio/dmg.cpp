@@ -1,7 +1,28 @@
 #include "memory/mmio/dmg.hpp"
+#include "cpu/interrupts.hpp"
 #include "emu_types.hpp"
 #include "timer/timer.hpp"
 #include <cassert>
+
+namespace Serial {
+
+SerialCtrl::SerialCtrl(MMIORegister &serial_data) : sd(serial_data) {}
+
+/* We completely ignore clock speed because we just straight up assume that the
+ * transfer completes instantly, then we don't actually transfer anything. */
+void SerialCtrl::write(const byte_t value) {
+  if ((value & 0x81) == 0x81) {   // Use internal clk and transfer in progress
+    state = (value & 0x3) | 0x7C; // Clear transfer in progress bit
+    sd.write(0xFF);               // No connection, so read ones
+    // This is hacky and inaccurate, just shoot the interrupt out instantly
+    if_reg->put_flag(InterruptFlagMask::INT_FLAG_SERIAL, true);
+  }
+}
+void SerialCtrl::set_interrupt_reg(InterruptBits *reg) { if_reg = reg; }
+byte_t SerialCtrl::peek() const { return state | 0x7C; }
+byte_t SerialCtrl::read() { return peek(); }
+
+} // namespace Serial
 
 namespace PPU {
 

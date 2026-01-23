@@ -8,6 +8,7 @@
 #include "memory/bus.hpp"
 #include "memory/mmio/mmio.hpp"
 #include "ppu/ppu.hpp"
+#include "serial/serial.hpp"
 #include "timer/timer.hpp"
 
 #include <cstdint>
@@ -52,6 +53,7 @@ private:
   std::unique_ptr<APU> apu{};
   std::unique_ptr<PixelProcessingUnit> ppu{};
   std::unique_ptr<TimerUnit> timer{};
+  std::unique_ptr<SerialUnit> serial{};
 
   /* Top-level system initialization helpers */
   void system_init(); // Connects all components in the system

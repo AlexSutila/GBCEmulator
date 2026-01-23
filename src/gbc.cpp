@@ -59,11 +59,12 @@ void GameBoyColor::system_init() {
   apu = std::make_unique<APU>(*bus, fe_);
   ppu = std::make_unique<PixelProcessingUnit>(bus.get(), fe_, sys_);
   timer = std::make_unique<TimerUnit>(bus.get(), sys_);
+  serial = std::make_unique<SerialUnit>(bus.get());
 
   /* Joypad initialization */
-  auto *joypad_reg = dynamic_cast<Joypad::JOYP *>(
+  auto *const joypad_reg = dynamic_cast<Joypad::JOYP *>(
       bus->get_mmio(IORegisterMapping::MMIO_JOYPAD));
-  auto *if_reg = dynamic_cast<InterruptBits *>(
+  auto *const if_reg = dynamic_cast<InterruptBits *>(
       bus->get_mmio(IORegisterMapping::MMIO_INT_FLAGS));
   if (!joypad_reg || !if_reg)
     throw std::logic_error("Failed to configure joypad MMIO");
@@ -102,7 +103,7 @@ void GameBoyColor::skip_bios() {
   bus->write_byte(static_cast<addr_t>(mmio::MMIO_TIMER_TAC), 0xF8);
   bus->write_byte(static_cast<addr_t>(mmio::MMIO_INT_FLAGS), 0xE1);
   // TODO: Audio registers
-  bus->write_byte(static_cast<addr_t>(mmio::MMIO_LCD_CONTROL), 0x91);
+  bus->write_byte(static_cast<addr_t>(mmio::MMIO_LCD_CTRL), 0x91);
   bus->write_byte(static_cast<addr_t>(mmio::MMIO_LCD_SCY), 0x00);
   bus->write_byte(static_cast<addr_t>(mmio::MMIO_LCD_SCX), 0x00);
   bus->write_byte(static_cast<addr_t>(mmio::MMIO_LCD_Y_COMP), 0x00);
