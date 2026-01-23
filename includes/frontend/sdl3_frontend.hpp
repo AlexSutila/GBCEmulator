@@ -136,7 +136,6 @@ private:
 
   // Frame buffer and rendering control
   std::array<std::unique_ptr<std::uint32_t[]>, 2> framebuffers;
-  std::uint32_t pixels_rendered{};
   std::atomic<int> front_index{0};
   mutable std::mutex ui_mutex{};
 

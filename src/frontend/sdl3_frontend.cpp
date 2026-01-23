@@ -81,7 +81,6 @@ SDL3Frontend::SDL3Frontend() : Frontend() {
       std::make_unique<std::uint32_t[]>(framebuf_height * framebuf_width);
   framebuffers[1] =
       std::make_unique<std::uint32_t[]>(framebuf_height * framebuf_width);
-  pixels_rendered = 0;
   running = true;
   clear();
 
@@ -119,13 +118,11 @@ void SDL3Frontend::put_pixel(int x, int y, std::uint32_t c) {
   /* We perform double buffering to prevent screen tearing */
   const int back_index = 1 - front_index.load(std::memory_order_relaxed);
   framebuffers[back_index][y * framebuf_width + x] = c;
-  ++pixels_rendered;
 
-  /* Frame is complete so swap frame buffers */
-  if (pixels_rendered == framebuf_height * framebuf_width) {
+  /* Frame completion can be indicated by the fact that we are placing
+   * the last pixel in the frame, so we need to swap buffers here. */
+  if (x + 1 == framebuf_width && y + 1 == framebuf_height)
     front_index.store(back_index, std::memory_order_release);
-    pixels_rendered = 0;
-  }
 }
 
 void SDL3Frontend::poll_events() {
