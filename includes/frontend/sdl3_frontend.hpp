@@ -9,6 +9,7 @@
 #include <cstddef>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <stop_token>
 #include <string>
 
@@ -20,22 +21,25 @@ public:
   static constexpr int framebuf_height = 144;
   static constexpr int scale = 4;
 
-  std::array<std::uint32_t, framebuf_height * framebuf_width> get_frame() override;
+  std::array<std::uint32_t, framebuf_height * framebuf_width>
+  get_frame() override;
   void put_pixel(int x, int y, std::uint32_t c) override;
   void clear(std::uint32_t c = 0x00FFFFFF) override;
   void queue_audio_samples(const float *samples,
-                         std::size_t sample_count) override;
+                           std::size_t sample_count) override;
   void refresh_output_devices();
   bool switch_output_device_by_index(int idx);
   void start() override;
 
-  bool consume_load_request(std::string &rom_path);
+  bool consume_load_bios_request(std::optional<std::string> &bios_path);
+  bool consume_load_rom_request(std::string &rom_path);
   void set_status_message(std::string message);
   void poll_events();
   void present_ui();
 
 private:
-  void emulation_thread_fn(std::stop_token st, cart c);
+  void emulation_thread_fn(std::stop_token st, cart c,
+                           std::optional<std::string> bios);
   void join_emu_thread_if_running();
   std::jthread emulation_thread{};
 
@@ -50,17 +54,20 @@ private:
   struct UiState {
     bool show_load_window{true};
     bool show_settings_window{false};
-    bool request_load{false};
+    bool request_load_bios{false};
+    bool request_load_rom{false};
     bool fast_forward{false};
     bool force_mono_dmg{false};
+    std::optional<std::string> bios_path{std::nullopt};
     std::string rom_path{};
     std::string status_message{};
     // Keybinding
     std::optional<std::size_t> waiting_for_bind{};
-    int  keybind_preset_index{};          // default preset at index 0
+    int keybind_preset_index{}; // default preset at index 0
     // Sound / volume control
-    float volume = 0.5f;                 // >1.0 for boost
-    int output_device_index = 0;         // 0 = system default, 1..N = physical device ids
+    float volume = 0.5f;         // >1.0 for boost
+    int output_device_index = 0; // 0 = system default
+                                 // 1..N = physical device ids
     std::vector<SDL_AudioDeviceID> output_device_ids;
     std::vector<std::string> output_device_names;
   };
@@ -75,40 +82,48 @@ private:
   };
 
   static constexpr std::array<Joypad::JoypadButton, 8> button_order{
-    Joypad::JoypadButton::RIGHT,  Joypad::JoypadButton::LEFT,
-    Joypad::JoypadButton::UP,     Joypad::JoypadButton::DOWN,
-    Joypad::JoypadButton::A,      Joypad::JoypadButton::B,
-    Joypad::JoypadButton::SELECT, Joypad::JoypadButton::START};
+      Joypad::JoypadButton::RIGHT,  Joypad::JoypadButton::LEFT,
+      Joypad::JoypadButton::UP,     Joypad::JoypadButton::DOWN,
+      Joypad::JoypadButton::A,      Joypad::JoypadButton::B,
+      Joypad::JoypadButton::SELECT, Joypad::JoypadButton::START};
   static constexpr int KCount = 8;
   std::array<SDL_Keycode, KCount> keybinds{};
   struct KeybindPreset {
-    const char* name;
+    const char *name;
     std::array<SDL_Keycode, KCount> keys;
   };
 
   static constexpr std::array<KeybindPreset, 4> kPresets{{
-    { "WASD",
-    { SDLK_D, SDLK_A, SDLK_W, SDLK_S, SDLK_J, SDLK_K, SDLK_BACKSPACE, SDLK_RETURN } },
+      {"WASD",
+       {SDLK_D, SDLK_A, SDLK_W, SDLK_S, SDLK_J, SDLK_K, SDLK_BACKSPACE,
+        SDLK_RETURN}},
 
-    { "Arrows",
-      { SDLK_RIGHT, SDLK_LEFT, SDLK_UP, SDLK_DOWN, SDLK_Z, SDLK_X, SDLK_RSHIFT, SDLK_RETURN } },
+      {"Arrows",
+       {SDLK_RIGHT, SDLK_LEFT, SDLK_UP, SDLK_DOWN, SDLK_Z, SDLK_X, SDLK_RSHIFT,
+        SDLK_RETURN}},
 
-    { "IJKL",
-      { SDLK_L, SDLK_J, SDLK_I, SDLK_K, SDLK_Z, SDLK_X, SDLK_BACKSPACE, SDLK_RETURN } },
+      {"IJKL",
+       {SDLK_L, SDLK_J, SDLK_I, SDLK_K, SDLK_Z, SDLK_X, SDLK_BACKSPACE,
+        SDLK_RETURN}},
 
-    // Just a placeholder for custom bindings
-    { "Custom", { SDLK_UNKNOWN, SDLK_UNKNOWN, SDLK_UNKNOWN, SDLK_UNKNOWN,
-                  SDLK_UNKNOWN, SDLK_UNKNOWN, SDLK_UNKNOWN, SDLK_UNKNOWN } },
+      // Just a placeholder for custom bindings
+      {"Custom",
+       {SDLK_UNKNOWN, SDLK_UNKNOWN, SDLK_UNKNOWN, SDLK_UNKNOWN, SDLK_UNKNOWN,
+        SDLK_UNKNOWN, SDLK_UNKNOWN, SDLK_UNKNOWN}},
   }};
 
   mutable std::mutex audio_mutex;
 
-  static constexpr int kCustomPresetIndex = static_cast<int>(kPresets.size()) - 1;
+  static constexpr int kCustomPresetIndex =
+      static_cast<int>(kPresets.size()) - 1;
 
   // Helper: apply preset -> keybinds
-  static void ApplyPreset(std::array<SDL_Keycode, KCount>& keybinds, int preset_index) {
-    if (preset_index < 0 || preset_index >= static_cast<int>(kPresets.size())) return;
-    if (preset_index == kCustomPresetIndex) return; // don't clobber custom
+  static void ApplyPreset(std::array<SDL_Keycode, KCount> &keybinds,
+                          int preset_index) {
+    if (preset_index < 0 || preset_index >= static_cast<int>(kPresets.size()))
+      return;
+    if (preset_index == kCustomPresetIndex)
+      return; // don't clobber custom
     keybinds = kPresets[preset_index].keys;
   }
 
@@ -131,7 +146,8 @@ private:
   UiState ui_state{};
   InputState input_state{};
 
-  IGFD::FileDialogConfig config;
+  IGFD::FileDialogConfig bios_sel_conf;
+  IGFD::FileDialogConfig rom_sel_conf;
   ImVec2 max_size, min_size;
 };
 
