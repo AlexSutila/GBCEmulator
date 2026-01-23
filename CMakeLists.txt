@@ -153,7 +153,7 @@ target_compile_options(gbc_py
 include(CheckIPOSupported)
 check_ipo_supported(RESULT ipo_ok OUTPUT ipo_err LANGUAGES CXX)
 
-if(ipo_ok)
+if(ipo_ok AND NOT MINGW)
   set_property(TARGET imgui  PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
   set_property(TARGET gbc    PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
   set_property(TARGET gbc_py PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)

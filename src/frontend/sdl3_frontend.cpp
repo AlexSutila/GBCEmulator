@@ -27,7 +27,7 @@ static const char *bios_filters =
 
 static constexpr double cycles_per_audio_frame = 4'194'304.0 / 48'000.0;
 static constexpr unsigned max_catchup_cycles = 70'224 / 4;
-static constexpr unsigned target_queue_ms = 20;
+static constexpr unsigned target_queue_ms = 50;
 static constexpr std::uint32_t black = 0xFF000000;
 
 SDL3Frontend::SDL3Frontend() : Frontend() {

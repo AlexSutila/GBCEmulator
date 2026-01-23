@@ -675,14 +675,17 @@ void APU::generate_sample() {
   if (nr51 & 0x08)
     right_raw += ch4;
 
-  float left = left_raw * master_left;
-  float right = right_raw * master_right;
+  // Apply master volume
+  float left = left_raw * master_left * master_gain;
+  float right = right_raw * master_right * master_gain;
 
-  left = clamp_sample(left * master_gain);
-  right = clamp_sample(right * master_gain);
-
+  // Remove DC offset
   left  = dc_block(left,  dc_x1_l, dc_y1_l);
   right = dc_block(right, dc_x1_r, dc_y1_r);
+
+  // Clamp now
+  left = clamp_sample(left);
+  right = clamp_sample(right);
 
   mix_buffer[frame_cursor * 2] = left;
   mix_buffer[frame_cursor * 2 + 1] = right;
