@@ -4,6 +4,7 @@
 #include "apu/apu.hpp"
 #include "cart/cart.hpp"
 #include "cpu/lr35902.hpp"
+#include "memory/boot.hpp"
 #include "memory/bus.hpp"
 #include "memory/mmio/mmio.hpp"
 #include "ppu/ppu.hpp"
@@ -30,7 +31,7 @@ struct runtime_sys_info {
 
 class GameBoyColor {
 public:
-  // TODO: Configurable bios constructor
+  GameBoyColor(Frontend &frontend, const std::string &bios_path);
   GameBoyColor(Frontend &frontend);
   void insert_cartridge(cart c);
   void init_test_bed();
@@ -52,17 +53,20 @@ private:
   std::unique_ptr<PixelProcessingUnit> ppu{};
   std::unique_ptr<TimerUnit> timer{};
 
-  /* Initialization helpers */
+  /* Top-level system initialization helpers */
   void system_init(); // Connects all components in the system
-  void hwio_init();   // Primes hardware registers with post-bios execution
-                      // values. This is necessary for skipping the bios.
-  void cram_init(IORegisterMapping index, IORegisterMapping data);
+  void skip_bios();   // Skips bios when unconfigured
+
+  /* Helpers for initializing emulator state to skip the BIOS */
+  void cram_init_mono(IORegisterMapping index, IORegisterMapping data);
+  void cram_init_mono();
 
   /* For moving emulation state along */
   void step_dma(bool fast_cycle);
   bool vdma_enabled() const;
   void step_processor();
 
+  std::optional<BootROM> bios_{};
   runtime_sys_info sys_{};
   Frontend &fe_;
 };

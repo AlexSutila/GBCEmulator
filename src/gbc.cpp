@@ -1,7 +1,6 @@
 #include "gbc.hpp"
 #include "cart/cart.hpp"
 #include "cpu/lr35902.hpp"
-#include "memory/boot.hpp"
 #include "memory/bus.hpp"
 #include "memory/dma.hpp"
 #include "memory/mmio/dmg.hpp"
@@ -10,21 +9,38 @@
 #include "ppu/ppu.hpp"
 #include "timer/timer.hpp"
 #include <memory>
+#include <optional>
+#include <stdexcept>
 
-GameBoyColor::GameBoyColor(Frontend &frontend) : fe_(frontend) {
-  using mmio = IORegisterMapping;
-  system_init(); // Generic hardware connection initialization
+GameBoyColor::GameBoyColor(Frontend &frontend, const std::string &bios_path)
+    : fe_(frontend) {
+  system_init(); // Connects all system components
 
-  const LR35902::ProcessorState cpu_regs = cgb_boot_regs();
-  /* We cannot simply start executing without a BIOS for numerous reasons. So,
-   * if we want to skip the BIOS, we need the system to 'pretend' like it really
-   * did run through the BIOS. */
-  cpu->load_state(cpu_regs); // Fake CPU register values
-  hwio_init();               // Fake the post-bios MMIO register values
+  /* We set CGB mode mased on the size of the boot ROM. This is the best way
+   * to make sure we get the coloring right, but it will likely cause strange
+   * behavior in-game. Behavior should be okay with any CGB bios though. */
+  try {
+    bios_ = BootROM(bios_path);
+    // Strange behavior if you use CGB game with DMG bios. Nothing you can do!
+    sys_.cgb_mode = bios_->is_large_rom();
+  }
 
-  // Color ram has to be initialized for both sprites and background
-  cram_init(mmio::MMIO_LCD_BGPI, mmio::MMIO_LCD_BGPD);
-  cram_init(mmio::MMIO_LCD_OBPI, mmio::MMIO_LCD_OBPD);
+  /* If this fails for whatever reason, simply continue as if we didn't have a
+     BIOS configured. Emulator will start in CGB mode (obviously). */
+  catch (std::runtime_error &e) {
+    bios_ = std::nullopt;
+    skip_bios();
+  }
+  cram_init_mono(); // Just in case BIOS does not init CRAM
+}
+
+GameBoyColor::GameBoyColor(Frontend &frontend)
+    : bios_(std::nullopt), fe_(frontend) {
+  system_init(); // Connects all system components
+  skip_bios();   // BIOS is left unconfigured
+  /* We still kind of have to do this here in case we run DMG games. Will likely
+   * end up staring at a pure black screen in such cases if we dont. */
+  cram_init_mono();
 }
 
 void GameBoyColor::system_init() {
@@ -38,7 +54,7 @@ void GameBoyColor::system_init() {
   };
 
   /* Component initializaiton */
-  bus = std::make_unique<AddressBus>(sys_);
+  bus = std::make_unique<AddressBus>(sys_, bios_);
   cpu = std::make_unique<LR35902>(bus.get(), sys_);
   apu = std::make_unique<APU>(*bus, fe_);
   ppu = std::make_unique<PixelProcessingUnit>(bus.get(), fe_, sys_);
@@ -58,8 +74,25 @@ void GameBoyColor::system_init() {
   joypad_reg->set_interrupt_reg(if_reg);
 }
 
-void GameBoyColor::hwio_init() {
+void GameBoyColor::skip_bios() {
   using mmio = IORegisterMapping;
+
+  /* We cannot simply start executing without a BIOS for numerous reasons. So,
+   * if we want to skip the BIOS, we need the system to 'pretend' like it really
+   * did run through the BIOS. */
+  constexpr LR35902::ProcessorState boot_regs = {
+      .pc = 0x0100,
+      .sp = 0xFFFE,
+      .a = 0x11,
+      .b = 0x00,
+      .c = 0x14,
+      .d = 0x00,
+      .e = 0x00,
+      .f = 0x00,
+      .h = 0xC0,
+      .l = 0x60,
+  };
+  cpu->load_state(boot_regs); // Fake CPU register values
 
   // Load hardware MMIO registers with post-BIOS initial conditions
   bus->write_byte(static_cast<addr_t>(mmio::MMIO_JOYPAD), 0xC7);
@@ -92,9 +125,20 @@ void GameBoyColor::hwio_init() {
   // Finally, perform a synthetic write to unmap the boot ROM and terminate
   // the execution of our fake basic input-output system.
   bus->write_byte(static_cast<addr_t>(mmio::MMIO_VRAM_BANK), 0xFE);
+
+  // Color ram has to be initialized for both sprites and background
+  cram_init_mono(mmio::MMIO_LCD_BGPI, mmio::MMIO_LCD_BGPD);
+  cram_init_mono(mmio::MMIO_LCD_OBPI, mmio::MMIO_LCD_OBPD);
 }
 
-void GameBoyColor::cram_init(IORegisterMapping index, IORegisterMapping data) {
+void GameBoyColor::cram_init_mono() {
+  using mmio = IORegisterMapping;
+  cram_init_mono(mmio::MMIO_LCD_BGPI, mmio::MMIO_LCD_BGPD);
+  cram_init_mono(mmio::MMIO_LCD_OBPI, mmio::MMIO_LCD_OBPD);
+}
+
+void GameBoyColor::cram_init_mono(IORegisterMapping index,
+                                  IORegisterMapping data) {
   constexpr auto nr_palettes = 8;
   constexpr auto nr_colors = 4;
 
@@ -128,7 +172,8 @@ void GameBoyColor::insert_cartridge(cart c) {
    * Another side note, KEY0 uses a reference to this boolean to formulate the
    * actual value of the register read over the address bus. Hence, by changing
    * this we are also updating the value of KEY0 respectively. */
-  sys_.cgb_mode = cgb_enabled(cgb_flag);
+  if (!bios_.has_value())
+    sys_.cgb_mode = cgb_enabled(cgb_flag);
 }
 
 void GameBoyColor::init_test_bed() {

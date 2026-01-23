@@ -11,8 +11,10 @@
 #include <array>
 #include <map>
 #include <memory>
+#include <optional>
 
 struct runtime_sys_info;
+class BootROM;
 
 /*
  * Game Boy Memory Map
@@ -39,7 +41,10 @@ public:
   const byte_t read_byte(const addr_t addr);
   ObjAttrDMA &get_oam_dma() { return oam_dma; };
   VDMA &get_vdma() { return vdma; }
-  AddressBus(runtime_sys_info &sys);
+
+  /* Second constructor is called when skipping BIOS, first constructor may also
+   * ignore the BIOS if the initialization fails for some reason. */
+  AddressBus(runtime_sys_info &sys, std::optional<BootROM> &bios);
 
   /* For attaching MMIO component interface registers */
   void connect_mmio(const addr_t addr, MMIORegister *const reg);
@@ -75,17 +80,13 @@ private:
   WramBank wram_bank_ctrl{};
   BootROMCtrl boot_rom_ctrl{};
 
-  /* Helpers */
   constexpr byte_t open_bus() { return 0xFF; }
   const byte_t get_vram_bank() const;
   const byte_t get_wram_bank() const;
-  bool boot_rom_enabled();
+  bool is_boot_rom_range(const addr_t a);
 
-  /* Maps memory mapped IO registers to their respective addresses in memory. */
   std::map<addr_t, MMIORegister *> io_registers{};
-  void init_io_registers();
-
-  /* Usable hardware features are determined by the cartridge header. */
+  std::optional<BootROM> &bios_;
   runtime_sys_info &sys_;
 };
 

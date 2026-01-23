@@ -11,7 +11,6 @@
 #include "cpu/registers/register.hpp"
 #include "frontend/frontend.hpp"
 #include "gbc.hpp"
-#include "memory/boot.hpp"
 #include "memory/bus.hpp"
 #include "memory/mmio/dmg.hpp"
 #include "memory/mmio/mmio.hpp"
@@ -35,6 +34,7 @@ public:
 private:
   std::array<std::uint32_t, 160 * 144> frame_data{};
 };
+
 class PyGameBoyColor {
 public:
   PyGameBoyColor() : fe_() {}
@@ -204,7 +204,6 @@ PYBIND11_MODULE(gbc_py, m) {
 
   // Expose main Address Bus class
   py::class_<AddressBus>(m, "AddressBus")
-      .def(py::init<runtime_sys_info &>(), py::arg("sys"))
       .def("init_test_bed", &AddressBus::init_test_bed)
       .def("write_byte", &AddressBus::write_byte, py::arg("addr"),
            py::arg("value"))
