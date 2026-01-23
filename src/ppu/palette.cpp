@@ -4,6 +4,34 @@
 
 #include <cstdint>
 
+const std::uint16_t argb8888_to_rgb555(std::uint32_t argb) {
+  const std::uint8_t r8 = (argb >> 16) & 0xFF;
+  const std::uint8_t g8 = (argb >> 8) & 0xFF;
+  const std::uint8_t b8 = argb & 0xFF;
+
+  // Truncate the lower bits
+  const std::uint8_t r5 = r8 >> 3;
+  const std::uint8_t g5 = g8 >> 3;
+  const std::uint8_t b5 = b8 >> 3;
+  return static_cast<std::uint16_t>((r5 << 0) | (g5 << 5) | (b5 << 10));
+}
+
+const std::uint32_t rgb555_to_argb8888(std::uint8_t lo, std::uint8_t hi) {
+  const std::uint16_t rgb555 =
+      (static_cast<std::uint16_t>(hi) << 8) | static_cast<std::uint16_t>(lo);
+
+  const std::uint8_t r5 = (rgb555 >> 0) & 0x1F;
+  const std::uint8_t g5 = (rgb555 >> 5) & 0x1F;
+  const std::uint8_t b5 = (rgb555 >> 10) & 0x1F;
+
+  // Expand the lower bits
+  const std::uint8_t r8 = (r5 << 3) | (r5 >> 2);
+  const std::uint8_t g8 = (g5 << 3) | (g5 >> 2);
+  const std::uint8_t b8 = (b5 << 3) | (b5 >> 2);
+  return (0xFFu << 24) | (static_cast<std::uint32_t>(r8) << 16) |
+         (static_cast<std::uint32_t>(g8) << 8) | static_cast<std::uint32_t>(b8);
+}
+
 /* Initialization order matters because the data register has internal
  * dependencies on both the RAM array and the index register. */
 ColorRam::ColorRam() : mem_{}, idx_reg(), data_reg(mem_, idx_reg) {}
@@ -34,18 +62,7 @@ const std::uint32_t ColorRam::get_cgb_color(const byte_t color_idx,
   const byte_t hi = mem_.at(base_addr + 1);
 
   // Compute the full color value, and convert it from RGB555 format
-  addr_t rgb555 = (static_cast<addr_t>(hi) << 8) | static_cast<addr_t>(lo);
-
-  // Extract all of the 5-bit color channels
-  const std::uint8_t r5 = (rgb555 >> 0) & 0x1F;
-  const std::uint8_t g5 = (rgb555 >> 5) & 0x1F;
-  const std::uint8_t b5 = (rgb555 >> 10) & 0x1F;
-
-  // Expand 5-bit to 8-bit (replicate high bits, ignore LSBs)
-  const std::uint8_t r8 = (r5 << 3) | (r5 >> 2);
-  const std::uint8_t g8 = (g5 << 3) | (g5 >> 2);
-  const std::uint8_t b8 = (b5 << 3) | (b5 >> 2);
-  return (0xFFu << 24) | (r8 << 16) | (g8 << 8) | b8;
+  return rgb555_to_argb8888(lo, hi);
 }
 
 /* Not in use (see comment under palette.hpp), but these are original colors

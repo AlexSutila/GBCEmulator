@@ -116,14 +116,9 @@ void AddressBus::init_test_bed() {
 void AddressBus::eject_cartridge() { cart_.reset(); }
 
 const byte_t AddressBus::read_byte(const addr_t addr) {
-  const std::vector<byte_t> &boot_rom = get_boot_rom();
-
-  /* Read from boot ROM if it is mapped (boot ROM overrides READs only) */
-  if (boot_rom_enabled() && is_bootrom_range(addr))
-    return boot_rom.at(addr);
 
   /* Cartridge memory */
-  else if (cart_ && is_cart_range(addr))
+  if (cart_ && is_cart_range(addr))
     return cart_->read(addr);
 
   /* Read from VRAM, only banked in CGB mode */

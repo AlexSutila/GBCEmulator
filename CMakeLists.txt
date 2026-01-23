@@ -72,6 +72,7 @@ set(GBC_CORE_SOURCES
     src/cpu/registers/flags.cpp
 
     src/memory/bus.cpp
+    src/memory/boot.cpp
     src/memory/mmio/dmg.cpp
     src/memory/mmio/cgb.cpp
     src/memory/mmio/mmio.cpp

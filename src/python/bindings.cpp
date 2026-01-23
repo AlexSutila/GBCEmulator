@@ -202,12 +202,6 @@ PYBIND11_MODULE(gbc_py, m) {
       .def("set_flag", &CpuFlagsRegister::set_flag)
       .def("clr_flag", &CpuFlagsRegister::clr_flag);
 
-  // Expose boot ROM for memory testing
-  m.def("get_boot_rom", []() {
-    const auto &rom = get_boot_rom();
-    return py::bytes(reinterpret_cast<const char *>(rom.data()), rom.size());
-  });
-
   // Expose main Address Bus class
   py::class_<AddressBus>(m, "AddressBus")
       .def(py::init<runtime_sys_info &>(), py::arg("sys"))

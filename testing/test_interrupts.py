@@ -21,6 +21,7 @@ def test_if_register_unused_bits():
     gbc = GameBoyColor()
     bus = gbc.get_bus()
     bus.init_test_bed()
+    bus.write_byte(0xFF0F, 0)  # Write to clear value written by BIOS
     assert bus.read_byte(0xFF0F) == 0xE0
     bus.write_byte(0xFF0F, 0xFF)
     assert bus.read_byte(0xFF0F) == 0xFF
@@ -102,8 +103,10 @@ def test_ime_enable_ei_timing_full():
 
     # Disable boot ROM and write bytecode
     bus.write_byte(0xFF50, 0)
+    bus.write_byte(0xFF50, 0)
+    entry_point = 0x0100
     for addr, byte in enumerate(bytecode):
-        bus.write_byte(addr, byte)
+        bus.write_byte(entry_point + addr, byte)
 
     for _ in range(8):
         cpu.step()

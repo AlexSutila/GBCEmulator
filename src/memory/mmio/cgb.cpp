@@ -14,7 +14,11 @@ void KEY0::write(const byte_t value) {
    * speed mode the system is operating in. */
   sys_.cgb_mode = (state & dmg_mode_mask) == 0;
 }
-byte_t KEY0::peek() const { return state | ~dmg_mode_mask; }
+byte_t KEY0::peek() const {
+  constexpr byte_t dmg_mode = dmg_mode_mask;
+  constexpr byte_t cgb_mode = 0x00; // Bit cleared
+  return sys_.cgb_mode ? cgb_mode : dmg_mode;
+}
 byte_t KEY0::read() { return peek(); }
 
 void KEY1::write(const byte_t value) {

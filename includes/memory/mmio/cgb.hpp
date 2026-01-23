@@ -4,7 +4,6 @@
 #include "emu_types.hpp"
 #include "memory/mmio/mmio.hpp"
 #include <array>
-#include <cstddef>
 
 struct runtime_sys_info;
 

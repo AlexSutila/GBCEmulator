@@ -1,15 +1,17 @@
 #ifndef __GBC_H
 #define __GBC_H
 
+#include "apu/apu.hpp"
 #include "cart/cart.hpp"
 #include "cpu/lr35902.hpp"
-#include "apu/apu.hpp"
 #include "memory/bus.hpp"
+#include "memory/mmio/mmio.hpp"
 #include "ppu/ppu.hpp"
 #include "timer/timer.hpp"
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 
 class Frontend;
 
@@ -28,6 +30,7 @@ struct runtime_sys_info {
 
 class GameBoyColor {
 public:
+  // TODO: Configurable bios constructor
   GameBoyColor(Frontend &frontend);
   void insert_cartridge(cart c);
   void init_test_bed();
@@ -49,12 +52,18 @@ private:
   std::unique_ptr<PixelProcessingUnit> ppu{};
   std::unique_ptr<TimerUnit> timer{};
 
+  /* Initialization helpers */
+  void system_init(); // Connects all components in the system
+  void hwio_init();   // Primes hardware registers with post-bios execution
+                      // values. This is necessary for skipping the bios.
+  void cram_init(IORegisterMapping index, IORegisterMapping data);
+
+  /* For moving emulation state along */
   void step_dma(bool fast_cycle);
   bool vdma_enabled() const;
   void step_processor();
 
   runtime_sys_info sys_{};
-  bool has_cartridge{};
   Frontend &fe_;
 };
 
