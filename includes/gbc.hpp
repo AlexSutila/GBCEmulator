@@ -4,6 +4,7 @@
 #include "apu/apu.hpp"
 #include "cart/cart.hpp"
 #include "cpu/lr35902.hpp"
+#include "debugger/debugger.hpp"
 #include "memory/boot.hpp"
 #include "memory/bus.hpp"
 #include "memory/mmio/mmio.hpp"
@@ -38,6 +39,15 @@ public:
   void init_test_bed();
   void step();
 
+  /* Optional debugger configurable by frontend */
+  void configure_debugger(Debug::Debugger debugger) {
+    debugger_ = std::move(debugger);
+  }
+  Debug::Debugger &get_debugger() {
+    assert(debugger_.has_value());
+    return debugger_.value();
+  }
+
   /* Getters mainly for python bindings */
   AddressBus *get_bus() { return bus.get(); };
   LR35902 *get_cpu() { return cpu.get(); };
@@ -68,6 +78,7 @@ private:
   bool vdma_enabled() const;
   void step_processor();
 
+  std::optional<Debug::Debugger> debugger_{};
   std::optional<BootROM> bios_{};
   runtime_sys_info sys_{};
   Frontend &fe_;

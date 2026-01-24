@@ -6,6 +6,7 @@
 #include "cart/cart.hpp"
 #include "cpu/lr35902.hpp"
 #include "debugger/breakpoint.hpp"
+#include "debugger/debugger.hpp"
 #include "debugger/print.hpp"
 #include "memory/mmio/dmg.hpp"
 #include "ppu/palette.hpp"
@@ -527,11 +528,29 @@ void SDL3Frontend::build_debug_dialog(ImVec2 max_size, ImVec2 min_size) {
     ImGui::Text("IE: %s", Debug::to_string(i).c_str());
 
     ImGui::SeparatorText("Control Flow");
-    ImGui::Button("Break");
+    if (ImGui::Button("Break")) {
+      std::lock_guard<std::mutex> lock(dbg_mutex);
+      dbg_state.reason = Debug::BRK_STOPPED_BY_UI;
+      dbg_state.stopped = true;
+    }
     ImGui::SameLine();
-    ImGui::Button("Step");
+    if (ImGui::Button("Step")) {
+      {
+        std::lock_guard<std::mutex> lock(dbg_mutex);
+        dbg_state.reason = Debug::BRK_STEP_INSTRUCTION;
+        dbg_state.stopped = false;
+      }
+      dbg_cv.notify_one();
+    }
     ImGui::SameLine();
-    ImGui::Button("Continue");
+    if (ImGui::Button("Continue")) {
+      {
+        std::lock_guard<std::mutex> lock(dbg_mutex);
+        dbg_state.reason = Debug::BRK_CONTINUE;
+        dbg_state.stopped = false;
+      }
+      dbg_cv.notify_one();
+    }
 
     ImGui::End();
   }
@@ -553,7 +572,7 @@ void SDL3Frontend::build_breakpoint_dialog(ImVec2 max_size, ImVec2 min_size) {
     ImGui::Button("Add");
 
     ImGui::End();
- }
+  }
 }
 
 void SDL3Frontend::build_ui() {
@@ -601,6 +620,16 @@ void SDL3Frontend::emulation_thread_fn(std::stop_token st, cart c,
              : std::make_unique<GameBoyColor>(*this);
   gbc_->insert_cartridge(c);
 
+  /* Configure the debugger */
+  auto on_brk_callback = [this]() {
+    std::unique_lock<std::mutex> lock(dbg_mutex);
+    dbg_state.stopped = true;
+    // Avoid crazy polling loops that eat up CPU time
+    dbg_cv.wait(lock, [&] { return !dbg_state.stopped; });
+    return dbg_state.reason;
+  };
+  gbc_->configure_debugger(Debug::Debugger(on_brk_callback));
+
   /* Establish connection with button state */
   auto *joypad = dynamic_cast<Joypad::JOYP *>(
       gbc_->get_bus()->get_mmio(IORegisterMapping::MMIO_JOYPAD));
@@ -621,20 +650,20 @@ void SDL3Frontend::emulation_thread_fn(std::stop_token st, cart c,
       continue;
     }
 
-    /* Read input state and catch up with audio stream */
-    // max_catchup_cycles is ~17556 cycles (~4ms of emulated time)
+    /* Read input state and catch up with audio stream, the max_catchup_cycles
+     * is ~17556 cycles (~4ms of emulated time) */
     joypad->set_state(input_state.buttons.load(std::memory_order_relaxed));
     for (auto i{0}; i < max_catchup_cycles; i++)
       gbc_->step();
 
-    /* Hint to the OS to let this thread sleep. This is better than manually
-     * claculating a sleep period and explicitly making this thread sleep bc
-     * it is possible (and more likely) to introduce jitter which will cause
-     * small breaks in the audio that sound like pops and cracks. */
-
     /* Update additional meta-data, avoid mutex acquisition */
     emu_state.is_cgb.store(gbc_->is_cgb_mode());
     ff = emu_state.fast_forward.load();
+
+    /* Update the fuck ass debugger */
+    std::lock_guard<std::mutex> lock(dbg_mutex);
+    if (dbg_state.stopped)
+      gbc_->get_debugger().request_stop(dbg_state.reason);
   }
 }
 

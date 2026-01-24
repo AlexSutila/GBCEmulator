@@ -3,8 +3,10 @@
 #include "cpu/interrupts.hpp"
 #include "cpu/registers/flags.hpp"
 #include "cpu/registers/register.hpp"
-#include "memory/mmio/mmio.hpp"
+#include "debugger/breakpoint.hpp"
+#include "debugger/debugger.hpp"
 #include "gbc.hpp"
+#include "memory/mmio/mmio.hpp"
 
 #include <cassert>
 #include <iomanip>
@@ -14,12 +16,14 @@
 #include <sstream>
 #include <stdexcept>
 
-LR35902::LR35902(AddressBus *bus_ptr, runtime_sys_info &sys)
-    : bus(bus_ptr),  // For memory access
-      sys_(sys),     // General operating mode info
-      ime(),         // Acts as interrupt master enable
-      ie_reg(false), // Enables individual interrupts
-      if_reg(true)   // Requests individual interrupts
+LR35902::LR35902(AddressBus *bus_ptr, std::optional<Debug::Debugger> &debugger,
+                 runtime_sys_info &sys)
+    : bus(bus_ptr),       // For memory access
+      sys_(sys),          // General operating mode info
+      ime(),              // Acts as interrupt master enable
+      ie_reg(false),      // Enables individual interrupts
+      if_reg(true),       // Requests individual interrupts
+      debugger_(debugger) // Optionally configured by frontend
 {
   using flags = InterruptFlagMask;
   using mmio = IORegisterMapping;
@@ -117,6 +121,7 @@ std::optional<Instruction *> LR35902::should_interrupt() {
 /* Read opcode from PC, populate `ins_` instruction reference */
 void LR35902::do_fetch() {
   ime.step();
+  try_brk(Debug::BRK_ADDRESS_EXECUTED | Debug::BRK_STEP_INSTRUCTION);
 
   // Check for interrupts, delay fetch until after ISR
   const auto isr = should_interrupt();
@@ -207,4 +212,9 @@ void LR35902::step() {
     do_halt();
     break;
   }
+}
+
+void LR35902::try_brk(Debug::BreakReason reason) {
+  if (debugger_.has_value())
+    debugger_->eval(reg_file.reg_pc, reason);
 }

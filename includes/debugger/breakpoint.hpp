@@ -8,6 +8,7 @@
 namespace Debug {
 
 enum BreakReason : std::uint32_t {
+  BRK_CONTINUE = 0,
   // User configured or hardwardware specified reasons
   BRK_ADDRESS_EXECUTED = 1 << 1,
   BRK_ADDRESS_READ = 1 << 2,
@@ -15,6 +16,17 @@ enum BreakReason : std::uint32_t {
   // Hardware specified reasons only
   BRK_STEP_INSTRUCTION = 1 << 4,
 };
+
+constexpr BreakReason operator|(BreakReason a, BreakReason b) {
+  return static_cast<BreakReason>(static_cast<uint8_t>(a) |
+                                  static_cast<uint8_t>(b));
+}
+
+constexpr bool operator&(BreakReason a, BreakReason b) {
+  return static_cast<uint8_t>(a) & static_cast<uint8_t>(b);
+}
+
+constexpr auto BRK_STOPPED_BY_UI = BRK_STEP_INSTRUCTION;
 
 class Breakpoint {
 public:

@@ -1,12 +1,14 @@
 #ifndef __RENDERER_H
 #define __RENDERER_H
 
+#include "debugger/breakpoint.hpp"
 #include "frontend/frontend.hpp"
 #include "imgui.h"
 #include <ImGuiFileDialog.h>
 #include <SDL3/SDL.h>
 #include <array>
 #include <atomic>
+#include <condition_variable>
 #include <cstddef>
 #include <memory>
 #include <mutex>
@@ -137,6 +139,13 @@ private:
   SDL_AudioSpec audio_spec{};
   SDL_AudioStream *audio_stream{};
 
+  struct DebuggerState {
+    Debug::BreakReason reason{Debug::BRK_CONTINUE};
+    bool stopped{false};
+  };
+  std::condition_variable dbg_cv{};
+  std::mutex dbg_mutex{};
+
   struct EmulatorState {
     std::atomic<bool> fast_forward{};
     std::atomic<bool> is_cgb{};
@@ -202,6 +211,7 @@ private:
 
   // System keep-alive
   std::atomic<bool> running{};
+  DebuggerState dbg_state{};
   EmulatorState emu_state{};
   InputState input_state{};
   UiState ui_state{};

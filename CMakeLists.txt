@@ -107,6 +107,7 @@ set(GBC_CORE_SOURCES
     src/cart/mbc/mbc_factory.cpp
 
     src/debugger/breakpoint.cpp
+    src/debugger/debugger.cpp
     src/debugger/print.cpp
 )
 set(GBC_INCLUDE_DIR

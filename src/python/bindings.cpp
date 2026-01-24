@@ -232,10 +232,6 @@ PYBIND11_MODULE(gbc_py, m) {
       .def_readwrite("l", &LR35902::ProcessorState::l)
       .def_readwrite("ime_enabled", &LR35902::ProcessorState::ime_enabled);
   py::class_<LR35902>(m, "LR35902")
-      .def(py::init<AddressBus *, runtime_sys_info &>(), py::arg("bus"),
-           py::arg("sys"),
-           py::keep_alive<1, 2>() // LR35902 keeps AddressBus alive
-           )
       .def("step", &LR35902::step)
       .def("get_state", &LR35902::get_state)
       .def("load_state", &LR35902::load_state, py::arg("state"));

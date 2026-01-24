@@ -13,7 +13,7 @@
 #include <stdexcept>
 
 GameBoyColor::GameBoyColor(Frontend &frontend, const std::string &bios_path)
-    : fe_(frontend) {
+    : debugger_(std::nullopt), fe_(frontend) {
   system_init(); // Connects all system components
 
   /* We set CGB mode mased on the size of the boot ROM. This is the best way
@@ -35,7 +35,7 @@ GameBoyColor::GameBoyColor(Frontend &frontend, const std::string &bios_path)
 }
 
 GameBoyColor::GameBoyColor(Frontend &frontend)
-    : bios_(std::nullopt), fe_(frontend) {
+    : debugger_(std::nullopt), bios_(std::nullopt), fe_(frontend) {
   system_init(); // Connects all system components
   skip_bios();   // BIOS is left unconfigured
   /* We still kind of have to do this here in case we run DMG games. Will likely
@@ -55,7 +55,7 @@ void GameBoyColor::system_init() {
 
   /* Component initializaiton */
   bus = std::make_unique<AddressBus>(sys_, bios_);
-  cpu = std::make_unique<LR35902>(bus.get(), sys_);
+  cpu = std::make_unique<LR35902>(bus.get(), debugger_, sys_);
   apu = std::make_unique<APU>(*bus, fe_);
   ppu = std::make_unique<PixelProcessingUnit>(bus.get(), fe_, sys_);
   timer = std::make_unique<TimerUnit>(bus.get(), sys_);

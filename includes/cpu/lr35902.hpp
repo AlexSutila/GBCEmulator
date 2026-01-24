@@ -4,6 +4,7 @@
 #include "cpu/instr/instr.hpp"
 #include "cpu/interrupts.hpp"
 #include "cpu/registers/regfile.hpp"
+#include "debugger/debugger.hpp"
 #include "memory/bus.hpp"
 
 #include <array>
@@ -19,7 +20,8 @@ struct runtime_sys_info;
  */
 class LR35902 {
 public:
-  LR35902(AddressBus *bus_ptr, runtime_sys_info &sys);
+  LR35902(AddressBus *bus_ptr, std::optional<Debug::Debugger> &debugger,
+          runtime_sys_info &sys);
   void step();
 
   struct ProcessorState {
@@ -75,6 +77,9 @@ private:
   Instruction *ins_{}; // Reference to current ins
   std::optional<std::size_t> total_ins_clks{};
   std::size_t cur_ins_clks{};
+
+  std::optional<Debug::Debugger> &debugger_;
+  void try_brk(Debug::BreakReason reason);
 };
 
 #endif // __LR35902_H
