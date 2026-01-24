@@ -1,5 +1,6 @@
 #include "memory/bus.hpp"
 #include "cart/cart.hpp"
+#include "debugger/breakpoint.hpp"
 #include "emu_types.hpp"
 #include "gbc.hpp"
 #include "memory/mmio/cgb.hpp"
@@ -54,13 +55,16 @@ static constexpr bool is_hram_range(const addr_t a) noexcept {
   return (a >= 0xFF80 && a <= 0xFFFE);
 }
 
-AddressBus::AddressBus(runtime_sys_info &sys, std::optional<BootROM> &bios)
-    : key0(sys),        // Controls backwards compatability
-      key1(sys),        // Controls clock speed mode
-      oam_dma(*this),   // Performs object attribute DMA (DMG and CGB)
-      vdma(*this, sys), // Performs GDMA and HDMA (CGB only)
-      bios_(bios),      // This constructor ignores the BIOS
-      sys_(sys)         // Generic system information
+AddressBus::AddressBus(runtime_sys_info &sys,
+                       std::optional<Debug::Debugger> &debugger,
+                       std::optional<BootROM> &bios)
+    : key0(sys),           // Controls backwards compatability
+      key1(sys),           // Controls clock speed mode
+      oam_dma(*this),      // Performs object attribute DMA (DMG and CGB)
+      vdma(*this, sys),    // Performs GDMA and HDMA (CGB only)
+      debugger_(debugger), // Optionally configured by frontend
+      bios_(bios),         // Optionally configured by frontend
+      sys_(sys)            // Generic system information
 {
   constexpr std::size_t vram_bank_size = 0x2000;
   constexpr std::size_t wram_bank_size = 0x1000;
@@ -118,6 +122,7 @@ void AddressBus::init_test_bed() {
 void AddressBus::eject_cartridge() { cart_.reset(); }
 
 const byte_t AddressBus::read_byte(const addr_t addr) {
+  try_brk(addr, Debug::BRK_ADDRESS_READ);
 
   /* Read from boot ROM if it is mapped (boot ROM overrides reads only) */
   if (is_boot_rom_range(addr))
@@ -222,6 +227,8 @@ void AddressBus::write_byte(const addr_t addr, const byte_t value) {
   /* Write to High RAM */
   else if (is_hram_range(addr))
     hram[(addr - 0xFF80) & HRAM_MASK] = value;
+
+  try_brk(addr, Debug::BRK_ADDRESS_WRITTEN);
 }
 
 MMIORegister *AddressBus::get_mmio(IORegisterMapping mapping) const {
@@ -229,4 +236,9 @@ MMIORegister *AddressBus::get_mmio(IORegisterMapping mapping) const {
   assert(io_registers.contains(addr));
   /* The address bus maintains ownership, so raw pointers are fine. */
   return io_registers.at(addr);
+}
+
+void AddressBus::try_brk(const addr_t addr, Debug::BreakReason reason) {
+  if (debugger_.has_value())
+    debugger_->eval(addr, reason);
 }

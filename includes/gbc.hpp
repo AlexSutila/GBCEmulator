@@ -43,10 +43,7 @@ public:
   void configure_debugger(Debug::Debugger debugger) {
     debugger_ = std::move(debugger);
   }
-  Debug::Debugger &get_debugger() {
-    assert(debugger_.has_value());
-    return debugger_.value();
-  }
+  std::optional<Debug::Debugger> &get_debugger() { return debugger_; }
 
   /* Getters mainly for python bindings */
   AddressBus *get_bus() { return bus.get(); };

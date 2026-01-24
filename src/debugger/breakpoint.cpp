@@ -6,9 +6,8 @@
 namespace Debug {
 
 Breakpoint::Breakpoint(BreakReason reason_flags, addr_t watch_addr)
-    : reasons(reason_flags),  // Should be read/write/execute only
-      addr(watch_addr),       // Address of breakpoint
-      hardware_defined(false) // Configured by debugger during runtime
+    : reasons(reason_flags), // Should be read/write/execute only
+      addr(watch_addr)       // Address of breakpoint
 {
   constexpr auto BRK_ALLOWED_FLAGS =
       BRK_ADDRESS_EXECUTED | BRK_ADDRESS_READ | BRK_ADDRESS_WRITTEN;
@@ -17,12 +16,15 @@ Breakpoint::Breakpoint(BreakReason reason_flags, addr_t watch_addr)
 }
 
 bool Breakpoint::eval(BreakReason reason_flags) const {
-  return reason_flags == reasons;
+  return (reason_flags & reasons) != 0;
+}
+
+bool Breakpoint::has_flag(BreakReason flag) const {
+  return (flag & reasons) != 0;
 }
 
 [[nodiscard]] std::string Breakpoint::to_string() const {
   const auto r = static_cast<unsigned>(reasons);
-
   const bool exec = r & BRK_ADDRESS_EXECUTED;
   const bool read = r & BRK_ADDRESS_READ;
   const bool write = r & BRK_ADDRESS_WRITTEN;
@@ -31,7 +33,6 @@ bool Breakpoint::eval(BreakReason reason_flags) const {
   out << "BP " << (exec ? 'E' : '-') << (read ? 'R' : '-')
       << (write ? 'W' : '-') << " @ 0x" << std::hex << std::uppercase
       << std::setw(4) << std::setfill('0') << addr;
-
   return out.str();
 }
 

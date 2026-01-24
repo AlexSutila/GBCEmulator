@@ -1,8 +1,6 @@
 #ifndef __RENDERER_H
 #define __RENDERER_H
 
-#include "cpu/interrupts.hpp"
-#include "cpu/lr35902.hpp"
 #include "debugger/breakpoint.hpp"
 #include "frontend/frontend.hpp"
 #include "imgui.h"
@@ -131,6 +129,7 @@ private:
   void build_settings_dialog(ImVec2, ImVec2);
   void build_debug_dialog(ImVec2, ImVec2);
   void build_breakpoint_dialog(ImVec2, ImVec2);
+  void build_config_breakpoint_dialog();
   void build_ui();
 
   // SDL3 display boilerplate
@@ -140,6 +139,14 @@ private:
   SDL_AudioDeviceID audio_device{};
   SDL_AudioSpec audio_spec{};
   SDL_AudioStream *audio_stream{};
+
+  struct BreakpointPrompt {
+    addr_t addr{0};
+    bool read{false};
+    bool write{false};
+    bool execute{false};
+    bool show{false};
+  };
 
   struct DebuggerState {
     Debug::BreakReason reason{Debug::BRK_CONTINUE};
@@ -220,9 +227,12 @@ private:
   std::atomic<int> front_index{0};
   mutable std::mutex ui_mutex{};
 
+  // Debug interface
+  BreakpointPrompt bp_prompt{};
+  DebuggerState dbg_state{};
+
   // System keep-alive
   std::atomic<bool> running{};
-  DebuggerState dbg_state{};
   EmulatorState emu_state{};
   InputState input_state{};
   UiState ui_state{};

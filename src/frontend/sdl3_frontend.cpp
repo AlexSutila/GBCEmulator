@@ -556,19 +556,42 @@ void SDL3Frontend::build_debug_dialog(ImVec2 max_size, ImVec2 min_size) {
 
 void SDL3Frontend::build_breakpoint_dialog(ImVec2 max_size, ImVec2 min_size) {
   if (ui_state.show_breakpoints_window) {
+    std::lock_guard<std::mutex> lock(dbg_mutex);
     ImGui::Begin("Breakoints", &ui_state.show_breakpoints_window);
-
-    // Temporary, eventually use callback for GBC to populate
-    Debug::Breakpoint b{Debug::BRK_ADDRESS_READ, 0xFF50};
-
     ImGui::SeparatorText("Breakpoints");
-    ImGui::Text("%s", b.to_string().c_str());
-    ImGui::SameLine();
-    ImGui::Button("Edit");
-    ImGui::SameLine();
-    ImGui::Button("Remove");
-    ImGui::Button("Add");
+    auto &debugger = gbc_->get_debugger();
 
+    if (!debugger.has_value()) {
+      ImGui::Text("Debugger not configured");
+      ImGui::End();
+      return;
+    }
+
+    const auto bps = debugger->get_breakpoints();
+    for (const auto &[addr, bp] : bps) {
+      ImGui::PushID(addr);
+
+      ImGui::Text("%s", bp.to_string().c_str());
+      ImGui::SameLine();
+      if (ImGui::Button("Edit")) {
+        bp_prompt.execute = bp.has_flag(Debug::BRK_ADDRESS_EXECUTED);
+        bp_prompt.read = bp.has_flag(Debug::BRK_ADDRESS_READ);
+        bp_prompt.write = bp.has_flag(Debug::BRK_ADDRESS_WRITTEN);
+        bp_prompt.addr = addr;
+        bp_prompt.show = true;
+      }
+      ImGui::SameLine();
+      if (ImGui::Button("Remove"))
+        debugger->breakpoint_del(addr);
+      ImGui::PopID();
+    }
+    if (ImGui::Button("Add"))
+      bp_prompt.show = true;
+
+    if (bp_prompt.show) {
+      ImGui::OpenPopup("Configure breakpoint");
+      build_config_breakpoint_dialog();
+    }
     ImGui::End();
   }
 }
@@ -588,15 +611,51 @@ void SDL3Frontend::build_ui() {
   emu_state.fast_forward.store(ui_state.fast_forward);
 }
 
+void SDL3Frontend::build_config_breakpoint_dialog() {
+  if (ImGui::BeginPopupModal("Configure breakpoint", nullptr,
+                             ImGuiWindowFlags_AlwaysAutoResize)) {
+
+    ImGui::InputScalar("Address", ImGuiDataType_U16, &bp_prompt.addr, nullptr,
+                       nullptr, "%04X", ImGuiInputTextFlags_CharsHexadecimal);
+    ImGui::Checkbox("Exec", &bp_prompt.execute);
+    ImGui::SameLine();
+    ImGui::Checkbox("Read", &bp_prompt.read);
+    ImGui::SameLine();
+    ImGui::Checkbox("Write", &bp_prompt.write);
+    ImGui::Separator();
+
+    if (ImGui::Button("OK", ImVec2(120, 0))) {
+      Debug::BreakReason reason{};
+      if (bp_prompt.execute)
+        reason = reason | Debug::BRK_ADDRESS_EXECUTED;
+      if (bp_prompt.write)
+        reason = reason | Debug::BRK_ADDRESS_WRITTEN;
+      if (bp_prompt.read)
+        reason = reason | Debug::BRK_ADDRESS_READ;
+      gbc_->get_debugger()->breakpoint_add(bp_prompt.addr, reason);
+      ImGui::CloseCurrentPopup();
+      bp_prompt.show = false;
+    }
+    ImGui::SameLine();
+
+    if (ImGui::Button("Cancel", ImVec2(120, 0))) {
+      ImGui::CloseCurrentPopup();
+      bp_prompt.show = false;
+    }
+
+    ImGui::EndPopup();
+  }
+}
+
 void SDL3Frontend::read_system_dbg_state() {
   dbg_state.sys_state = Debug::to_string(gbc_->get_sys());
   dbg_state.cpu_state = Debug::to_string(gbc_->get_cpu()->get_state());
   dbg_state.disasm = gbc_->get_cpu()->disasm();
 
   const InterruptBits *const ie_reg = dynamic_cast<InterruptBits *>(
-    gbc_->get_bus()->get_mmio(IORegisterMapping::MMIO_INT_ENABLE));
+      gbc_->get_bus()->get_mmio(IORegisterMapping::MMIO_INT_ENABLE));
   const InterruptBits *const if_reg = dynamic_cast<InterruptBits *>(
-    gbc_->get_bus()->get_mmio(IORegisterMapping::MMIO_INT_FLAGS));
+      gbc_->get_bus()->get_mmio(IORegisterMapping::MMIO_INT_FLAGS));
   dbg_state.ie_state = Debug::to_string(*ie_reg);
   dbg_state.if_state = Debug::to_string(*if_reg);
 }
@@ -632,14 +691,15 @@ void SDL3Frontend::emulation_thread_fn(std::stop_token st, cart c,
   gbc_->insert_cartridge(c);
 
   /* Configure the debugger */
-  auto on_brk_callback = [this]() {
+  auto on_brk_callback = [this, st]() {
     std::unique_lock<std::mutex> lock(dbg_mutex);
     dbg_state.stopped = true;
     read_system_dbg_state();
 
-    // Avoid crazy polling loops that eat up CPU time
-    dbg_cv.wait(lock, [&] { return !dbg_state.stopped; });
-    return dbg_state.reason;
+    dbg_cv.wait(lock, [this, st] { // Avoid polling loops
+      return !dbg_state.stopped || st.stop_requested();
+    });
+    return st.stop_requested() ? Debug::BRK_CONTINUE : dbg_state.reason;
   };
   gbc_->configure_debugger(Debug::Debugger(on_brk_callback));
 
@@ -676,13 +736,18 @@ void SDL3Frontend::emulation_thread_fn(std::stop_token st, cart c,
     /* Update the fuck ass debugger */
     std::lock_guard<std::mutex> lock(dbg_mutex);
     if (dbg_state.stopped)
-      gbc_->get_debugger().request_stop(dbg_state.reason);
+      gbc_->get_debugger()->request_stop(dbg_state.reason);
   }
 }
 
 void SDL3Frontend::join_emu_thread_if_running() {
   if (emulation_thread.joinable()) {
     emulation_thread.request_stop();
+    {
+      std::lock_guard<std::mutex> lock(dbg_mutex);
+      dbg_state.stopped = false;
+    }
+    dbg_cv.notify_all();
     emulation_thread.join();
   }
 }

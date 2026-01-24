@@ -32,13 +32,13 @@ class Breakpoint {
 public:
   explicit Breakpoint(BreakReason reason_flags, addr_t watch_addr);
   bool eval(BreakReason reason_flags) const;
+  bool has_flag(BreakReason flag) const;
 
   [[nodiscard]] std::string to_string() const;
 
 private:
   BreakReason reasons{};
   const addr_t addr;
-  const bool hardware_defined{};
 };
 
 }; // namespace Debug

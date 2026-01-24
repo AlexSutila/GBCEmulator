@@ -14,6 +14,10 @@ public:
   void eval(const addr_t addr, Debug::BreakReason reason);
   void request_stop(Debug::BreakReason reason);
 
+  const std::unordered_map<addr_t, Breakpoint> &get_breakpoints() const;
+  void breakpoint_add(const addr_t addr, Debug::BreakReason reason);
+  void breakpoint_del(const addr_t addr);
+
 private:
   std::function<BreakReason()> on_brk_callback{};
   std::unordered_map<addr_t, Breakpoint> bp_map{};

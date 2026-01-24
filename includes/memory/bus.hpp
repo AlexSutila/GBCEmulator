@@ -2,6 +2,8 @@
 #define __BUS_H
 
 #include "cart/cart.hpp"
+#include "debugger/breakpoint.hpp"
+#include "debugger/debugger.hpp"
 #include "emu_types.hpp"
 #include "memory/dma.hpp"
 #include "memory/mmio/cgb.hpp"
@@ -44,7 +46,8 @@ public:
 
   /* Second constructor is called when skipping BIOS, first constructor may also
    * ignore the BIOS if the initialization fails for some reason. */
-  AddressBus(runtime_sys_info &sys, std::optional<BootROM> &bios);
+  AddressBus(runtime_sys_info &sys, std::optional<Debug::Debugger> &debugger,
+             std::optional<BootROM> &bios);
 
   /* For attaching MMIO component interface registers */
   void connect_mmio(const addr_t addr, MMIORegister *const reg);
@@ -85,7 +88,9 @@ private:
   const byte_t get_wram_bank() const;
   bool is_boot_rom_range(const addr_t a);
 
+  void try_brk(const addr_t addr, Debug::BreakReason reason);
   std::map<addr_t, MMIORegister *> io_registers{};
+  std::optional<Debug::Debugger> &debugger_;
   std::optional<BootROM> &bios_;
   runtime_sys_info &sys_;
 };
