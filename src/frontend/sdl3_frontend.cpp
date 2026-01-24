@@ -14,7 +14,6 @@
 #include <chrono>
 #include <exception>
 #include <imgui.h>
-#include <iostream>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -26,7 +25,6 @@ static const char *rom_filters =
 static const char *bios_filters =
     "BIOS files (*.bin){.bin},All files (*.*){.*}";
 
-static constexpr double cycles_per_audio_frame = 4'194'304.0 / 48'000.0;
 static constexpr unsigned max_catchup_cycles = 70'224 / 4;
 static constexpr unsigned target_queue_ms = 20;
 static constexpr std::uint32_t black = 0xFF000000;
@@ -79,9 +77,9 @@ SDL3Frontend::SDL3Frontend() : Frontend() {
   if (!ImGui_ImplSDLRenderer3_Init(renderer))
     throw std::runtime_error("Failed to initialize ImGui SDL renderer backend");
 
-  config.path = settings_.rom_dir;
-  bios_sel_conf.path = rom_sel_conf.path = ".";
-  config.flags = bios_sel_conf.flags = rom_sel_conf.flags =
+  rom_sel_conf.path = settings_.rom_dir;
+  bios_sel_conf.path = ".";
+  bios_sel_conf.flags = rom_sel_conf.flags =
       ImGuiFileDialogFlags_Modal | ImGuiFileDialogFlags_ReadOnlyFileNameField;
   framebuffers[0] =
       std::make_unique<std::uint32_t[]>(framebuf_height * framebuf_width);
@@ -319,7 +317,7 @@ bool SDL3Frontend::consume_load_rom_request(std::string &rom_path) {
 
   /* Update recent ROMs and last used directory */
   const auto new_rom_path = fs::path(rom_path).parent_path().string();
-  config.path = new_rom_path;
+  rom_sel_conf.path = new_rom_path;
   settings_.rom_dir = new_rom_path;
   settings_.add_recent_rom(rom_path);
   settings_.save();
@@ -345,7 +343,7 @@ void SDL3Frontend::build_ui() {
     if (ImGui::BeginMenu("File")) {
       if (ImGui::MenuItem("Load ROM..."))
         ImGuiFileDialog::Instance()->OpenDialog(
-            "RomFileDialog", "Choose a ROM file", filters, config);
+            "RomFileDialog", "Choose a ROM file", rom_filters, rom_sel_conf);
 
       if (ImGui::BeginMenu("Open Recent")) {
         if (settings_.recent_roms.empty()) {
@@ -356,7 +354,7 @@ void SDL3Frontend::build_ui() {
             // Alternatively we can use std::filesystem::path(path).filename().string().c_str() for short names
             if (ImGui::MenuItem(std::filesystem::path(path).filename().string().c_str())) {
               ui_state.rom_path = path;
-              ui_state.request_load = true;
+              ui_state.request_load_rom = true;
             }
           }
         }
