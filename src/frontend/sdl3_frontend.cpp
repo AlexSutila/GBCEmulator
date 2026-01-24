@@ -72,7 +72,7 @@ SDL3Frontend::SDL3Frontend() : Frontend() {
   if (!ImGui_ImplSDLRenderer3_Init(renderer))
     throw std::runtime_error("Failed to initialize ImGui SDL renderer backend");
 
-  config.path = ".";
+  config.path = settings_.rom_dir;
   config.flags =
       ImGuiFileDialogFlags_Modal | ImGuiFileDialogFlags_ReadOnlyFileNameField;
   framebuffers[0] =
@@ -349,6 +349,7 @@ void SDL3Frontend::build_ui() {
           "RomFileDialog", ImGuiWindowFlags_NoCollapse, min_size, max_size)) {
     if (ImGuiFileDialog::Instance()->IsOk()) {
       ui_state.rom_path = ImGuiFileDialog::Instance()->GetFilePathName();
+      settings_.rom_dir = ui_state.rom_path.substr(0, ui_state.rom_path.find_last_of("/\\"));
       ui_state.request_load = true;
     }
     ImGuiFileDialog::Instance()->Close();
