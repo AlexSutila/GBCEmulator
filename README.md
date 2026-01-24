@@ -1,11 +1,5 @@
 # Overview
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/0dace201-c6b8-4621-a7bc-ebbd1889c048" width="45%" />
-  <img src="https://github.com/user-attachments/assets/f48935dd-bf13-47fa-ad38-34dd47ad5f69" width="46%" />
-</p>
-
 Lolyep. This repo presents yet another GameBoy Color emulator written entirely from scratch. It serves as a spiritual successor to an earlier (and very poorly written) [DMG GameBoy Emulator](https://github.com/AlexSutila/GBEmulator), aiming to be a cleaner, more accurate, and more modular foundation for both DMG and CGB emulation.
- - **Note:** For those with a keen eye. Yes, we do show prehistorik man intentionally. We know emulating it is a nightmare :)
 
 ## Compatability
 This emulator is designed to be compatible with **GameBoy Color (CGB)** games (obviously), and also implements the backwards compatability features CGB models provide. As such, this emulator can be used to emulate **original DMG GameBoy** games as well. The games shown in the screenshot below do not define the compatability limitations of this emulator, but they are known to play reasonably well.
@@ -16,7 +10,7 @@ This emulator is designed to be compatible with **GameBoy Color (CGB)** games (o
 
 ### DMG GameBoy Backwards Compatability
 ![DMG Compatability](assets/dmg_demo.png)
- - Fulll support for authentic re-coloring of original monochrome games through a configurable BIOS.
+ - Full support for authentic re-coloring of original monochrome games through a configurable BIOS.
  - That re-coloring of DMG games can be optionally disabled (since it looks hideous for some games).
 
 ### Memory Bank Circuitry Support
@@ -40,7 +34,7 @@ To evaluate the accuracy of any emulator, the homebrew community has released a 
 - **Note:** An accurate pixel FIFO is not necessary for passing these tests, in fact [this emulator](https://github.com/AlexSutila/GBEmulator) manages to pass DMG acid with a rudimentary scanline renderer. This emulator goes a step further and implements a full pixel FIFO, just because :)
 
 ### Mooneye Test Suite
-TODO: We're passing a handful of them, we just need a fancy visualizer lol
+We cannot realistically expect to pass every single one of these tests, as not all of them are designed to pass on CGB hardware. The tests we actually evaluate and their pass/fail status can be seen [here](assets/test_results.md).
 
 ## Multiple Frontends
 This emulator currently supports two frontends:

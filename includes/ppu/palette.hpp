@@ -27,4 +27,8 @@ private:
  * option that bypasses the coloring the CGB hardware does for DMG games. */
 [[nodiscard]] const std::uint32_t get_mono_color(const byte_t idx);
 
+/* Helpers for color format conversion */
+[[nodiscard]] const std::uint16_t argb8888_to_rgb555(std::uint32_t argb);
+[[nodiscard]] const std::uint32_t rgb555_to_argb8888(byte_t, byte_t);
+
 #endif // __PALETTE_H

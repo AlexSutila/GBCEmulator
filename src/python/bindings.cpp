@@ -11,7 +11,6 @@
 #include "cpu/registers/register.hpp"
 #include "frontend/frontend.hpp"
 #include "gbc.hpp"
-#include "memory/boot.hpp"
 #include "memory/bus.hpp"
 #include "memory/mmio/dmg.hpp"
 #include "memory/mmio/mmio.hpp"
@@ -35,6 +34,7 @@ public:
 private:
   std::array<std::uint32_t, 160 * 144> frame_data{};
 };
+
 class PyGameBoyColor {
 public:
   PyGameBoyColor() : fe_() {}
@@ -51,6 +51,11 @@ public:
   LR35902 *get_cpu() { return fe_.get()->get_cpu(); };
   PixelProcessingUnit *get_ppu() { return fe_.get()->get_ppu(); }
   TimerUnit *get_timer() { return fe_.get()->get_timer(); }
+  void put_joyp_state(std::uint8_t state) {
+    auto *joypad = dynamic_cast<Joypad::JOYP *>(
+            fe_.get()->get_bus()->get_mmio(IORegisterMapping::MMIO_JOYPAD));
+    joypad->set_state(state);
+  }
 
 private:
   PyFrontend fe_;
@@ -197,15 +202,8 @@ PYBIND11_MODULE(gbc_py, m) {
       .def("set_flag", &CpuFlagsRegister::set_flag)
       .def("clr_flag", &CpuFlagsRegister::clr_flag);
 
-  // Expose boot ROM for memory testing
-  m.def("get_boot_rom", []() {
-    const auto &rom = get_boot_rom();
-    return py::bytes(reinterpret_cast<const char *>(rom.data()), rom.size());
-  });
-
   // Expose main Address Bus class
   py::class_<AddressBus>(m, "AddressBus")
-      .def(py::init<runtime_sys_info &>(), py::arg("sys"))
       .def("init_test_bed", &AddressBus::init_test_bed)
       .def("write_byte", &AddressBus::write_byte, py::arg("addr"),
            py::arg("value"))
@@ -319,6 +317,8 @@ PYBIND11_MODULE(gbc_py, m) {
       .def("get_ppu", &PyGameBoyColor::get_ppu,
            py::return_value_policy::reference_internal)
       .def("get_timer", &PyGameBoyColor::get_timer,
+           py::return_value_policy::reference_internal)
+      .def("put_joyp_state", &PyGameBoyColor::put_joyp_state,
            py::return_value_policy::reference_internal);
 
   // For testing

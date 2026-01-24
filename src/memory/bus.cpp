@@ -2,7 +2,6 @@
 #include "cart/cart.hpp"
 #include "emu_types.hpp"
 #include "gbc.hpp"
-#include "memory/boot.hpp"
 #include "memory/mmio/cgb.hpp"
 #include "memory/mmio/dmg.hpp"
 #include "memory/mmio/mmio.hpp"
@@ -10,8 +9,8 @@
 #include <cassert>
 #include <cstddef>
 #include <memory>
+#include <optional>
 #include <stdexcept>
-#include <vector>
 
 /* To make the contents of this file slightly less aggregious of a playground
  * for performing heap corruption exploits lmao */
@@ -25,8 +24,10 @@ template <typename T> std::unique_ptr<T[]> make_zeroed(std::size_t size) {
   return p;
 }
 
-static constexpr bool is_bootrom_range(const addr_t a) noexcept {
-  return (a <= 0x00FF) || (a >= 0x0200 && a <= 0x0900);
+bool AddressBus::is_boot_rom_range(const addr_t a) {
+  if (!boot_rom_ctrl.boot_rom_enabled() || !bios_.has_value())
+    return false;
+  return bios_->in_range(a);
 }
 
 static constexpr bool is_cart_range(const addr_t a) noexcept {
@@ -53,11 +54,12 @@ static constexpr bool is_hram_range(const addr_t a) noexcept {
   return (a >= 0xFF80 && a <= 0xFFFE);
 }
 
-AddressBus::AddressBus(runtime_sys_info &sys)
+AddressBus::AddressBus(runtime_sys_info &sys, std::optional<BootROM> &bios)
     : key0(sys),        // Controls backwards compatability
       key1(sys),        // Controls clock speed mode
       oam_dma(*this),   // Performs object attribute DMA (DMG and CGB)
       vdma(*this, sys), // Performs GDMA and HDMA (CGB only)
+      bios_(bios),      // This constructor ignores the BIOS
       sys_(sys)         // Generic system information
 {
   constexpr std::size_t vram_bank_size = 0x2000;
@@ -116,15 +118,14 @@ void AddressBus::init_test_bed() {
 void AddressBus::eject_cartridge() { cart_.reset(); }
 
 const byte_t AddressBus::read_byte(const addr_t addr) {
-  const std::vector<byte_t> &boot_rom = get_boot_rom();
 
-  /* Read from boot ROM if it is mapped (boot ROM overrides READs only) */
-  if (boot_rom_enabled() && is_bootrom_range(addr))
-    return boot_rom.at(addr);
+  /* Read from boot ROM if it is mapped (boot ROM overrides reads only) */
+  if (is_boot_rom_range(addr))
+    return bios_->read_byte(addr);
 
   /* Cartridge memory */
   else if (cart_ && is_cart_range(addr))
-    return cart_->read(addr);
+    return cart_->read_byte(addr);
 
   /* Read from VRAM, only banked in CGB mode */
   else if (is_vram_range(addr)) {
@@ -222,8 +223,6 @@ void AddressBus::write_byte(const addr_t addr, const byte_t value) {
   else if (is_hram_range(addr))
     hram[(addr - 0xFF80) & HRAM_MASK] = value;
 }
-
-bool AddressBus::boot_rom_enabled() { return boot_rom_ctrl.boot_rom_enabled(); }
 
 MMIORegister *AddressBus::get_mmio(IORegisterMapping mapping) const {
   const addr_t addr = static_cast<addr_t>(mapping);

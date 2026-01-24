@@ -545,11 +545,14 @@ void APU::trigger_channel4() {
 }
 
 double APU::ch4_clock_hz() const {
-  static constexpr int divisors[8] = {8,16,32,48,64,80,96,112};
-  const int r = divisors[nr43 & 0x07];
+  double r = nr43 & 0x07;
   const int s = (nr43 >> 4) & 0x0F;
-  // 524288 / r / 2^(s+1)
-  return 524288.0 / double(r) / double(1u << (s + 1));
+
+  if (r == 0) {
+    r = 0.5;
+  }
+  // 262144 / r / 2^s
+  return 262144.0 / r / double(1u << s);
 }
 
 void APU::ch4_clock_lfsr() {
@@ -675,14 +678,17 @@ void APU::generate_sample() {
   if (nr51 & 0x08)
     right_raw += ch4;
 
-  float left = left_raw * master_left;
-  float right = right_raw * master_right;
+  // Apply master volume
+  float left = left_raw * master_left * master_gain;
+  float right = right_raw * master_right * master_gain;
 
-  left = clamp_sample(left * master_gain);
-  right = clamp_sample(right * master_gain);
-
+  // Remove DC offset
   left  = dc_block(left,  dc_x1_l, dc_y1_l);
   right = dc_block(right, dc_x1_r, dc_y1_r);
+
+  // Clamp now
+  left = clamp_sample(left);
+  right = clamp_sample(right);
 
   mix_buffer[frame_cursor * 2] = left;
   mix_buffer[frame_cursor * 2 + 1] = right;

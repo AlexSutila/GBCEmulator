@@ -71,7 +71,7 @@ public:
   explicit Cartridge()
       : image_({}), mbc_(make_test_mbc()) {}
 
-  [[nodiscard]] byte_t read(addr_t addr) { return mbc_->read(addr); }
+  [[nodiscard]] byte_t read_byte(addr_t addr) { return mbc_->read(addr); }
   void write(addr_t addr, byte_t v) { mbc_->write(addr, v); }
 
   [[nodiscard]] const cart &image() const noexcept { return image_; }

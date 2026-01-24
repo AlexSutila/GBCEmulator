@@ -60,9 +60,9 @@ PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus, Frontend &fe,
   auto bgpd = bg_cram->get_data_reg(), obpd = obj_cram->get_data_reg();
   auto bgpi = bg_cram->get_idx_reg(), obpi = obj_cram->get_idx_reg();
 
-  /* Configure convenience MMIO register references */
-  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_CONTROL), &lcdc_);
-  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_STATUS), &stat_);
+  /* Configure MMIO register connections over address bus */
+  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_CTRL), &lcdc_);
+  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_STAT), &stat_);
   bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_Y_COMP), &lyc_);
   bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_SCY), &scy_);
   bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_LCD_SCX), &scx_);

@@ -1,15 +1,19 @@
 #ifndef __GBC_H
 #define __GBC_H
 
+#include "apu/apu.hpp"
 #include "cart/cart.hpp"
 #include "cpu/lr35902.hpp"
-#include "apu/apu.hpp"
+#include "memory/boot.hpp"
 #include "memory/bus.hpp"
+#include "memory/mmio/mmio.hpp"
 #include "ppu/ppu.hpp"
+#include "serial/serial.hpp"
 #include "timer/timer.hpp"
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 
 class Frontend;
 
@@ -28,6 +32,7 @@ struct runtime_sys_info {
 
 class GameBoyColor {
 public:
+  GameBoyColor(Frontend &frontend, const std::string &bios_path);
   GameBoyColor(Frontend &frontend);
   void insert_cartridge(cart c);
   void init_test_bed();
@@ -48,13 +53,23 @@ private:
   std::unique_ptr<APU> apu{};
   std::unique_ptr<PixelProcessingUnit> ppu{};
   std::unique_ptr<TimerUnit> timer{};
+  std::unique_ptr<SerialUnit> serial{};
 
+  /* Top-level system initialization helpers */
+  void system_init(); // Connects all components in the system
+  void skip_bios();   // Skips bios when unconfigured
+
+  /* Helpers for initializing emulator state to skip the BIOS */
+  void cram_init_mono(IORegisterMapping index, IORegisterMapping data);
+  void cram_init_mono();
+
+  /* For moving emulation state along */
   void step_dma(bool fast_cycle);
   bool vdma_enabled() const;
   void step_processor();
 
+  std::optional<BootROM> bios_{};
   runtime_sys_info sys_{};
-  bool has_cartridge{};
   Frontend &fe_;
 };
 

@@ -1,4 +1,5 @@
 #include "frontend/sdl3_frontend.hpp"
+#include "ImGuiFileDialog.h"
 #include "SDL3/SDL_audio.h"
 #include "SDL3/SDL_render.h"
 #include "SDL3/SDL_video.h"
@@ -13,12 +14,18 @@
 #include <chrono>
 #include <exception>
 #include <imgui.h>
+#include <iostream>
 #include <memory>
+#include <mutex>
+#include <optional>
 #include <stdexcept>
 #include <thread>
 
-static const char *filters =
+static const char *rom_filters =
     "ROM files (*.gb *.gbc){.gb,.gbc},All files (*.*){.*}";
+static const char *bios_filters =
+    "BIOS files (*.bin){.bin},All files (*.*){.*}";
+
 static constexpr double cycles_per_audio_frame = 4'194'304.0 / 48'000.0;
 static constexpr unsigned max_catchup_cycles = 70'224 / 4;
 static constexpr unsigned target_queue_ms = 20;
@@ -73,13 +80,13 @@ SDL3Frontend::SDL3Frontend() : Frontend() {
     throw std::runtime_error("Failed to initialize ImGui SDL renderer backend");
 
   config.path = settings_.rom_dir;
-  config.flags =
+  bios_sel_conf.path = rom_sel_conf.path = ".";
+  config.flags = bios_sel_conf.flags = rom_sel_conf.flags =
       ImGuiFileDialogFlags_Modal | ImGuiFileDialogFlags_ReadOnlyFileNameField;
   framebuffers[0] =
       std::make_unique<std::uint32_t[]>(framebuf_height * framebuf_width);
   framebuffers[1] =
       std::make_unique<std::uint32_t[]>(framebuf_height * framebuf_width);
-  pixels_rendered = 0;
   running = true;
   clear();
 
@@ -122,13 +129,11 @@ void SDL3Frontend::put_pixel(int x, int y, std::uint32_t c) {
   /* We perform double buffering to prevent screen tearing */
   const int back_index = 1 - front_index.load(std::memory_order_relaxed);
   framebuffers[back_index][y * framebuf_width + x] = c;
-  ++pixels_rendered;
 
-  /* Frame is complete so swap frame buffers */
-  if (pixels_rendered == framebuf_height * framebuf_width) {
+  /* Frame completion can be indicated by the fact that we are placing
+   * the last pixel in the frame, so we need to swap buffers here. */
+  if (x + 1 == framebuf_width && y + 1 == framebuf_height)
     front_index.store(back_index, std::memory_order_release);
-    pixels_rendered = 0;
-  }
 }
 
 void SDL3Frontend::poll_events() {
@@ -207,16 +212,22 @@ void SDL3Frontend::clear(std::uint32_t c) {
 
 void SDL3Frontend::queue_audio_samples(const float *samples,
                                        std::size_t sample_count) {
-  if (!samples || sample_count == 0) return;
+  if (!samples || sample_count == 0)
+    return;
 
   std::scoped_lock lock(audio_mutex);
-  if (!audio_device || !audio_stream) return;
+  if (!audio_device || !audio_stream)
+    return;
 
   constexpr std::size_t max_queue_bytes = 48000 * 2 * sizeof(float); // ~1s
   const int queued = SDL_GetAudioStreamQueued(audio_stream);
 
-  if (queued < 0) { SDL_ClearAudioStream(audio_stream); return; }
-  if ((std::size_t)queued > max_queue_bytes) return;
+  if (queued < 0) {
+    SDL_ClearAudioStream(audio_stream);
+    return;
+  }
+  if ((std::size_t)queued > max_queue_bytes)
+    return;
 
   const int byte_count = (int)(sample_count * sizeof(float));
   if (!SDL_PutAudioStreamData(audio_stream, samples, byte_count)) {
@@ -233,7 +244,7 @@ void SDL3Frontend::refresh_output_devices() {
   ui_state.output_device_names.emplace_back("System default");
 
   int count = 0;
-  SDL_AudioDeviceID* devs = SDL_GetAudioPlaybackDevices(&count);
+  SDL_AudioDeviceID *devs = SDL_GetAudioPlaybackDevices(&count);
   if (!devs) {
     set_status_message(SDL_GetError());
     return;
@@ -242,39 +253,37 @@ void SDL3Frontend::refresh_output_devices() {
   // SDL docs: returns a 0-terminated array; also provides count
   for (int i = 0; devs[i] != 0; ++i) {
     const SDL_AudioDeviceID id = devs[i];
-    const char* name = SDL_GetAudioDeviceName(id); // human-readable name
+    const char *name = SDL_GetAudioDeviceName(id); // human-readable name
     ui_state.output_device_ids.push_back(id);
     ui_state.output_device_names.emplace_back(name ? name : "(unknown device)");
   }
-
   SDL_free(devs);
 }
 
 bool SDL3Frontend::switch_output_device_by_index(int idx) {
-  if (idx < 0 || idx >= static_cast<int>(ui_state.output_device_ids.size())) return false;
+  if (idx < 0 || idx >= static_cast<int>(ui_state.output_device_ids.size()))
+    return false;
 
   const SDL_AudioDeviceID desired = ui_state.output_device_ids[idx];
-
   std::scoped_lock lock(audio_mutex);
-
-  if (!audio_stream) return false;
+  if (!audio_stream)
+    return false;
 
   // Stop audio on old device
   SDL_ClearAudioStream(audio_stream);
-
   if (audio_device) {
     SDL_UnbindAudioStream(audio_stream);
     SDL_CloseAudioDevice(audio_device);
     audio_device = 0;
   }
 
-  // Open new device (can be a physical device id or SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK)
+  // Open new device (can be a physical device id or
+  // SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK)
   audio_device = SDL_OpenAudioDevice(desired, &audio_spec);
   if (!audio_device) {
     set_status_message(SDL_GetError());
     return false;
   }
-
   if (!SDL_BindAudioStream(audio_device, audio_stream)) {
     set_status_message(SDL_GetError());
     SDL_CloseAudioDevice(audio_device);
@@ -287,14 +296,25 @@ bool SDL3Frontend::switch_output_device_by_index(int idx) {
   return true;
 }
 
-
-bool SDL3Frontend::consume_load_request(std::string &rom_path) {
+bool SDL3Frontend::consume_load_bios_request(
+    std::optional<std::string> &bios_path) {
   std::lock_guard<std::mutex> lock(ui_mutex);
-  if (!ui_state.request_load)
+  if (!ui_state.request_load_bios)
+    return false;
+
+  /* Denote new BIOS path */
+  ui_state.request_load_bios = false;
+  bios_path = ui_state.bios_path;
+  return true;
+}
+
+bool SDL3Frontend::consume_load_rom_request(std::string &rom_path) {
+  std::lock_guard<std::mutex> lock(ui_mutex);
+  if (!ui_state.request_load_rom)
     return false;
 
   /* Denote new cartridge path */
-  ui_state.request_load = false;
+  ui_state.request_load_rom = false;
   rom_path = ui_state.rom_path;
 
   /* Update recent ROMs and last used directory */
@@ -309,19 +329,6 @@ bool SDL3Frontend::consume_load_request(std::string &rom_path) {
 void SDL3Frontend::set_status_message(std::string message) {
   std::lock_guard<std::mutex> lock(ui_mutex);
   ui_state.status_message = std::move(message);
-}
-
-const int SDL3Frontend::calc_sync_cycles() const {
-  int queued_bytes = SDL_GetAudioStreamQueued(audio_stream);
-  queued_bytes = std::max(queued_bytes, 0); // Clamp to be non-negative
-
-  const int bytes_per_frame = int(sizeof(float) * 2); // stereo float
-  const int queued_frames = queued_bytes / bytes_per_frame;
-  const int target_frames = (audio_spec.freq * target_queue_ms) / 1000;
-
-  int delta_frames = target_frames - queued_frames;
-  int cycles = delta_frames * cycles_per_audio_frame;
-  return std::clamp(cycles, 0, int(max_catchup_cycles));
 }
 
 void SDL3Frontend::build_ui() {
@@ -355,7 +362,6 @@ void SDL3Frontend::build_ui() {
         }
         ImGui::EndMenu();
       }
-
       if (ImGui::MenuItem("Quit"))
         running = false;
       ImGui::EndMenu();
@@ -363,6 +369,9 @@ void SDL3Frontend::build_ui() {
     if (ImGui::BeginMenu("Settings")) {
       if (ImGui::MenuItem("Emulator Settings"))
         ui_state.show_settings_window = true;
+      if (ImGui::MenuItem("Select BIOS (optional)"))
+        ImGuiFileDialog::Instance()->OpenDialog(
+            "BiosFileDialog", "Choose a BIN file", bios_filters, bios_sel_conf);
       ImGui::EndMenu();
     }
     ImGui::EndMainMenuBar();
@@ -373,7 +382,18 @@ void SDL3Frontend::build_ui() {
           "RomFileDialog", ImGuiWindowFlags_NoCollapse, min_size, max_size)) {
     if (ImGuiFileDialog::Instance()->IsOk()) {
       ui_state.rom_path = ImGuiFileDialog::Instance()->GetFilePathName();
-      ui_state.request_load = true;
+      ui_state.request_load_rom = true;
+    }
+    ImGuiFileDialog::Instance()->Close();
+    ui_state.show_load_window = false;
+  }
+
+  /* BIOS selection dialog */
+  if (ImGuiFileDialog::Instance()->Display(
+          "BiosFileDialog", ImGuiWindowFlags_NoCollapse, min_size, max_size)) {
+    if (ImGuiFileDialog::Instance()->IsOk()) {
+      ui_state.bios_path = ImGuiFileDialog::Instance()->GetFilePathName();
+      ui_state.request_load_bios = true;
     }
     ImGuiFileDialog::Instance()->Close();
     ui_state.show_load_window = false;
@@ -384,7 +404,6 @@ void SDL3Frontend::build_ui() {
     ImGui::Begin("Settings", &ui_state.show_settings_window);
     ImGui::Checkbox("Fast forward", &ui_state.fast_forward);
     ImGui::Checkbox("Force DMG monochrome", &settings_.force_mono_dmg);
-
     ImGui::SeparatorText("Audio");
 
     // Volume slider
@@ -401,12 +420,12 @@ void SDL3Frontend::build_ui() {
       refresh_output_devices();
       ui_state.output_device_index = 0;
     }
-
     ImGui::SetNextItemWidth(260.0f);
 
-    std::vector<const char*> items;
+    std::vector<const char *> items;
     items.reserve(ui_state.output_device_names.size());
-    for (auto& s : ui_state.output_device_names) items.push_back(s.c_str());
+    for (auto &s : ui_state.output_device_names)
+      items.push_back(s.c_str());
 
     int old_audio_idx = ui_state.output_device_index;
     if (ImGui::Combo("Output device", &ui_state.output_device_index,
@@ -415,24 +434,25 @@ void SDL3Frontend::build_ui() {
         ui_state.output_device_index = old_audio_idx; // revert on failure
         switch_output_device_by_index(old_audio_idx);
       }
-                     }
+    }
 
     ImGui::SameLine();
     if (ImGui::Button("Refresh")) {
       refresh_output_devices();
-      ui_state.output_device_index = std::min(ui_state.output_device_index,
-                                             static_cast<int>(ui_state.output_device_names.size()) - 1);
+      ui_state.output_device_index =
+          std::min(ui_state.output_device_index,
+                   static_cast<int>(ui_state.output_device_names.size()) - 1);
     }
-
 
     ImGui::SeparatorText("Keybinds");
     // --- Preset dropdown ---
     {
       // Build an array of names for ImGui::Combo
-      static std::array<const char*, kPresets.size()> preset_names{};
+      static std::array<const char *, kPresets.size()> preset_names{};
       static bool preset_names_init = false;
       if (!preset_names_init) {
-        for (size_t i = 0; i < kPresets.size(); ++i) preset_names[i] = kPresets[i].name;
+        for (size_t i = 0; i < kPresets.size(); ++i)
+          preset_names[i] = kPresets[i].name;
         preset_names_init = true;
       }
 
@@ -449,20 +469,18 @@ void SDL3Frontend::build_ui() {
         }
       }
     }
-
     ImGui::Spacing();
 
-    static constexpr std::array<const char*, KCount> keybind_labels{
-      "Right","Left","Up","Down","A","B","Select","Start"
-    };
-
+    static constexpr std::array<const char *, KCount> keybind_labels{
+        "Right", "Left", "Up", "Down", "A", "B", "Select", "Start"};
     for (std::size_t i = 0; i < keybind_labels.size(); ++i) {
       ImGui::Text("%s", keybind_labels[i]);
       ImGui::SameLine(120.0f);
 
       const bool waiting = (ui_state.waiting_for_bind == static_cast<int>(i));
-      std::string button_label = waiting ? "Press a key..." : (std::string("Bind##") + keybind_labels[i]);
-
+      std::string button_label =
+          waiting ? "Press a key..."
+                  : (std::string("Bind##") + keybind_labels[i]);
       if (ImGui::Button(button_label.c_str()))
         ui_state.waiting_for_bind = static_cast<int>(i);
 
@@ -492,7 +510,8 @@ const std::uint32_t *SDL3Frontend::front_buffer() const {
   return framebuffers[front_index.load(std::memory_order_acquire)].get();
 }
 
-void SDL3Frontend::emulation_thread_fn(std::stop_token st, cart c) {
+void SDL3Frontend::emulation_thread_fn(std::stop_token st, cart c,
+                                       std::optional<std::string> bios_path) {
   bool ff = false;
   clear(black);
 
@@ -501,9 +520,12 @@ void SDL3Frontend::emulation_thread_fn(std::stop_token st, cart c) {
   SDL_ClearAudioStream(audio_stream);
 
   /* Re-instantiate emulator instance */
-  gbc_ = std::make_unique<GameBoyColor>(*this);
+  gbc_ = bios_path.has_value()
+             ? std::make_unique<GameBoyColor>(*this, bios_path.value())
+             : std::make_unique<GameBoyColor>(*this);
   gbc_->insert_cartridge(c);
 
+  /* Establish connection with button state */
   auto *joypad = dynamic_cast<Joypad::JOYP *>(
       gbc_->get_bus()->get_mmio(IORegisterMapping::MMIO_JOYPAD));
   if (!joypad)
@@ -511,19 +533,28 @@ void SDL3Frontend::emulation_thread_fn(std::stop_token st, cart c) {
 
   /* Run emulation in real-time */
   while (!st.stop_requested()) [[likely]] {
-    const int sync_cycles = calc_sync_cycles();
+    // Audio sync logic
+    // Check how much audio is currently buffered
+    const int queued_bytes = SDL_GetAudioStreamQueued(audio_stream);
+    int queued_ms = (queued_bytes * 1000) / (sizeof(float) * 2 * 48000);
+
+    // If we are ahead of the target (and not fast-forwarding), sleep briefly.
+    // 1ms should be short enough to prevent underruns
+    if (!ff && queued_ms > target_queue_ms) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      continue;
+    }
 
     /* Read input state and catch up with audio stream */
+    // max_catchup_cycles is ~17556 cycles (~4ms of emulated time)
     joypad->set_state(input_state.buttons.load(std::memory_order_relaxed));
-    for (auto i{0}; i < sync_cycles; i++)
+    for (auto i{0}; i < max_catchup_cycles; i++)
       gbc_->step();
 
     /* Hint to the OS to let this thread sleep. This is better than manually
      * claculating a sleep period and explicitly making this thread sleep bc
      * it is possible (and more likely) to introduce jitter which will cause
      * small breaks in the audio that sound like pops and cracks. */
-    if (!ff && sync_cycles == 0)
-      std::this_thread::yield();
 
     /* Update additional meta-data, avoid mutex acquisition */
     emu_state.is_cgb.store(gbc_->is_cgb_mode());
@@ -561,24 +592,29 @@ void SDL3Frontend::update_button_state(const SDL_Keycode key,
 }
 
 void SDL3Frontend::start() {
+  std::optional<std::string> bios_path{std::nullopt};
   std::string rom_path{};
-  clear(black);
 
+  clear(black);
   while (running.load()) [[likely]] {
+
     /* Handle cart re-insertion */
-    if (consume_load_request(rom_path)) {
+    if (consume_load_rom_request(rom_path)) {
       join_emu_thread_if_running();
 
       /* Attempt to load cartridge, if it fails thread doesn't start */
       try {
-        cart loaded = load_cart_fs(rom_path.c_str());
-        emulation_thread =
-            std::jthread(&SDL3Frontend::emulation_thread_fn, this, loaded);
+        cart cart_ctx = load_cart_fs(rom_path.c_str());
+        emulation_thread = std::jthread(&SDL3Frontend::emulation_thread_fn,
+                                        this, cart_ctx, bios_path);
         set_status_message(std::format("Loaded ROM: {}", rom_path));
       } catch (std::exception &e) {
         set_status_message(std::format("Failed to load ROM: {}", e.what()));
       }
     }
+
+    /* Handle BIOS selection, won't take effect until ROM re-inserted */
+    consume_load_bios_request(bios_path);
 
     /* Shows ui in what ever state it is currently in */
     poll_events();
