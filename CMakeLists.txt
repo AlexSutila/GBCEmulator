@@ -37,6 +37,12 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(imgui)
 FetchContent_MakeAvailable(imgui_file_dialog)
+FetchContent_Declare(
+    json
+    GIT_REPOSITORY https://github.com/nlohmann/json.git
+    GIT_TAG        v3.12.0
+)
+FetchContent_MakeAvailable(json)
 
 set(IMGUI_SOURCES
     ${imgui_SOURCE_DIR}/imgui.cpp
@@ -128,6 +134,7 @@ add_executable(gbc
 target_link_libraries(gbc
     PRIVATE SDL3::SDL3
     PRIVATE imgui
+    PRIVATE nlohmann_json::nlohmann_json
 )
 target_include_directories(gbc
     PRIVATE ${GBC_INCLUDE_DIR}
@@ -144,6 +151,7 @@ pybind11_add_module(gbc_py
 target_link_libraries(gbc_py
     PRIVATE SDL3::SDL3
     PRIVATE imgui
+    PRIVATE nlohmann_json::nlohmann_json
 )
 target_include_directories(gbc_py
     PRIVATE ${GBC_INCLUDE_DIR}

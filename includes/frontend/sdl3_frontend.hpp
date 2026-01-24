@@ -13,6 +13,8 @@
 #include <stop_token>
 #include <string>
 
+#include "settings.hpp"
+
 class SDL3Frontend final : public Frontend {
 public:
   SDL3Frontend();
@@ -51,21 +53,20 @@ private:
   SDL_AudioSpec audio_spec{};
   SDL_AudioStream *audio_stream{};
 
+  Settings settings_;
   struct UiState {
     bool show_load_window{true};
     bool show_settings_window{false};
     bool request_load_bios{false};
     bool request_load_rom{false};
     bool fast_forward{false};
-    bool force_mono_dmg{false};
     std::optional<std::string> bios_path{std::nullopt};
     std::string rom_path{};
     std::string status_message{};
     // Keybinding
     std::optional<std::size_t> waiting_for_bind{};
-    int keybind_preset_index{}; // default preset at index 0
     // Sound / volume control
-    float volume = 0.5f;         // >1.0 for boost
+
     int output_device_index = 0; // 0 = system default
                                  // 1..N = physical device ids
     std::vector<SDL_AudioDeviceID> output_device_ids;
@@ -87,7 +88,6 @@ private:
       Joypad::JoypadButton::A,      Joypad::JoypadButton::B,
       Joypad::JoypadButton::SELECT, Joypad::JoypadButton::START};
   static constexpr int KCount = 8;
-  std::array<SDL_Keycode, KCount> keybinds{};
   struct KeybindPreset {
     const char *name;
     std::array<SDL_Keycode, KCount> keys;
