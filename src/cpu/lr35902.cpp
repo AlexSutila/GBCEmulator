@@ -121,7 +121,6 @@ std::optional<Instruction *> LR35902::should_interrupt() {
 /* Read opcode from PC, populate `ins_` instruction reference */
 void LR35902::do_fetch() {
   ime.step();
-  try_brk(Debug::BRK_ADDRESS_EXECUTED | Debug::BRK_STEP_INSTRUCTION);
 
   // Check for interrupts, delay fetch until after ISR
   const auto isr = should_interrupt();
@@ -130,7 +129,7 @@ void LR35902::do_fetch() {
 
   // Else continue with fetch/decode/exec as usual
   else {
-    const byte_t op = bus->read_byte(reg_file.reg_pc++);
+    const byte_t op = bus->read_byte(reg_file.reg_pc);
     std::unique_ptr<Instruction> &ins = lookup.at(op);
 
     // Handle un-implemented opcodes
@@ -139,8 +138,13 @@ void LR35902::do_fetch() {
       oss << "Unimplemented opcode: 0x" << std::uppercase << std::hex
           << std::setw(2) << std::setfill('0') << static_cast<int>(op);
       throw std::logic_error(oss.str());
+
     } else
       ins_ = ins.get();
+
+    // Handle execution breakpoints
+    try_brk(Debug::BRK_ADDRESS_EXECUTED | Debug::BRK_STEP_INSTRUCTION);
+    reg_file.reg_pc++;
   }
   state = CpuStates::STATE_DECODE;
 }
