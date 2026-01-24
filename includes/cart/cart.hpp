@@ -21,7 +21,6 @@ constexpr std::size_t kMinRomSize = 0x0150;
 
 struct rom_header {
   std::array<byte_t, 4> entry_point{};      // 0100-0103
-  std::array<byte_t, 0x30> nintendo_logo{}; // 0104-0133
   std::array<byte_t, 16>
       title_area{}; // 0134-0143 (optionally title / manufacturer / cgb_flag)
   std::array<byte_t, 2> new_licensee_code{}; // 0144-0145
@@ -53,7 +52,6 @@ struct cart {
   std::size_t declared_rom_bytes{}; // from header 0148
   std::size_t declared_ram_bytes{}; // from header 0149
 
-  bool logo_ok{};
   bool header_checksum_ok{};
   bool global_checksum_ok{};
 

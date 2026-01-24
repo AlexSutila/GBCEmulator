@@ -466,7 +466,6 @@ std::string describe_cart(const cart &c) {
   os << "Mask ROM version (014C): " << hex8(h.mask_rom_version) << "\n\n";
 
   os << "[Boot/Integrity]\n";
-  os << "Nintendo logo check (full): " << (c.logo_ok ? "OK" : "FAIL") << "\n";
   os << "Entry point (0100-0103): " << bytes_hex(h.entry_point) << "\n";
 
   os << "Header checksum (014D): expected " << hex8(h.header_checksum)

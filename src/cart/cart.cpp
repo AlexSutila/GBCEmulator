@@ -35,22 +35,6 @@ static std::string ascii_ztrim(const byte_t *p, std::size_t n) {
   return std::string(reinterpret_cast<const char *>(p), len);
 }
 
-// Nintendo logo bytes (0104-0133).
-static constexpr std::array<byte_t, 0x30> kNintendoLogo = {
-    0xCE, 0xED, 0x66, 0x66, 0xCC, 0x0D, 0x00, 0x0B, 0x03, 0x73, 0x00, 0x83,
-    0x00, 0x0C, 0x00, 0x0D, 0x00, 0x08, 0x11, 0x1F, 0x88, 0x89, 0x00, 0x0E,
-    0xDC, 0xCC, 0x6E, 0xE6, 0xDD, 0xDD, 0xD9, 0x99, 0xBB, 0xBB, 0x67, 0x63,
-    0x6E, 0x0E, 0xEC, 0xCC, 0xDD, 0xDC, 0x99, 0x9F, 0xBB, 0xB9, 0x33, 0x3E};
-
-// GB: checks all 0x30 bytes
-// CGB+: checks first 0x18 bytes only
-static bool check_logo(std::span<const byte_t> rom) {
-  if (rom.size() < 0x0134)
-    return false;
-  return std::equal(kNintendoLogo.begin(), kNintendoLogo.end(),
-                    rom.begin() + 0x0104);
-}
-
 // Header checksum algorithm from boot ROM
 static byte_t compute_header_checksum(std::span<const byte_t> rom) {
   byte_t checksum = 0;
@@ -149,7 +133,6 @@ static rom_header parse_header(std::span<const byte_t> rom) {
   rom_header h{};
 
   std::copy_n(rom.data() + 0x0100, 4, h.entry_point.begin());
-  std::copy_n(rom.data() + 0x0104, 0x30, h.nintendo_logo.begin());
   std::copy_n(rom.data() + 0x0134, 16, h.title_area.begin());
 
   h.new_licensee_code[0] = rom[0x0144];
@@ -178,7 +161,6 @@ void validate(cart &c) {
   c.header = parse_header(c.rom);
   c.declared_rom_bytes = rom_bytes_from_code(c.header.rom_size_code);
   c.declared_ram_bytes = ram_bytes_from_code(c.header.ram_size_code);
-  c.logo_ok = check_logo(c.rom);
 
   const byte_t computed_hchk = compute_header_checksum(c.rom);
   c.header_checksum_ok = (computed_hchk == c.header.header_checksum);
