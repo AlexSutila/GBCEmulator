@@ -58,13 +58,13 @@ static constexpr bool is_hram_range(const addr_t a) noexcept {
 AddressBus::AddressBus(runtime_sys_info &sys,
                        std::optional<Debug::Debugger> &debugger,
                        std::optional<BootROM> &bios)
-    : key0(sys),           // Controls backwards compatability
-      key1(sys),           // Controls clock speed mode
-      oam_dma(*this),      // Performs object attribute DMA (DMG and CGB)
-      vdma(*this, sys),    // Performs GDMA and HDMA (CGB only)
-      debugger_(debugger), // Optionally configured by frontend
-      bios_(bios),         // Optionally configured by frontend
-      sys_(sys)            // Generic system information
+    : Debug::Debuggable(debugger), // Bus read/write breakpoings
+      key0(sys),                   // Controls backwards compatability
+      key1(sys),                   // Controls clock speed mode
+      oam_dma(*this),              // Performs object attribute DMA (DMG/CGB)
+      vdma(*this, sys),            // Performs GDMA and HDMA (CGB only)
+      bios_(bios),                 // Optionally configured by frontend
+      sys_(sys)                    // Generic system information
 {
   constexpr std::size_t vram_bank_size = 0x2000;
   constexpr std::size_t wram_bank_size = 0x1000;
@@ -236,9 +236,4 @@ MMIORegister *AddressBus::get_mmio(IORegisterMapping mapping) const {
   assert(io_registers.contains(addr));
   /* The address bus maintains ownership, so raw pointers are fine. */
   return io_registers.at(addr);
-}
-
-void AddressBus::try_brk(const addr_t addr, Debug::BreakReason reason) {
-  if (debugger_.has_value())
-    debugger_->eval(addr, reason);
 }

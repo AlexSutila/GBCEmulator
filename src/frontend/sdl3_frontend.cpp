@@ -532,10 +532,28 @@ void SDL3Frontend::build_debug_dialog(ImVec2 max_size, ImVec2 min_size) {
       dbg_state.stopped = true;
     }
     ImGui::SameLine();
-    if (ImGui::Button("Step")) {
+    if (ImGui::Button("Step Instruction")) {
       {
         std::lock_guard<std::mutex> lock(dbg_mutex);
         dbg_state.reason = Debug::BRK_STEP_INSTRUCTION;
+        dbg_state.stopped = false;
+      }
+      dbg_cv.notify_one();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Step Scanline")) {
+      {
+        std::lock_guard<std::mutex> lock(dbg_mutex);
+        dbg_state.reason = Debug::BRK_STEP_SCANLINE;
+        dbg_state.stopped = false;
+      }
+      dbg_cv.notify_one();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Step Frame")) {
+      {
+        std::lock_guard<std::mutex> lock(dbg_mutex);
+        dbg_state.reason = Debug::BRK_STEP_FRAME;
         dbg_state.stopped = false;
       }
       dbg_cv.notify_one();

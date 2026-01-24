@@ -4,6 +4,7 @@
 #include "cpu/instr/instr.hpp"
 #include "cpu/interrupts.hpp"
 #include "cpu/registers/regfile.hpp"
+#include "debugger/breakpoint.hpp"
 #include "debugger/debugger.hpp"
 #include "memory/bus.hpp"
 
@@ -18,7 +19,7 @@ struct runtime_sys_info;
  * 8-bit 8080-like Sharp CPU (speculated to be a SM83 core), running
  * between 4.194304 MHz and 8.388608 MHz based on mode of operation
  */
-class LR35902 {
+class LR35902 final : private Debug::Debuggable {
 public:
   LR35902(AddressBus *bus_ptr, std::optional<Debug::Debugger> &debugger,
           runtime_sys_info &sys);
@@ -42,6 +43,8 @@ public:
   ProcessorState get_state() const;
 
 private:
+  static constexpr Debug::BreakReason brk_reason_flags =
+      Debug::BRK_ADDRESS_EXECUTED | Debug::BRK_STEP_INSTRUCTION;
   RegisterFile reg_file{};
   AddressBus *const bus{};
   runtime_sys_info &sys_;
@@ -78,9 +81,6 @@ private:
   Instruction *ins_{}; // Reference to current ins
   std::optional<std::size_t> total_ins_clks{};
   std::size_t cur_ins_clks{};
-
-  std::optional<Debug::Debugger> &debugger_;
-  void try_brk(Debug::BreakReason reason);
 };
 
 #endif // __LR35902_H

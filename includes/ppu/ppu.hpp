@@ -2,6 +2,7 @@
 #define __PPU_H
 
 #include "cpu/interrupts.hpp"
+#include "debugger/debugger.hpp"
 #include "memory/bus.hpp"
 #include "memory/dma.hpp"
 #include "memory/mmio/cgb.hpp"
@@ -21,9 +22,11 @@
 struct runtime_sys_info;
 class Frontend;
 
-class PixelProcessingUnit {
+class PixelProcessingUnit : private Debug::Debuggable {
 public:
-  PixelProcessingUnit(AddressBus *bus, Frontend &fe, runtime_sys_info &sys);
+  PixelProcessingUnit(AddressBus *bus, Frontend &fe,
+                      std::optional<Debug::Debugger> &debugger,
+                      runtime_sys_info &sys);
   void reset();
   void step();
 

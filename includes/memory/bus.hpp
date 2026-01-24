@@ -2,7 +2,6 @@
 #define __BUS_H
 
 #include "cart/cart.hpp"
-#include "debugger/breakpoint.hpp"
 #include "debugger/debugger.hpp"
 #include "emu_types.hpp"
 #include "memory/dma.hpp"
@@ -37,7 +36,7 @@ class BootROM;
  *  FFFF    FFFF    Interrupt Enable Register (IE)
  */
 
-class AddressBus {
+class AddressBus final : private Debug::Debuggable {
 public:
   void write_byte(const addr_t addr, const byte_t value);
   const byte_t read_byte(const addr_t addr);
@@ -88,9 +87,7 @@ private:
   const byte_t get_wram_bank() const;
   bool is_boot_rom_range(const addr_t a);
 
-  void try_brk(const addr_t addr, Debug::BreakReason reason);
   std::map<addr_t, MMIORegister *> io_registers{};
-  std::optional<Debug::Debugger> &debugger_;
   std::optional<BootROM> &bios_;
   runtime_sys_info &sys_;
 };

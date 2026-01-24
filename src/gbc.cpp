@@ -57,7 +57,7 @@ void GameBoyColor::system_init() {
   bus = std::make_unique<AddressBus>(sys_, debugger_, bios_);
   cpu = std::make_unique<LR35902>(bus.get(), debugger_, sys_);
   apu = std::make_unique<APU>(*bus, fe_);
-  ppu = std::make_unique<PixelProcessingUnit>(bus.get(), fe_, sys_);
+  ppu = std::make_unique<PixelProcessingUnit>(bus.get(), fe_, debugger_, sys_);
   timer = std::make_unique<TimerUnit>(bus.get(), sys_);
   serial = std::make_unique<SerialUnit>(bus.get());
 

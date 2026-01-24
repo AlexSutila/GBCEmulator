@@ -1,5 +1,6 @@
 #include "ppu/ppu.hpp"
 #include "cpu/interrupts.hpp"
+#include "debugger/breakpoint.hpp"
 #include "frontend/frontend.hpp"
 #include "gbc.hpp"
 #include "memory/bus.hpp"
@@ -28,27 +29,29 @@ template <typename T> T *init_mmio(AddressBus *bus, IORegisterMapping reg_id) {
   throw std::logic_error(std::string("Failed to configure MMIO (PPU)"));
 }
 
-PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus, Frontend &fe,
-                                         runtime_sys_info &sys)
-    : sys_(sys),              // General operating mode info
-      fe_(fe),                // To access frame buffer(s)
-      vram(bus->get_vram()),  // Tile data/map/attribute content
-      oam(bus->get_oam()),    // Object (sprite) attribute memory
-      lcdc_(),                // LCD control
-      stat_(),                // PPU status
-      lyc_(),                 // Current scanline compare
-      scy_(),                 // BG scroll Y
-      scx_(),                 // BG scroll X
-      wy_(),                  // Window scroll Y
-      wx_(),                  // Window scroll X
-      ly_(),                  // Current scanline
-      bgp_(),                 // DMG background and window palette
-      obp0_(),                // The first DMG sprite/object palette
-      obp1_(),                // The second DMG sprite/object palette
-      opri_(),                // CGB object priority resolution
-      vdma_(bus->get_vdma()), // Performs GDMA and HDMA in CGB mode
-      obj_fifo(),             // Pushes object (or sprite) pixels
-      bg_fifo(),              // Pushes background/window pixels
+PixelProcessingUnit::PixelProcessingUnit(
+    AddressBus *bus, Frontend &fe, std::optional<Debug::Debugger> &debugger,
+    runtime_sys_info &sys)
+    : Debug::Debuggable(debugger), // Scanline/frame breakpoints
+      sys_(sys),                   // General operating mode info
+      fe_(fe),                     // To access frame buffer(s)
+      vram(bus->get_vram()),       // Tile data/map/attribute content
+      oam(bus->get_oam()),         // Object (sprite) attribute memory
+      lcdc_(),                     // LCD control
+      stat_(),                     // PPU status
+      lyc_(),                      // Current scanline compare
+      scy_(),                      // BG scroll Y
+      scx_(),                      // BG scroll X
+      wy_(),                       // Window scroll Y
+      wx_(),                       // Window scroll X
+      ly_(),                       // Current scanline
+      bgp_(),                      // DMG background and window palette
+      obp0_(),                     // The first DMG sprite/object palette
+      obp1_(),                     // The second DMG sprite/object palette
+      opri_(),                     // CGB object priority resolution
+      vdma_(bus->get_vdma()),      // Performs GDMA and HDMA in CGB mode
+      obj_fifo(),                  // Pushes object (or sprite) pixels
+      bg_fifo(),                   // Pushes background/window pixels
       obj_cram(std::make_unique<ColorRam>()), // CGB sprite color RAM
       bg_cram(std::make_unique<ColorRam>())   // CGB background color RAM
 {
@@ -289,6 +292,13 @@ void PixelProcessingUnit::do_oam_scan() {
     cur_scanline_clks = cur_mode_clks = 0;
     total_mode_clks = oam_t_cycles;
     scanline_153_bug = false;
+
+    /* State entry always indicates the start of a new scanline, but if the LY
+     * register currently reads zero, we have also begun a new frame too. */
+    Debug::BreakReason reason =
+        (ly_.peek() == 0) ? Debug::BRK_STEP_SCANLINE | Debug::BRK_STEP_FRAME
+                          : Debug::BRK_STEP_SCANLINE;
+    try_brk(reason);
 
     /* Keeps track of which sprite we are on being on. If the sprite is visible
      * on the current scanline, we push it into the vector to so all the sprites

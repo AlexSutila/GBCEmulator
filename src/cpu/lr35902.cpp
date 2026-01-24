@@ -18,12 +18,12 @@
 
 LR35902::LR35902(AddressBus *bus_ptr, std::optional<Debug::Debugger> &debugger,
                  runtime_sys_info &sys)
-    : bus(bus_ptr),       // For memory access
-      sys_(sys),          // General operating mode info
-      ime(),              // Acts as interrupt master enable
-      ie_reg(false),      // Enables individual interrupts
-      if_reg(true),       // Requests individual interrupts
-      debugger_(debugger) // Optionally configured by frontend
+    : Debug::Debuggable(debugger), // For execution breakpoints on fetch
+      bus(bus_ptr),                // For memory access
+      sys_(sys),                   // General operating mode info
+      ime(),                       // Acts as interrupt master enable
+      ie_reg(false),               // Enables individual interrupts
+      if_reg(true)                 // Requests individual interrupts
 {
   using flags = InterruptFlagMask;
   using mmio = IORegisterMapping;
@@ -143,7 +143,7 @@ void LR35902::do_fetch() {
       ins_ = ins.get();
 
     // Handle execution breakpoints
-    try_brk(Debug::BRK_ADDRESS_EXECUTED | Debug::BRK_STEP_INSTRUCTION);
+    try_brk(reg_file.reg_pc, brk_reason_flags);
     reg_file.reg_pc++;
   }
   state = CpuStates::STATE_DECODE;
@@ -216,9 +216,4 @@ void LR35902::step() {
     do_halt();
     break;
   }
-}
-
-void LR35902::try_brk(Debug::BreakReason reason) {
-  if (debugger_.has_value())
-    debugger_->eval(reg_file.reg_pc, reason);
 }

@@ -7,6 +7,15 @@
 
 namespace Debug {
 
+/**
+ * A comprehensive list of reasons for a breakpoint to stop execution. User
+ * configured breakpoints are, obviously, configurable and specified via UI.
+ * Other reasons include the actual hardware event that is being evaluated.
+ * -------------------------------------------------------------------------
+ * Reasons are treated like bitmasks, hence, sometimes multiple reasons may
+ * be required for a given breakpoint to stop execution. Details vary based
+ * on the nature of each breakpoint.
+ */
 enum BreakReason : std::uint32_t {
   BRK_CONTINUE = 0,
   // User configured or hardwardware specified reasons
@@ -15,6 +24,8 @@ enum BreakReason : std::uint32_t {
   BRK_ADDRESS_WRITTEN = 1 << 3,
   // Hardware specified reasons only
   BRK_STEP_INSTRUCTION = 1 << 4,
+  BRK_STEP_SCANLINE = 1 << 5,
+  BRK_STEP_FRAME = 1 << 6,
 };
 
 constexpr BreakReason operator|(BreakReason a, BreakReason b) {
@@ -26,6 +37,10 @@ constexpr bool operator&(BreakReason a, BreakReason b) {
   return static_cast<uint8_t>(a) & static_cast<uint8_t>(b);
 }
 
+/* The rationale here, is the user likely expects to see the `current` CPU state
+ * right as they press `break` (or what ever it is, based on frontend details).
+ * Pausing on other events might be confusing, and this event happens frequently
+ * enough to still come across as seamless to the naked eye. */
 constexpr auto BRK_STOPPED_BY_UI = BRK_STEP_INSTRUCTION;
 
 class Breakpoint {
