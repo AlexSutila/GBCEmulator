@@ -296,6 +296,13 @@ bool SDL3Frontend::consume_load_request(std::string &rom_path) {
   /* Denote new cartridge path */
   ui_state.request_load = false;
   rom_path = ui_state.rom_path;
+
+  /* Update recent ROMs and last used directory */
+  const auto new_rom_path = fs::path(rom_path).parent_path().string();
+  config.path = new_rom_path;
+  settings_.rom_dir = new_rom_path;
+  settings_.add_recent_rom(rom_path);
+  settings_.save();
   return true;
 }
 
@@ -332,6 +339,23 @@ void SDL3Frontend::build_ui() {
       if (ImGui::MenuItem("Load ROM..."))
         ImGuiFileDialog::Instance()->OpenDialog(
             "RomFileDialog", "Choose a ROM file", filters, config);
+
+      if (ImGui::BeginMenu("Open Recent")) {
+        if (settings_.recent_roms.empty()) {
+          ImGui::MenuItem("(No recent files)", nullptr, false, false);
+        } else {
+          for (const auto& path : settings_.recent_roms) {
+            // Display full path for clarity
+            // Alternatively we can use std::filesystem::path(path).filename().string().c_str() for short names
+            if (ImGui::MenuItem(std::filesystem::path(path).filename().string().c_str())) {
+              ui_state.rom_path = path;
+              ui_state.request_load = true;
+            }
+          }
+        }
+        ImGui::EndMenu();
+      }
+
       if (ImGui::MenuItem("Quit"))
         running = false;
       ImGui::EndMenu();
@@ -349,7 +373,6 @@ void SDL3Frontend::build_ui() {
           "RomFileDialog", ImGuiWindowFlags_NoCollapse, min_size, max_size)) {
     if (ImGuiFileDialog::Instance()->IsOk()) {
       ui_state.rom_path = ImGuiFileDialog::Instance()->GetFilePathName();
-      settings_.rom_dir = ui_state.rom_path.substr(0, ui_state.rom_path.find_last_of("/\\"));
       ui_state.request_load = true;
     }
     ImGuiFileDialog::Instance()->Close();

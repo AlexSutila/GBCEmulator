@@ -18,9 +18,11 @@ struct Settings {
   std::string rom_dir = ".";
   std::array<SDL_Keycode, 8> keybinds = {
     SDLK_D, SDLK_A, SDLK_W, SDLK_S, SDLK_J, SDLK_K, SDLK_BACKSPACE, SDLK_RETURN
-};
+  };
+  std::vector<std::string> recent_roms;
   static Settings load(const std::string& filename = "config.json");
   void save(const std::string& filename = "config.json") const;
+  void add_recent_rom(const std::string& path);
 };
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Settings,
@@ -28,7 +30,8 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Settings,
     force_mono_dmg,
     keybind_preset_index,
     rom_dir,
-    keybinds
+    keybinds,
+    recent_roms
 )
 
 inline Settings Settings::load(const std::string& filename) {
@@ -50,6 +53,17 @@ inline void Settings::save(const std::string& filename) const {
   if (file.is_open()) {
     json j = *this;
     file << j.dump(4); // Indented 4 spaces
+  }
+}
+
+inline void Settings::add_recent_rom(const std::string& path) {
+  // Remove if already exists (so we can move it to top)
+  const auto it = std::ranges::remove(recent_roms, path).begin();
+  recent_roms.erase(it, recent_roms.end());
+  recent_roms.insert(recent_roms.begin(), path);
+  // Keep only the last 10 entries
+  if (recent_roms.size() > 10) {
+    recent_roms.resize(10);
   }
 }
 #endif
