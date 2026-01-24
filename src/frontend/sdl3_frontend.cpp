@@ -83,10 +83,8 @@ SDL3Frontend::SDL3Frontend() : Frontend() {
   running = true;
   clear();
 
-  if (settings_.keybind_preset_index == kCustomPresetIndex) {
-    keybinds = settings_.custom_keybinds;
-  } else {
-    ApplyPreset(keybinds, settings_.keybind_preset_index);
+  if (settings_.keybind_preset_index != kCustomPresetIndex) {
+    ApplyPreset(settings_.keybinds, settings_.keybind_preset_index);
   }
 }
 
@@ -143,7 +141,7 @@ void SDL3Frontend::poll_events() {
       ImGuiIO &io = ImGui::GetIO();
       if (e.type == SDL_EVENT_KEY_DOWN && ui_state.waiting_for_bind) {
         if (e.key.key != SDLK_ESCAPE)
-          keybinds[*ui_state.waiting_for_bind] = e.key.key;
+          settings_.keybinds[*ui_state.waiting_for_bind] = e.key.key;
         ui_state.waiting_for_bind.reset();
         // Any manual change -> Custom
         settings_.keybind_preset_index = kCustomPresetIndex;
@@ -420,7 +418,7 @@ void SDL3Frontend::build_ui() {
                        preset_names.data(), preset_names.size())) {
         // Only apply immediately if not currently rebinding
         if (ui_state.waiting_for_bind < 0) {
-          ApplyPreset(keybinds, settings_.keybind_preset_index);
+          ApplyPreset(settings_.keybinds, settings_.keybind_preset_index);
         } else {
           // revert change while waiting for bind
           settings_.keybind_preset_index = old_idx;
@@ -445,7 +443,7 @@ void SDL3Frontend::build_ui() {
         ui_state.waiting_for_bind = static_cast<int>(i);
 
       ImGui::SameLine(240.0f);
-      ImGui::Text("%s", SDL_GetKeyName(keybinds[i]));
+      ImGui::Text("%s", SDL_GetKeyName(settings_.keybinds[i]));
     }
 
     ImGui::End();
@@ -517,8 +515,8 @@ void SDL3Frontend::join_emu_thread_if_running() {
 }
 
 byte_t SDL3Frontend::button_mask_for_key(const SDL_Keycode key) const {
-  for (std::size_t i = 0; i < keybinds.size(); ++i) {
-    if (keybinds[i] == key)
+  for (std::size_t i = 0; i < settings_.keybinds.size(); ++i) {
+    if (settings_.keybinds[i] == key)
       return static_cast<byte_t>(button_order[i]);
   }
   return 0;

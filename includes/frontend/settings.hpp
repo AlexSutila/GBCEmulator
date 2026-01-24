@@ -16,7 +16,7 @@ struct Settings {
   bool force_mono_dmg = false;
   int keybind_preset_index = 0;
   std::string rom_dir{};
-  std::array<SDL_Keycode, 8> custom_keybinds = {
+  std::array<SDL_Keycode, 8> keybinds = {
     SDLK_D, SDLK_A, SDLK_W, SDLK_S, SDLK_J, SDLK_K, SDLK_BACKSPACE, SDLK_RETURN
 };
   static Settings load(const std::string& filename = "config.json");
@@ -28,7 +28,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Settings,
     force_mono_dmg,
     keybind_preset_index,
     rom_dir,
-    custom_keybinds
+    keybinds
 )
 
 inline Settings Settings::load(const std::string& filename) {

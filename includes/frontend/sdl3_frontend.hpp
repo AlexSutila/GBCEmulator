@@ -80,7 +80,6 @@ private:
     Joypad::JoypadButton::A,      Joypad::JoypadButton::B,
     Joypad::JoypadButton::SELECT, Joypad::JoypadButton::START};
   static constexpr int KCount = 8;
-  std::array<SDL_Keycode, KCount> keybinds{};
   struct KeybindPreset {
     const char* name;
     std::array<SDL_Keycode, KCount> keys;
