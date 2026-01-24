@@ -26,7 +26,7 @@ void InterruptBits::put_flag(InterruptFlagMask flag, bool value) {
     raw = raw | mask;
 }
 
-bool InterruptBits::get_flag(InterruptFlagMask flag) {
+bool InterruptBits::get_flag(InterruptFlagMask flag) const {
   const byte_t mask = static_cast<byte_t>(flag);
   return (raw & mask) != 0;
 }

@@ -44,7 +44,7 @@ public:
   InterruptBits(const bool pull_unused_high);
 
   void put_flag(InterruptFlagMask flag, bool value);
-  bool get_flag(InterruptFlagMask flag);
+  bool get_flag(InterruptFlagMask flag) const;
 
 private:
   union {

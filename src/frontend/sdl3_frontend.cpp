@@ -4,6 +4,9 @@
 #include "SDL3/SDL_render.h"
 #include "SDL3/SDL_video.h"
 #include "cart/cart.hpp"
+#include "cpu/lr35902.hpp"
+#include "debugger/breakpoint.hpp"
+#include "debugger/print.hpp"
 #include "memory/mmio/dmg.hpp"
 #include "ppu/palette.hpp"
 #include <SDL3/SDL.h>
@@ -365,19 +368,29 @@ void SDL3Frontend::build_main_menu_bar(ImVec2 max_size, ImVec2 min_size) {
         running = false;
       ImGui::EndMenu();
     }
-    if (ImGui::BeginMenu("Settings")) {
+
+    if (ImGui::BeginMenu("Options")) {
       if (ImGui::MenuItem("Emulator Settings"))
         ui_state.show_settings_window = true;
-      if (ImGui::MenuItem("Select BIOS (optional)"))
+      if (ImGui::MenuItem("Select BIOS"))
         ImGuiFileDialog::Instance()->OpenDialog(
             "BiosFileDialog", "Choose a BIN file", bios_filters, bios_sel_conf);
+      ImGui::EndMenu();
+    }
+
+    if (ImGui::BeginMenu("Debug")) {
+      if (ImGui::MenuItem("Open Debugger"))
+        ui_state.show_debug_window = true;
+      if (ImGui::MenuItem("Edit Breakpoints"))
+        ui_state.show_breakpoints_window = true;
       ImGui::EndMenu();
     }
     ImGui::EndMainMenuBar();
   }
 }
 
-void SDL3Frontend::build_rom_selection_dialog(ImVec2 max_size, ImVec2 min_size) {
+void SDL3Frontend::build_rom_selection_dialog(ImVec2 max_size,
+                                              ImVec2 min_size) {
   if (ImGuiFileDialog::Instance()->Display(
           "RomFileDialog", ImGuiWindowFlags_NoCollapse, min_size, max_size)) {
     if (ImGuiFileDialog::Instance()->IsOk()) {
@@ -389,7 +402,8 @@ void SDL3Frontend::build_rom_selection_dialog(ImVec2 max_size, ImVec2 min_size) 
   }
 }
 
-void SDL3Frontend::build_bios_selection_dialog(ImVec2 max_size, ImVec2 min_size) {
+void SDL3Frontend::build_bios_selection_dialog(ImVec2 max_size,
+                                               ImVec2 min_size) {
   if (ImGuiFileDialog::Instance()->Display(
           "BiosFileDialog", ImGuiWindowFlags_NoCollapse, min_size, max_size)) {
     if (ImGuiFileDialog::Instance()->IsOk()) {
@@ -489,9 +503,57 @@ void SDL3Frontend::build_settings_dialog(ImVec2 max_size, ImVec2 min_size) {
       ImGui::SameLine(240.0f);
       ImGui::Text("%s", SDL_GetKeyName(settings_.keybinds[i]));
     }
+    ImGui::End();
+  }
+}
+
+void SDL3Frontend::build_debug_dialog(ImVec2 max_size, ImVec2 min_size) {
+  if (ui_state.show_debug_window) {
+    ImGui::Begin("Debug", &ui_state.show_debug_window);
+
+    // Temporary, eventually use callback for GBC to populate
+    LR35902::ProcessorState s{};
+    InterruptBits i{0};
+    runtime_sys_info r{};
+
+    ImGui::SeparatorText("System State");
+    ImGui::Text("%s", Debug::to_string(r).c_str());
+
+    ImGui::SeparatorText("Processor State");
+    ImGui::Text("%s", Debug::to_string(s).c_str());
+    ImGui::SameLine();
+    ImGui::Text("IF: %s", Debug::to_string(i).c_str());
+    ImGui::SameLine();
+    ImGui::Text("IE: %s", Debug::to_string(i).c_str());
+
+    ImGui::SeparatorText("Control Flow");
+    ImGui::Button("Break");
+    ImGui::SameLine();
+    ImGui::Button("Step");
+    ImGui::SameLine();
+    ImGui::Button("Continue");
 
     ImGui::End();
   }
+}
+
+void SDL3Frontend::build_breakpoint_dialog(ImVec2 max_size, ImVec2 min_size) {
+  if (ui_state.show_breakpoints_window) {
+    ImGui::Begin("Breakoints", &ui_state.show_breakpoints_window);
+
+    // Temporary, eventually use callback for GBC to populate
+    Debug::Breakpoint b{Debug::BRK_ADDRESS_READ, 0xFF50};
+
+    ImGui::SeparatorText("Breakpoints");
+    ImGui::Text("%s", b.to_string().c_str());
+    ImGui::SameLine();
+    ImGui::Button("Edit");
+    ImGui::SameLine();
+    ImGui::Button("Remove");
+    ImGui::Button("Add");
+
+    ImGui::End();
+ }
 }
 
 void SDL3Frontend::build_ui() {
@@ -502,6 +564,8 @@ void SDL3Frontend::build_ui() {
   build_rom_selection_dialog(max_size, min_size);
   build_bios_selection_dialog(max_size, min_size);
   build_settings_dialog(max_size, min_size);
+  build_debug_dialog(max_size, min_size);
+  build_breakpoint_dialog(max_size, min_size);
 
   /* Update additional meta-data, avoid mutex acquisition */
   emu_state.fast_forward.store(ui_state.fast_forward);

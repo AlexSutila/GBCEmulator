@@ -36,6 +36,26 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Settings, volume, force_mono_dmg,
                                    keybind_preset_index, rom_dir, keybinds,
                                    recent_roms)
 
+struct UiState {
+  bool show_load_window{false};
+  bool show_settings_window{false};
+  bool show_breakpoints_window{false};
+  bool show_debug_window{false};
+  bool request_load_bios{false};
+  bool request_load_rom{false};
+  bool fast_forward{false};
+  std::optional<std::string> bios_path{std::nullopt};
+  std::string rom_path{};
+  std::string status_message{};
+  // Keybinding
+  std::optional<std::size_t> waiting_for_bind{};
+  // Sound / volume control
+  int output_device_index = 0; // 0 = system default
+                               // 1..N = physical device ids
+  std::vector<SDL_AudioDeviceID> output_device_ids;
+  std::vector<std::string> output_device_names;
+};
+
 inline Settings Settings::load(const std::string &filename) {
   Settings s;
   std::ifstream file(filename);
@@ -99,11 +119,14 @@ private:
   void join_emu_thread_if_running();
   std::jthread emulation_thread{};
 
+  // All of these must be called with `ui_mutex` acquired
   std::tuple<ImVec2, ImVec2> get_sizing_metadata() const;
   void build_main_menu_bar(ImVec2, ImVec2);
   void build_rom_selection_dialog(ImVec2, ImVec2);
   void build_bios_selection_dialog(ImVec2, ImVec2);
   void build_settings_dialog(ImVec2, ImVec2);
+  void build_debug_dialog(ImVec2, ImVec2);
+  void build_breakpoint_dialog(ImVec2, ImVec2);
   void build_ui();
 
   // SDL3 display boilerplate
@@ -114,34 +137,14 @@ private:
   SDL_AudioSpec audio_spec{};
   SDL_AudioStream *audio_stream{};
 
-  Settings settings_;
-  struct UiState {
-    bool show_load_window{true};
-    bool show_settings_window{false};
-    bool request_load_bios{false};
-    bool request_load_rom{false};
-    bool fast_forward{false};
-    std::optional<std::string> bios_path{std::nullopt};
-    std::string rom_path{};
-    std::string status_message{};
-    // Keybinding
-    std::optional<std::size_t> waiting_for_bind{};
-    // Sound / volume control
-
-    int output_device_index = 0; // 0 = system default
-                                 // 1..N = physical device ids
-    std::vector<SDL_AudioDeviceID> output_device_ids;
-    std::vector<std::string> output_device_names;
-  };
-
   struct EmulatorState {
     std::atomic<bool> fast_forward{};
     std::atomic<bool> is_cgb{};
   };
-
   struct InputState {
     std::atomic<byte_t> buttons{};
   };
+  Settings settings_;
 
   static constexpr std::array<Joypad::JoypadButton, 8> button_order{
       Joypad::JoypadButton::RIGHT,  Joypad::JoypadButton::LEFT,
@@ -172,7 +175,6 @@ private:
        {SDLK_UNKNOWN, SDLK_UNKNOWN, SDLK_UNKNOWN, SDLK_UNKNOWN, SDLK_UNKNOWN,
         SDLK_UNKNOWN, SDLK_UNKNOWN, SDLK_UNKNOWN}},
   }};
-
   mutable std::mutex audio_mutex;
 
   static constexpr int kCustomPresetIndex =
@@ -201,8 +203,8 @@ private:
   // System keep-alive
   std::atomic<bool> running{};
   EmulatorState emu_state{};
-  UiState ui_state{};
   InputState input_state{};
+  UiState ui_state{};
 
   IGFD::FileDialogConfig bios_sel_conf;
   IGFD::FileDialogConfig rom_sel_conf;
