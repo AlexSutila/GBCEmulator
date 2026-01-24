@@ -25,6 +25,7 @@ static constexpr unsigned target_queue_ms = 20;
 static constexpr std::uint32_t black = 0xFF000000;
 
 SDL3Frontend::SDL3Frontend() : Frontend() {
+  /* SDL3 initialization */
   if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO))
     throw std::runtime_error(SDL_GetError());
 
@@ -58,8 +59,11 @@ SDL3Frontend::SDL3Frontend() : Frontend() {
     throw std::runtime_error(SDL_GetError());
   if (!SDL_BindAudioStream(audio_device, audio_stream))
     throw std::runtime_error(SDL_GetError());
-  // SDL_PauseAudioDevice(audio_device);
 
+  /* Load settings */
+  settings_ = Settings::load();
+
+  /* ImGui initialization */
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
   ImGui::StyleColorsDark();
@@ -79,10 +83,17 @@ SDL3Frontend::SDL3Frontend() : Frontend() {
   running = true;
   clear();
 
-  ApplyPreset(keybinds, ui_state.keybind_preset_index);
+  if (settings_.keybind_preset_index == kCustomPresetIndex) {
+    keybinds = settings_.custom_keybinds;
+  } else {
+    ApplyPreset(keybinds, settings_.keybind_preset_index);
+  }
 }
 
 SDL3Frontend::~SDL3Frontend() {
+  // Save current settings to disk
+  settings_.save();
+
   ImGui_ImplSDLRenderer3_Shutdown();
   ImGui_ImplSDL3_Shutdown();
   ImGui::DestroyContext();
@@ -135,7 +146,7 @@ void SDL3Frontend::poll_events() {
           keybinds[*ui_state.waiting_for_bind] = e.key.key;
         ui_state.waiting_for_bind.reset();
         // Any manual change -> Custom
-        ui_state.keybind_preset_index = kCustomPresetIndex;
+        settings_.keybind_preset_index = kCustomPresetIndex;
         continue;
       }
       if (io.WantCaptureKeyboard)
@@ -274,7 +285,7 @@ bool SDL3Frontend::switch_output_device_by_index(int idx) {
   }
 
   // Re-apply gain after rebinding
-  SDL_SetAudioStreamGain(audio_stream, ui_state.volume);
+  SDL_SetAudioStreamGain(audio_stream, settings_.volume);
   return true;
 }
 
@@ -350,16 +361,16 @@ void SDL3Frontend::build_ui() {
   if (ui_state.show_settings_window) {
     ImGui::Begin("Settings", &ui_state.show_settings_window);
     ImGui::Checkbox("Fast forward", &ui_state.fast_forward);
-    ImGui::Checkbox("Force DMG monochrome", &ui_state.force_mono_dmg);
+    ImGui::Checkbox("Force DMG monochrome", &settings_.force_mono_dmg);
 
     ImGui::SeparatorText("Audio");
 
     // Volume slider
     ImGui::SetNextItemWidth(200.0f);
-    if (ImGui::SliderFloat("Volume", &ui_state.volume, 0.0f, 1.5f, "%.2f")) {
+    if (ImGui::SliderFloat("Volume", &settings_.volume, 0.0f, 1.5f, "%.2f")) {
       std::scoped_lock audio_lock(audio_mutex);
       if (audio_stream) {
-        SDL_SetAudioStreamGain(audio_stream, ui_state.volume);
+        SDL_SetAudioStreamGain(audio_stream, settings_.volume);
       }
     }
 
@@ -403,16 +414,16 @@ void SDL3Frontend::build_ui() {
         preset_names_init = true;
       }
 
-      int old_idx = ui_state.keybind_preset_index;
+      int old_idx = settings_.keybind_preset_index;
       ImGui::SetNextItemWidth(100.0f);
-      if (ImGui::Combo("Preset", &ui_state.keybind_preset_index,
+      if (ImGui::Combo("Preset", &settings_.keybind_preset_index,
                        preset_names.data(), preset_names.size())) {
         // Only apply immediately if not currently rebinding
         if (ui_state.waiting_for_bind < 0) {
-          ApplyPreset(keybinds, ui_state.keybind_preset_index);
+          ApplyPreset(keybinds, settings_.keybind_preset_index);
         } else {
           // revert change while waiting for bind
-          ui_state.keybind_preset_index = old_idx;
+          settings_.keybind_preset_index = old_idx;
         }
       }
     }
@@ -447,7 +458,7 @@ void SDL3Frontend::build_ui() {
 const std::uint32_t SDL3Frontend::format_pixel_data(std::uint32_t px) const {
   constexpr std::uint32_t alpha_mask = 0xFF000000;
   /* We are abusing the alpha bits to store DMG color palette indecies */
-  if (!emu_state.is_cgb.load() && ui_state.force_mono_dmg) {
+  if (!emu_state.is_cgb.load() && settings_.force_mono_dmg) {
     const byte_t mono_pal_idx = static_cast<byte_t>((px >> 24) & 0xFF);
     return get_mono_color(mono_pal_idx) | alpha_mask;
   }

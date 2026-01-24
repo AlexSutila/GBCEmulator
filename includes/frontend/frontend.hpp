@@ -2,9 +2,7 @@
 #define __FRONTEND_H
 
 #include "gbc.hpp"
-#include <cstdint>
 #include <memory>
-#include <cstddef>
 #include <array>
 
 class Frontend {
