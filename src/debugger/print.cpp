@@ -43,7 +43,6 @@ std::string to_string(const InterruptBits &i) {
   auto flag = [&](InterruptFlagMask m) {
     return i.get_flag(m) ? "SET " : "clear";
   };
-
   out << "Raw: " << hex8(i.peek()) << "\n\n"
       << "Flags:\n"
       << " VBLANK (bit 0): " << flag(InterruptFlagMask::INT_FLAG_VBLANK) << "\n"
@@ -52,7 +51,6 @@ std::string to_string(const InterruptBits &i) {
       << " SERIAL (bit 3): " << flag(InterruptFlagMask::INT_FLAG_SERIAL) << "\n"
       << " JOYPAD (bit 4): " << flag(InterruptFlagMask::INT_FLAG_JOYPAD)
       << "\n";
-
   return out.str();
 }
 

@@ -4,11 +4,13 @@
 #include "SDL3/SDL_render.h"
 #include "SDL3/SDL_video.h"
 #include "cart/cart.hpp"
+#include "cpu/interrupts.hpp"
 #include "cpu/lr35902.hpp"
 #include "debugger/breakpoint.hpp"
 #include "debugger/debugger.hpp"
 #include "debugger/print.hpp"
 #include "memory/mmio/dmg.hpp"
+#include "memory/mmio/mmio.hpp"
 #include "ppu/palette.hpp"
 #include <SDL3/SDL.h>
 #include <algorithm>
@@ -512,20 +514,16 @@ void SDL3Frontend::build_debug_dialog(ImVec2 max_size, ImVec2 min_size) {
   if (ui_state.show_debug_window) {
     ImGui::Begin("Debug", &ui_state.show_debug_window);
 
-    // Temporary, eventually use callback for GBC to populate
-    LR35902::ProcessorState s{};
-    InterruptBits i{0};
-    runtime_sys_info r{};
-
     ImGui::SeparatorText("System State");
-    ImGui::Text("%s", Debug::to_string(r).c_str());
+    ImGui::Text("Disassembly: %s", dbg_state.disasm.c_str());
+    ImGui::Text(" %s", dbg_state.sys_state.c_str());
 
     ImGui::SeparatorText("Processor State");
-    ImGui::Text("%s", Debug::to_string(s).c_str());
+    ImGui::Text("%s", dbg_state.cpu_state.c_str());
     ImGui::SameLine();
-    ImGui::Text("IF: %s", Debug::to_string(i).c_str());
+    ImGui::Text("IF: %s", dbg_state.if_state.c_str());
     ImGui::SameLine();
-    ImGui::Text("IE: %s", Debug::to_string(i).c_str());
+    ImGui::Text("IE: %s", dbg_state.ie_state.c_str());
 
     ImGui::SeparatorText("Control Flow");
     if (ImGui::Button("Break")) {
@@ -590,6 +588,19 @@ void SDL3Frontend::build_ui() {
   emu_state.fast_forward.store(ui_state.fast_forward);
 }
 
+void SDL3Frontend::read_system_dbg_state() {
+  dbg_state.sys_state = Debug::to_string(gbc_->get_sys());
+  dbg_state.cpu_state = Debug::to_string(gbc_->get_cpu()->get_state());
+  dbg_state.disasm = gbc_->get_cpu()->disasm();
+
+  const InterruptBits *const ie_reg = dynamic_cast<InterruptBits *>(
+    gbc_->get_bus()->get_mmio(IORegisterMapping::MMIO_INT_ENABLE));
+  const InterruptBits *const if_reg = dynamic_cast<InterruptBits *>(
+    gbc_->get_bus()->get_mmio(IORegisterMapping::MMIO_INT_FLAGS));
+  dbg_state.ie_state = Debug::to_string(*ie_reg);
+  dbg_state.if_state = Debug::to_string(*if_reg);
+}
+
 const std::uint32_t SDL3Frontend::format_pixel_data(std::uint32_t px) const {
   constexpr std::uint32_t alpha_mask = 0xFF000000;
   /* We are abusing the alpha bits to store DMG color palette indecies */
@@ -624,6 +635,8 @@ void SDL3Frontend::emulation_thread_fn(std::stop_token st, cart c,
   auto on_brk_callback = [this]() {
     std::unique_lock<std::mutex> lock(dbg_mutex);
     dbg_state.stopped = true;
+    read_system_dbg_state();
+
     // Avoid crazy polling loops that eat up CPU time
     dbg_cv.wait(lock, [&] { return !dbg_state.stopped; });
     return dbg_state.reason;
@@ -657,7 +670,7 @@ void SDL3Frontend::emulation_thread_fn(std::stop_token st, cart c,
       gbc_->step();
 
     /* Update additional meta-data, avoid mutex acquisition */
-    emu_state.is_cgb.store(gbc_->is_cgb_mode());
+    emu_state.is_cgb.store(gbc_->get_sys().cgb_mode);
     ff = emu_state.fast_forward.load();
 
     /* Update the fuck ass debugger */

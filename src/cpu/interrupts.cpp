@@ -13,11 +13,8 @@ void InterruptBits::write(byte_t value) {
     raw |= 0xE0;
 }
 
-byte_t InterruptBits::read() {
-  if (pull_high)
-    raw |= 0xE0;
-  return raw;
-}
+byte_t InterruptBits::peek() const { return pull_high ? raw | 0xE0 : raw; }
+byte_t InterruptBits::read() { return peek(); }
 
 void InterruptBits::put_flag(InterruptFlagMask flag, bool value) {
   const byte_t mask = static_cast<byte_t>(flag);

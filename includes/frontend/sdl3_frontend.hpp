@@ -1,6 +1,8 @@
 #ifndef __RENDERER_H
 #define __RENDERER_H
 
+#include "cpu/interrupts.hpp"
+#include "cpu/lr35902.hpp"
 #include "debugger/breakpoint.hpp"
 #include "frontend/frontend.hpp"
 #include "imgui.h"
@@ -142,9 +144,18 @@ private:
   struct DebuggerState {
     Debug::BreakReason reason{Debug::BRK_CONTINUE};
     bool stopped{false};
+    // System state information
+    std::string disasm{};
+    std::string sys_state{};
+    std::string cpu_state{};
+    std::string ie_state{};
+    std::string if_state{};
   };
   std::condition_variable dbg_cv{};
   std::mutex dbg_mutex{};
+
+  // All must be called with `dbg_mutex` held
+  void read_system_dbg_state();
 
   struct EmulatorState {
     std::atomic<bool> fast_forward{};

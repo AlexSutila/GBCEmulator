@@ -40,6 +40,7 @@ enum class InterruptVector : addr_t {
 class InterruptBits final : public MMIORegister {
 public:
   void write(byte_t value) override;
+  byte_t peek() const override;
   byte_t read() override;
   InterruptBits(const bool pull_unused_high);
 

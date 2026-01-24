@@ -22,6 +22,7 @@ class LR35902 {
 public:
   LR35902(AddressBus *bus_ptr, std::optional<Debug::Debugger> &debugger,
           runtime_sys_info &sys);
+  std::string disasm() const { return ins_->describe(); };
   void step();
 
   struct ProcessorState {

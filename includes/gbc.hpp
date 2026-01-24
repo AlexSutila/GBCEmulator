@@ -53,9 +53,7 @@ public:
   LR35902 *get_cpu() { return cpu.get(); };
   PixelProcessingUnit *get_ppu() { return ppu.get(); }
   TimerUnit *get_timer() { return timer.get(); }
-
-  /* Getters for high level system runtime info */
-  bool is_cgb_mode() const { return sys_.cgb_mode; }
+  const runtime_sys_info &get_sys() { return sys_; }
 
 private:
   std::unique_ptr<AddressBus> bus{};
