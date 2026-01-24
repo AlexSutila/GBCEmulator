@@ -206,7 +206,6 @@ private:
 
   IGFD::FileDialogConfig bios_sel_conf;
   IGFD::FileDialogConfig rom_sel_conf;
-  ImVec2 max_size, min_size;
 };
 
 #endif // __RENDERER_H
