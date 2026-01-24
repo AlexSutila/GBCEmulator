@@ -19,6 +19,7 @@
 #include <optional>
 #include <stdexcept>
 #include <thread>
+#include <tuple>
 
 static const char *rom_filters =
     "ROM files (*.gb *.gbc){.gb,.gbc},All files (*.*){.*}";
@@ -329,16 +330,14 @@ void SDL3Frontend::set_status_message(std::string message) {
   ui_state.status_message = std::move(message);
 }
 
-void SDL3Frontend::build_ui() {
-  std::lock_guard<std::mutex> lock(ui_mutex);
-  ImGuiIO &io = ImGui::GetIO();
-  const float display_w = io.DisplaySize.x;
-  const float display_h = io.DisplaySize.y;
+std::tuple<ImVec2, ImVec2> SDL3Frontend::get_sizing_metadata() const {
+  const float display_w = ImGui::GetIO().DisplaySize.x;
+  const float display_h = ImGui::GetIO().DisplaySize.y;
+  return std::make_tuple(ImVec2((float)display_w, (float)display_h),
+                         ImVec2(400.0f, 250.0f));
+}
 
-  max_size = ImVec2((float)display_w, (float)display_h);
-  min_size = ImVec2(400.0f, 250.0f);
-
-  /* Main menu bar */
+void SDL3Frontend::build_main_menu_bar(ImVec2 max_size, ImVec2 min_size) {
   if (ImGui::BeginMainMenuBar()) {
     if (ImGui::BeginMenu("File")) {
       if (ImGui::MenuItem("Load ROM..."))
@@ -349,10 +348,12 @@ void SDL3Frontend::build_ui() {
         if (settings_.recent_roms.empty()) {
           ImGui::MenuItem("(No recent files)", nullptr, false, false);
         } else {
-          for (const auto& path : settings_.recent_roms) {
-            // Display full path for clarity
-            // Alternatively we can use std::filesystem::path(path).filename().string().c_str() for short names
-            if (ImGui::MenuItem(std::filesystem::path(path).filename().string().c_str())) {
+          for (const auto &path : settings_.recent_roms) {
+            // Display full path for clarity, alternatively we can use
+            // std::filesystem::path(path).filename().string().c_str() for short
+            // names
+            if (ImGui::MenuItem(
+                    std::filesystem::path(path).filename().string().c_str())) {
               ui_state.rom_path = path;
               ui_state.request_load_rom = true;
             }
@@ -374,8 +375,9 @@ void SDL3Frontend::build_ui() {
     }
     ImGui::EndMainMenuBar();
   }
+}
 
-  /* ROM selection dialog */
+void SDL3Frontend::build_rom_selection_dialog(ImVec2 max_size, ImVec2 min_size) {
   if (ImGuiFileDialog::Instance()->Display(
           "RomFileDialog", ImGuiWindowFlags_NoCollapse, min_size, max_size)) {
     if (ImGuiFileDialog::Instance()->IsOk()) {
@@ -385,8 +387,9 @@ void SDL3Frontend::build_ui() {
     ImGuiFileDialog::Instance()->Close();
     ui_state.show_load_window = false;
   }
+}
 
-  /* BIOS selection dialog */
+void SDL3Frontend::build_bios_selection_dialog(ImVec2 max_size, ImVec2 min_size) {
   if (ImGuiFileDialog::Instance()->Display(
           "BiosFileDialog", ImGuiWindowFlags_NoCollapse, min_size, max_size)) {
     if (ImGuiFileDialog::Instance()->IsOk()) {
@@ -396,8 +399,9 @@ void SDL3Frontend::build_ui() {
     ImGuiFileDialog::Instance()->Close();
     ui_state.show_load_window = false;
   }
+}
 
-  /* Settings dialog */
+void SDL3Frontend::build_settings_dialog(ImVec2 max_size, ImVec2 min_size) {
   if (ui_state.show_settings_window) {
     ImGui::Begin("Settings", &ui_state.show_settings_window);
     ImGui::Checkbox("Fast forward", &ui_state.fast_forward);
@@ -488,6 +492,16 @@ void SDL3Frontend::build_ui() {
 
     ImGui::End();
   }
+}
+
+void SDL3Frontend::build_ui() {
+  std::lock_guard<std::mutex> lock(ui_mutex);
+  const auto [max_size, min_size] = get_sizing_metadata();
+
+  build_main_menu_bar(max_size, min_size);
+  build_rom_selection_dialog(max_size, min_size);
+  build_bios_selection_dialog(max_size, min_size);
+  build_settings_dialog(max_size, min_size);
 
   /* Update additional meta-data, avoid mutex acquisition */
   emu_state.fast_forward.store(ui_state.fast_forward);

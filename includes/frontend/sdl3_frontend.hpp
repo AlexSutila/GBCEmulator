@@ -2,6 +2,7 @@
 #define __RENDERER_H
 
 #include "frontend/frontend.hpp"
+#include "imgui.h"
 #include <ImGuiFileDialog.h>
 #include <SDL3/SDL.h>
 #include <array>
@@ -13,6 +14,7 @@
 #include <optional>
 #include <stop_token>
 #include <string>
+#include <tuple>
 
 struct Settings {
   // For future reference: to add a new setting
@@ -96,6 +98,13 @@ private:
                            std::optional<std::string> bios);
   void join_emu_thread_if_running();
   std::jthread emulation_thread{};
+
+  std::tuple<ImVec2, ImVec2> get_sizing_metadata() const;
+  void build_main_menu_bar(ImVec2, ImVec2);
+  void build_rom_selection_dialog(ImVec2, ImVec2);
+  void build_bios_selection_dialog(ImVec2, ImVec2);
+  void build_settings_dialog(ImVec2, ImVec2);
+  void build_ui();
 
   // SDL3 display boilerplate
   SDL_Renderer *renderer{};
@@ -183,7 +192,6 @@ private:
   const std::uint32_t *front_buffer() const;
   void update_button_state(SDL_Keycode key, bool pressed);
   byte_t button_mask_for_key(SDL_Keycode key) const;
-  void build_ui();
 
   // Frame buffer and rendering control
   std::array<std::unique_ptr<std::uint32_t[]>, 2> framebuffers;
