@@ -32,8 +32,8 @@ static const char *rom_filters =
 static const char *bios_filters =
     "BIOS files (*.bin){.bin},All files (*.*){.*}";
 
-static constexpr unsigned max_catchup_cycles = 70'224 / 4;
-static constexpr unsigned target_queue_ms = 20;
+static constexpr int max_catchup_cycles = 70'224 / 4;
+static constexpr int target_queue_ms = 20;
 static constexpr std::uint32_t black = 0xFF000000;
 
 /*
@@ -281,9 +281,6 @@ void SDL3Frontend::build_main_menu_bar(ImVec2 max_size, ImVec2 min_size) {
           ImGui::MenuItem("(No recent files)", nullptr, false, false);
         } else {
           for (const auto &path : settings.recent_roms) {
-            // Display full path for clarity, alternatively we can use
-            // std::filesystem::path(path).filename().string().c_str() for short
-            // names
             if (ImGui::MenuItem(
                     std::filesystem::path(path).filename().string().c_str())) {
               ui_state.rom_path = path;
@@ -293,17 +290,20 @@ void SDL3Frontend::build_main_menu_bar(ImVec2 max_size, ImVec2 min_size) {
         }
         ImGui::EndMenu();
       }
+
+      if (ImGui::MenuItem("Select BIOS"))
+        ImGuiFileDialog::Instance()->OpenDialog(
+            "BiosFileDialog", "Choose a BIN file", bios_filters, bios_sel_conf);
       if (ImGui::MenuItem("Quit"))
         running = false;
       ImGui::EndMenu();
     }
 
     if (ImGui::BeginMenu("Options")) {
-      if (ImGui::MenuItem("Emulator Settings"))
+      if (ImGui::MenuItem("Settings"))
         ui_state.show_settings_window = true;
-      if (ImGui::MenuItem("Select BIOS"))
-        ImGuiFileDialog::Instance()->OpenDialog(
-            "BiosFileDialog", "Choose a BIN file", bios_filters, bios_sel_conf);
+      if (ImGui::MenuItem("Keybinds"))
+        ui_state.show_keybind_window = true;
       ImGui::EndMenu();
     }
 
@@ -347,10 +347,10 @@ void SDL3Frontend::build_bios_selection_dialog(ImVec2 max_size,
 void SDL3Frontend::build_settings_dialog() {
   if (ui_state.show_settings_window) {
     ImGui::Begin("Settings", &ui_state.show_settings_window);
+    ImGui::SeparatorText("General");
     ImGui::Checkbox("Fast forward", &ui_state.fast_forward);
     ImGui::Checkbox("Force DMG monochrome", &settings.force_mono_dmg);
     ImGui::SeparatorText("Audio");
-
     // Volume slider
     ImGui::SetNextItemWidth(200.0f);
     if (ImGui::SliderFloat("Volume", &settings.volume, 0.0f, 1.5f, "%.2f")) {
@@ -388,51 +388,69 @@ void SDL3Frontend::build_settings_dialog() {
           std::min(ui_state.output_device_index,
                    static_cast<int>(ui_state.output_device_names.size()) - 1);
     }
+    ImGui::End();
+  }
+}
 
-    ImGui::SeparatorText("Keybinds");
-    // --- Preset dropdown ---
-    {
-      // Build an array of names for ImGui::Combo
-      static std::array<const char *, kPresets.size()> preset_names{};
-      static bool preset_names_init = false;
-      if (!preset_names_init) {
-        for (size_t i = 0; i < kPresets.size(); ++i)
-          preset_names[i] = kPresets[i].name;
-        preset_names_init = true;
-      }
-
-      int old_idx = settings.keybind_preset_index;
-      ImGui::SetNextItemWidth(100.0f);
-      if (ImGui::Combo("Preset", &settings.keybind_preset_index,
-                       preset_names.data(), preset_names.size())) {
-        // Only apply immediately if not currently rebinding
-        if (ui_state.waiting_for_bind < 0) {
-          apply_keybind_preset(settings.keybinds,
-                               settings.keybind_preset_index);
-        } else {
-          // revert change while waiting for bind
-          settings.keybind_preset_index = old_idx;
-        }
-      }
+void SDL3Frontend::build_keybind_dialog(ImVec2 max_size, ImVec2 min_size) {
+  if (ui_state.show_keybind_window) {
+    ImGui::Begin("Keybinds", &ui_state.show_keybind_window);
+    ImGui::SeparatorText("Gameplay");
+    // Build an array of names for ImGui::Combo
+    static std::array<const char *, kPresets.size()> preset_names{};
+    static bool preset_names_init = false;
+    if (!preset_names_init) {
+      for (size_t i = 0; i < kPresets.size(); ++i)
+        preset_names[i] = kPresets[i].name;
+      preset_names_init = true;
     }
+
+    int old_idx = settings.keybind_preset_index;
+    ImGui::SetNextItemWidth(100.0f);
+    if (ImGui::Combo("Preset", &settings.keybind_preset_index,
+                     preset_names.data(), preset_names.size())) {
+      // Only apply immediately if not currently rebinding
+      if (ui_state.waiting_for_bind < 0) {
+        apply_keybind_preset(settings.keybinds,
+                             settings.keybind_preset_index);
+      } else {
+        // revert change while waiting for bind
+        settings.keybind_preset_index = old_idx;
+      }
+                     }
     ImGui::Spacing();
 
-    static constexpr std::array<const char *, KCount> keybind_labels{
-        "Right", "Left", "Up", "Down", "A", "B", "Select", "Start"};
-    for (std::size_t i = 0; i < keybind_labels.size(); ++i) {
-      ImGui::Text("%s", keybind_labels[i]);
+    for (std::size_t i = 0; i < control_labels.size(); ++i) {
+      ImGui::Text("%s", control_labels[i]);
       ImGui::SameLine(120.0f);
 
       const bool waiting = (ui_state.waiting_for_bind == static_cast<int>(i));
       std::string button_label =
           waiting ? "Press a key..."
-                  : (std::string("Bind##") + keybind_labels[i]);
+                  : (std::string("Bind##") + control_labels[i]);
       if (ImGui::Button(button_label.c_str()))
         ui_state.waiting_for_bind = static_cast<int>(i);
 
       ImGui::SameLine(240.0f);
       ImGui::Text("%s", SDL_GetKeyName(settings.keybinds[i]));
     }
+
+    ImGui::SeparatorText("General");
+    for (std::size_t i = 0; i < general_labels.size(); ++i) {
+      ImGui::Text("%s", general_labels[i]);
+      ImGui::SameLine(120.0f);
+
+      const bool waiting = (ui_state.waiting_for_bind == static_cast<int>(i));
+      std::string button_label =
+          waiting ? "Press a key..."
+                  : (std::string("Bind##") + general_labels[i]);
+      if (ImGui::Button(button_label.c_str()))
+        ui_state.waiting_for_bind = static_cast<int>(i);
+
+      ImGui::SameLine(240.0f);
+      ImGui::Text("%s", SDL_GetKeyName(settings.general_keybinds[i]));
+    }
+
     ImGui::End();
   }
 }

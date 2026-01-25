@@ -21,7 +21,7 @@
 /**
  * For future reference: to add a new setting
  * 1. Add it here
- * 2. Update the marcro below
+ * 2. Update the macro below
  */
 struct Settings {
   float volume = 0.5f;
@@ -31,12 +31,14 @@ struct Settings {
   std::array<SDL_Keycode, 8> keybinds = {SDLK_D,         SDLK_A,     SDLK_W,
                                          SDLK_S,         SDLK_J,     SDLK_K,
                                          SDLK_BACKSPACE, SDLK_RETURN};
+  std::array<SDL_Keycode, 5> general_keybinds = {
+      SDLK_G, SDLK_F, SDLK_EQUALS, SDLK_MINUS, SDLK_M};
   std::vector<std::string> recent_roms;
   static Settings load(const std::string &filename = ".gbc.config.json");
   void save(const std::string &filename = ".gbc.config.json") const;
   void add_recent_rom(const std::string &path);
 };
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Settings, volume, force_mono_dmg,
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Settings, volume, force_mono_dmg,
                                    keybind_preset_index, rom_dir, keybinds,
                                    recent_roms)
 
@@ -51,6 +53,7 @@ struct UiState {
   bool show_load_window{false};
   bool show_settings_window{false};
   bool show_breakpoints_window{false};
+  bool show_keybind_window{false};
   bool show_debug_window{false};
   bool request_load_bios{false};
   bool request_load_rom{false};
@@ -89,12 +92,16 @@ struct KeybindPreset {
   const char *name;
   std::array<SDL_Keycode, KCount> keys;
 };
+  static constexpr std::array<Joypad::JoypadButton, 8> button_order{
+      Joypad::JoypadButton::RIGHT,  Joypad::JoypadButton::LEFT,
+      Joypad::JoypadButton::UP,     Joypad::JoypadButton::DOWN,
+      Joypad::JoypadButton::A,      Joypad::JoypadButton::B,
+      Joypad::JoypadButton::SELECT, Joypad::JoypadButton::START};
+  static constexpr std::array<const char *, KCount> control_labels{
+    "Right", "Left", "Up", "Down", "A", "B", "Select", "Start"};
+  static constexpr std::array<const char*, 5> general_labels{
+    "FF Toggle", "FF (Hold)", "Vol Up" , "Vol Down", "Monochrome"};
 
-static constexpr std::array<Joypad::JoypadButton, KCount> button_order{
-    Joypad::JoypadButton::RIGHT,  Joypad::JoypadButton::LEFT,
-    Joypad::JoypadButton::UP,     Joypad::JoypadButton::DOWN,
-    Joypad::JoypadButton::A,      Joypad::JoypadButton::B,
-    Joypad::JoypadButton::SELECT, Joypad::JoypadButton::START};
 
 static constexpr std::array<KeybindPreset, 4> kPresets{{
     {"WASD",
@@ -146,6 +153,7 @@ private:
   void build_rom_selection_dialog(ImVec2, ImVec2);
   void build_bios_selection_dialog(ImVec2, ImVec2);
   void build_settings_dialog();
+  void build_keybind_dialog(ImVec2 max_size, ImVec2 min_size);
   bool consume_load_bios_request(opt_string_t &bios_path);
   bool consume_load_rom_request(std::string &rom_path);
   void set_status_message(std::string message);
