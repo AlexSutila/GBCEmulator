@@ -29,12 +29,14 @@ struct Settings {
   std::array<SDL_Keycode, 8> keybinds = {SDLK_D,         SDLK_A,     SDLK_W,
                                          SDLK_S,         SDLK_J,     SDLK_K,
                                          SDLK_BACKSPACE, SDLK_RETURN};
+  std::array<SDL_Keycode, 5> general_keybinds = {
+      SDLK_G, SDLK_F, SDLK_MINUS, SDLK_EQUALS, SDLK_M};
   std::vector<std::string> recent_roms;
   static Settings load(const std::string &filename = ".gbc.config.json");
   void save(const std::string &filename = ".gbc.config.json") const;
   void add_recent_rom(const std::string &path);
 };
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Settings, volume, force_mono_dmg,
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Settings, volume, force_mono_dmg,
                                    keybind_preset_index, rom_dir, keybinds,
                                    recent_roms)
 
@@ -187,6 +189,8 @@ private:
   };
   static constexpr std::array<const char *, KCount> control_labels{
     "Right", "Left", "Up", "Down", "A", "B", "Select", "Start"};
+  static constexpr std::array<const char*, 5> general_labels{
+    "FF Toggle", "FF (Hold)", "Vol Up" , "Vol Down", "Monochrome"};
 
 
   static constexpr std::array<KeybindPreset, 4> kPresets{{

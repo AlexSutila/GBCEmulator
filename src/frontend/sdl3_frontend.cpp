@@ -509,7 +509,20 @@ void SDL3Frontend::build_keybind_dialog(ImVec2 max_size, ImVec2 min_size) {
     }
 
     ImGui::SeparatorText("General");
+    for (std::size_t i = 0; i < general_labels.size(); ++i) {
+      ImGui::Text("%s", general_labels[i]);
+      ImGui::SameLine(120.0f);
 
+      const bool waiting = (ui_state.waiting_for_bind == static_cast<int>(i));
+      std::string button_label =
+          waiting ? "Press a key..."
+                  : (std::string("Bind##") + general_labels[i]);
+      if (ImGui::Button(button_label.c_str()))
+        ui_state.waiting_for_bind = static_cast<int>(i);
+
+      ImGui::SameLine(240.0f);
+      ImGui::Text("%s", SDL_GetKeyName(settings_.general_keybinds[i]));
+    }
 
     ImGui::End();
   }
