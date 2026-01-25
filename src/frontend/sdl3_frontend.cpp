@@ -392,7 +392,7 @@ void SDL3Frontend::build_settings_dialog() {
   }
 }
 
-void SDL3Frontend::build_keybind_dialog(ImVec2 max_size, ImVec2 min_size) {
+void SDL3Frontend::build_keybinds_dialog(ImVec2 max_size, ImVec2 min_size) {
   if (ui_state.show_keybind_window) {
     ImGui::Begin("Keybinds", &ui_state.show_keybind_window);
     ImGui::SeparatorText("Gameplay");
@@ -440,12 +440,12 @@ void SDL3Frontend::build_keybind_dialog(ImVec2 max_size, ImVec2 min_size) {
       ImGui::Text("%s", general_labels[i]);
       ImGui::SameLine(120.0f);
 
-      const bool waiting = (ui_state.waiting_for_bind == static_cast<int>(i));
+      const bool waiting = (ui_state.waiting_for_bind == static_cast<int>(i+KCount));
       std::string button_label =
           waiting ? "Press a key..."
                   : (std::string("Bind##") + general_labels[i]);
       if (ImGui::Button(button_label.c_str()))
-        ui_state.waiting_for_bind = static_cast<int>(i);
+        ui_state.waiting_for_bind = static_cast<int>(i+KCount);
 
       ImGui::SameLine(240.0f);
       ImGui::Text("%s", SDL_GetKeyName(settings.general_keybinds[i]));
@@ -534,6 +534,7 @@ void SDL3Frontend::build_ui() {
   build_rom_selection_dialog(max_size, min_size);
   build_bios_selection_dialog(max_size, min_size);
   build_settings_dialog();
+  build_keybinds_dialog(max_size, min_size);
   build_debug_dialog();
   build_breakpoint_dialog();
   emu_state.fast_forward.store(ui_state.fast_forward);
@@ -729,6 +730,44 @@ void SDL3Frontend::apply_keybind_preset(
   keybinds = kPresets[preset_index].keys;
 }
 
+void SDL3Frontend::handle_general_input(const SDL_Keycode key, const bool pressed) {
+  const auto &binds = settings.general_keybinds;
+
+  // Index 0: Fast Forward Toggle
+  // Toggles on key press
+  if (pressed && key == binds[0]) {
+    ui_state.fast_forward = !ui_state.fast_forward;
+  }
+
+  // Index 1: Fast Forward (Hold)
+  // Enable on press, disable on release.
+  // Note: This directly overrides the toggle state.
+  if (key == binds[1]) {
+    ui_state.fast_forward = pressed;
+  }
+
+  // Index 2: Volume Up
+  if (pressed && key == binds[2]) {
+    settings.volume = std::min(1.5f, settings.volume + 0.05f);
+    std::scoped_lock lock(audio_mutex);
+    if (audio_stream)
+      SDL_SetAudioStreamGain(audio_stream, settings.volume);
+  }
+
+  // Index 3: Volume Down
+  if (pressed && key == binds[3]) {
+    settings.volume = std::max(0.0f, settings.volume - 0.05f);
+    std::scoped_lock lock(audio_mutex);
+    if (audio_stream)
+      SDL_SetAudioStreamGain(audio_stream, settings.volume);
+  }
+
+  // Index 4: Monochrome Toggle
+  if (pressed && key == binds[4]) {
+    settings.force_mono_dmg = !settings.force_mono_dmg;
+  }
+}
+
 void SDL3Frontend::update_button_state(const SDL_Keycode key,
                                        const bool pressed) {
   const byte_t mask = button_mask_for_key(key);
@@ -771,6 +810,7 @@ void SDL3Frontend::poll_events() {
         continue;
       const bool pressed = (e.type == SDL_EVENT_KEY_DOWN);
       update_button_state(e.key.key, pressed);
+      handle_general_input(e.key.key, pressed);
     }
   }
 }
