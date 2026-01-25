@@ -3,7 +3,6 @@
 #include "cpu/interrupts.hpp"
 #include "cpu/registers/flags.hpp"
 #include "cpu/registers/register.hpp"
-#include "debugger/breakpoint.hpp"
 #include "debugger/debugger.hpp"
 #include "gbc.hpp"
 #include "memory/mmio/mmio.hpp"
@@ -67,8 +66,8 @@ LR35902::LR35902(AddressBus *bus_ptr, std::optional<Debug::Debugger> &debugger,
 }
 
 template <InterruptFlagMask mask, InterruptVector vec>
-std::unique_ptr<Instruction> LR35902::mk_isr() {
-  return std::make_unique<ISR<mask, vec>>(&reg_file, bus, &ime, &if_reg);
+std::unique_ptr<ISR> LR35902::mk_isr() {
+  return std::make_unique<ISR>(mask, vec, &reg_file, bus, ime, if_reg);
 }
 
 void LR35902::load_state(LR35902::ProcessorState state) {
@@ -109,7 +108,7 @@ LR35902::ProcessorState LR35902::get_state() const {
 }
 
 // Lower bits get higher priority, return the corresponding ISR
-std::optional<Instruction *> LR35902::should_interrupt() {
+std::optional<ISR *> LR35902::should_interrupt() {
   for (byte_t shift{0}; shift < 5; shift++) {
     const auto flag = static_cast<InterruptFlagMask>(1 << shift);
     if (ie_reg.get_flag(flag) && if_reg.get_flag(flag))
@@ -120,33 +119,34 @@ std::optional<Instruction *> LR35902::should_interrupt() {
 
 /* Read opcode from PC, populate `ins_` instruction reference */
 void LR35902::do_fetch() {
-  ime.step();
 
   // Check for interrupts, delay fetch until after ISR
   const auto isr = should_interrupt();
-  if (ime.is_enabled() && isr.has_value())
+  if (ime.is_enabled() && isr.has_value()) {
     ins_ = isr.value();
+    return;
+  }
 
   // Else continue with fetch/decode/exec as usual
-  else {
-    const byte_t op = bus->read_byte(reg_file.reg_pc);
-    std::unique_ptr<Instruction> &ins = lookup.at(op);
+  ime.step(); // Only happens if we aren't interrupted
 
-    // Handle un-implemented opcodes
-    if (!ins) [[unlikely]] {
-      std::ostringstream oss;
-      oss << "Unimplemented opcode: 0x" << std::uppercase << std::hex
-          << std::setw(2) << std::setfill('0') << static_cast<int>(op);
-      throw std::logic_error(oss.str());
+  const byte_t op = bus->read_byte(reg_file.reg_pc);
+  std::unique_ptr<Instruction> &ins = lookup.at(op);
 
-    } else
-      ins_ = ins.get();
+  // Handle un-implemented opcodes
+  if (!ins) [[unlikely]] {
+    std::ostringstream oss;
+    oss << "Unimplemented opcode: 0x" << std::uppercase << std::hex
+        << std::setw(2) << std::setfill('0') << static_cast<int>(op);
+    throw std::logic_error(oss.str());
 
-    // Handle execution breakpoints
-    try_brk(reg_file.reg_pc, brk_reason_flags);
-    reg_file.reg_pc++;
-  }
+  } else
+    ins_ = ins.get();
+
+  // Handle execution breakpoints
+  try_brk(reg_file.reg_pc, brk_reason_flags);
   state = CpuStates::STATE_DECODE;
+  reg_file.reg_pc++;
 }
 
 /* Parse operands, prepare for execution */
@@ -179,27 +179,28 @@ void LR35902::do_execute() {
 }
 
 void LR35902::do_halt() {
-  ime.step();
+  const auto isr = should_interrupt();
 
   /* The processor waits until an interrupt is requested, in other words two
    * bits are set in IE and IF such that the bitwise AND is non-zero. The
    * behavior varies when IME is enabled or disabled. */
-  const auto isr = should_interrupt();
+  if (!isr.has_value())
+    return;
+  sys_.halted = false;
 
   /* If IME is enabled, execution stops until the interrupt is requested, then
    * interrupt is serviced and execution resumes as normal. */
-  if (ime.is_enabled() && isr.has_value()) {
-    state = CpuStates::STATE_DECODE;
-    sys_.halted = false;
+  if (ime.is_enabled()) {
+    isr.value()->incur_halt_delay();
     ins_ = isr.value();
+    state = CpuStates::STATE_DECODE;
   }
 
   /* If IME is disabled, the execution still stops. The only difference is the
    * interrupt will not be serviced and it just continues executing from the
    * instruction following `HALT`. */
-  else if (isr.has_value()) {
+  else {
     state = CpuStates::STATE_FETCH;
-    sys_.halted = false;
   }
 }
 

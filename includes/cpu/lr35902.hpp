@@ -50,10 +50,10 @@ private:
   runtime_sys_info &sys_;
 
   /* Interrupt handling */
-  std::optional<Instruction *> should_interrupt();
+  std::optional<ISR *> should_interrupt();
+  std::array<std::unique_ptr<ISR>, 5> isr_lookup{};
   template <InterruptFlagMask mask, InterruptVector vec>
-  std::unique_ptr<Instruction> mk_isr(); // Helper
-  std::array<std::unique_ptr<Instruction>, 5> isr_lookup{};
+  std::unique_ptr<ISR> mk_isr(); // Helper
   InterruptMasterEnable ime;
   InterruptBits ie_reg;
   InterruptBits if_reg;

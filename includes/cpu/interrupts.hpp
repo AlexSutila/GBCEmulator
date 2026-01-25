@@ -87,7 +87,6 @@ public:
 
 private:
   enum ImeStates {
-    IME_PENDING,  /* IME is about to enter one instruction delay state */
     IME_DELAYED,  /* EI was invoked, delay for one instruction */
     IME_ENABLED,  /* IME is enabled */
     IME_DISABLED, /* IME is disabled */
@@ -107,34 +106,31 @@ private:
  * 2. The current value of the PC register is pushed onto the stack
  * 3. The PC register is set to the address of the handler
  *
- * The whole process consumes a fixed 20 clock cycles total
+ * The whole process consumes a fixed 20 clock cycles total, unless coming out
+ * of the halted state in which case an additional 4 clock cycle delay is also
+ * incurred.
  */
-template <InterruptFlagMask flag, InterruptVector vec>
 class ISR final : public Instruction {
 public:
-  ISR(RegisterFile *reg_file_ptr, AddressBus *bus_ptr,
-      InterruptMasterEnable *ime_ptr, InterruptBits *if_ptr)
-      : Instruction(reg_file_ptr, bus_ptr), ime(ime_ptr), if_reg(if_ptr) {}
-  std::size_t exec() override {
-    addr_t sp = read_reg<Register16Bit::REG_SP>();
-    ime->disable();
-
-    // Push old program counter onto the stack
-    bus->write_byte(--sp, reg_file->reg_pc >> 8);
-    bus->write_byte(--sp, reg_file->reg_pc & 0xFF);
-
-    // Need to clear the corresponding IF bit
-    if_reg->put_flag(flag, false);
-
-    // Write back
-    reg_file->reg_pc = static_cast<addr_t>(vec);
-    write_reg<Register16Bit::REG_SP>(sp);
-    return 20;
-  }
+  ISR(const InterruptFlagMask int_flag, const InterruptVector int_vector,
+      RegisterFile *reg_file_ptr, AddressBus *bus_ptr,
+      InterruptMasterEnable &ime, InterruptBits &if_reg)
+      : Instruction(reg_file_ptr, bus_ptr),
+        ime_(ime),      // Needed to disable interrupt master enable
+        if_(if_reg),    // Needed to clear the corresponding flag bit
+        flag(int_flag), // Denotes which IE and IF flag bit is used
+        vec(int_vector) {}
+  void incur_halt_delay(); // Invoked by CPU to incur the when halted
+  std::size_t exec() override;
 
 private:
-  InterruptMasterEnable *ime{};
-  InterruptBits *if_reg{};
+  InterruptMasterEnable &ime_;
+  InterruptBits &if_;
+
+  // Interrupt source is described by these fields
+  const InterruptFlagMask flag;
+  const InterruptVector vec;
+  bool halt_delay{false};
 };
 
 #endif // __INTERRUPTS_H

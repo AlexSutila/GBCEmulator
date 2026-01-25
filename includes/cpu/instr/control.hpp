@@ -118,6 +118,7 @@ public:
     return 4;
   }
   std::string describe() override { return std::format("HALT"); }
+  std::size_t mem_access_t_cycle() override { return 4; }
 
 private:
   runtime_sys_info &sys_;
@@ -141,6 +142,7 @@ public:
     return 4;
   }
   std::string describe() override { return std::format("STOP"); }
+  std::size_t mem_access_t_cycle() override { return 4; }
 
 private:
   runtime_sys_info &sys_;

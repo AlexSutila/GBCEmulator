@@ -115,7 +115,6 @@ PYBIND11_MODULE(gbc_py, m) {
   py::class_<rom_header>(m, "RomHeader")
       .def(py::init<>())
       .def_readonly("entry_point", &rom_header::entry_point)
-      .def_readonly("nintendo_logo", &rom_header::nintendo_logo)
       .def_readonly("title_area", &rom_header::title_area)
       .def_readonly("new_licensee_code", &rom_header::new_licensee_code)
       .def_readonly("sgb_flag", &rom_header::sgb_flag)
@@ -136,7 +135,6 @@ PYBIND11_MODULE(gbc_py, m) {
       .def_readonly("header", &cart::header)
       .def_readonly("declared_rom_bytes", &cart::declared_rom_bytes)
       .def_readonly("declared_ram_bytes", &cart::declared_ram_bytes)
-      .def_readonly("logo_ok", &cart::logo_ok)
       .def_readonly("header_checksum_ok", &cart::header_checksum_ok)
       .def_readonly("global_checksum_ok", &cart::global_checksum_ok)
       .def_property_readonly(
