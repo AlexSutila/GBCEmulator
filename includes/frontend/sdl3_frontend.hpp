@@ -21,7 +21,7 @@
 struct Settings {
   // For future reference: to add a new setting
   // 1. Add it here
-  // 2. Update the marcro below
+  // 2. Update the macro below
   float volume = 0.5f;
   bool force_mono_dmg = false;
   int keybind_preset_index = 0;
@@ -42,6 +42,7 @@ struct UiState {
   bool show_load_window{false};
   bool show_settings_window{false};
   bool show_breakpoints_window{false};
+  bool show_keybind_window{false};
   bool show_debug_window{false};
   bool request_load_bios{false};
   bool request_load_rom{false};
@@ -127,6 +128,7 @@ private:
   void build_rom_selection_dialog(ImVec2, ImVec2);
   void build_bios_selection_dialog(ImVec2, ImVec2);
   void build_settings_dialog(ImVec2, ImVec2);
+  void build_keybind_dialog(ImVec2 max_size, ImVec2 min_size);
   void build_debug_dialog(ImVec2, ImVec2);
   void build_breakpoint_dialog(ImVec2, ImVec2);
   void build_config_breakpoint_dialog();
@@ -183,6 +185,9 @@ private:
     const char *name;
     std::array<SDL_Keycode, KCount> keys;
   };
+  static constexpr std::array<const char *, KCount> control_labels{
+    "Right", "Left", "Up", "Down", "A", "B", "Select", "Start"};
+
 
   static constexpr std::array<KeybindPreset, 4> kPresets{{
       {"WASD",
