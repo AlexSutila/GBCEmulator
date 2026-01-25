@@ -30,7 +30,7 @@ struct Settings {
                                          SDLK_S,         SDLK_J,     SDLK_K,
                                          SDLK_BACKSPACE, SDLK_RETURN};
   std::array<SDL_Keycode, 5> general_keybinds = {
-      SDLK_G, SDLK_F, SDLK_MINUS, SDLK_EQUALS, SDLK_M};
+      SDLK_G, SDLK_F, SDLK_EQUALS, SDLK_MINUS, SDLK_M};
   std::vector<std::string> recent_roms;
   static Settings load(const std::string &filename = ".gbc.config.json");
   void save(const std::string &filename = ".gbc.config.json") const;
@@ -133,6 +133,7 @@ private:
   void build_keybind_dialog(ImVec2 max_size, ImVec2 min_size);
   void build_debug_dialog(ImVec2, ImVec2);
   void build_breakpoint_dialog(ImVec2, ImVec2);
+  void handle_general_input(SDL_Keycode key, bool pressed);
   void build_config_breakpoint_dialog();
   void build_ui();
 

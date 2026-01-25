@@ -161,6 +161,7 @@ void SDL3Frontend::poll_events() {
         continue;
       const bool pressed = (e.type == SDL_EVENT_KEY_DOWN);
       update_button_state(e.key.key, pressed);
+      handle_general_input(e.key.key, pressed);
     }
   }
 }
@@ -809,6 +810,44 @@ void SDL3Frontend::update_button_state(const SDL_Keycode key,
   else
     current &= static_cast<byte_t>(~mask);
   input_state.buttons.store(current, std::memory_order_relaxed);
+}
+
+void SDL3Frontend::handle_general_input(const SDL_Keycode key, const bool pressed) {
+  const auto &binds = settings_.general_keybinds;
+
+  // Index 0: Fast Forward Toggle
+  // Toggles on key press
+  if (pressed && key == binds[0]) {
+    ui_state.fast_forward = !ui_state.fast_forward;
+  }
+
+  // Index 1: Fast Forward (Hold)
+  // Enable on press, disable on release.
+  // Note: This directly overrides the toggle state.
+  if (key == binds[1]) {
+    ui_state.fast_forward = pressed;
+  }
+
+  // Index 2: Volume Up
+  if (pressed && key == binds[2]) {
+    settings_.volume = std::min(1.5f, settings_.volume + 0.05f);
+    std::scoped_lock lock(audio_mutex);
+    if (audio_stream)
+      SDL_SetAudioStreamGain(audio_stream, settings_.volume);
+  }
+
+  // Index 3: Volume Down
+  if (pressed && key == binds[3]) {
+    settings_.volume = std::max(0.0f, settings_.volume - 0.05f);
+    std::scoped_lock lock(audio_mutex);
+    if (audio_stream)
+      SDL_SetAudioStreamGain(audio_stream, settings_.volume);
+  }
+
+  // Index 4: Monochrome Toggle
+  if (pressed && key == binds[4]) {
+    settings_.force_mono_dmg = !settings_.force_mono_dmg;
+  }
 }
 
 void SDL3Frontend::start() {
