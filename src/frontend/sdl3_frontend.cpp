@@ -36,6 +36,51 @@ static constexpr unsigned max_catchup_cycles = 70'224 / 4;
 static constexpr unsigned target_queue_ms = 20;
 static constexpr std::uint32_t black = 0xFF000000;
 
+/*
+ * ============================================================
+ *  Persistent settings helpers
+ * ============================================================
+ */
+
+Settings Settings::load(const std::string &filename) {
+  Settings s;
+  std::ifstream file(filename);
+  if (file.is_open()) {
+    try {
+      nlohmann::json j;
+      file >> j;
+      s = j.get<Settings>();
+    } catch (...) { /* Fallback to defaults on corrupt file */
+    }
+  }
+  return s;
+}
+
+void Settings::save(const std::string &filename) const {
+  std::ofstream file(filename);
+  if (file.is_open()) {
+    nlohmann::json j = *this;
+    file << j.dump(4); // Indented 4 spaces
+  }
+}
+
+void Settings::add_recent_rom(const std::string &path) {
+  // Remove if already exists (so we can move it to top)
+  const auto it = std::ranges::remove(recent_roms, path).begin();
+  recent_roms.erase(it, recent_roms.end());
+  recent_roms.insert(recent_roms.begin(), path);
+  // Keep only the last 10 entries
+  if (recent_roms.size() > 10) {
+    recent_roms.resize(10);
+  }
+}
+
+/*
+ * ============================================================
+ *  Frontend constructors and overrides
+ * ============================================================
+ */
+
 SDL3Frontend::SDL3Frontend() : Frontend() {
   /* SDL3 initialization */
   if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO))
@@ -73,7 +118,7 @@ SDL3Frontend::SDL3Frontend() : Frontend() {
     throw std::runtime_error(SDL_GetError());
 
   /* Load settings */
-  settings_ = Settings::load();
+  settings = Settings::load();
 
   /* ImGui initialization */
   IMGUI_CHECKVERSION();
@@ -84,7 +129,7 @@ SDL3Frontend::SDL3Frontend() : Frontend() {
   if (!ImGui_ImplSDLRenderer3_Init(renderer))
     throw std::runtime_error("Failed to initialize ImGui SDL renderer backend");
 
-  rom_sel_conf.path = settings_.rom_dir;
+  rom_sel_conf.path = settings.rom_dir;
   bios_sel_conf.path = ".";
   bios_sel_conf.flags = rom_sel_conf.flags =
       ImGuiFileDialogFlags_Modal | ImGuiFileDialogFlags_ReadOnlyFileNameField;
@@ -95,14 +140,14 @@ SDL3Frontend::SDL3Frontend() : Frontend() {
   running = true;
   clear();
 
-  if (settings_.keybind_preset_index != kCustomPresetIndex) {
-    ApplyPreset(settings_.keybinds, settings_.keybind_preset_index);
+  if (settings.keybind_preset_index != kCustomPresetIndex) {
+    apply_keybind_preset(settings.keybinds, settings.keybind_preset_index);
   }
 }
 
 SDL3Frontend::~SDL3Frontend() {
   // Save current settings to disk
-  settings_.save();
+  settings.save();
 
   ImGui_ImplSDLRenderer3_Shutdown();
   ImGui_ImplSDL3_Shutdown();
@@ -141,78 +186,10 @@ void SDL3Frontend::put_pixel(int x, int y, std::uint32_t c) {
     front_index.store(back_index, std::memory_order_release);
 }
 
-void SDL3Frontend::poll_events() {
-  SDL_Event e;
-  while (SDL_PollEvent(&e)) {
-    ImGui_ImplSDL3_ProcessEvent(&e);
-    if (e.type == SDL_EVENT_QUIT)
-      running = false;
-    if (e.type == SDL_EVENT_KEY_DOWN || e.type == SDL_EVENT_KEY_UP) {
-      ImGuiIO &io = ImGui::GetIO();
-      if (e.type == SDL_EVENT_KEY_DOWN && ui_state.waiting_for_bind) {
-        if (e.key.key != SDLK_ESCAPE)
-          settings_.keybinds[*ui_state.waiting_for_bind] = e.key.key;
-        ui_state.waiting_for_bind.reset();
-        // Any manual change -> Custom
-        settings_.keybind_preset_index = kCustomPresetIndex;
-        continue;
-      }
-      if (io.WantCaptureKeyboard)
-        continue;
-      const bool pressed = (e.type == SDL_EVENT_KEY_DOWN);
-      update_button_state(e.key.key, pressed);
-    }
-  }
-}
-
 inline auto calc_delta(const std::chrono::steady_clock::time_point &start) {
   return std::chrono::duration_cast<std::chrono::microseconds>(
              std::chrono::steady_clock::now() - start)
       .count();
-}
-
-void SDL3Frontend::present_ui() {
-  using namespace std::chrono;
-
-  const std::uint32_t *pixels = front_buffer();
-  int window_w{}, window_h{};
-  uint32_t *texturePixels{};
-  int pitch{};
-
-  SDL_LockTexture(texture, nullptr, reinterpret_cast<void **>(&texturePixels),
-                  &pitch);
-
-  pitch /= sizeof(uint32_t);
-  for (int y = 0; y < framebuf_height; ++y)
-    for (int x = 0; x < framebuf_width; ++x) {
-      const auto c = format_pixel_data(pixels[y * framebuf_width + x]);
-      texturePixels[y * pitch + x] = c;
-    }
-  SDL_UnlockTexture(texture);
-
-  ImGui_ImplSDLRenderer3_NewFrame();
-  ImGui_ImplSDL3_NewFrame();
-  ImGui::NewFrame();
-  build_ui();
-  ImGui::Render();
-  SDL_RenderClear(renderer);
-
-  /* Need to account for bar consuming space for top few pixels */
-  SDL_GetWindowSize(window, &window_w, &window_h);
-  const float menu_bar_h = ImGui::GetFrameHeight();
-  SDL_FRect dst_rect{0.0f,       // x
-                     menu_bar_h, // y offset by menu bar
-                     float(window_w), float(window_h - menu_bar_h)};
-
-  SDL_RenderTexture(renderer, texture, nullptr, &dst_rect);
-  ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), renderer);
-  SDL_RenderPresent(renderer);
-}
-
-void SDL3Frontend::clear(std::uint32_t c) {
-  for (int i = 0; i < framebuf_width * framebuf_height; ++i)
-    for (auto &buffer : framebuffers)
-      buffer[i] = c;
 }
 
 void SDL3Frontend::queue_audio_samples(const float *samples,
@@ -240,108 +217,57 @@ void SDL3Frontend::queue_audio_samples(const float *samples,
   }
 }
 
-void SDL3Frontend::refresh_output_devices() {
-  ui_state.output_device_ids.clear();
-  ui_state.output_device_names.clear();
-
-  // Slot 0: System default
-  ui_state.output_device_ids.push_back(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK);
-  ui_state.output_device_names.emplace_back("System default");
-
-  int count = 0;
-  SDL_AudioDeviceID *devs = SDL_GetAudioPlaybackDevices(&count);
-  if (!devs) {
-    set_status_message(SDL_GetError());
-    return;
-  }
-
-  // SDL docs: returns a 0-terminated array; also provides count
-  for (int i = 0; devs[i] != 0; ++i) {
-    const SDL_AudioDeviceID id = devs[i];
-    const char *name = SDL_GetAudioDeviceName(id); // human-readable name
-    ui_state.output_device_ids.push_back(id);
-    ui_state.output_device_names.emplace_back(name ? name : "(unknown device)");
-  }
-  SDL_free(devs);
+void SDL3Frontend::clear(std::uint32_t c) {
+  for (int i = 0; i < framebuf_width * framebuf_height; ++i)
+    for (auto &buffer : framebuffers)
+      buffer[i] = c;
 }
 
-bool SDL3Frontend::switch_output_device_by_index(int idx) {
-  if (idx < 0 || idx >= static_cast<int>(ui_state.output_device_ids.size()))
-    return false;
+void SDL3Frontend::start() {
+  std::optional<std::string> bios_path{std::nullopt};
+  std::string rom_path{};
 
-  const SDL_AudioDeviceID desired = ui_state.output_device_ids[idx];
-  std::scoped_lock lock(audio_mutex);
-  if (!audio_stream)
-    return false;
+  clear(black);
+  while (running.load()) [[likely]] {
 
-  // Stop audio on old device
-  SDL_ClearAudioStream(audio_stream);
-  if (audio_device) {
-    SDL_UnbindAudioStream(audio_stream);
-    SDL_CloseAudioDevice(audio_device);
-    audio_device = 0;
+    /* Handle cart re-insertion */
+    if (consume_load_rom_request(rom_path)) {
+      join_emu_thread_if_running();
+
+      /* Attempt to load cartridge, if it fails thread doesn't start */
+      try {
+        cart cart_ctx = load_cart_fs(rom_path.c_str());
+        emulation_thread = std::jthread(&SDL3Frontend::emulation_thread_fn,
+                                        this, cart_ctx, bios_path);
+        set_status_message(std::format("Loaded ROM: {}", rom_path));
+      } catch (std::exception &e) {
+        set_status_message(std::format("Failed to load ROM: {}", e.what()));
+      }
+    }
+
+    /* Handle BIOS selection, won't take effect until ROM re-inserted */
+    consume_load_bios_request(bios_path);
+    poll_events();
+    present_ui();
   }
 
-  // Open new device (can be a physical device id or
-  // SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK)
-  audio_device = SDL_OpenAudioDevice(desired, &audio_spec);
-  if (!audio_device) {
-    set_status_message(SDL_GetError());
-    return false;
-  }
-  if (!SDL_BindAudioStream(audio_device, audio_stream)) {
-    set_status_message(SDL_GetError());
-    SDL_CloseAudioDevice(audio_device);
-    audio_device = 0;
-    return false;
-  }
-
-  // Re-apply gain after rebinding
-  SDL_SetAudioStreamGain(audio_stream, settings_.volume);
-  return true;
+  /* Kill emulation thread */
+  emulation_thread.request_stop();
+  join_emu_thread_if_running();
 }
 
-bool SDL3Frontend::consume_load_bios_request(
-    std::optional<std::string> &bios_path) {
-  std::lock_guard<std::mutex> lock(ui_mutex);
-  if (!ui_state.request_load_bios)
-    return false;
-
-  /* Denote new BIOS path */
-  ui_state.request_load_bios = false;
-  bios_path = ui_state.bios_path;
-  return true;
-}
-
-bool SDL3Frontend::consume_load_rom_request(std::string &rom_path) {
-  std::lock_guard<std::mutex> lock(ui_mutex);
-  if (!ui_state.request_load_rom)
-    return false;
-
-  /* Denote new cartridge path */
-  ui_state.request_load_rom = false;
-  rom_path = ui_state.rom_path;
-
-  /* Update recent ROMs and last used directory */
-  const auto new_rom_path = fs::path(rom_path).parent_path().string();
-  rom_sel_conf.path = new_rom_path;
-  settings_.rom_dir = new_rom_path;
-  settings_.add_recent_rom(rom_path);
-  settings_.save();
-  return true;
-}
-
-void SDL3Frontend::set_status_message(std::string message) {
-  std::lock_guard<std::mutex> lock(ui_mutex);
-  ui_state.status_message = std::move(message);
-}
-
-std::tuple<ImVec2, ImVec2> SDL3Frontend::get_sizing_metadata() const {
+std::tuple<ImVec2, ImVec2> SDL3Frontend::calc_winsize_bounds() const {
   const float display_w = ImGui::GetIO().DisplaySize.x;
   const float display_h = ImGui::GetIO().DisplaySize.y;
   return std::make_tuple(ImVec2((float)display_w, (float)display_h),
                          ImVec2(400.0f, 250.0f));
 }
+
+/*
+ * ============================================================
+ *  General User Interface Helpers
+ * ============================================================
+ */
 
 void SDL3Frontend::build_main_menu_bar(ImVec2 max_size, ImVec2 min_size) {
   if (ImGui::BeginMainMenuBar()) {
@@ -351,10 +277,10 @@ void SDL3Frontend::build_main_menu_bar(ImVec2 max_size, ImVec2 min_size) {
             "RomFileDialog", "Choose a ROM file", rom_filters, rom_sel_conf);
 
       if (ImGui::BeginMenu("Open Recent")) {
-        if (settings_.recent_roms.empty()) {
+        if (settings.recent_roms.empty()) {
           ImGui::MenuItem("(No recent files)", nullptr, false, false);
         } else {
-          for (const auto &path : settings_.recent_roms) {
+          for (const auto &path : settings.recent_roms) {
             // Display full path for clarity, alternatively we can use
             // std::filesystem::path(path).filename().string().c_str() for short
             // names
@@ -418,19 +344,19 @@ void SDL3Frontend::build_bios_selection_dialog(ImVec2 max_size,
   }
 }
 
-void SDL3Frontend::build_settings_dialog(ImVec2 max_size, ImVec2 min_size) {
+void SDL3Frontend::build_settings_dialog() {
   if (ui_state.show_settings_window) {
     ImGui::Begin("Settings", &ui_state.show_settings_window);
     ImGui::Checkbox("Fast forward", &ui_state.fast_forward);
-    ImGui::Checkbox("Force DMG monochrome", &settings_.force_mono_dmg);
+    ImGui::Checkbox("Force DMG monochrome", &settings.force_mono_dmg);
     ImGui::SeparatorText("Audio");
 
     // Volume slider
     ImGui::SetNextItemWidth(200.0f);
-    if (ImGui::SliderFloat("Volume", &settings_.volume, 0.0f, 1.5f, "%.2f")) {
+    if (ImGui::SliderFloat("Volume", &settings.volume, 0.0f, 1.5f, "%.2f")) {
       std::scoped_lock audio_lock(audio_mutex);
       if (audio_stream) {
-        SDL_SetAudioStreamGain(audio_stream, settings_.volume);
+        SDL_SetAudioStreamGain(audio_stream, settings.volume);
       }
     }
 
@@ -475,16 +401,17 @@ void SDL3Frontend::build_settings_dialog(ImVec2 max_size, ImVec2 min_size) {
         preset_names_init = true;
       }
 
-      int old_idx = settings_.keybind_preset_index;
+      int old_idx = settings.keybind_preset_index;
       ImGui::SetNextItemWidth(100.0f);
-      if (ImGui::Combo("Preset", &settings_.keybind_preset_index,
+      if (ImGui::Combo("Preset", &settings.keybind_preset_index,
                        preset_names.data(), preset_names.size())) {
         // Only apply immediately if not currently rebinding
         if (ui_state.waiting_for_bind < 0) {
-          ApplyPreset(settings_.keybinds, settings_.keybind_preset_index);
+          apply_keybind_preset(settings.keybinds,
+                               settings.keybind_preset_index);
         } else {
           // revert change while waiting for bind
-          settings_.keybind_preset_index = old_idx;
+          settings.keybind_preset_index = old_idx;
         }
       }
     }
@@ -504,13 +431,194 @@ void SDL3Frontend::build_settings_dialog(ImVec2 max_size, ImVec2 min_size) {
         ui_state.waiting_for_bind = static_cast<int>(i);
 
       ImGui::SameLine(240.0f);
-      ImGui::Text("%s", SDL_GetKeyName(settings_.keybinds[i]));
+      ImGui::Text("%s", SDL_GetKeyName(settings.keybinds[i]));
     }
     ImGui::End();
   }
 }
 
-void SDL3Frontend::build_debug_dialog(ImVec2 max_size, ImVec2 min_size) {
+bool SDL3Frontend::consume_load_bios_request(opt_string_t &bios_path) {
+  std::lock_guard<std::mutex> lock(ui_mutex);
+  if (!ui_state.request_load_bios)
+    return false;
+
+  /* Denote new BIOS path */
+  ui_state.request_load_bios = false;
+  bios_path = ui_state.bios_path;
+  return true;
+}
+
+bool SDL3Frontend::consume_load_rom_request(std::string &rom_path) {
+  std::lock_guard<std::mutex> lock(ui_mutex);
+  if (!ui_state.request_load_rom)
+    return false;
+
+  /* Denote new cartridge path */
+  ui_state.request_load_rom = false;
+  rom_path = ui_state.rom_path;
+
+  /* Update recent ROMs and last used directory */
+  const auto new_rom_path = fs::path(rom_path).parent_path().string();
+  rom_sel_conf.path = new_rom_path;
+  settings.rom_dir = new_rom_path;
+  settings.add_recent_rom(rom_path);
+  settings.save();
+  return true;
+}
+
+void SDL3Frontend::set_status_message(std::string message) {
+  std::lock_guard<std::mutex> lock(ui_mutex);
+  ui_state.status_message = std::move(message);
+}
+
+void SDL3Frontend::present_ui() {
+  using namespace std::chrono;
+
+  const std::uint32_t *pixels = get_front_buffer();
+  int window_w{}, window_h{};
+  uint32_t *texturePixels{};
+  int pitch{};
+
+  SDL_LockTexture(texture, nullptr, reinterpret_cast<void **>(&texturePixels),
+                  &pitch);
+
+  pitch /= sizeof(uint32_t);
+  for (int y = 0; y < framebuf_height; ++y)
+    for (int x = 0; x < framebuf_width; ++x) {
+      const auto c = format_pixel_data(pixels[y * framebuf_width + x]);
+      texturePixels[y * pitch + x] = c;
+    }
+  SDL_UnlockTexture(texture);
+
+  ImGui_ImplSDLRenderer3_NewFrame();
+  ImGui_ImplSDL3_NewFrame();
+  ImGui::NewFrame();
+  build_ui();
+  ImGui::Render();
+  SDL_RenderClear(renderer);
+
+  /* Need to account for bar consuming space for top few pixels */
+  SDL_GetWindowSize(window, &window_w, &window_h);
+  const float menu_bar_h = ImGui::GetFrameHeight();
+  SDL_FRect dst_rect{0.0f,       // x
+                     menu_bar_h, // y offset by menu bar
+                     float(window_w), float(window_h - menu_bar_h)};
+
+  SDL_RenderTexture(renderer, texture, nullptr, &dst_rect);
+  ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), renderer);
+  SDL_RenderPresent(renderer);
+}
+
+void SDL3Frontend::build_ui() {
+  std::lock_guard<std::mutex> lock(ui_mutex);
+  const auto [max_size, min_size] = calc_winsize_bounds();
+  build_main_menu_bar(max_size, min_size);
+  build_rom_selection_dialog(max_size, min_size);
+  build_bios_selection_dialog(max_size, min_size);
+  build_settings_dialog();
+  build_debug_dialog();
+  build_breakpoint_dialog();
+  emu_state.fast_forward.store(ui_state.fast_forward);
+}
+
+void SDL3Frontend::build_breakpoint_dialog() {
+  if (ui_state.show_breakpoints_window) {
+    std::lock_guard<std::mutex> lock(dbg_mutex);
+    ImGui::Begin("Breakoints", &ui_state.show_breakpoints_window);
+    ImGui::SeparatorText("Breakpoints");
+    auto &debugger = gbc_->get_debugger();
+
+    if (!debugger.has_value()) {
+      ImGui::Text("Debugger not configured");
+      ImGui::End();
+      return;
+    }
+
+    const auto bps = debugger->get_breakpoints();
+    for (const auto &[addr, bp] : bps) {
+      ImGui::PushID(addr);
+
+      ImGui::Text("%s", bp.to_string().c_str());
+      ImGui::SameLine();
+      if (ImGui::Button("Edit")) {
+        bp_prompt.execute = bp.has_flag(Debug::BRK_ADDRESS_EXECUTED);
+        bp_prompt.read = bp.has_flag(Debug::BRK_ADDRESS_READ);
+        bp_prompt.write = bp.has_flag(Debug::BRK_ADDRESS_WRITTEN);
+        bp_prompt.addr = addr;
+        bp_prompt.show = true;
+      }
+      ImGui::SameLine();
+      if (ImGui::Button("Remove"))
+        debugger->breakpoint_del(addr);
+      ImGui::PopID();
+    }
+    if (ImGui::Button("Add"))
+      bp_prompt.show = true;
+
+    if (bp_prompt.show) {
+      ImGui::OpenPopup("Configure breakpoint");
+      build_config_breakpoint_dialog();
+    }
+    ImGui::End();
+  }
+}
+
+/*
+ * ============================================================
+ *  Debugger User Interface Helpers
+ * ============================================================
+ */
+
+void SDL3Frontend::build_config_breakpoint_dialog() {
+  if (ImGui::BeginPopupModal("Configure breakpoint", nullptr,
+                             ImGuiWindowFlags_AlwaysAutoResize)) {
+
+    ImGui::InputScalar("Address", ImGuiDataType_U16, &bp_prompt.addr, nullptr,
+                       nullptr, "%04X", ImGuiInputTextFlags_CharsHexadecimal);
+    ImGui::Checkbox("Exec", &bp_prompt.execute);
+    ImGui::SameLine();
+    ImGui::Checkbox("Read", &bp_prompt.read);
+    ImGui::SameLine();
+    ImGui::Checkbox("Write", &bp_prompt.write);
+    ImGui::Separator();
+
+    if (ImGui::Button("OK", ImVec2(120, 0))) {
+      Debug::BreakReason reason{};
+      if (bp_prompt.execute)
+        reason = reason | Debug::BRK_ADDRESS_EXECUTED;
+      if (bp_prompt.write)
+        reason = reason | Debug::BRK_ADDRESS_WRITTEN;
+      if (bp_prompt.read)
+        reason = reason | Debug::BRK_ADDRESS_READ;
+      gbc_->get_debugger()->breakpoint_add(bp_prompt.addr, reason);
+      ImGui::CloseCurrentPopup();
+      bp_prompt.show = false;
+    }
+    ImGui::SameLine();
+
+    if (ImGui::Button("Cancel", ImVec2(120, 0))) {
+      ImGui::CloseCurrentPopup();
+      bp_prompt.show = false;
+    }
+
+    ImGui::EndPopup();
+  }
+}
+
+void SDL3Frontend::read_system_dbg_state() {
+  dbg_state.sys_state = Debug::to_string(gbc_->get_sys());
+  dbg_state.cpu_state = Debug::to_string(gbc_->get_cpu()->get_state());
+  dbg_state.disasm = gbc_->get_cpu()->disasm();
+
+  const InterruptBits *const ie_reg = dynamic_cast<InterruptBits *>(
+      gbc_->get_bus()->get_mmio(IORegisterMapping::MMIO_INT_ENABLE));
+  const InterruptBits *const if_reg = dynamic_cast<InterruptBits *>(
+      gbc_->get_bus()->get_mmio(IORegisterMapping::MMIO_INT_FLAGS));
+  dbg_state.ie_state = Debug::to_string(*ie_reg);
+  dbg_state.if_state = Debug::to_string(*if_reg);
+}
+
+void SDL3Frontend::build_debug_dialog() {
   if (ui_state.show_debug_window) {
     ImGui::Begin("Debug", &ui_state.show_debug_window);
 
@@ -572,126 +680,155 @@ void SDL3Frontend::build_debug_dialog(ImVec2 max_size, ImVec2 min_size) {
   }
 }
 
-void SDL3Frontend::build_breakpoint_dialog(ImVec2 max_size, ImVec2 min_size) {
-  if (ui_state.show_breakpoints_window) {
-    std::lock_guard<std::mutex> lock(dbg_mutex);
-    ImGui::Begin("Breakoints", &ui_state.show_breakpoints_window);
-    ImGui::SeparatorText("Breakpoints");
-    auto &debugger = gbc_->get_debugger();
-
-    if (!debugger.has_value()) {
-      ImGui::Text("Debugger not configured");
-      ImGui::End();
-      return;
-    }
-
-    const auto bps = debugger->get_breakpoints();
-    for (const auto &[addr, bp] : bps) {
-      ImGui::PushID(addr);
-
-      ImGui::Text("%s", bp.to_string().c_str());
-      ImGui::SameLine();
-      if (ImGui::Button("Edit")) {
-        bp_prompt.execute = bp.has_flag(Debug::BRK_ADDRESS_EXECUTED);
-        bp_prompt.read = bp.has_flag(Debug::BRK_ADDRESS_READ);
-        bp_prompt.write = bp.has_flag(Debug::BRK_ADDRESS_WRITTEN);
-        bp_prompt.addr = addr;
-        bp_prompt.show = true;
-      }
-      ImGui::SameLine();
-      if (ImGui::Button("Remove"))
-        debugger->breakpoint_del(addr);
-      ImGui::PopID();
-    }
-    if (ImGui::Button("Add"))
-      bp_prompt.show = true;
-
-    if (bp_prompt.show) {
-      ImGui::OpenPopup("Configure breakpoint");
-      build_config_breakpoint_dialog();
-    }
-    ImGui::End();
-  }
-}
-
-void SDL3Frontend::build_ui() {
-  std::lock_guard<std::mutex> lock(ui_mutex);
-  const auto [max_size, min_size] = get_sizing_metadata();
-
-  build_main_menu_bar(max_size, min_size);
-  build_rom_selection_dialog(max_size, min_size);
-  build_bios_selection_dialog(max_size, min_size);
-  build_settings_dialog(max_size, min_size);
-  build_debug_dialog(max_size, min_size);
-  build_breakpoint_dialog(max_size, min_size);
-
-  /* Update additional meta-data, avoid mutex acquisition */
-  emu_state.fast_forward.store(ui_state.fast_forward);
-}
-
-void SDL3Frontend::build_config_breakpoint_dialog() {
-  if (ImGui::BeginPopupModal("Configure breakpoint", nullptr,
-                             ImGuiWindowFlags_AlwaysAutoResize)) {
-
-    ImGui::InputScalar("Address", ImGuiDataType_U16, &bp_prompt.addr, nullptr,
-                       nullptr, "%04X", ImGuiInputTextFlags_CharsHexadecimal);
-    ImGui::Checkbox("Exec", &bp_prompt.execute);
-    ImGui::SameLine();
-    ImGui::Checkbox("Read", &bp_prompt.read);
-    ImGui::SameLine();
-    ImGui::Checkbox("Write", &bp_prompt.write);
-    ImGui::Separator();
-
-    if (ImGui::Button("OK", ImVec2(120, 0))) {
-      Debug::BreakReason reason{};
-      if (bp_prompt.execute)
-        reason = reason | Debug::BRK_ADDRESS_EXECUTED;
-      if (bp_prompt.write)
-        reason = reason | Debug::BRK_ADDRESS_WRITTEN;
-      if (bp_prompt.read)
-        reason = reason | Debug::BRK_ADDRESS_READ;
-      gbc_->get_debugger()->breakpoint_add(bp_prompt.addr, reason);
-      ImGui::CloseCurrentPopup();
-      bp_prompt.show = false;
-    }
-    ImGui::SameLine();
-
-    if (ImGui::Button("Cancel", ImVec2(120, 0))) {
-      ImGui::CloseCurrentPopup();
-      bp_prompt.show = false;
-    }
-
-    ImGui::EndPopup();
-  }
-}
-
-void SDL3Frontend::read_system_dbg_state() {
-  dbg_state.sys_state = Debug::to_string(gbc_->get_sys());
-  dbg_state.cpu_state = Debug::to_string(gbc_->get_cpu()->get_state());
-  dbg_state.disasm = gbc_->get_cpu()->disasm();
-
-  const InterruptBits *const ie_reg = dynamic_cast<InterruptBits *>(
-      gbc_->get_bus()->get_mmio(IORegisterMapping::MMIO_INT_ENABLE));
-  const InterruptBits *const if_reg = dynamic_cast<InterruptBits *>(
-      gbc_->get_bus()->get_mmio(IORegisterMapping::MMIO_INT_FLAGS));
-  dbg_state.ie_state = Debug::to_string(*ie_reg);
-  dbg_state.if_state = Debug::to_string(*if_reg);
-}
-
 const std::uint32_t SDL3Frontend::format_pixel_data(std::uint32_t px) const {
   constexpr std::uint32_t alpha_mask = 0xFF000000;
-  /* We are abusing the alpha bits to store DMG color palette indecies */
-  if (!emu_state.is_cgb.load() && settings_.force_mono_dmg) {
+  /* We are abusing the alpha bits to store DMG color palette indecies CGB mode
+   * will always be colored so the bits as are just returned w alpha bits set */
+
+  if (!emu_state.is_cgb.load() && settings.force_mono_dmg) {
     const byte_t mono_pal_idx = static_cast<byte_t>((px >> 24) & 0xFF);
     return get_mono_color(mono_pal_idx) | alpha_mask;
   }
-  /* CGB mode will always be colored */
   return px | alpha_mask;
 }
 
-const std::uint32_t *SDL3Frontend::front_buffer() const {
+const std::uint32_t *SDL3Frontend::get_front_buffer() const {
   return framebuffers[front_index.load(std::memory_order_acquire)].get();
 }
+
+/*
+ * ============================================================
+ *  Input / Joypad Update Helpers
+ * ============================================================
+ */
+
+void SDL3Frontend::apply_keybind_preset(
+    std::array<SDL_Keycode, KCount> &keybinds, int preset_index) {
+  if (preset_index < 0 || preset_index >= static_cast<int>(kPresets.size()))
+    return;
+  if (preset_index == kCustomPresetIndex)
+    return; // don't clobber custom
+  keybinds = kPresets[preset_index].keys;
+}
+
+void SDL3Frontend::update_button_state(const SDL_Keycode key,
+                                       const bool pressed) {
+  const byte_t mask = button_mask_for_key(key);
+  if (mask == 0)
+    return;
+
+  byte_t current = input_state.buttons.load(std::memory_order_relaxed);
+  if (pressed)
+    current |= mask;
+  else
+    current &= static_cast<byte_t>(~mask);
+  input_state.buttons.store(current, std::memory_order_relaxed);
+}
+
+byte_t SDL3Frontend::button_mask_for_key(const SDL_Keycode key) const {
+  for (std::size_t i = 0; i < settings.keybinds.size(); ++i) {
+    if (settings.keybinds[i] == key)
+      return static_cast<byte_t>(button_order[i]);
+  }
+  return 0;
+}
+
+void SDL3Frontend::poll_events() {
+  SDL_Event e;
+  while (SDL_PollEvent(&e)) {
+    ImGui_ImplSDL3_ProcessEvent(&e);
+    if (e.type == SDL_EVENT_QUIT)
+      running = false;
+    if (e.type == SDL_EVENT_KEY_DOWN || e.type == SDL_EVENT_KEY_UP) {
+      ImGuiIO &io = ImGui::GetIO();
+      if (e.type == SDL_EVENT_KEY_DOWN && ui_state.waiting_for_bind) {
+        if (e.key.key != SDLK_ESCAPE)
+          settings.keybinds[*ui_state.waiting_for_bind] = e.key.key;
+        ui_state.waiting_for_bind.reset();
+        // Any manual change -> Custom
+        settings.keybind_preset_index = kCustomPresetIndex;
+        continue;
+      }
+      if (io.WantCaptureKeyboard)
+        continue;
+      const bool pressed = (e.type == SDL_EVENT_KEY_DOWN);
+      update_button_state(e.key.key, pressed);
+    }
+  }
+}
+
+/*
+ * ============================================================
+ *  Audio helpers
+ * ============================================================
+ */
+
+bool SDL3Frontend::switch_output_device_by_index(int idx) {
+  if (idx < 0 || idx >= static_cast<int>(ui_state.output_device_ids.size()))
+    return false;
+
+  const SDL_AudioDeviceID desired = ui_state.output_device_ids[idx];
+  std::scoped_lock lock(audio_mutex);
+  if (!audio_stream)
+    return false;
+
+  // Stop audio on old device
+  SDL_ClearAudioStream(audio_stream);
+  if (audio_device) {
+    SDL_UnbindAudioStream(audio_stream);
+    SDL_CloseAudioDevice(audio_device);
+    audio_device = 0;
+  }
+
+  // Open new device (can be a physical device id or
+  // SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK)
+  audio_device = SDL_OpenAudioDevice(desired, &audio_spec);
+  if (!audio_device) {
+    set_status_message(SDL_GetError());
+    return false;
+  }
+  if (!SDL_BindAudioStream(audio_device, audio_stream)) {
+    set_status_message(SDL_GetError());
+    SDL_CloseAudioDevice(audio_device);
+    audio_device = 0;
+    return false;
+  }
+
+  // Re-apply gain after rebinding
+  SDL_SetAudioStreamGain(audio_stream, settings.volume);
+  return true;
+}
+
+void SDL3Frontend::refresh_output_devices() {
+  ui_state.output_device_ids.clear();
+  ui_state.output_device_names.clear();
+
+  // Slot 0: System default
+  ui_state.output_device_ids.push_back(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK);
+  ui_state.output_device_names.emplace_back("System default");
+
+  int count = 0;
+  SDL_AudioDeviceID *devs = SDL_GetAudioPlaybackDevices(&count);
+  if (!devs) {
+    set_status_message(SDL_GetError());
+    return;
+  }
+
+  // SDL docs: returns a 0-terminated array; also provides count
+  for (int i = 0; devs[i] != 0; ++i) {
+    const SDL_AudioDeviceID id = devs[i];
+    const char *name = SDL_GetAudioDeviceName(id); // human-readable name
+    ui_state.output_device_ids.push_back(id);
+    ui_state.output_device_names.emplace_back(name ? name : "(unknown device)");
+  }
+  SDL_free(devs);
+}
+
+/*
+ * ============================================================
+ *  Emulation Thread Helpers
+ * ============================================================
+ */
 
 void SDL3Frontend::emulation_thread_fn(std::stop_token st, cart c,
                                        std::optional<std::string> bios_path) {
@@ -768,61 +905,4 @@ void SDL3Frontend::join_emu_thread_if_running() {
     dbg_cv.notify_all();
     emulation_thread.join();
   }
-}
-
-byte_t SDL3Frontend::button_mask_for_key(const SDL_Keycode key) const {
-  for (std::size_t i = 0; i < settings_.keybinds.size(); ++i) {
-    if (settings_.keybinds[i] == key)
-      return static_cast<byte_t>(button_order[i]);
-  }
-  return 0;
-}
-
-void SDL3Frontend::update_button_state(const SDL_Keycode key,
-                                       const bool pressed) {
-  const byte_t mask = button_mask_for_key(key);
-  if (mask == 0)
-    return;
-
-  byte_t current = input_state.buttons.load(std::memory_order_relaxed);
-  if (pressed)
-    current |= mask;
-  else
-    current &= static_cast<byte_t>(~mask);
-  input_state.buttons.store(current, std::memory_order_relaxed);
-}
-
-void SDL3Frontend::start() {
-  std::optional<std::string> bios_path{std::nullopt};
-  std::string rom_path{};
-
-  clear(black);
-  while (running.load()) [[likely]] {
-
-    /* Handle cart re-insertion */
-    if (consume_load_rom_request(rom_path)) {
-      join_emu_thread_if_running();
-
-      /* Attempt to load cartridge, if it fails thread doesn't start */
-      try {
-        cart cart_ctx = load_cart_fs(rom_path.c_str());
-        emulation_thread = std::jthread(&SDL3Frontend::emulation_thread_fn,
-                                        this, cart_ctx, bios_path);
-        set_status_message(std::format("Loaded ROM: {}", rom_path));
-      } catch (std::exception &e) {
-        set_status_message(std::format("Failed to load ROM: {}", e.what()));
-      }
-    }
-
-    /* Handle BIOS selection, won't take effect until ROM re-inserted */
-    consume_load_bios_request(bios_path);
-
-    /* Shows ui in what ever state it is currently in */
-    poll_events();
-    present_ui();
-  }
-
-  /* Kill emulation thread */
-  emulation_thread.request_stop();
-  join_emu_thread_if_running();
 }
