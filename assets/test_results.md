@@ -2,6 +2,7 @@
 | ----------------------- | ------------ | ----------------------------------------------------------------------- | -----: | -----: | -------: |
 | testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/div_timing.gb0                     |      1 |      0 |        1 |
 | testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/div_timing.gb1                     |      1 |      0 |        1 |
+| testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/ei_sequence.gb                     |      1 |      0 |        1 |
 | testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/ei_timing.gb                       |      1 |      0 |        1 |
 | testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/halt_ime0_ei.gb                    |      1 |      0 |        1 |
 | testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/halt_ime1_timing.gb                |      1 |      0 |        1 |
@@ -53,7 +54,6 @@
 | testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/call_cc_timing.gb                  |      0 |      1 |        1 |
 | testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/call_timing2.gb                    |      0 |      1 |        1 |
 | testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/call_timing.gb                     |      0 |      1 |        1 |
-| testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/ei_sequence.gb                     |      0 |      1 |        1 |
 | testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/halt_ime0_nointr_timing.gb         |      0 |      1 |        1 |
 | testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/jp_cc_timing.gb                    |      0 |      1 |        1 |
 | testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/jp_timing.gb                       |      0 |      1 |        1 |
@@ -74,4 +74,4 @@
 | testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/oam_dma_start.gb                   |      0 |      1 |        1 |
 | testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/oam_dma_timing.gb                  |      0 |      1 |        1 |
 | testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/emulator-only/mbc1/multicart_rom_8Mb.gb       |      0 |      1 |        1 |
-| TOTAL                   |              |                                                                         |     49 |     25 |       74 |
+| TOTAL                   |              |                                                                         |     50 |     24 |       74 |

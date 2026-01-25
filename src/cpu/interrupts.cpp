@@ -35,7 +35,7 @@ InterruptMasterEnable::InterruptMasterEnable() : ime_state(IME_DISABLED) {}
  * instantly. */
 void InterruptMasterEnable::enable(bool delayed) {
   if (delayed && ime_state != IME_ENABLED)
-    ime_state = IME_PENDING;
+    ime_state = IME_DELAYED;
   else
     ime_state = IME_ENABLED;
 }
@@ -51,9 +51,7 @@ bool InterruptMasterEnable::is_enabled() const {
 /* Responsible for handling the delayed enable of the IME through `ei`. As a
  * result, this must be invoked once per instruction. */
 void InterruptMasterEnable::step() {
-  if (ime_state == IME_PENDING)
-    ime_state = IME_DELAYED;
-  else if (ime_state == IME_DELAYED)
+  if (ime_state == IME_DELAYED)
     ime_state = IME_ENABLED;
 }
 

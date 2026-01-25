@@ -87,7 +87,6 @@ public:
 
 private:
   enum ImeStates {
-    IME_PENDING,  /* IME is about to enter one instruction delay state */
     IME_DELAYED,  /* EI was invoked, delay for one instruction */
     IME_ENABLED,  /* IME is enabled */
     IME_DISABLED, /* IME is disabled */
