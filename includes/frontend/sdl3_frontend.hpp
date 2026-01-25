@@ -153,7 +153,7 @@ private:
   void build_rom_selection_dialog(ImVec2, ImVec2);
   void build_bios_selection_dialog(ImVec2, ImVec2);
   void build_settings_dialog();
-  void build_keybind_dialog(ImVec2 max_size, ImVec2 min_size);
+  void build_keybinds_dialog(ImVec2 max_size, ImVec2 min_size);
   bool consume_load_bios_request(opt_string_t &bios_path);
   bool consume_load_rom_request(std::string &rom_path);
   void set_status_message(std::string message);
@@ -184,6 +184,7 @@ private:
   // Input / joypad update helpers
   void apply_keybind_preset(std::array<SDL_Keycode, KCount> &keybinds,
                             int preset_index);
+  void handle_general_input(SDL_Keycode key, bool pressed);
   void update_button_state(SDL_Keycode key, bool pressed);
   byte_t button_mask_for_key(SDL_Keycode key) const;
   void poll_events();
