@@ -3,7 +3,6 @@
 #include "cpu/interrupts.hpp"
 #include "cpu/registers/flags.hpp"
 #include "cpu/registers/register.hpp"
-#include "debugger/breakpoint.hpp"
 #include "debugger/debugger.hpp"
 #include "gbc.hpp"
 #include "memory/mmio/mmio.hpp"
@@ -67,8 +66,8 @@ LR35902::LR35902(AddressBus *bus_ptr, std::optional<Debug::Debugger> &debugger,
 }
 
 template <InterruptFlagMask mask, InterruptVector vec>
-std::unique_ptr<Instruction> LR35902::mk_isr() {
-  return std::make_unique<ISR<mask, vec>>(&reg_file, bus, &ime, &if_reg);
+std::unique_ptr<ISR> LR35902::mk_isr() {
+  return std::make_unique<ISR>(mask, vec, &reg_file, bus, ime, if_reg);
 }
 
 void LR35902::load_state(LR35902::ProcessorState state) {
@@ -109,7 +108,7 @@ LR35902::ProcessorState LR35902::get_state() const {
 }
 
 // Lower bits get higher priority, return the corresponding ISR
-std::optional<Instruction *> LR35902::should_interrupt() {
+std::optional<ISR *> LR35902::should_interrupt() {
   for (byte_t shift{0}; shift < 5; shift++) {
     const auto flag = static_cast<InterruptFlagMask>(1 << shift);
     if (ie_reg.get_flag(flag) && if_reg.get_flag(flag))
@@ -191,6 +190,9 @@ void LR35902::do_halt() {
   if (ime.is_enabled() && isr.has_value()) {
     state = CpuStates::STATE_DECODE;
     sys_.halted = false;
+
+    // See `interrupts.hpp` and `interrupts.cpp` for details on this delay.
+    isr.value()->incur_halt_delay(); // 4 extra cycles
     ins_ = isr.value();
   }
 

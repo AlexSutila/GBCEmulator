@@ -56,3 +56,23 @@ void InterruptMasterEnable::step() {
   else if (ime_state == IME_DELAYED)
     ime_state = IME_ENABLED;
 }
+
+/* See details about interrupt service routines in `interrupts.hpp` */
+std::size_t ISR::exec() {
+  addr_t sp = read_reg<Register16Bit::REG_SP>();
+  bool was_halted = halt_delay;
+  halt_delay = false;
+  ime_.disable();
+
+  // Push old program counter onto the stack
+  bus->write_byte(--sp, reg_file->reg_pc >> 8);
+  bus->write_byte(--sp, reg_file->reg_pc & 0xFF);
+  if_.put_flag(flag, false);
+
+  // Write back
+  reg_file->reg_pc = static_cast<addr_t>(vec);
+  write_reg<Register16Bit::REG_SP>(sp);
+  return was_halted ? 24 : 20;
+}
+
+void ISR::incur_halt_delay() { halt_delay = true; }
