@@ -78,7 +78,10 @@ private:
   void do_execute();
   void do_halt();
 
+  bool halt_bug_triggered{false};
   Instruction *ins_{}; // Reference to current ins
+
+  // Timing metadata
   std::optional<std::size_t> total_ins_clks{};
   std::size_t cur_ins_clks{};
 };
