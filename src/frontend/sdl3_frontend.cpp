@@ -411,13 +411,12 @@ void SDL3Frontend::build_keybinds_dialog(ImVec2 max_size, ImVec2 min_size) {
                      preset_names.data(), preset_names.size())) {
       // Only apply immediately if not currently rebinding
       if (ui_state.waiting_for_bind < 0) {
-        apply_keybind_preset(settings.keybinds,
-                             settings.keybind_preset_index);
+        apply_keybind_preset(settings.keybinds, settings.keybind_preset_index);
       } else {
         // revert change while waiting for bind
         settings.keybind_preset_index = old_idx;
       }
-                     }
+    }
     ImGui::Spacing();
 
     for (std::size_t i = 0; i < control_labels.size(); ++i) {
@@ -440,12 +439,13 @@ void SDL3Frontend::build_keybinds_dialog(ImVec2 max_size, ImVec2 min_size) {
       ImGui::Text("%s", general_labels[i]);
       ImGui::SameLine(120.0f);
 
-      const bool waiting = (ui_state.waiting_for_bind == static_cast<int>(i+KCount));
+      const bool waiting =
+          (ui_state.waiting_for_bind == static_cast<int>(i + KCount));
       std::string button_label =
           waiting ? "Press a key..."
                   : (std::string("Bind##") + general_labels[i]);
       if (ImGui::Button(button_label.c_str()))
-        ui_state.waiting_for_bind = static_cast<int>(i+KCount);
+        ui_state.waiting_for_bind = static_cast<int>(i + KCount);
 
       ImGui::SameLine(240.0f);
       ImGui::Text("%s", SDL_GetKeyName(settings.general_keybinds[i]));
@@ -730,7 +730,8 @@ void SDL3Frontend::apply_keybind_preset(
   keybinds = kPresets[preset_index].keys;
 }
 
-void SDL3Frontend::handle_general_input(const SDL_Keycode key, const bool pressed) {
+void SDL3Frontend::handle_general_input(const SDL_Keycode key,
+                                        const bool pressed) {
   const auto &binds = settings.general_keybinds;
 
   // Index 0: Fast Forward Toggle

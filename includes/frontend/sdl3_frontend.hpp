@@ -31,16 +31,17 @@ struct Settings {
   std::array<SDL_Keycode, 8> keybinds = {SDLK_D,         SDLK_A,     SDLK_W,
                                          SDLK_S,         SDLK_J,     SDLK_K,
                                          SDLK_BACKSPACE, SDLK_RETURN};
-  std::array<SDL_Keycode, 5> general_keybinds = {
-      SDLK_G, SDLK_F, SDLK_EQUALS, SDLK_MINUS, SDLK_M};
+  std::array<SDL_Keycode, 5> general_keybinds = {SDLK_G, SDLK_F, SDLK_EQUALS,
+                                                 SDLK_MINUS, SDLK_M};
   std::vector<std::string> recent_roms;
   static Settings load(const std::string &filename = ".gbc.config.json");
   void save(const std::string &filename = ".gbc.config.json") const;
   void add_recent_rom(const std::string &path);
 };
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Settings, volume, force_mono_dmg,
-                                   keybind_preset_index, rom_dir, keybinds,
-                                   recent_roms)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Settings, volume,
+                                                force_mono_dmg,
+                                                keybind_preset_index, rom_dir,
+                                                keybinds, recent_roms)
 
 struct UiState {
   std::vector<SDL_AudioDeviceID> output_device_ids;
@@ -92,16 +93,15 @@ struct KeybindPreset {
   const char *name;
   std::array<SDL_Keycode, KCount> keys;
 };
-  static constexpr std::array<Joypad::JoypadButton, 8> button_order{
-      Joypad::JoypadButton::RIGHT,  Joypad::JoypadButton::LEFT,
-      Joypad::JoypadButton::UP,     Joypad::JoypadButton::DOWN,
-      Joypad::JoypadButton::A,      Joypad::JoypadButton::B,
-      Joypad::JoypadButton::SELECT, Joypad::JoypadButton::START};
-  static constexpr std::array<const char *, KCount> control_labels{
+static constexpr std::array<Joypad::JoypadButton, 8> button_order{
+    Joypad::JoypadButton::RIGHT,  Joypad::JoypadButton::LEFT,
+    Joypad::JoypadButton::UP,     Joypad::JoypadButton::DOWN,
+    Joypad::JoypadButton::A,      Joypad::JoypadButton::B,
+    Joypad::JoypadButton::SELECT, Joypad::JoypadButton::START};
+static constexpr std::array<const char *, KCount> control_labels{
     "Right", "Left", "Up", "Down", "A", "B", "Select", "Start"};
-  static constexpr std::array<const char*, 5> general_labels{
-    "FF Toggle", "FF (Hold)", "Vol Up" , "Vol Down", "Monochrome"};
-
+static constexpr std::array<const char *, 5> general_labels{
+    "FF Toggle", "FF (Hold)", "Vol Up", "Vol Down", "Monochrome"};
 
 static constexpr std::array<KeybindPreset, 4> kPresets{{
     {"WASD",
