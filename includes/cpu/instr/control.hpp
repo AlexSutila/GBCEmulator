@@ -115,12 +115,12 @@ class HALT final : public Instruction {
 public:
   HALT(RegisterFile *reg_file_ptr, AddressBus *bus_ptr,
        InterruptMasterEnable &ime, InterruptBits &if_reg, InterruptBits &ie_reg,
-       bool &halt_bug_flag, runtime_sys_info &sys)
+       runtime_sys_info &sys)
       : Instruction(reg_file_ptr, bus_ptr),
         ime_(ime),   // Needed to trigger the HALT bug
         if_(if_reg), // ^^^
         ie_(ie_reg), // ^^^
-        halt_bug_triggered_(halt_bug_flag), sys_(sys) {}
+        sys_(sys) {}
   std::size_t exec() override {
     constexpr byte_t mask = 0x1F; // Mask out unused interrupt bits
     const byte_t isr_pending = if_.peek() & ie_.peek() & mask;
@@ -129,7 +129,7 @@ public:
     /* If the IME is disabled and there is no interrupt pending, there is a
      * hardware bug that causes PC increment to fail for one instruction */
     if (!ime_.is_enabled() && !isr_pending)
-      halt_bug_triggered_ = true;
+      reg_file->halt_bug_triggered = true;
     return 4;
   }
   std::string describe() override { return std::format("HALT"); }
@@ -142,8 +142,6 @@ public:
 private:
   InterruptMasterEnable &ime_;
   InterruptBits &if_, &ie_;
-
-  bool &halt_bug_triggered_;
   runtime_sys_info &sys_;
 };
 

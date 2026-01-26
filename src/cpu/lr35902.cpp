@@ -148,8 +148,8 @@ void LR35902::do_fetch() {
   state = CpuStates::STATE_DECODE;
 
   // If the halt bug was triggered, PC freaks out and doesn't increment
-  if (halt_bug_triggered)
-    halt_bug_triggered = false;
+  if (reg_file.halt_bug_triggered)
+    reg_file.halt_bug_triggered = false;
   else reg_file.reg_pc++;
 }
 
