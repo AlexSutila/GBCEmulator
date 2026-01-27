@@ -123,12 +123,12 @@ public:
         sys_(sys) {}
   std::size_t exec() override {
     constexpr byte_t mask = 0x1F; // Mask out unused interrupt bits
-    const byte_t isr_pending = if_.peek() & ie_.peek() & mask;
+    const bool isr_pending = (if_.peek() & ie_.peek() & mask) != 0;
     sys_.halted = true;
 
     /* If the IME is disabled and there is no interrupt pending, there is a
      * hardware bug that causes PC increment to fail for one instruction */
-    if (!ime_.is_enabled() && !isr_pending)
+    if (!ime_.is_enabled() && isr_pending)
       reg_file->halt_bug_triggered = true;
     return 4;
   }
