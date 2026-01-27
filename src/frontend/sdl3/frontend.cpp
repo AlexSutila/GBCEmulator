@@ -84,18 +84,6 @@ void SDL3Frontend::start() {
 }
 
 /* Rendering */
-std::uint32_t SDL3Frontend::format_pixel_data(const std::uint32_t px) const {
-  constexpr std::uint32_t alpha_mask = 0xFF000000;
-  /* We are abusing the alpha bits to store DMG color palette indecision CGB mode
-   * will always be colored so the bits as are just returned w alpha bits set */
-
-  if (!is_cgb.load() && gui.get_settings_c().force_mono_dmg) {
-    const auto mono_pal_idx = static_cast<byte_t>((px >> 24) & 0xFF);
-    return get_mono_color(mono_pal_idx) | alpha_mask;
-  }
-  return px | alpha_mask;
-}
-
 const std::uint32_t *SDL3Frontend::get_front_buffer() const {
   return framebuffers[front_index.load(std::memory_order_acquire)].get();
 }
@@ -125,13 +113,8 @@ void SDL3Frontend::render_frame() {
   // --- PHASE 1: PREPARE TEXTURE ---
   // 1. Get the raw buffer from the emulator thread
   const std::uint32_t* raw_pixels = get_front_buffer();
-  // 2. Format pixels (DMG palette handling, etc.)
-  static std::vector<std::uint32_t> texture_buffer(160 * 144);
-  for (int i = 0; i < 160 * 144; ++i) {
-    texture_buffer[i] = format_pixel_data(raw_pixels[i]);
-  }
-  // 3. Send to GPU
-  host.update_texture(texture_buffer.data(), 160, 144);
+  // 2. Send to GPU
+  host.update_texture(raw_pixels, 160, 144, is_cgb, gui.get_settings_c().force_mono_dmg);
 
   // --- PHASE 2: UI COMPOSITION ---
   // 1. Start the ImGui frame

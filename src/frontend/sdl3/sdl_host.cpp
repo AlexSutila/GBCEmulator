@@ -1,4 +1,5 @@
 #include "frontend/sdl3/sdl_host.hpp"
+#include "ppu/palette.hpp"
 
 SDLHost::SDLHost(const int width, const int height, const int scale) {
   if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO))
@@ -35,10 +36,17 @@ SDLHost::~SDLHost() {
 }
 
 /* Rendering */
-void SDLHost::update_texture(const std::uint32_t *pixels, const int width, const int height) const {
+void SDLHost::update_texture(const std::uint32_t *pixels, const int width, const int height,
+                                const std::atomic<bool>& is_cgb, const bool force_mono) const {
   uint32_t *texturePixels{};
   int pitch{};
   SDL_LockTexture(texture, nullptr, reinterpret_cast<void **>(&texturePixels), &pitch);
+  pitch /= sizeof(uint32_t);
+  for (int y = 0; y < height; ++y)
+    for (int x = 0; x < width; ++x) {
+      const auto c = format_pixel_data(pixels[y * width + x], is_cgb.load(), force_mono);
+      texturePixels[y * pitch + x] = c;
+    }
   SDL_UnlockTexture(texture);
 }
 
@@ -50,6 +58,18 @@ void SDLHost::draw_texture(const float menu_bar_height) const {
                            static_cast<float>(window_w), (static_cast<float>(window_h) - menu_bar_height)};
 
   SDL_RenderTexture(renderer, texture, nullptr, &dst_rect);
+}
+
+std::uint32_t SDLHost::format_pixel_data(const std::uint32_t px, const bool is_cgb, const bool force_mono) {
+  constexpr std::uint32_t alpha_mask = 0xFF000000;
+  /* We are abusing the alpha bits to store DMG color palette indecision CGB mode
+   * will always be colored so the bits as are just returned w alpha bits set */
+
+  if (!is_cgb && force_mono) {
+    const auto mono_pal_idx = static_cast<byte_t>((px >> 24) & 0xFF);
+    return get_mono_color(mono_pal_idx) | alpha_mask;
+  }
+  return px | alpha_mask;
 }
 
 /* Audio related */

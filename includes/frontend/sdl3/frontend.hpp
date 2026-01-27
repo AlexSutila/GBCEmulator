@@ -52,7 +52,6 @@ private:
   std::array<std::unique_ptr<std::uint32_t[]>, 2> framebuffers;
   std::atomic<int> front_index{0};
   const std::uint32_t *get_front_buffer() const;
-  std::uint32_t format_pixel_data(std::uint32_t px) const;
 
   // ROM loading
   bool consume_load_rom_request(std::string& rom_path);
