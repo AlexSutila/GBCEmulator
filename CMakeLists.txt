@@ -109,6 +109,10 @@ set(GBC_CORE_SOURCES
     src/debugger/breakpoint.cpp
     src/debugger/debugger.cpp
     src/debugger/print.cpp
+        src/frontend/sdl3/frontend.cpp
+        src/frontend/sdl3/sdl_host.cpp
+        src/frontend/sdl3/gui.cpp
+        src/frontend/sdl3/debugger.cpp
 )
 set(GBC_INCLUDE_DIR
     ${CMAKE_CURRENT_SOURCE_DIR}/includes
@@ -131,7 +135,6 @@ endif()
 
 # Emulator executable
 add_executable(gbc
-    src/frontend/sdl3_frontend.cpp
     main.cpp
     ${GBC_CORE_SOURCES}
 )
