@@ -221,7 +221,7 @@ void SDL3Frontend::handle_keypress(const SDL_Keycode key, const bool pressed) {
 
   // Frontend input
   const auto &binds = gui.get_settings_c().general_keybinds;
-  auto settings = gui.get_settings();
+  auto &settings = gui.get_settings();
 
   // FF toggle
   if (pressed && key == binds[0]) ui_state.fast_forward = !ui_state.fast_forward;

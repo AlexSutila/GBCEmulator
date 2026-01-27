@@ -162,7 +162,7 @@ void GbcImGui::build_settings_window(UiState& state, SDLHost& host) {
   for (auto &s : state.audio_device_names)
     items.push_back(s.c_str());
 
-  int old_audio_idx = state.current_audio_dev_idx;
+  const int old_audio_idx = state.current_audio_dev_idx;
   if (ImGui::Combo("Output device", &state.current_audio_dev_idx,
                    items.data(), static_cast<int>(items.size()))) {
     if (!host.set_audio_device(state.current_audio_dev_idx, state.audio_device_ids, settings.volume)) {
