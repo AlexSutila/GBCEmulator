@@ -39,6 +39,8 @@ def __render_from_url(url):
 def __run_test_set(
     urls: List[str],
     out_path: str,
+    rows: int,
+    cols: int,
     titles: Optional[List[str]] = None,
 ):
     images = [__render_from_url(url) for url in urls]
@@ -47,7 +49,6 @@ def __run_test_set(
     if titles is not None and len(titles) != n:
         raise ValueError("titles must be the same length as urls")
 
-    rows, cols = 2, 3
     fig, axes = plt.subplots(rows, cols, figsize=(4 * cols, 4 * rows))
     axes = axes.ravel()
 
@@ -93,6 +94,8 @@ def run_acid_test_suite():
             'dmg-acid',
             'cgb-acid'
         ],
+        rows=1,
+        cols=2,
         out_path='assets/acid_tests.png'
     )
 
@@ -115,6 +118,8 @@ def run_blargg_cpu_tests():
             'interrupt_time',
             'halt_bug'
         ],
+        rows=2,
+        cols=3,
         out_path='assets/blargg_cpu_mem.png'
     )
 
