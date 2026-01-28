@@ -484,7 +484,7 @@ void PixelProcessingUnit::update_stat() {
 
   /* Condition 1: The LY register is equal to the LYC register */
   const bool cond_a = (ly_.peek() == lyc_.peek()) &&
-                      stat_.int_enabled(PPU::StatIntFlags::LYC_EQ_LY);
+                      stat_.int_enabled(PPU::StatIntFlags::LYC_SEL);
 
   /* Condition 2: We are in HBLANK and the STAT source bit is set */
   const bool cond_b = (stat_.get_mode() == PPU::StatModes::MODE_HBLANK) &&

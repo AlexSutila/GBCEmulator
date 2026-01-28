@@ -39,6 +39,8 @@ def __render_from_url(url):
 def __run_test_set(
     urls: List[str],
     out_path: str,
+    rows: int,
+    cols: int,
     titles: Optional[List[str]] = None,
 ):
     images = [__render_from_url(url) for url in urls]
@@ -47,9 +49,8 @@ def __run_test_set(
     if titles is not None and len(titles) != n:
         raise ValueError("titles must be the same length as urls")
 
-    fig, axes = plt.subplots(1, n, figsize=(4 * n, 4))
-    if n == 1:
-        axes = [axes]
+    fig, axes = plt.subplots(rows, cols, figsize=(4 * cols, 4 * rows))
+    axes = axes.ravel()
 
     for i, (ax, img) in enumerate(zip(axes, images)):
         ax.imshow(img)
@@ -70,7 +71,7 @@ def __run_test_set(
         if titles is not None:
             ax.text(
                 0.5,
-                -0.08,
+                -0.03,
                 titles[i],
                 transform=ax.transAxes,
                 ha="center",
@@ -93,6 +94,8 @@ def run_acid_test_suite():
             'dmg-acid',
             'cgb-acid'
         ],
+        rows=1,
+        cols=2,
         out_path='assets/acid_tests.png'
     )
 
@@ -105,14 +108,18 @@ def run_blargg_cpu_tests():
             'https://github.com/retrio/gb-test-roms/raw/refs/heads/master/mem_timing-2/mem_timing.gb',
             'https://github.com/retrio/gb-test-roms/raw/refs/heads/master/instr_timing/instr_timing.gb',
             'https://github.com/retrio/gb-test-roms/raw/refs/heads/master/interrupt_time/interrupt_time.gb',
+            'https://github.com/retrio/gb-test-roms/raw/refs/heads/master/halt_bug.gb',
         ],
         titles=[
             'cpu_instrs',
             'mem_timing',
             'mem_timing2',
             'instr_timing',
-            'interrupt_time'
+            'interrupt_time',
+            'halt_bug'
         ],
+        rows=2,
+        cols=3,
         out_path='assets/blargg_cpu_mem.png'
     )
 

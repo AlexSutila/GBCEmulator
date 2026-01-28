@@ -22,6 +22,9 @@ struct RegisterFile {
   CpuRegister reg_bc, reg_de, reg_hl, reg_sp;
   CpuFlagsRegister reg_af;
   addr_t reg_pc; // Instruction pointer
+
+  // TODO: Consider EI and RST quirks
+  bool halt_bug_triggered{false};
 };
 
 // Used for compile time register decoding

@@ -146,7 +146,11 @@ void LR35902::do_fetch() {
   // Handle execution breakpoints
   try_brk(reg_file.reg_pc, brk_reason_flags);
   state = CpuStates::STATE_DECODE;
-  reg_file.reg_pc++;
+
+  // If the halt bug was triggered, PC freaks out and doesn't increment
+  if (reg_file.halt_bug_triggered)
+    reg_file.halt_bug_triggered = false;
+  else reg_file.reg_pc++;
 }
 
 /* Parse operands, prepare for execution */
@@ -186,6 +190,8 @@ void LR35902::do_halt() {
    * behavior varies when IME is enabled or disabled. */
   if (!isr.has_value())
     return;
+
+  // Leave halt mode when an interrupt is pending
   sys_.halted = false;
 
   /* If IME is enabled, execution stops until the interrupt is requested, then

@@ -107,20 +107,41 @@ private:
 };
 
 /*
- * Halt processor
+ * Halt processor, though this instruction is quite buggy under certain hardware
+ * conditions, hence we kinda have to pass a million things to it to emulate
+ * these hardware quirks as well.
  */
 class HALT final : public Instruction {
 public:
-  HALT(RegisterFile *reg_file_ptr, AddressBus *bus_ptr, runtime_sys_info &sys)
-      : Instruction(reg_file_ptr, bus_ptr), sys_(sys) {}
+  HALT(RegisterFile *reg_file_ptr, AddressBus *bus_ptr,
+       InterruptMasterEnable &ime, InterruptBits &if_reg, InterruptBits &ie_reg,
+       runtime_sys_info &sys)
+      : Instruction(reg_file_ptr, bus_ptr),
+        ime_(ime),   // Needed to trigger the HALT bug
+        if_(if_reg), // ^^^
+        ie_(ie_reg), // ^^^
+        sys_(sys) {}
   std::size_t exec() override {
+    constexpr byte_t mask = 0x1F; // Mask out unused interrupt bits
+    const bool isr_pending = (if_.peek() & ie_.peek() & mask) != 0;
     sys_.halted = true;
+
+    /* If the IME is disabled and there is no interrupt pending, there is a
+     * hardware bug that causes PC increment to fail for one instruction */
+    if (!ime_.is_enabled() && isr_pending)
+      reg_file->halt_bug_triggered = true;
     return 4;
   }
   std::string describe() override { return std::format("HALT"); }
+
+  /* NOTE: This instruction does not access memory. However, we still do not
+   * want this instruction to take effect and actually place the processor in
+   * HALT mode until the instruction has completed. */
   std::size_t mem_access_t_cycle() override { return 4; }
 
 private:
+  InterruptMasterEnable &ime_;
+  InterruptBits &if_, &ie_;
   runtime_sys_info &sys_;
 };
 
@@ -142,6 +163,8 @@ public:
     return 4;
   }
   std::string describe() override { return std::format("STOP"); }
+
+  // Subject to change??? But same rationale as HALT timing for now.
   std::size_t mem_access_t_cycle() override { return 4; }
 
 private:
