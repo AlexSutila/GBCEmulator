@@ -11,22 +11,22 @@
 #include <atomic>
 
 class SDL3Frontend final : public Frontend {
-  static constexpr int framebuf_height = 144;
-  static constexpr int framebuf_width = 160;
-  static constexpr int framebuf_size = framebuf_width * framebuf_height;
-  static constexpr int scale = 4;
-  static constexpr unsigned black = 0xFF000000;
+  static constexpr int framebuf_height{144};
+  static constexpr int framebuf_width{160};
+  static constexpr int framebuf_size{framebuf_width * framebuf_height};
+  static constexpr int scale{4};
+  static constexpr unsigned black{0xFF000000};
   static constexpr std::array<Joypad::JoypadButton, 8> button_order{
     Joypad::JoypadButton::RIGHT,  Joypad::JoypadButton::LEFT,
     Joypad::JoypadButton::UP,     Joypad::JoypadButton::DOWN,
     Joypad::JoypadButton::A,      Joypad::JoypadButton::B,
     Joypad::JoypadButton::SELECT, Joypad::JoypadButton::START};
-  static constexpr int max_catchup_cycles = 70'224 / 4;
-  static constexpr int target_queue_ms = 20;
+  static constexpr int max_catchup_cycles{70'224 / 4}; // 1/4 second worth of cycles at 4.19MHz
+  static constexpr int target_queue_ms{20};
 
 public:
   SDL3Frontend();
-  ~SDL3Frontend();
+  ~SDL3Frontend() override;
 
   // Frontend Interface Overrides
   void start() override;

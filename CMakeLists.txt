@@ -105,21 +105,28 @@ set(GBC_CORE_SOURCES
     src/cart/mbc/mbc5.cpp
     src/cart/mbc/test_mbc.cpp
     src/cart/mbc/mbc_factory.cpp
+)
 
+## UI/Frontend
+set(GBC_FRONTEND_SOURCES
+    src/frontend/sdl3/frontend.cpp
+    src/frontend/sdl3/sdl_host.cpp
+    src/frontend/sdl3/gui.cpp
+    src/frontend/sdl3/debugger.cpp
+)
+
+## Debugger
+set(GBC_DEBUGGER_SOURCES
     src/debugger/breakpoint.cpp
     src/debugger/debugger.cpp
     src/debugger/print.cpp
-        src/frontend/sdl3/frontend.cpp
-        src/frontend/sdl3/sdl_host.cpp
-        src/frontend/sdl3/gui.cpp
-        src/frontend/sdl3/debugger.cpp
 )
 set(GBC_INCLUDE_DIR
     ${CMAKE_CURRENT_SOURCE_DIR}/includes
 )
 
 set(GBC_RELEASE_OPTIONS
-    -Ofast
+    -O3
     -fvisibility=hidden
 )
 
@@ -137,6 +144,8 @@ endif()
 add_executable(gbc
     main.cpp
     ${GBC_CORE_SOURCES}
+    ${GBC_FRONTEND_SOURCES}
+    ${GBC_DEBUGGER_SOURCES}
 )
 target_link_libraries(gbc
     PRIVATE SDL3::SDL3

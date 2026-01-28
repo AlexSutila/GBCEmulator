@@ -1,7 +1,5 @@
 #include "frontend/sdl3/debugger.hpp"
-
 #include <imgui.h>
-
 #include "debugger/print.hpp"
 
 

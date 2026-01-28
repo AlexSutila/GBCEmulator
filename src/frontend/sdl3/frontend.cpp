@@ -179,7 +179,7 @@ void SDL3Frontend::emulation_thread_fn(const std::stop_token& st, const cart& c,
 
     // If we are ahead of the target (and not fast-forwarding), sleep briefly.
     // 1ms should be short enough to prevent underruns
-    if (const int queued_ms = queued_bytes * 1000 / (sizeof(float) * 2 * 48000);
+    if (const int queued_ms = static_cast<int>(queued_bytes * 1000 / (sizeof(float) * 2 * 48000));
       !ff && queued_ms > target_queue_ms) {
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
       continue;

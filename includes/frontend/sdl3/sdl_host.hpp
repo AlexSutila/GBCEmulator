@@ -34,12 +34,12 @@ public:
   void clear_audio_stream() const {SDL_ClearAudioStream(audio_stream);}
 
 private:
-  SDL_Window* window = nullptr;
-  SDL_Renderer* renderer = nullptr;
-  SDL_Texture* texture = nullptr;
+  SDL_Window* window{nullptr};
+  SDL_Renderer* renderer{nullptr};
+  SDL_Texture* texture{nullptr};
 
-  SDL_AudioDeviceID audio_device = 0;
-  SDL_AudioStream* audio_stream = nullptr;
+  SDL_AudioDeviceID audio_device{0};
+  SDL_AudioStream* audio_stream{nullptr};
   SDL_AudioSpec audio_spec{};
   mutable std::mutex audio_mutex;
 };

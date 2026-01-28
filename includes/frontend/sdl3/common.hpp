@@ -19,15 +19,14 @@ namespace fs = std::filesystem;
  * 2. Update the macro below
  */
 struct Settings {
-  float volume = 0.5f;
-  bool force_mono_dmg = false;
-  int keybind_preset_index = 0;
-  std::string rom_dir = ".";
-  std::array<SDL_Keycode, 8> keybinds = {SDLK_D,         SDLK_A,     SDLK_W,
-                                         SDLK_S,         SDLK_J,     SDLK_K,
-                                         SDLK_BACKSPACE, SDLK_RETURN};
-  std::array<SDL_Keycode, 5> general_keybinds = {
-    SDLK_G, SDLK_F, SDLK_EQUALS, SDLK_MINUS, SDLK_M};
+  float volume{0.5f};
+  bool force_mono_dmg{false};
+  int keybind_preset_index{};
+  std::string rom_dir{"."};
+  std::array<SDL_Keycode, 8> keybinds{SDLK_D,         SDLK_A,     SDLK_W,
+                                      SDLK_S,         SDLK_J,     SDLK_K,
+                                      SDLK_BACKSPACE, SDLK_RETURN};
+  std::array<SDL_Keycode, 5> general_keybinds{SDLK_G, SDLK_F, SDLK_EQUALS, SDLK_MINUS, SDLK_M};
   std::vector<std::string> recent_roms;
   static Settings load(const std::string &filename = ".gbc.config.json");
   void save(const std::string &filename = ".gbc.config.json") const;
@@ -98,28 +97,27 @@ struct InputState {
 };
 
 struct UiState {
-  bool show_settings = false;
-  bool show_debug = false;
-  bool show_breakpoints = false;
-  bool show_keybinds = false;
-  bool fast_forward = false;
+  bool show_settings{false};
+  bool show_debug{false};
+  bool show_breakpoints{false};
+  bool show_keybinds{false};
+  bool fast_forward{false};
 
   // File requests
-  bool request_load_rom = false;
+  bool request_load_rom{false};
   std::string load_rom_path;
-  bool request_load_bios = false;
+  bool request_load_bios{false};
   std::string load_bios_path;
   bool request_quit = false;
 
   // Audio Device Cache
   std::vector<std::string> audio_device_names;
   std::vector<SDL_AudioDeviceID> audio_device_ids;
-  int current_audio_dev_idx = 0;
+  int current_audio_dev_idx{};
 
   // Miscellaneous
   std::string status_message;
   std::optional<std::size_t> waiting_for_bind{};
-
 };
 
 #endif //GBC_COMMON_HPP
