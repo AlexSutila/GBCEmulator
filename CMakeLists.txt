@@ -121,6 +121,15 @@ set(GBC_DEBUGGER_SOURCES
     src/debugger/debugger.cpp
     src/debugger/print.cpp
 )
+
+## UI/Frontend
+set(GBC_FRONTEND_SOURCES
+    src/frontend/sdl3/frontend.cpp
+    src/frontend/sdl3/sdl_host.cpp
+    src/frontend/sdl3/gui.cpp
+    src/frontend/sdl3/debugger.cpp
+)
+
 set(GBC_INCLUDE_DIR
     ${CMAKE_CURRENT_SOURCE_DIR}/includes
 )
