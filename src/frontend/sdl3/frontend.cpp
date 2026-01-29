@@ -1,13 +1,12 @@
 #include "frontend/sdl3/frontend.hpp"
 
-SDL3Frontend::SDL3Frontend()
-  : host(framebuf_width, framebuf_height, scale) {
+SDL3Frontend::SDL3Frontend() : host(framebuf_width, framebuf_height, scale) {
   host.init_audio();
   gui.init(host);
   framebuffers[0] =
-    std::make_unique<std::uint32_t[]>(framebuf_height * framebuf_width);
+      std::make_unique<std::uint32_t[]>(framebuf_height * framebuf_width);
   framebuffers[1] =
-    std::make_unique<std::uint32_t[]>(framebuf_height * framebuf_width);
+      std::make_unique<std::uint32_t[]>(framebuf_height * framebuf_width);
   running = true;
   clear(black);
 }
@@ -47,7 +46,8 @@ void SDL3Frontend::clear(const std::uint32_t c) {
       buffer[i] = c;
 }
 
-void SDL3Frontend::queue_audio_samples(const float *samples, const size_t count) {
+void SDL3Frontend::queue_audio_samples(const float *samples,
+                                       const size_t count) {
   host.queue_audio(samples, count);
 }
 
@@ -102,7 +102,8 @@ void SDL3Frontend::process_events() {
     }
     // If we got here, the GUI didn't want it
     if (e.type == SDL_EVENT_KEY_DOWN || e.type == SDL_EVENT_KEY_UP) {
-      // Update the atomic input state for the emulator thread and handle general frontend input
+      // Update the atomic input state for the emulator thread and handle
+      // general frontend input
       const bool pressed = (e.type == SDL_EVENT_KEY_DOWN);
       handle_keypress(e.key.key, pressed);
     }
@@ -112,9 +113,10 @@ void SDL3Frontend::process_events() {
 void SDL3Frontend::render_frame() {
   // --- PHASE 1: PREPARE TEXTURE ---
   // 1. Get the raw buffer from the emulator thread
-  const std::uint32_t* raw_pixels = get_front_buffer();
+  const std::uint32_t *raw_pixels = get_front_buffer();
   // 2. Send to GPU
-  host.update_texture(raw_pixels, 160, 144, is_cgb, gui.get_settings_c().force_mono_dmg);
+  host.update_texture(raw_pixels, 160, 144, is_cgb,
+                      gui.get_settings_c().force_mono_dmg);
 
   // --- PHASE 2: UI COMPOSITION ---
   // 1. Start the ImGui frame
@@ -147,7 +149,8 @@ void SDL3Frontend::render_frame() {
   host.present();
 }
 
-void SDL3Frontend::emulation_thread_fn(const std::stop_token& st, const cart& c, const std::optional<std::string>& bios) {
+void SDL3Frontend::emulation_thread_fn(const std::stop_token &st, const cart &c,
+                                       const std::optional<std::string> &bios) {
   bool ff = false;
   clear(black);
 
@@ -156,9 +159,8 @@ void SDL3Frontend::emulation_thread_fn(const std::stop_token& st, const cart& c,
   host.clear_audio_stream();
 
   /* Re-instantiate emulator instance */
-  gbc = bios.has_value()
-             ? std::make_unique<GameBoyColor>(*this, bios.value())
-             : std::make_unique<GameBoyColor>(*this);
+  gbc = bios.has_value() ? std::make_unique<GameBoyColor>(*this, bios.value())
+                         : std::make_unique<GameBoyColor>(*this);
   gbc->insert_cartridge(c);
   auto callback = [this, st]() -> Debug::BreakReason {
     return debugger.on_breakpoint(st, gbc);
@@ -179,8 +181,9 @@ void SDL3Frontend::emulation_thread_fn(const std::stop_token& st, const cart& c,
 
     // If we are ahead of the target (and not fast-forwarding), sleep briefly.
     // 1ms should be short enough to prevent underruns
-    if (const int queued_ms = static_cast<int>(queued_bytes * 1000 / (sizeof(float) * 2 * 48000));
-      !ff && queued_ms > target_queue_ms) {
+    if (const int queued_ms =
+            static_cast<int>(queued_bytes * 1000 / (sizeof(float) * 2 * 48000));
+        !ff && queued_ms > target_queue_ms) {
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
       continue;
     }
@@ -224,9 +227,11 @@ void SDL3Frontend::handle_keypress(const SDL_Keycode key, const bool pressed) {
   auto &settings = gui.get_settings();
 
   // FF toggle
-  if (pressed && key == binds[0]) ui_state.fast_forward = !ui_state.fast_forward;
+  if (pressed && key == binds[0])
+    ui_state.fast_forward = !ui_state.fast_forward;
   // FF Hold (overrides toggle)
-  if (key == binds[1]) ui_state.fast_forward = pressed;
+  if (key == binds[1])
+    ui_state.fast_forward = pressed;
   // Volume up
   if (pressed && key == binds[2]) {
     settings.volume = std::min(1.5f, settings.volume + 0.05f);
@@ -238,7 +243,8 @@ void SDL3Frontend::handle_keypress(const SDL_Keycode key, const bool pressed) {
     host.set_volume(settings.volume);
   }
   // Monochrome
-  if (pressed && key == binds[4]) settings.force_mono_dmg = !settings.force_mono_dmg;
+  if (pressed && key == binds[4])
+    settings.force_mono_dmg = !settings.force_mono_dmg;
 }
 
 byte_t SDL3Frontend::button_mask_for_key(const SDL_Keycode key) const {
@@ -264,7 +270,8 @@ bool SDL3Frontend::consume_load_rom_request(std::string &rom_path) {
   return true;
 }
 
-bool SDL3Frontend::consume_load_bios_request(std::optional<std::string> &bios_path) {
+bool SDL3Frontend::consume_load_bios_request(
+    std::optional<std::string> &bios_path) {
   std::lock_guard lock(ui_mutex);
   if (!ui_state.request_load_bios)
     return false;
@@ -280,4 +287,3 @@ void SDL3Frontend::set_status_message(std::string message) {
   std::lock_guard lock(ui_mutex);
   ui_state.status_message = std::move(message);
 }
-

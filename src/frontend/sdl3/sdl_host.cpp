@@ -1,12 +1,15 @@
 #include "frontend/sdl3/sdl_host.hpp"
+#include "SDL3/SDL_render.h"
 #include "ppu/palette.hpp"
+#include <algorithm>
+#include <cmath>
 
 SDLHost::SDLHost(const int width, const int height, const int scale) {
   if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO))
     throw std::runtime_error(SDL_GetError());
 
-  window = SDL_CreateWindow("GBC", width * scale,
-                            height * scale, SDL_WINDOW_RESIZABLE);
+  window = SDL_CreateWindow("GBC", width * scale, height * scale,
+                            SDL_WINDOW_RESIZABLE);
   if (!window)
     throw std::runtime_error(SDL_GetError());
 
@@ -19,7 +22,7 @@ SDLHost::SDLHost(const int width, const int height, const int scale) {
                               SDL_TEXTUREACCESS_STREAMING, width, height);
   if (!texture)
     throw std::runtime_error(SDL_GetError());
-  SDL_SetTextureScaleMode(texture, SDL_ScaleMode::SDL_SCALEMODE_PIXELART);
+  SDL_SetTextureScaleMode(texture, SDL_ScaleMode::SDL_SCALEMODE_NEAREST);
 }
 
 SDLHost::~SDLHost() {
@@ -36,15 +39,18 @@ SDLHost::~SDLHost() {
 }
 
 /* Rendering */
-void SDLHost::update_texture(const std::uint32_t *pixels, const int width, const int height,
-                                const std::atomic<bool>& is_cgb, const bool force_mono) const {
+void SDLHost::update_texture(const std::uint32_t *pixels, const int width,
+                             const int height, const std::atomic<bool> &is_cgb,
+                             const bool force_mono) const {
   uint32_t *texturePixels{};
   int pitch{};
-  SDL_LockTexture(texture, nullptr, reinterpret_cast<void **>(&texturePixels), &pitch);
+  SDL_LockTexture(texture, nullptr, reinterpret_cast<void **>(&texturePixels),
+                  &pitch);
   pitch /= sizeof(uint32_t);
   for (int y = 0; y < height; ++y)
     for (int x = 0; x < width; ++x) {
-      const auto c = format_pixel_data(pixels[y * width + x], is_cgb.load(), force_mono);
+      const auto c =
+          format_pixel_data(pixels[y * width + x], is_cgb.load(), force_mono);
       texturePixels[y * pitch + x] = c;
     }
   SDL_UnlockTexture(texture);
@@ -53,17 +59,33 @@ void SDLHost::update_texture(const std::uint32_t *pixels, const int width, const
 void SDLHost::draw_texture(const float menu_bar_height) const {
   int window_w{}, window_h{};
   SDL_GetWindowSize(window, &window_w, &window_h);
-  const SDL_FRect dst_rect{0.0f,              // x
-                           menu_bar_height,   // y offset by menu bar
-                           static_cast<float>(window_w), (static_cast<float>(window_h) - menu_bar_height)};
+  const float avail_w = static_cast<float>(window_w);
+  const float avail_h = static_cast<float>(window_h) - menu_bar_height;
 
+  // Scale texture so it doesn't warp with window size
+  float tex_w{}, tex_h{};
+  SDL_GetTextureSize(texture, &tex_w, &tex_h);
+
+  // Fractional scale is fine, as long as its uniform
+  float scale = std::min(avail_w / tex_w, avail_h / tex_h);
+  const float dst_w = tex_w * scale;
+  const float dst_h = tex_h * scale;
+
+  const SDL_FRect dst_rect{
+      (avail_w - dst_w) * 0.5f,                   // center X
+      menu_bar_height + (avail_h - dst_h) * 0.5f, // Center Y under menu
+      dst_w, dst_h
+  };
   SDL_RenderTexture(renderer, texture, nullptr, &dst_rect);
 }
 
-std::uint32_t SDLHost::format_pixel_data(const std::uint32_t px, const bool is_cgb, const bool force_mono) {
+std::uint32_t SDLHost::format_pixel_data(const std::uint32_t px,
+                                         const bool is_cgb,
+                                         const bool force_mono) {
   constexpr std::uint32_t alpha_mask = 0xFF000000;
-  /* We are abusing the alpha bits to store DMG color palette indecision CGB mode
-   * will always be colored so the bits as are just returned w alpha bits set */
+  /* We are abusing the alpha bits to store DMG color palette indecision CGB
+   * mode will always be colored so the bits as are just returned w alpha bits
+   * set */
 
   if (!is_cgb && force_mono) {
     const auto mono_pal_idx = static_cast<byte_t>((px >> 24) & 0xFF);
@@ -108,12 +130,14 @@ void SDLHost::queue_audio(const float *samples, const std::size_t count) const {
     return;
 
   if (const int byte_count = static_cast<int>(count * sizeof(float));
-    !SDL_PutAudioStreamData(audio_stream, samples, byte_count)) {
+      !SDL_PutAudioStreamData(audio_stream, samples, byte_count)) {
     SDL_ClearAudioStream(audio_stream);
   }
 }
 
-bool SDLHost::set_audio_device(const int device_index, const std::vector<SDL_AudioDeviceID>& ids, const float vol) {
+bool SDLHost::set_audio_device(const int device_index,
+                               const std::vector<SDL_AudioDeviceID> &ids,
+                               const float vol) {
   if (device_index < 0 || device_index >= static_cast<int>(ids.size()))
     return false;
 
@@ -130,7 +154,8 @@ bool SDLHost::set_audio_device(const int device_index, const std::vector<SDL_Aud
     audio_device = 0;
   }
 
-  // Open new device (can be a physical device id or SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK)
+  // Open new device (can be a physical device id or
+  // SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK)
   audio_device = SDL_OpenAudioDevice(desired, &audio_spec);
   if (!audio_device) {
     // set_status_message(SDL_GetError());
@@ -148,7 +173,8 @@ bool SDLHost::set_audio_device(const int device_index, const std::vector<SDL_Aud
   return true;
 }
 
-void SDLHost::refresh_audio_devices(std::vector<std::string>& names, std::vector<SDL_AudioDeviceID>& ids) {
+void SDLHost::refresh_audio_devices(std::vector<std::string> &names,
+                                    std::vector<SDL_AudioDeviceID> &ids) {
   names.clear();
   ids.clear();
 
