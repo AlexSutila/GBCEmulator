@@ -105,6 +105,10 @@ PixelProcessingUnit::PixelProcessingUnit(
   /* Configure PPU to initial state, doesn't technically happen until PPU is
    * enabled but we do it anyway just because. */
   reset();
+
+  /* This needs to be initialized to false by default, but the actual high/low
+   * value of this signal is persistent across PPU enable and disable. */
+  stat_irq_signal_edge = false;
 }
 
 bool PixelProcessingUnit::should_advance_ly() {
@@ -273,6 +277,10 @@ void PixelProcessingUnit::do_disabled() {
     fe_.clear(); // This is slow
     reset();
 
+    // Disabling the PPU impacts the other PPU related registers
+    stat_.set_mode(PPU::StatModes::MODE_HBLANK);
+    ly_.write(0); // Start at first scanline
+
     /* Reset PPU state only once when it is disabled. */
     flush_on_disable = false;
   }
@@ -292,6 +300,11 @@ void PixelProcessingUnit::do_oam_scan() {
     cur_scanline_clks = cur_mode_clks = 0;
     total_mode_clks = oam_t_cycles;
     scanline_153_bug = false;
+
+    /* Handle strange timing on first scanline of PPU being enabled. The modes
+     * which follow OAM are supposedly unimpacted. */
+    if (ppu_enable_oam_bug) [[unlikely]]
+      total_mode_clks = oam_t_cycles - 2; // Hardware bug
 
     /* State entry always indicates the start of a new scanline, but if the LY
      * register currently reads zero, we have also begun a new frame too. */
@@ -315,7 +328,7 @@ void PixelProcessingUnit::do_oam_scan() {
    * Check one sprite every two clocks. Because we are indexing object attribute
    * memory array directly, we don't need to consider the base address of object
    * attribute memory. */
-  if (cur_mode_clks % 2 == 0) {
+  if (cur_mode_clks % 2 == 0 && !ppu_enable_oam_bug) {
     const addr_t sprite_base_offset = sprite_size_bytes * sprites_searched;
     const byte_t y_pos = oam[sprite_base_offset + oam_y_offset];
     const byte_t x_pos = oam[sprite_base_offset + oam_x_offset];
@@ -364,6 +377,9 @@ void PixelProcessingUnit::do_oam_scan() {
   // State transition logic
   state = modes::MODE_DRAWING;
   total_mode_clks.reset();
+
+  if (ppu_enable_oam_bug) [[unlikely]]
+    ppu_enable_oam_bug = false;
 }
 
 void PixelProcessingUnit::do_draw() {
@@ -480,7 +496,13 @@ void PixelProcessingUnit::update_stat() {
   /* The actual firing of the interrupt is fired on a rising edge of an internal
    * signal. That signal is set based on various conditions. */
   const bool old = stat_irq_signal_edge;
-  stat_.set_mode(state);
+
+  /* Handle STAT mode bits reading wrong value for first scanline upon the PPU
+   * being enabled after not being enabled. */
+  if (ppu_enable_oam_bug && state == PPU::StatModes::MODE_OAM_SCAN) [[unlikely]]
+    stat_.set_mode(PPU::StatModes::MODE_HBLANK); // Hardware bug
+  else
+    stat_.set_mode(state);
 
   /* Condition 1: The LY register is equal to the LYC register */
   const bool cond_a = (ly_.peek() == lyc_.peek()) &&
@@ -508,7 +530,7 @@ void PixelProcessingUnit::update_stat() {
 }
 
 void PixelProcessingUnit::reset() {
-  using namespace PPU;
+  ppu_enable_oam_bug = true;
   flush_on_disable = true;
   fetcher->reset();
   obj_fifo.flush();
@@ -520,12 +542,9 @@ void PixelProcessingUnit::reset() {
 
   /* Configure status MMIO register initial state. The state bits read zero
    * (HBLANK) when the PPU is disabled via bit zero of the LCDC register. */
-  state = StatModes::MODE_OAM_SCAN; // PPU itself always starts in OAM SCAN
-  stat_.set_mode(StatModes::MODE_HBLANK);
+  state = PPU::StatModes::MODE_OAM_SCAN; // PPU itself always starts in OAM SCAN
+  stat_.set_mode(PPU::StatModes::MODE_HBLANK);
   ly_.reset();
-
-  /* Reset edge that triggers stat IRQs */
-  stat_irq_signal_edge = false;
 }
 
 void PixelProcessingUnit::step() {

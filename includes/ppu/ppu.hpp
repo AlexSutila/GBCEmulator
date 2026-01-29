@@ -73,6 +73,10 @@ private:
   /* For tracking locational data for sprites during OAM search */
   std::size_t sprites_searched{};
   std::vector<Sprite> oam_data{};
+  /* For the first frame upon the PPU being enabled, the first scanline has
+   * strange timings and OAM is 2 cycles short. TODO: This first frame is not
+   * actually pushed to the LCD to prevent visual artifacts. */
+  bool ppu_enable_oam_bug{};
 
   /* Coloring and palette configuration */
   std::uint32_t get_bgwin_rgb(const pixel &px) const;

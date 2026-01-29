@@ -143,8 +143,8 @@ void LR35902::do_fetch() {
   } else
     ins_ = ins.get();
 
-  // Handle execution breakpoints
-  try_brk(reg_file.reg_pc, brk_reason_flags);
+  // Save this to handle execution breakpoints
+  ins_base_addr = reg_file.reg_pc;
   state = CpuStates::STATE_DECODE;
 
   // If the halt bug was triggered, PC freaks out and doesn't increment
@@ -159,6 +159,9 @@ void LR35902::do_decode() {
   total_ins_clks.reset();
   cur_ins_clks = 0;
   ins_->parse();
+
+  // This must happen after `ins_->parse()` for correct operands
+  try_brk(ins_base_addr, brk_reason_flags);
 }
 
 /* Execute instruction on critical mem-access clock cycle */

@@ -78,7 +78,9 @@ private:
   void do_execute();
   void do_halt();
 
-  Instruction *ins_{}; // Reference to current ins
+  addr_t ins_base_addr{}; // For debugger reference
+  Instruction *ins_{};    // Reference to current ins
+
   std::optional<std::size_t> total_ins_clks{};
   std::size_t cur_ins_clks{};
 };
