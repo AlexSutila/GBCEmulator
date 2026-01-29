@@ -63,6 +63,7 @@ public:
   std::string describe() override {
     return std::format("LD {}, HL", to_string<dst>());
   }
+  std::size_t mem_access_t_cycle() override { return 4; }
 };
 
 /*
@@ -81,6 +82,7 @@ public:
   std::string describe() override {
     return std::format("LD {}, HL", to_string<src>());
   }
+  std::size_t mem_access_t_cycle() override { return 4; }
 };
 
 /*
@@ -102,7 +104,7 @@ public:
     const addr_t addr = reg_file->reg_pc++;
     imm = bus->read_byte(addr);
   }
-  std::size_t mem_access_t_cycle() override { return 4; }
+  std::size_t mem_access_t_cycle() override { return 8; }
 
 private:
   byte_t imm;
@@ -124,6 +126,7 @@ public:
   std::string describe() override {
     return std::format("LD A, {}", to_string<src>());
   }
+  std::size_t mem_access_t_cycle() override { return 4; }
 };
 
 /*
@@ -146,7 +149,7 @@ public:
     const byte_t msb = bus->read_byte(reg_file->reg_pc++);
     addr = (msb << 8) | lsb;
   }
-  std::size_t mem_access_t_cycle() override { return 8; }
+  std::size_t mem_access_t_cycle() override { return 12; }
 
 private:
   addr_t addr;
@@ -168,6 +171,7 @@ public:
   std::string describe() override {
     return std::format("LD {}, A", to_string<dst>());
   }
+  std::size_t mem_access_t_cycle() override { return 4; }
 };
 
 /*
@@ -190,7 +194,7 @@ public:
     const byte_t msb = bus->read_byte(reg_file->reg_pc++);
     addr = (msb << 8) | lsb;
   }
-  std::size_t mem_access_t_cycle() override { return 8; }
+  std::size_t mem_access_t_cycle() override { return 12; }
 
 private:
   addr_t addr;
@@ -212,7 +216,7 @@ public:
     return std::format("LD A, {}", static_cast<int>(addr));
   }
   void parse() override { addr = 0xFF00 | bus->read_byte(reg_file->reg_pc++); }
-  std::size_t mem_access_t_cycle() override { return 4; }
+  std::size_t mem_access_t_cycle() override { return 8; }
 
 private:
   addr_t addr;
@@ -234,7 +238,7 @@ public:
     return std::format("LD {}, A", static_cast<int>(addr));
   }
   void parse() override { addr = 0xFF00 | bus->read_byte(reg_file->reg_pc++); }
-  std::size_t mem_access_t_cycle() override { return 4; }
+  std::size_t mem_access_t_cycle() override { return 8; }
 
 private:
   addr_t addr;
@@ -253,6 +257,7 @@ public:
     return 8;
   }
   std::string describe() override { return std::format("LD C, A"); }
+  std::size_t mem_access_t_cycle() override { return 4; }
 };
 
 /*
@@ -269,6 +274,7 @@ public:
     return 8;
   }
   std::string describe() override { return std::format("LDH A, C"); }
+  std::size_t mem_access_t_cycle() override { return 4; }
 };
 
 /*
@@ -288,6 +294,7 @@ public:
     return 8;
   }
   std::string describe() override { return std::format("LDI HL, A"); }
+  std::size_t mem_access_t_cycle() override { return 4; }
 };
 
 /*
@@ -307,6 +314,7 @@ public:
     return 8;
   }
   std::string describe() override { return std::format("LDI A, HL"); }
+  std::size_t mem_access_t_cycle() override { return 4; }
 };
 
 /*
@@ -326,6 +334,7 @@ public:
     return 8;
   }
   std::string describe() override { return std::format("LDD HL, A"); }
+  std::size_t mem_access_t_cycle() override { return 4; }
 };
 
 /*
@@ -345,6 +354,7 @@ public:
     return 8;
   }
   std::string describe() override { return std::format("LDD A, HL"); }
+  std::size_t mem_access_t_cycle() override { return 4; }
 };
 
 /*

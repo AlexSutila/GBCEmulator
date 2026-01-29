@@ -96,6 +96,7 @@ public:
     return 8;
   }
   std::string describe() override { return std::format("ADD A, HL"); }
+  std::size_t mem_access_t_cycle() override { return 4; }
 };
 
 /*
@@ -199,6 +200,7 @@ public:
     return 8;
   }
   std::string describe() override { return std::format("ADC A, HL"); }
+  std::size_t mem_access_t_cycle() override { return 4; }
 };
 
 /*
@@ -284,6 +286,7 @@ public:
     return 8;
   }
   std::string describe() override { return std::format("SUB A, HL"); }
+  std::size_t mem_access_t_cycle() override { return 4; }
 };
 
 /*
@@ -390,6 +393,7 @@ public:
     return 8;
   }
   std::string describe() override { return std::format("SBC A, HL"); }
+  std::size_t mem_access_t_cycle() override { return 4; }
 };
 
 /*
@@ -472,6 +476,7 @@ public:
     return 8;
   }
   std::string describe() override { return std::format("AND A, HL"); }
+  std::size_t mem_access_t_cycle() override { return 4; }
 };
 
 /*
@@ -554,6 +559,7 @@ public:
     return 8;
   }
   std::string describe() override { return std::format("XOR A, HL"); }
+  std::size_t mem_access_t_cycle() override { return 4; }
 };
 
 /*
@@ -636,6 +642,7 @@ public:
     return 8;
   }
   std::string describe() override { return std::format("OR A, HL"); }
+  std::size_t mem_access_t_cycle() override { return 4; }
 };
 
 /*
@@ -712,6 +719,7 @@ public:
     return 8;
   }
   std::string describe() override { return std::format("CP A, HL"); }
+  std::size_t mem_access_t_cycle() override { return 4; }
 };
 
 /*
@@ -766,7 +774,7 @@ public:
     return 12;
   }
   std::size_t mem_access_t_cycle() override {
-    return state == InstrStates::INSTR_STATE_READ ? 0 : 4;
+    return state == InstrStates::INSTR_STATE_READ ? 4 : 8;
   }
   std::string describe() override { return std::format("INC HL"); }
   void parse() override { state = InstrStates::INSTR_STATE_READ; }
@@ -829,7 +837,7 @@ public:
     return 12;
   }
   std::size_t mem_access_t_cycle() override {
-    return state == InstrStates::INSTR_STATE_READ ? 0 : 4;
+    return state == InstrStates::INSTR_STATE_READ ? 4 : 8;
   }
   std::string describe() override { return std::format("DEC HL"); }
   void parse() override { state = InstrStates::INSTR_STATE_READ; }

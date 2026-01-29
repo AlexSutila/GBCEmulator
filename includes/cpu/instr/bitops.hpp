@@ -196,7 +196,7 @@ public:
     return 16;
   }
   std::size_t mem_access_t_cycle() override {
-    return state == InstrStates::INSTR_STATE_READ ? 4 : 8;
+    return state == InstrStates::INSTR_STATE_READ ? 8 : 12;
   }
   std::string describe() override { return std::format("RLC HL"); }
   void parse() override { state = InstrStates::INSTR_STATE_READ; }
@@ -259,7 +259,7 @@ public:
     return 16;
   }
   std::size_t mem_access_t_cycle() override {
-    return state == InstrStates::INSTR_STATE_READ ? 4 : 8;
+    return state == InstrStates::INSTR_STATE_READ ? 8 : 12;
   }
   std::string describe() override { return std::format("RL HL"); }
   void parse() override { state = InstrStates::INSTR_STATE_READ; }
@@ -321,7 +321,7 @@ public:
     return 16;
   }
   std::size_t mem_access_t_cycle() override {
-    return state == InstrStates::INSTR_STATE_READ ? 4 : 8;
+    return state == InstrStates::INSTR_STATE_READ ? 8 : 12;
   }
   std::string describe() override { return std::format("RRC HL"); }
   void parse() override { state = InstrStates::INSTR_STATE_READ; }
@@ -384,7 +384,7 @@ public:
     return 16;
   }
   std::size_t mem_access_t_cycle() override {
-    return state == InstrStates::INSTR_STATE_READ ? 4 : 8;
+    return state == InstrStates::INSTR_STATE_READ ? 8 : 12;
   }
   std::string describe() override { return std::format("RR HL"); }
   void parse() override { state = InstrStates::INSTR_STATE_READ; }
@@ -445,7 +445,7 @@ public:
     return 16;
   }
   std::size_t mem_access_t_cycle() override {
-    return state == InstrStates::INSTR_STATE_READ ? 4 : 8;
+    return state == InstrStates::INSTR_STATE_READ ? 8 : 12;
   }
   std::string describe() override { return std::format("SLA HL"); }
   void parse() override { state = InstrStates::INSTR_STATE_READ; }
@@ -505,7 +505,7 @@ public:
     return 16;
   }
   std::size_t mem_access_t_cycle() override {
-    return state == InstrStates::INSTR_STATE_READ ? 4 : 8;
+    return state == InstrStates::INSTR_STATE_READ ? 8 : 12;
   }
   std::string describe() override { return std::format("SLA HL"); }
   void parse() override { state = InstrStates::INSTR_STATE_READ; }
@@ -564,7 +564,7 @@ public:
     return 16;
   }
   std::size_t mem_access_t_cycle() override {
-    return state == InstrStates::INSTR_STATE_READ ? 4 : 8;
+    return state == InstrStates::INSTR_STATE_READ ? 8 : 12;
   }
   std::string describe() override { return std::format("SWAP HL"); }
   void parse() override { state = InstrStates::INSTR_STATE_READ; }
@@ -624,7 +624,7 @@ public:
     return 16;
   }
   std::size_t mem_access_t_cycle() override {
-    return state == InstrStates::INSTR_STATE_READ ? 4 : 8;
+    return state == InstrStates::INSTR_STATE_READ ? 8 : 12;
   }
   std::string describe() override { return std::format("SRL HL"); }
   void parse() override { state = InstrStates::INSTR_STATE_READ; }
@@ -672,7 +672,7 @@ public:
   std::string describe() override {
     return std::format("BIT {}, HL", static_cast<int>(bit));
   }
-  std::size_t mem_access_t_cycle() override { return 4; }
+  std::size_t mem_access_t_cycle() override { return 8; }
 };
 
 template <byte_t bit, Register8Bit dst> class RES_N_X final : public Instruction {
@@ -708,7 +708,7 @@ public:
     return 16;
   }
   std::size_t mem_access_t_cycle() override {
-    return state == InstrStates::INSTR_STATE_READ ? 4 : 8;
+    return state == InstrStates::INSTR_STATE_READ ? 8 : 12;
   }
   std::string describe() override {
     return std::format("RST {}, HL", static_cast<int>(bit));
@@ -753,7 +753,7 @@ public:
     return 16;
   }
   std::size_t mem_access_t_cycle() override {
-    return state == InstrStates::INSTR_STATE_READ ? 4 : 8;
+    return state == InstrStates::INSTR_STATE_READ ? 8 : 12;
   }
   std::string describe() override {
     return std::format("SET {}, HL", static_cast<int>(bit));
