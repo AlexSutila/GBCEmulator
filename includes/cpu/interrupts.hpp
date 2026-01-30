@@ -121,6 +121,7 @@ public:
         flag(int_flag), // Denotes which IE and IF flag bit is used
         vec(int_vector) {}
   void incur_halt_delay(); // Invoked by CPU to incur the when halted
+  std::string describe() override;
   std::size_t exec() override;
 
 private:

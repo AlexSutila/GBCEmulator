@@ -1,4 +1,6 @@
 #include "cpu/interrupts.hpp"
+#include <format>
+#include <stdexcept>
 
 /* Most unused bits read one because there is no physical hardware attached to
  * them. However, for IE, there is an exception, hence allow pulling the unused
@@ -53,6 +55,31 @@ bool InterruptMasterEnable::is_enabled() const {
 void InterruptMasterEnable::step() {
   if (ime_state == IME_DELAYED)
     ime_state = IME_ENABLED;
+}
+
+std::string ISR::describe() {
+  char const *vec_str{};
+
+  switch (vec) {
+  case InterruptVector::INT_VECTOR_JOYPAD:
+    vec_str = "JOYPAD";
+    break;
+  case InterruptVector::INT_VECTOR_SERIAL:
+    vec_str = "SERIAL";
+    break;
+  case InterruptVector::INT_VECTOR_TIMER:
+    vec_str = "TIMER";
+    break;
+  case InterruptVector::INT_VECTOR_LCD:
+    vec_str = "STAT (LCD)";
+    break;
+  case InterruptVector::INT_VECTOR_VBLANK:
+    vec_str = "VBLANK";
+    break;
+  default:
+    throw std::runtime_error("ISR::describe() - invalid ISR");
+  }
+  return std::format("ISR ({})", vec_str);
 }
 
 /* See details about interrupt service routines in `interrupts.hpp` */
