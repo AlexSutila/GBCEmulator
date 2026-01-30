@@ -68,9 +68,8 @@ void SDL3Frontend::start() {
         cart cart_ctx = load_cart_fs(rom_path.c_str());
         emulation_thread = std::jthread(&SDL3Frontend::emulation_thread_fn,
                                         this, cart_ctx, bios_path);
-        set_status_message(std::format("Loaded ROM: {}", rom_path));
       } catch (std::exception &e) {
-        set_status_message(std::format("Failed to load ROM: {}", e.what()));
+        Logger::push(LogLevel::Warning, "ROM", "Failed to load ROM", e.what());
       }
     }
 
@@ -166,8 +165,7 @@ void SDL3Frontend::emulation_thread_fn(const std::stop_token &st, const cart &c,
       auto bios_rom = BootROM(bios.value());
       gbc = std::make_unique<GameBoyColor>(*this, bios_rom);
     } catch (std::runtime_error &e) {
-      GbcImGui::push_notification(ui_state, LogLevel::Warning, "BIOS",
-        "Failed to load BIOS",e.what());
+      Logger::push(LogLevel::Warning, "BIOS", "Failed to load BIOS", e.what());
       gui.get_settings().prev_bios_path = "";
       gbc = std::make_unique<GameBoyColor>(*this);
     }
@@ -295,10 +293,4 @@ bool SDL3Frontend::consume_load_bios_request(
 
   gui.update_bios_path(ui_state.load_bios_path);
   return true;
-}
-
-/* Misc. helpers. Consider future removal */
-void SDL3Frontend::set_status_message(std::string message) {
-  std::lock_guard lock(ui_mutex);
-  ui_state.status_message = std::move(message);
 }

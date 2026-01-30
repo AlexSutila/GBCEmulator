@@ -37,7 +37,7 @@ public:
   bool process_event(const SDL_Event& e, UiState& ui_state);
 
   static void push_notification(UiState& state, LogLevel level, const std::string& type, const std::string& summary,
-                                                          const std::string& details = "");
+                                        const std::string& details = "", time_t timestamp= std::time(nullptr));
 
   // Accessors
   [[nodiscard]] const Settings& get_settings_c() const { return settings; }

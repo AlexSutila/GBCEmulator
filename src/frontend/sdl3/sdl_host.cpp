@@ -157,11 +157,13 @@ bool SDLHost::set_audio_device(const int device_index,
   // SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK)
   audio_device = SDL_OpenAudioDevice(desired, &audio_spec);
   if (!audio_device) {
-    // set_status_message(SDL_GetError());
+    Logger::push(LogLevel::Error, "Audio", "Failed to open audio device",
+      "Failed to open audio device: " + std::string(SDL_GetError()));
     return false;
   }
   if (!SDL_BindAudioStream(audio_device, audio_stream)) {
-    // set_status_message(SDL_GetError());
+    Logger::push(LogLevel::Error, "Audio", "Failed to bind audio stream",
+      "Failed to bind audio stream: " + std::string(SDL_GetError()));
     SDL_CloseAudioDevice(audio_device);
     audio_device = 0;
     return false;
@@ -184,7 +186,8 @@ void SDLHost::refresh_audio_devices(std::vector<std::string> &names,
   int count = 0;
   SDL_AudioDeviceID *devs = SDL_GetAudioPlaybackDevices(&count);
   if (!devs) {
-    // set_status_message(SDL_GetError());
+    Logger::push(LogLevel::Error, "Audio", "Failed to get audio devices",
+      "Failed to get audio devices: " + std::string(SDL_GetError()));
     return;
   }
 

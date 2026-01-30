@@ -11,6 +11,7 @@
 #include <nlohmann/json.hpp>
 
 #include "emu_types.hpp"
+#include "frontend/logger.hpp"
 
 namespace fs = std::filesystem;
 /* ---------- Settings ---------- */
@@ -100,7 +101,6 @@ struct InputState {
 };
 
 /* ---------- Notifications ---------- */
-enum class LogLevel { Debug, Info, Warning, Error };
 struct Notification {
   int id;
   LogLevel level;

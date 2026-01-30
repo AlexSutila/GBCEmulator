@@ -39,6 +39,11 @@ void GbcImGui::shutdown() const {
 }
 
 void GbcImGui::render(UiState &state, SDLHost &host) {
+  // Sync all logs (errors) generated since last cycle
+  for (const auto new_logs = Logger::consume();
+    const auto& [level, type, summary, message, timestamp] : new_logs) {
+    push_notification(state, level, type, summary, message, timestamp);
+  }
   build_main_menu_bar(state);
   build_status_bar(state);
   build_file_dialogs(state);
@@ -74,14 +79,14 @@ bool GbcImGui::process_event(const SDL_Event &e, UiState &ui_state) {
 }
 
 void GbcImGui::push_notification(UiState& state, const LogLevel level, const std::string& type,
-                                 const std::string& summary, const std::string& details) {
+                                 const std::string& summary, const std::string& details, const time_t timestamp) {
   Notification n;
   n.id = state.next_notify_id++;
   n.level = level;
   n.type = type;
   n.summary = summary;
   n.details = details.empty() ? summary : details;
-  n.timestamp = std::time(nullptr);
+  n.timestamp = timestamp;
 
   state.notifications.push_back(n);
 
@@ -260,8 +265,7 @@ void GbcImGui::build_file_dialogs(UiState &state) {
         state.load_bios_path = bios_path;
         state.request_load_bios = true;
       } catch (std::runtime_error &e) {
-        push_notification(state, LogLevel::Warning, "BIOS",
-                          "Failed to load BIOS", e.what());
+        Logger::push(LogLevel::Warning, "BIOS", "Failed to load BIOS", e.what());
       }
     }
     ImGuiFileDialog::Instance()->Close();
