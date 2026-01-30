@@ -117,6 +117,10 @@ struct UiState {
   std::vector<SDL_AudioDeviceID> audio_device_ids;
   int current_audio_dev_idx{};
 
+  // Error messages
+  bool show_bios_error{false};
+  std::string bios_error_message;
+
   // Miscellaneous
   std::string status_message;
   std::optional<std::size_t> waiting_for_bind{};

@@ -36,6 +36,8 @@ public:
   void update_bios_path(const std::string& bios_path);
   bool process_event(const SDL_Event& e, UiState& ui_state);
 
+  static void build_bios_error_popup(UiState &state, const std::string& message);
+
   // Accessors
   [[nodiscard]] const Settings& get_settings_c() const { return settings; }
   [[nodiscard]] Settings& get_settings() { return settings; }

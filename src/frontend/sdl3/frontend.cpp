@@ -161,8 +161,19 @@ void SDL3Frontend::emulation_thread_fn(const std::stop_token &st, const cart &c,
   host.clear_audio_stream();
 
   /* Re-instantiate emulator instance */
-  gbc = bios.has_value() ? std::make_unique<GameBoyColor>(*this, bios.value())
-                         : std::make_unique<GameBoyColor>(*this);
+  if (bios.has_value()) {
+    try {
+      auto bios_rom = BootROM(bios.value());
+      gbc = std::make_unique<GameBoyColor>(*this, bios_rom);
+    } catch (std::runtime_error &e) {
+      ui_state.bios_error_message = e.what();
+      ui_state.show_bios_error = true;
+      gui.get_settings().prev_bios_path = "";
+      gbc = std::make_unique<GameBoyColor>(*this);
+    }
+  } else {
+    gbc = std::make_unique<GameBoyColor>(*this);
+  }
   gbc->insert_cartridge(c);
   auto callback = [this, st]() -> Debug::BreakReason {
     return debugger.on_breakpoint(st, gbc);

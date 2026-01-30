@@ -1,6 +1,9 @@
 #include "frontend/sdl3/gui.hpp"
 #include <backends/imgui_impl_sdl3.h>
 #include <backends/imgui_impl_sdlrenderer3.h>
+#include <sys/stat.h>
+
+#include "memory/boot.hpp"
 
 void GbcImGui::init(const SDLHost &host) {
   settings = Settings::load();
@@ -40,6 +43,8 @@ void GbcImGui::render(UiState &state, SDLHost &host) {
     build_settings_window(state, host);
   if (state.show_keybinds)
     build_keybinds_window(state);
+  if (state.show_bios_error)
+    build_bios_error_popup(state, state.bios_error_message);
 }
 
 // Returns true if the event was handled by the GUI and should be ignored by the
@@ -153,8 +158,15 @@ void GbcImGui::build_file_dialogs(UiState &state) {
   if (ImGuiFileDialog::Instance()->Display(
           "BiosFileDialog", ImGuiWindowFlags_NoCollapse, min_size, max_size)) {
     if (ImGuiFileDialog::Instance()->IsOk()) {
-      state.load_bios_path = ImGuiFileDialog::Instance()->GetFilePathName();
-      state.request_load_bios = true;
+      const auto bios_path = ImGuiFileDialog::Instance()->GetFilePathName();
+      try {
+        auto bios_rom = BootROM(bios_path);
+        state.load_bios_path = bios_path;
+        state.request_load_bios = true;
+      } catch (std::runtime_error &e) {
+        state.bios_error_message = e.what();
+        state.show_bios_error = true;
+      }
     }
     ImGuiFileDialog::Instance()->Close();
   }
@@ -265,6 +277,20 @@ void GbcImGui::build_keybinds_window(UiState &state) {
   }
 
   ImGui::End();
+}
+
+void GbcImGui::build_bios_error_popup(UiState &state, const std::string& message) {
+  ImGui::SetNextWindowSizeConstraints(ImVec2(200.0f, 75.0f), ImVec2(500.0f, FLT_MAX));
+  ImGui::OpenPopup("BIOS Load Error");
+  if (ImGui::BeginPopupModal("BIOS Load Error", &state.show_bios_error,
+                             ImGuiWindowFlags_AlwaysAutoResize)) {
+    ImGui::TextWrapped("%s", message.c_str());
+    ImGui::Separator();
+    if (ImGui::Button("OK")) {
+      state.show_bios_error = false;
+    }
+    ImGui::EndPopup();
+  }
 }
 
 void GbcImGui::apply_keybind_preset(std::array<SDL_Keycode, 8> &array,
