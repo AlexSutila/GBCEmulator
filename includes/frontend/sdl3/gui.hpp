@@ -57,6 +57,7 @@ private:
   IGFD::FileDialogConfig rom_sel_conf;
   IGFD::FileDialogConfig bios_sel_conf;
   static std::tuple<ImVec2, ImVec2> get_min_dialog_size() ;
+  static ImVec4 get_darkened_color(ImVec4 color, float factor);
   static void apply_keybind_preset(std::array<SDL_Keycode, 8>& array, int keybind_preset_index);
   static ImVec4 get_level_color(LogLevel level) ;
 };
