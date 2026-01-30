@@ -194,19 +194,30 @@ void GbcImGui::build_status_bar(UiState &state) {
       ImGui::TextDisabled("Ready");
     }
 
+    constexpr float right_items_width = 175.0f;
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(ImGui::GetWindowWidth() - right_items_width);
+
     if (!state.notifications.empty()) {
       // Flash color if there are errors
-      bool has_error = false;
-      for(const auto& n : state.notifications) if(n.level == LogLevel::Error) has_error = true;
-
-      if (has_error) ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1, 0.4f, 0.4f, 1));
-
-      std::string label = "Errors (" + std::to_string(state.notifications.size()) + ")";
+      auto highest_level = LogLevel::Debug;
+      for(const auto& n : state.notifications) {
+        if(n.level == LogLevel::Error){
+          highest_level = LogLevel::Error;
+        } else if (n.level == LogLevel::Warning && highest_level != LogLevel::Error) {
+          highest_level = LogLevel::Warning;
+        }
+      }
+      if (highest_level == LogLevel::Error) {
+        ImGui::PushStyleColor(ImGuiCol_Button, get_level_color(LogLevel::Error));
+      } else if (highest_level == LogLevel::Warning) {
+        ImGui::PushStyleColor(ImGuiCol_Button, get_level_color(LogLevel::Warning));
+      }
+      const std::string label = "Notif (" + std::to_string(state.notifications.size()) + ")";
       if (ImGui::SmallButton(label.c_str())) {
         state.show_notifications = !state.show_notifications;
       }
-
-      if (has_error) ImGui::PopStyleColor();
+      if (highest_level == LogLevel::Error || highest_level == LogLevel::Warning) ImGui::PopStyleColor();
       ImGui::SameLine();
     }
 
