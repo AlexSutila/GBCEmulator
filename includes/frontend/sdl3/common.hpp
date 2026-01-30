@@ -136,7 +136,6 @@ struct UiState {
   int next_notify_id = 0;
 
   // Miscellaneous
-  std::string status_message;
   std::optional<std::size_t> waiting_for_bind{};
 };
 

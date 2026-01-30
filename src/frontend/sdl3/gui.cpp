@@ -204,7 +204,6 @@ void GbcImGui::build_status_bar(UiState &state) {
     ImGui::SetCursorPosX(ImGui::GetWindowWidth() - right_items_width);
 
     if (!state.notifications.empty()) {
-      // Flash color if there are errors
       auto highest_level = LogLevel::Debug;
       for(const auto& n : state.notifications) {
         if(n.level == LogLevel::Error){
@@ -214,15 +213,24 @@ void GbcImGui::build_status_bar(UiState &state) {
         }
       }
       if (highest_level == LogLevel::Error) {
-        ImGui::PushStyleColor(ImGuiCol_Button, get_level_color(LogLevel::Error));
+        const auto color = get_level_color(LogLevel::Error);
+        ImGui::PushStyleColor(ImGuiCol_Button, color);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, get_darkened_color(color, 0.8));
       } else if (highest_level == LogLevel::Warning) {
-        ImGui::PushStyleColor(ImGuiCol_Button, get_level_color(LogLevel::Warning));
+        const auto color = get_level_color(LogLevel::Warning);
+        ImGui::PushStyleColor(ImGuiCol_Button, color);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, get_darkened_color(color, 0.8));
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 0.0f, 0.0f, 1.0f));
       }
       const std::string label = "Notif (" + std::to_string(state.notifications.size()) + ")";
       if (ImGui::SmallButton(label.c_str())) {
         state.show_notifications = !state.show_notifications;
       }
-      if (highest_level == LogLevel::Error || highest_level == LogLevel::Warning) ImGui::PopStyleColor();
+      if (highest_level == LogLevel::Error) {
+        ImGui::PopStyleColor(2);
+      } else if (highest_level == LogLevel::Warning) {
+        ImGui::PopStyleColor(3);
+      }
       ImGui::SameLine();
     }
 
@@ -451,6 +459,14 @@ std::tuple<ImVec2, ImVec2> GbcImGui::get_min_dialog_size() {
   const float display_h = ImGui::GetIO().DisplaySize.y;
   return std::make_tuple(ImVec2(display_w, display_h),
                          ImVec2(400.0f, 250.0f));
+}
+
+ImVec4 GbcImGui::get_darkened_color(const ImVec4 color, const float factor) {
+  return {
+    std::max(0.0f, color.x * factor),
+    std::max(0.0f, color.y * factor),
+    std::max(0.0f, color.z * factor),
+    color.w};
 }
 
 ImVec4 GbcImGui::get_level_color(const LogLevel level) {
