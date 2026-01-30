@@ -85,12 +85,19 @@ void GbcImGui::build_main_menu_bar(UiState &state) const {
         if (settings.recent_roms.empty()) {
           ImGui::MenuItem("(No recent files)", nullptr, false, false);
         } else {
+          int i = 0;
           for (const auto &path : settings.recent_roms) {
+            // This solves the identical label problem in ImGui
+            ImGui::PushID(i++);
             if (ImGui::MenuItem(
                     std::filesystem::path(path).filename().string().c_str())) {
               state.load_rom_path = path;
               state.request_load_rom = true;
             }
+            // In case differentiation is needed, we add a tooltip
+            if (ImGui::IsItemHovered())
+              ImGui::SetTooltip("%s", path.c_str());
+            ImGui::PopID();
           }
         }
         ImGui::EndMenu();
@@ -264,6 +271,6 @@ void GbcImGui::apply_keybind_preset(std::array<SDL_Keycode, 8> &array,
 std::tuple<ImVec2, ImVec2> GbcImGui::get_min_dialog_size() {
   const float display_w = ImGui::GetIO().DisplaySize.x;
   const float display_h = ImGui::GetIO().DisplaySize.y;
-  return std::make_tuple(ImVec2((float)display_w, (float)display_h),
+  return std::make_tuple(ImVec2(display_w, display_h),
                          ImVec2(400.0f, 250.0f));
 }
