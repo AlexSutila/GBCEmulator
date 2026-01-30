@@ -139,7 +139,7 @@ endif()
 
 # Emulator executable
 add_executable(gbc
-    main.cpp
+    src/frontend/sdl3/main.cpp
     ${GBC_CORE_SOURCES}
     ${GBC_FRONTEND_SOURCES}
 )
@@ -157,7 +157,7 @@ target_compile_options(gbc
 
 # Python bindings
 pybind11_add_module(gbc_py
-    src/python/bindings.cpp
+    src/frontend/python/bindings.cpp
     ${GBC_CORE_SOURCES}
 )
 target_link_libraries(gbc_py
