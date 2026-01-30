@@ -1,8 +1,23 @@
 #include "cpu/interrupts.hpp"
+#include <array>
 #include <format>
 #include <stdexcept>
 
-/* Most unused bits read one because there is no physical hardware attached to
+using isr_metadata = std::tuple<InterruptFlagMask, InterruptVector>;
+
+/**
+ * For Interrupt Service Routines (ISR) to compute effective the call address
+ * and what to set the PC to upon handling an interrupt. Do not mess with the
+ * order, it is specific to the bit order in the IE/IF registers.
+ */
+static constexpr std::array<InterruptVector, 5> int_vector_lookup = {
+    InterruptVector::INT_VECTOR_VBLANK, InterruptVector::INT_VECTOR_LCD,
+    InterruptVector::INT_VECTOR_TIMER,  InterruptVector::INT_VECTOR_SERIAL,
+    InterruptVector::INT_VECTOR_JOYPAD,
+};
+
+/**
+ * Most unused bits read one because there is no physical hardware attached to
  * them. However, for IE, there is an exception, hence allow pulling the unused
  * bits high to be conditional.
  */
@@ -57,47 +72,48 @@ void InterruptMasterEnable::step() {
     ime_state = IME_ENABLED;
 }
 
-std::string ISR::describe() {
-  char const *vec_str{};
+std::string ISR::describe() { return std::format("ISR"); }
 
-  switch (vec) {
-  case InterruptVector::INT_VECTOR_JOYPAD:
-    vec_str = "JOYPAD";
-    break;
-  case InterruptVector::INT_VECTOR_SERIAL:
-    vec_str = "SERIAL";
-    break;
-  case InterruptVector::INT_VECTOR_TIMER:
-    vec_str = "TIMER";
-    break;
-  case InterruptVector::INT_VECTOR_LCD:
-    vec_str = "STAT (LCD)";
-    break;
-  case InterruptVector::INT_VECTOR_VBLANK:
-    vec_str = "VBLANK";
-    break;
-  default:
-    throw std::runtime_error("ISR::describe() - invalid ISR");
-  }
-  return std::format("ISR ({})", vec_str);
-}
+void ISR::incur_halt_delay() { halt_delay = true; }
 
 /* See details about interrupt service routines in `interrupts.hpp` */
 std::size_t ISR::exec() {
   addr_t sp = read_reg<Register16Bit::REG_SP>();
+
+  // Consider additional four clock cycle delay when leaving halt mode
   bool was_halted = halt_delay;
   halt_delay = false;
-  ime_.disable();
+  ime_.disable(); // Always disabled to avoid crazy recursion
 
   // Push old program counter onto the stack
   bus->write_byte(--sp, reg_file->reg_pc >> 8);
   bus->write_byte(--sp, reg_file->reg_pc & 0xFF);
-  if_.put_flag(flag, false);
 
-  // Write back
+  // Write PC and clear flag since it has been handled
+  const auto [mask, vec] = calc_effective_call_addr();
   reg_file->reg_pc = static_cast<addr_t>(vec);
+  if_.put_flag(mask, false);
+
+  // Write back new value to stack pointer
   write_reg<Register16Bit::REG_SP>(sp);
   return was_halted ? 24 : 20;
 }
 
-void ISR::incur_halt_delay() { halt_delay = true; }
+const isr_metadata ISR::calc_effective_call_addr_ei_push() const {
+  // TODO
+  return {};
+}
+
+const isr_metadata ISR::calc_effective_call_addr() const {
+  constexpr auto num_interrupts = 5;
+
+  // Lower bits have higher priority, so check them first
+  for (byte_t shift{0}; shift < num_interrupts; shift++) {
+    const auto flag = static_cast<InterruptFlagMask>(1 << shift);
+    if (ie_.get_flag(flag) && if_.get_flag(flag))
+      return {flag, int_vector_lookup.at(shift)};
+  }
+
+  // We make an assumption that if this has been, an interrupt is in progress.
+  throw std::runtime_error("ISR::calc_effective_call_addr_ei_push()");
+}

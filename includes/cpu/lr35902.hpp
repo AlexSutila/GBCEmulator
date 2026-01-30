@@ -50,13 +50,11 @@ private:
   runtime_sys_info &sys_;
 
   /* Interrupt handling */
-  std::optional<ISR *> should_interrupt();
-  std::array<std::unique_ptr<ISR>, 5> isr_lookup{};
-  template <InterruptFlagMask mask, InterruptVector vec>
-  std::unique_ptr<ISR> mk_isr(); // Helper
+  const bool should_interrupt() const;
   InterruptMasterEnable ime;
   InterruptBits ie_reg;
   InterruptBits if_reg;
+  ISR isr;
 
   /* Opcode decoding configuration */
   using lookup_table_t = std::array<std::unique_ptr<Instruction>, 256>;
