@@ -34,6 +34,7 @@ struct runtime_sys_info {
 class GameBoyColor {
 public:
   GameBoyColor(Frontend &frontend, const std::string &bios_path);
+  GameBoyColor(Frontend &frontend, const BootROM &rom);
   GameBoyColor(Frontend &frontend);
   void insert_cartridge(cart c);
   void init_test_bed();

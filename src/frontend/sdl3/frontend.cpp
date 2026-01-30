@@ -52,7 +52,9 @@ void SDL3Frontend::queue_audio_samples(const float *samples,
 }
 
 void SDL3Frontend::start() {
-  std::optional<std::string> bios_path{std::nullopt};
+  std::optional<std::string> bios_path = gui.get_settings_c().prev_bios_path.empty()?
+                                            std::nullopt :
+                                            std::make_optional(gui.get_settings_c().prev_bios_path);
   std::string rom_path{};
 
   clear(black);
@@ -279,6 +281,8 @@ bool SDL3Frontend::consume_load_bios_request(
   /* Denote new BIOS path */
   ui_state.request_load_bios = false;
   bios_path = ui_state.load_bios_path;
+
+  gui.update_bios_path(ui_state.load_bios_path);
   return true;
 }
 

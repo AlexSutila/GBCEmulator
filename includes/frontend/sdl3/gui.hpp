@@ -33,6 +33,7 @@ public:
   static void end_frame() {ImGui::Render();}
 
   void update_rom_path(const std::string& rom_path);
+  void update_bios_path(const std::string& bios_path);
   bool process_event(const SDL_Event& e, UiState& ui_state);
 
   // Accessors

@@ -16,7 +16,8 @@ void GbcImGui::init(const SDLHost &host) {
     throw std::runtime_error("Failed to initialize ImGui SDL renderer backend");
 
   rom_sel_conf.path = settings.rom_dir;
-  bios_sel_conf.path = ".";
+  rom_sel_conf.flags = ImGuiFileDialogFlags_Modal | ImGuiFileDialogFlags_ReadOnlyFileNameField;
+  bios_sel_conf.path = settings.bios_dir;
   bios_sel_conf.flags = rom_sel_conf.flags =
       ImGuiFileDialogFlags_Modal | ImGuiFileDialogFlags_ReadOnlyFileNameField;
 
@@ -69,6 +70,14 @@ void GbcImGui::update_rom_path(const std::string &rom_path) {
   rom_sel_conf.path = new_rom_path;
   settings.rom_dir = new_rom_path;
   settings.add_recent_rom(rom_path);
+  settings.save();
+}
+
+void GbcImGui::update_bios_path(const std::string &bios_path) {
+  const auto new_bios_path = fs::path(bios_path).parent_path().string();
+  bios_sel_conf.path = new_bios_path;
+  settings.bios_dir = new_bios_path;
+  settings.prev_bios_path = bios_path;
   settings.save();
 }
 
