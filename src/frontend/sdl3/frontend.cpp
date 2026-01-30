@@ -166,8 +166,8 @@ void SDL3Frontend::emulation_thread_fn(const std::stop_token &st, const cart &c,
       auto bios_rom = BootROM(bios.value());
       gbc = std::make_unique<GameBoyColor>(*this, bios_rom);
     } catch (std::runtime_error &e) {
-      ui_state.bios_error_message = e.what();
-      ui_state.show_bios_error = true;
+      GbcImGui::push_notification(ui_state, LogLevel::Warning, "BIOS",
+        "Failed to load BIOS",e.what());
       gui.get_settings().prev_bios_path = "";
       gbc = std::make_unique<GameBoyColor>(*this);
     }

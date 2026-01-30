@@ -13,6 +13,7 @@
 #include "emu_types.hpp"
 
 namespace fs = std::filesystem;
+/* ---------- Settings ---------- */
 /**
  * For future reference: to add a new setting
  * 1. Add it here with its default value
@@ -71,7 +72,7 @@ inline void Settings::add_recent_rom(const std::string &path) {
   }
 }
 
-
+/* ---------- Input ---------- */
 static constexpr int KCount = 8;
 struct KeybindPreset {
   const char *name;
@@ -98,6 +99,18 @@ struct InputState {
   std::atomic<byte_t> buttons{};
 };
 
+/* ---------- Notifications ---------- */
+enum class LogLevel { Debug, Info, Warning, Error };
+struct Notification {
+  int id;
+  LogLevel level;
+  std::string type;    // e.g., "BIOS", "Audio"
+  std::string summary; // e.g., "File not found"
+  std::string details; // Full path, stack trace, etc.
+  std::time_t timestamp;
+};
+
+/* ---------- UI State ---------- */
 struct UiState {
   bool show_settings{false};
   bool show_debug{false};
@@ -117,9 +130,10 @@ struct UiState {
   std::vector<SDL_AudioDeviceID> audio_device_ids;
   int current_audio_dev_idx{};
 
-  // Error messages
-  bool show_bios_error{false};
-  std::string bios_error_message;
+  // Notification (errors)
+  std::vector<Notification> notifications;
+  bool show_notifications = false;
+  int next_notify_id = 0;
 
   // Miscellaneous
   std::string status_message;
