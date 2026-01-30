@@ -126,8 +126,8 @@ public:
   // Compute new PC location, considers stack overflow leading to EI overwrite
   // and the bizzare behavior that can emerge with that as well.
   using isr_metadata = std::tuple<InterruptFlagMask, InterruptVector>;
-  const isr_metadata calc_effective_call_addr_ei_push() const;
   const isr_metadata calc_effective_call_addr() const;
+  void handle_ei_push_bug(); // Occurs when interrupted with (SP == 0)
 
 private:
   InterruptMasterEnable &ime_;

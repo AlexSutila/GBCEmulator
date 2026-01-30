@@ -78,7 +78,8 @@ void ISR::incur_halt_delay() { halt_delay = true; }
 
 /* See details about interrupt service routines in `interrupts.hpp` */
 std::size_t ISR::exec() {
-  addr_t sp = read_reg<Register16Bit::REG_SP>();
+  const auto [flag, vec] = calc_effective_call_addr();
+  const addr_t sp = read_reg<Register16Bit::REG_SP>();
 
   // Consider additional four clock cycle delay when leaving halt mode
   bool was_halted = halt_delay;
@@ -86,22 +87,41 @@ std::size_t ISR::exec() {
   ime_.disable(); // Always disabled to avoid crazy recursion
 
   // Push old program counter onto the stack
-  bus->write_byte(--sp, reg_file->reg_pc >> 8);
-  bus->write_byte(--sp, reg_file->reg_pc & 0xFF);
+  const byte_t pc_hi = reg_file->reg_pc >> 8;
+  const byte_t pc_lo = reg_file->reg_pc & 0xFF;
+  bus->write_byte(sp - 1, pc_hi);
+  bus->write_byte(sp - 2, pc_lo);
 
-  // Write PC and clear flag since it has been handled
-  const auto [mask, vec] = calc_effective_call_addr();
-  reg_file->reg_pc = static_cast<addr_t>(vec);
-  if_.put_flag(mask, false);
+  // Handle strange behavior when low byte of upper byte push overwrites IE
+  if (sp == 0 && (static_cast<byte_t>(flag) & pc_hi) == 0) [[unlikely]]
+    handle_ei_push_bug();
 
-  // Write back new value to stack pointer
-  write_reg<Register16Bit::REG_SP>(sp);
+  // Expected behavior
+  else [[likely]] {
+    reg_file->reg_pc = static_cast<addr_t>(vec);
+    if_.put_flag(flag, false);
+  }
+  write_reg<Register16Bit::REG_SP>(sp - 2);
   return was_halted ? 24 : 20;
 }
 
-const isr_metadata ISR::calc_effective_call_addr_ei_push() const {
-  // TODO
-  return {};
+void ISR::handle_ei_push_bug() {
+  constexpr auto mask = 0x1F;
+  constexpr addr_t pc_bugged = 0;
+
+  // Case 1: The simple scenario is, the EI overwrite disabled interrupts, and
+  // as a result the PC freaks out and returns zero. No flags are cleared.
+  if ((ie_.peek() & if_.peek() & mask) == 0)
+    reg_file->reg_pc = pc_bugged;
+
+  // Case 2: The EI overwrite messed the pending interrupt up, but another one
+  // is still pending and the corresponding EI bit is still set. This interrupt
+  // will be served normally.
+  else {
+    const auto [flag, vec] = calc_effective_call_addr();
+    reg_file->reg_pc = static_cast<addr_t>(vec);
+    if_.put_flag(flag, false);
+  }
 }
 
 const isr_metadata ISR::calc_effective_call_addr() const {
