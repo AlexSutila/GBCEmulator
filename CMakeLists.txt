@@ -97,7 +97,6 @@ set(GBC_CORE_SOURCES
     src/ppu/sprites.cpp
 
     src/cart/cart.cpp
-    src/cart/cart_display.cpp
     src/cart/mbc/no_mbc.cpp
     src/cart/mbc/mbc1.cpp
     src/cart/mbc/mbc2.cpp
