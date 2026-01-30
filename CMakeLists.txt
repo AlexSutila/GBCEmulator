@@ -85,9 +85,9 @@ set(GBC_CORE_SOURCES
     src/memory/mmio/mmio.cpp
     src/memory/dma.cpp
 
-    src/timer/timer.cpp
-    src/serial/serial.cpp
-    src/apu/apu.cpp
+    src/timer.cpp
+    src/serial.cpp
+    src/apu.cpp
 
     src/ppu/ppu.cpp
     src/ppu/attributes.cpp

@@ -1,7 +1,7 @@
 #ifndef __GBC_H
 #define __GBC_H
 
-#include "apu/apu.hpp"
+#include "apu.hpp"
 #include "cart/cart.hpp"
 #include "cpu/lr35902.hpp"
 #include "debugger/debugger.hpp"
@@ -9,8 +9,8 @@
 #include "memory/bus.hpp"
 #include "memory/mmio/mmio.hpp"
 #include "ppu/ppu.hpp"
-#include "serial/serial.hpp"
-#include "timer/timer.hpp"
+#include "serial.hpp"
+#include "timer.hpp"
 
 #include <cstdint>
 #include <memory>

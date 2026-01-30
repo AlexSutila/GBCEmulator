@@ -7,7 +7,7 @@
 #include "memory/mmio/mmio.hpp"
 #include "ppu/palette.hpp"
 #include "ppu/ppu.hpp"
-#include "timer/timer.hpp"
+#include "timer.hpp"
 #include <memory>
 #include <optional>
 #include <stdexcept>

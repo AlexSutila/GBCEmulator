@@ -1,9 +1,8 @@
-#include "apu/apu.hpp"
+#include "apu.hpp"
 #include "frontend/frontend.hpp"
 #include "memory/bus.hpp"
 #include "memory/mmio/mmio.hpp"
 #include <algorithm>
-#include <cmath>
 
 namespace {
   constexpr addr_t audio_base =
