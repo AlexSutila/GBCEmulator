@@ -33,7 +33,11 @@ public:
   static void end_frame() {ImGui::Render();}
 
   void update_rom_path(const std::string& rom_path);
+  void update_bios_path(const std::string& bios_path);
   bool process_event(const SDL_Event& e, UiState& ui_state);
+
+  static void push_notification(UiState& state, LogLevel level, const std::string& type, const std::string& summary,
+                                        const std::string& details = "", time_t timestamp= std::time(nullptr));
 
   // Accessors
   [[nodiscard]] const Settings& get_settings_c() const { return settings; }
@@ -43,15 +47,19 @@ private:
   Settings settings;
 
   void build_main_menu_bar(UiState& state) const;
+  static void build_status_bar(UiState &state);
   static void build_file_dialogs(UiState& state);
   void build_settings_window(UiState& state, SDLHost& host);
   void build_keybinds_window(UiState& state);
+  static void build_notification_window(UiState& state);
 
   // Helpers
-  static std::tuple<ImVec2, ImVec2> get_min_dialog_size() ;
   IGFD::FileDialogConfig rom_sel_conf;
   IGFD::FileDialogConfig bios_sel_conf;
+  static std::tuple<ImVec2, ImVec2> get_min_dialog_size() ;
+  static ImVec4 get_darkened_color(ImVec4 color, float factor);
   static void apply_keybind_preset(std::array<SDL_Keycode, 8>& array, int keybind_preset_index);
+  static ImVec4 get_level_color(LogLevel level) ;
 };
 
 #endif //GBC_GUI_HPP

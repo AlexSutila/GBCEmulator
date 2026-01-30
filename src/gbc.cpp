@@ -34,6 +34,15 @@ GameBoyColor::GameBoyColor(Frontend &frontend, const std::string &bios_path)
   cram_init_mono(); // Just in case BIOS does not init CRAM
 }
 
+GameBoyColor::GameBoyColor(Frontend &frontend, const BootROM &rom)
+    : debugger_(std::nullopt), fe_(frontend) {
+  system_init();
+  // We assume rom is already valid
+  bios_ = rom;
+  sys_.cgb_mode = bios_->is_large_rom();
+  cram_init_mono();
+}
+
 GameBoyColor::GameBoyColor(Frontend &frontend)
     : debugger_(std::nullopt), bios_(std::nullopt), fe_(frontend) {
   system_init(); // Connects all system components

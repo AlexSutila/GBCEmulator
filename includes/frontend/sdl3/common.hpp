@@ -11,8 +11,10 @@
 #include <nlohmann/json.hpp>
 
 #include "emu_types.hpp"
+#include "frontend/logger.hpp"
 
 namespace fs = std::filesystem;
+/* ---------- Settings ---------- */
 /**
  * For future reference: to add a new setting
  * 1. Add it here with its default value
@@ -23,6 +25,8 @@ struct Settings {
   bool force_mono_dmg{false};
   int keybind_preset_index{};
   std::string rom_dir{"."};
+  std::string prev_bios_path;
+  std::string bios_dir{"."};
   std::array<SDL_Keycode, 8> keybinds{SDLK_D,         SDLK_A,     SDLK_W,
                                       SDLK_S,         SDLK_J,     SDLK_K,
                                       SDLK_BACKSPACE, SDLK_RETURN};
@@ -33,7 +37,7 @@ struct Settings {
   void add_recent_rom(const std::string &path);
 };
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Settings, volume, force_mono_dmg,
-                                   keybind_preset_index, rom_dir, keybinds,
+                                   keybind_preset_index, rom_dir, prev_bios_path, bios_dir, keybinds,
                                    recent_roms)
 
 inline Settings Settings::load(const std::string &filename) {
@@ -69,7 +73,7 @@ inline void Settings::add_recent_rom(const std::string &path) {
   }
 }
 
-
+/* ---------- Input ---------- */
 static constexpr int KCount = 8;
 struct KeybindPreset {
   const char *name;
@@ -96,6 +100,17 @@ struct InputState {
   std::atomic<byte_t> buttons{};
 };
 
+/* ---------- Notifications ---------- */
+struct Notification {
+  int id;
+  LogLevel level;
+  std::string type;    // e.g., "BIOS", "Audio"
+  std::string summary; // e.g., "File not found"
+  std::string details; // Full path, stack trace, etc.
+  std::time_t timestamp;
+};
+
+/* ---------- UI State ---------- */
 struct UiState {
   bool show_settings{false};
   bool show_debug{false};
@@ -115,8 +130,12 @@ struct UiState {
   std::vector<SDL_AudioDeviceID> audio_device_ids;
   int current_audio_dev_idx{};
 
+  // Notification (errors)
+  std::vector<Notification> notifications;
+  bool show_notifications = false;
+  int next_notify_id = 0;
+
   // Miscellaneous
-  std::string status_message;
   std::optional<std::size_t> waiting_for_bind{};
 };
 

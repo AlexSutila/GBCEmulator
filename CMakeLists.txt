@@ -126,7 +126,6 @@ set(GBC_INCLUDE_DIR
 set(GBC_RELEASE_OPTIONS
     -O3
     -fvisibility=hidden
-    -flto
 )
 
 set(GBC_COMPILE_OPTIONS

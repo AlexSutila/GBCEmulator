@@ -52,7 +52,9 @@ void SDL3Frontend::queue_audio_samples(const float *samples,
 }
 
 void SDL3Frontend::start() {
-  std::optional<std::string> bios_path{std::nullopt};
+  std::optional<std::string> bios_path = gui.get_settings_c().prev_bios_path.empty()?
+                                            std::nullopt :
+                                            std::make_optional(gui.get_settings_c().prev_bios_path);
   std::string rom_path{};
 
   clear(black);
@@ -66,9 +68,8 @@ void SDL3Frontend::start() {
         cart cart_ctx = load_cart_fs(rom_path.c_str());
         emulation_thread = std::jthread(&SDL3Frontend::emulation_thread_fn,
                                         this, cart_ctx, bios_path);
-        set_status_message(std::format("Loaded ROM: {}", rom_path));
       } catch (std::exception &e) {
-        set_status_message(std::format("Failed to load ROM: {}", e.what()));
+        Logger::push(LogLevel::Warning, "ROM", "Failed to load ROM", e.what());
       }
     }
 
@@ -159,8 +160,18 @@ void SDL3Frontend::emulation_thread_fn(const std::stop_token &st, const cart &c,
   host.clear_audio_stream();
 
   /* Re-instantiate emulator instance */
-  gbc = bios.has_value() ? std::make_unique<GameBoyColor>(*this, bios.value())
-                         : std::make_unique<GameBoyColor>(*this);
+  if (bios.has_value()) {
+    try {
+      auto bios_rom = BootROM(bios.value());
+      gbc = std::make_unique<GameBoyColor>(*this, bios_rom);
+    } catch (std::runtime_error &e) {
+      Logger::push(LogLevel::Warning, "BIOS", "Failed to load BIOS", e.what());
+      gui.get_settings().prev_bios_path = "";
+      gbc = std::make_unique<GameBoyColor>(*this);
+    }
+  } else {
+    gbc = std::make_unique<GameBoyColor>(*this);
+  }
   gbc->insert_cartridge(c);
   auto callback = [this, st]() -> Debug::BreakReason {
     return debugger.on_breakpoint(st, gbc);
@@ -279,11 +290,7 @@ bool SDL3Frontend::consume_load_bios_request(
   /* Denote new BIOS path */
   ui_state.request_load_bios = false;
   bios_path = ui_state.load_bios_path;
-  return true;
-}
 
-/* Misc. helpers. Consider future removal */
-void SDL3Frontend::set_status_message(std::string message) {
-  std::lock_guard lock(ui_mutex);
-  ui_state.status_message = std::move(message);
+  gui.update_bios_path(ui_state.load_bios_path);
+  return true;
 }

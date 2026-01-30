@@ -2,7 +2,6 @@
 #include "SDL3/SDL_render.h"
 #include "ppu/palette.hpp"
 #include <algorithm>
-#include <cmath>
 
 SDLHost::SDLHost(const int width, const int height, const int scale) {
   if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO))
@@ -59,15 +58,15 @@ void SDLHost::update_texture(const std::uint32_t *pixels, const int width,
 void SDLHost::draw_texture(const float menu_bar_height) const {
   int window_w{}, window_h{};
   SDL_GetWindowSize(window, &window_w, &window_h);
-  const float avail_w = static_cast<float>(window_w);
-  const float avail_h = static_cast<float>(window_h) - menu_bar_height;
+  const auto avail_w = static_cast<float>(window_w);
+  const auto avail_h = static_cast<float>(window_h) - menu_bar_height;
 
   // Scale texture so it doesn't warp with window size
   float tex_w{}, tex_h{};
   SDL_GetTextureSize(texture, &tex_w, &tex_h);
 
   // Fractional scale is fine, as long as its uniform
-  float scale = std::min(avail_w / tex_w, avail_h / tex_h);
+  const float scale = std::min(avail_w / tex_w, avail_h / tex_h);
   const float dst_w = tex_w * scale;
   const float dst_h = tex_h * scale;
 
@@ -158,11 +157,13 @@ bool SDLHost::set_audio_device(const int device_index,
   // SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK)
   audio_device = SDL_OpenAudioDevice(desired, &audio_spec);
   if (!audio_device) {
-    // set_status_message(SDL_GetError());
+    Logger::push(LogLevel::Error, "Audio", "Failed to open audio device",
+      "Failed to open audio device: " + std::string(SDL_GetError()));
     return false;
   }
   if (!SDL_BindAudioStream(audio_device, audio_stream)) {
-    // set_status_message(SDL_GetError());
+    Logger::push(LogLevel::Error, "Audio", "Failed to bind audio stream",
+      "Failed to bind audio stream: " + std::string(SDL_GetError()));
     SDL_CloseAudioDevice(audio_device);
     audio_device = 0;
     return false;
@@ -185,7 +186,8 @@ void SDLHost::refresh_audio_devices(std::vector<std::string> &names,
   int count = 0;
   SDL_AudioDeviceID *devs = SDL_GetAudioPlaybackDevices(&count);
   if (!devs) {
-    // set_status_message(SDL_GetError());
+    Logger::push(LogLevel::Error, "Audio", "Failed to get audio devices",
+      "Failed to get audio devices: " + std::string(SDL_GetError()));
     return;
   }
 

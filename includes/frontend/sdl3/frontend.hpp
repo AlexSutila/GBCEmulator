@@ -70,9 +70,6 @@ private:
   // Input helpers
   InputState input_state{};
   void handle_keypress(SDL_Keycode key, bool pressed);
-
-  // Shouldn't be here
-  void set_status_message(std::string message);
 };
 
 #endif // GBC_FRONTEND_HPP
