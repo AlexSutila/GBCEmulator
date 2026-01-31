@@ -160,7 +160,7 @@ void SDL3Frontend::render_frame() {
   // 1. Clear background
   host.clear_screen();
   // 2. Draw the Emulator Output
-  host.draw_texture(ImGui::GetFrameHeight());
+  host.draw_texture(ImGui::GetFrameHeight(), ImGui::GetFrameHeight());
   // 3. Draw the ImGui Overlay
   host.draw_overlay(ImGui::GetDrawData());
   // 4. Swap buffers
