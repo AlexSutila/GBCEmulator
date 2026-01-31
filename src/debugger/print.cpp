@@ -467,8 +467,6 @@ std::string describe_cart(const cart &c) {
   const std::uint16_t glob_chk = compute_global_checksum(c.rom);
 
   std::ostringstream os;
-
-  os << "=== Game Boy Cartridge Report ===\n";
   os << "File: " << c.file_path.string() << "\n";
   os << "ROM bytes: " << c.rom.size() << "\n\n";
 

@@ -1,4 +1,5 @@
 #include "frontend/sdl3/frontend.hpp"
+#include "debugger/print.hpp"
 
 SDL3Frontend::SDL3Frontend() : host(framebuf_width, framebuf_height, scale) {
   host.init_audio();
@@ -52,9 +53,10 @@ void SDL3Frontend::queue_audio_samples(const float *samples,
 }
 
 void SDL3Frontend::start() {
-  std::optional<std::string> bios_path = gui.get_settings_c().prev_bios_path.empty()?
-                                            std::nullopt :
-                                            std::make_optional(gui.get_settings_c().prev_bios_path);
+  std::optional<std::string> bios_path =
+      gui.get_settings_c().prev_bios_path.empty()
+          ? std::nullopt
+          : std::make_optional(gui.get_settings_c().prev_bios_path);
   std::string rom_path{};
 
   clear(black);
@@ -68,6 +70,7 @@ void SDL3Frontend::start() {
         cart cart_ctx = load_cart_fs(rom_path.c_str());
         emulation_thread = std::jthread(&SDL3Frontend::emulation_thread_fn,
                                         this, cart_ctx, bios_path);
+        ui_state.cart_info = Debug::describe_cart(cart_ctx);
       } catch (std::exception &e) {
         Logger::push(LogLevel::Warning, "ROM", "Failed to load ROM", e.what());
       }

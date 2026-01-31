@@ -5,6 +5,7 @@
 
 #include <ranges>
 
+#include "imgui.h"
 #include "memory/boot.hpp"
 
 void GbcImGui::init(const SDLHost &host) {
@@ -21,7 +22,8 @@ void GbcImGui::init(const SDLHost &host) {
     throw std::runtime_error("Failed to initialize ImGui SDL renderer backend");
 
   rom_sel_conf.path = settings.rom_dir;
-  rom_sel_conf.flags = ImGuiFileDialogFlags_Modal | ImGuiFileDialogFlags_ReadOnlyFileNameField;
+  rom_sel_conf.flags =
+      ImGuiFileDialogFlags_Modal | ImGuiFileDialogFlags_ReadOnlyFileNameField;
   bios_sel_conf.path = settings.bios_dir;
   bios_sel_conf.flags = rom_sel_conf.flags =
       ImGuiFileDialogFlags_Modal | ImGuiFileDialogFlags_ReadOnlyFileNameField;
@@ -41,7 +43,7 @@ void GbcImGui::shutdown() const {
 void GbcImGui::render(UiState &state, SDLHost &host) {
   // Sync all logs (errors) generated since last cycle
   for (const auto new_logs = Logger::consume();
-    const auto& [level, type, summary, message, timestamp] : new_logs) {
+       const auto &[level, type, summary, message, timestamp] : new_logs) {
     push_notification(state, level, type, summary, message, timestamp);
   }
   build_main_menu_bar(state);
@@ -53,6 +55,8 @@ void GbcImGui::render(UiState &state, SDLHost &host) {
     build_keybinds_window(state);
   if (state.show_notifications)
     build_notification_window(state);
+  if (state.show_about)
+    build_about_window(state);
 }
 
 // Returns true if the event was handled by the GUI and should be ignored by the
@@ -78,8 +82,11 @@ bool GbcImGui::process_event(const SDL_Event &e, UiState &ui_state) {
   return false; // NOT CONSUMED: pass to game loop
 }
 
-void GbcImGui::push_notification(UiState& state, const LogLevel level, const std::string& type,
-                                 const std::string& summary, const std::string& details, const time_t timestamp) {
+void GbcImGui::push_notification(UiState &state, const LogLevel level,
+                                 const std::string &type,
+                                 const std::string &summary,
+                                 const std::string &details,
+                                 const time_t timestamp) {
   Notification n;
   n.id = state.next_notify_id++;
   n.level = level;
@@ -164,13 +171,19 @@ void GbcImGui::build_main_menu_bar(UiState &state) const {
         state.show_breakpoints = true;
       ImGui::EndMenu();
     }
+
+    if (ImGui::BeginMenu("About")) {
+      state.show_about = true;
+      ImGui::EndMenu();
+    }
+
     ImGui::EndMainMenuBar();
   }
 }
 
 void GbcImGui::build_status_bar(UiState &state) {
   const float height = ImGui::GetFrameHeight();
-  const ImGuiViewport* viewport = ImGui::GetMainViewport();
+  const ImGuiViewport *viewport = ImGui::GetMainViewport();
 
   // Position at bottom of the main viewport
   // (Viewport Y + Viewport Height - Bar Height)
@@ -193,8 +206,10 @@ void GbcImGui::build_status_bar(UiState &state) {
   if (ImGui::Begin("StatusBar", nullptr, flags)) {
     // --- Left Aligned Content ---
     if (!state.load_rom_path.empty()) {
-      ImGui::Text("Loaded: %s",
-        std::filesystem::path(state.load_rom_path).filename().string().c_str());
+      ImGui::Text("Loaded: %s", std::filesystem::path(state.load_rom_path)
+                                    .filename()
+                                    .string()
+                                    .c_str());
     } else {
       ImGui::TextDisabled("Ready");
     }
@@ -205,24 +220,28 @@ void GbcImGui::build_status_bar(UiState &state) {
 
     if (!state.notifications.empty()) {
       auto highest_level = LogLevel::Debug;
-      for(const auto& n : state.notifications) {
-        if(n.level == LogLevel::Error){
+      for (const auto &n : state.notifications) {
+        if (n.level == LogLevel::Error) {
           highest_level = LogLevel::Error;
-        } else if (n.level == LogLevel::Warning && highest_level != LogLevel::Error) {
+        } else if (n.level == LogLevel::Warning &&
+                   highest_level != LogLevel::Error) {
           highest_level = LogLevel::Warning;
         }
       }
       if (highest_level == LogLevel::Error) {
         const auto color = get_level_color(LogLevel::Error);
         ImGui::PushStyleColor(ImGuiCol_Button, color);
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, get_darkened_color(color, 0.8));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+                              get_darkened_color(color, 0.8));
       } else if (highest_level == LogLevel::Warning) {
         const auto color = get_level_color(LogLevel::Warning);
         ImGui::PushStyleColor(ImGuiCol_Button, color);
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, get_darkened_color(color, 0.8));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+                              get_darkened_color(color, 0.8));
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 0.0f, 0.0f, 1.0f));
       }
-      const std::string label = "Notif (" + std::to_string(state.notifications.size()) + ")";
+      const std::string label =
+          "Notif (" + std::to_string(state.notifications.size()) + ")";
       if (ImGui::SmallButton(label.c_str())) {
         state.show_notifications = !state.show_notifications;
       }
@@ -273,7 +292,8 @@ void GbcImGui::build_file_dialogs(UiState &state) {
         state.load_bios_path = bios_path;
         state.request_load_bios = true;
       } catch (std::runtime_error &e) {
-        Logger::push(LogLevel::Warning, "BIOS", "Failed to load BIOS", e.what());
+        Logger::push(LogLevel::Warning, "BIOS", "Failed to load BIOS",
+                     e.what());
       }
     }
     ImGuiFileDialog::Instance()->Close();
@@ -387,61 +407,76 @@ void GbcImGui::build_keybinds_window(UiState &state) {
   ImGui::End();
 }
 
-void GbcImGui::build_notification_window(UiState& state) {
-    // Set a default size and position (bottom right)
-    ImGui::SetNextWindowSize(ImVec2(400, 300), ImGuiCond_FirstUseEver);
+void GbcImGui::build_about_window(UiState &state) {
+  // Set a default size and position (bottom right)
+  ImGui::SetNextWindowSize(ImVec2(400, 300), ImGuiCond_FirstUseEver);
+  if (ImGui::Begin("About")) {
+    ImGui::SeparatorText("Source");
+    ImGui::Text("%s", "github.com/AlexSutila/GBCEmulator");
+    ImGui::SeparatorText("Cartridge Info");
+    ImGui::Text("%s", state.cart_info.c_str());
+    ImGui::End();
+  }
+}
 
-    if (ImGui::Begin("Notifications", &state.show_notifications)) {
-        // --- Header / Toolbar ---
-        if (state.notifications.empty()) {
-            ImGui::TextDisabled("No new notifications.");
-        } else {
-            if (ImGui::Button("Clear All")) {
-                state.notifications.clear();
-            }
-            ImGui::SameLine();
-            ImGui::TextDisabled("%zu messages", state.notifications.size());
-            ImGui::Separator();
-        }
-        // --- List of Messages ---
-        // We need to track deletion ID because we can't erase from vector while looping
-        int id_to_delete = -1;
-        // Iterate backwards so newest are at the top
-        for (auto & n : std::ranges::reverse_view(state.notifications)) {
-            ImGui::PushID(n.id);
-            // Color coding
-            ImGui::PushStyleColor(ImGuiCol_Text, get_level_color(n.level));
-            // Summary Line (Expandable)
-            // Format: [Type] Summary
-            std::string header = "[" + n.type + "] " + n.summary;
-            const bool open = ImGui::TreeNode("##Node", "%s", header.c_str());
+void GbcImGui::build_notification_window(UiState &state) {
+  // Set a default size and position (bottom right)
+  ImGui::SetNextWindowSize(ImVec2(400, 300), ImGuiCond_FirstUseEver);
 
-            ImGui::PopStyleColor(); // Restore text color
-
-            // Details (if expanded)
-            if (open) {
-                ImGui::Indent();
-                ImGui::TextWrapped("%s", n.details.c_str());
-                // Timestamp
-                char time_buf[64];
-                std::strftime(time_buf, sizeof(time_buf), "%H:%M:%S", std::localtime(&n.timestamp));
-                ImGui::TextDisabled("Time: %s", time_buf);
-
-                if (ImGui::Button("Dismiss")) {
-                    id_to_delete = n.id;
-                }
-                ImGui::Unindent();
-                ImGui::TreePop();
-            }
-            ImGui::PopID();
-        }
-        // Handle deletion safely outside the loop
-        if (id_to_delete != -1) {
-            std::erase_if(state.notifications,
-                [id_to_delete](const Notification& n) { return n.id == id_to_delete; });
-        }
-        ImGui::End();
+  if (ImGui::Begin("Notifications", &state.show_notifications)) {
+    // --- Header / Toolbar ---
+    if (state.notifications.empty()) {
+      ImGui::TextDisabled("No new notifications.");
+    } else {
+      if (ImGui::Button("Clear All")) {
+        state.notifications.clear();
+      }
+      ImGui::SameLine();
+      ImGui::TextDisabled("%zu messages", state.notifications.size());
+      ImGui::Separator();
     }
+    // --- List of Messages ---
+    // We need to track deletion ID because we can't erase from vector while
+    // looping
+    int id_to_delete = -1;
+    // Iterate backwards so newest are at the top
+    for (auto &n : std::ranges::reverse_view(state.notifications)) {
+      ImGui::PushID(n.id);
+      // Color coding
+      ImGui::PushStyleColor(ImGuiCol_Text, get_level_color(n.level));
+      // Summary Line (Expandable)
+      // Format: [Type] Summary
+      std::string header = "[" + n.type + "] " + n.summary;
+      const bool open = ImGui::TreeNode("##Node", "%s", header.c_str());
+
+      ImGui::PopStyleColor(); // Restore text color
+
+      // Details (if expanded)
+      if (open) {
+        ImGui::Indent();
+        ImGui::TextWrapped("%s", n.details.c_str());
+        // Timestamp
+        char time_buf[64];
+        std::strftime(time_buf, sizeof(time_buf), "%H:%M:%S",
+                      std::localtime(&n.timestamp));
+        ImGui::TextDisabled("Time: %s", time_buf);
+
+        if (ImGui::Button("Dismiss")) {
+          id_to_delete = n.id;
+        }
+        ImGui::Unindent();
+        ImGui::TreePop();
+      }
+      ImGui::PopID();
+    }
+    // Handle deletion safely outside the loop
+    if (id_to_delete != -1) {
+      std::erase_if(state.notifications, [id_to_delete](const Notification &n) {
+        return n.id == id_to_delete;
+      });
+    }
+    ImGui::End();
+  }
 }
 
 void GbcImGui::apply_keybind_preset(std::array<SDL_Keycode, 8> &array,
@@ -457,23 +492,23 @@ void GbcImGui::apply_keybind_preset(std::array<SDL_Keycode, 8> &array,
 std::tuple<ImVec2, ImVec2> GbcImGui::get_min_dialog_size() {
   const float display_w = ImGui::GetIO().DisplaySize.x;
   const float display_h = ImGui::GetIO().DisplaySize.y;
-  return std::make_tuple(ImVec2(display_w, display_h),
-                         ImVec2(400.0f, 250.0f));
+  return std::make_tuple(ImVec2(display_w, display_h), ImVec2(400.0f, 250.0f));
 }
 
 ImVec4 GbcImGui::get_darkened_color(const ImVec4 color, const float factor) {
-  return {
-    std::max(0.0f, color.x * factor),
-    std::max(0.0f, color.y * factor),
-    std::max(0.0f, color.z * factor),
-    color.w};
+  return {std::max(0.0f, color.x * factor), std::max(0.0f, color.y * factor),
+          std::max(0.0f, color.z * factor), color.w};
 }
 
 ImVec4 GbcImGui::get_level_color(const LogLevel level) {
   switch (level) {
-  case LogLevel::Error:   return {0.80f, 0.40f, 0.40f, 1.0f}; // Light red #cc6666
-  case LogLevel::Warning: return {0.94f, 0.78f, 0.45f, 1.0f}; // Yellow #f0c674
-  case LogLevel::Info:    return {0.71f, 0.74f, 0.40f, 1.0f}; // Light green #b5bd68
-  default:                return {0.77f, 0.78f, 0.78f, 1.0f}; // Grey #c5c8c6
+  case LogLevel::Error:
+    return {0.80f, 0.40f, 0.40f, 1.0f}; // Light red #cc6666
+  case LogLevel::Warning:
+    return {0.94f, 0.78f, 0.45f, 1.0f}; // Yellow #f0c674
+  case LogLevel::Info:
+    return {0.71f, 0.74f, 0.40f, 1.0f}; // Light green #b5bd68
+  default:
+    return {0.77f, 0.78f, 0.78f, 1.0f}; // Grey #c5c8c6
   }
 }

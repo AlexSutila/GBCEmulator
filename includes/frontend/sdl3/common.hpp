@@ -116,6 +116,7 @@ struct UiState {
   bool show_debug{false};
   bool show_breakpoints{false};
   bool show_keybinds{false};
+  bool show_about{false};
   bool fast_forward{false};
 
   // File requests
@@ -137,6 +138,7 @@ struct UiState {
 
   // Miscellaneous
   std::optional<std::size_t> waiting_for_bind{};
+  std::string cart_info{"No ROM loaded"};
 };
 
 #endif //GBC_COMMON_HPP

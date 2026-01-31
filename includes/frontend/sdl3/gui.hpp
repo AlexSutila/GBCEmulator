@@ -51,6 +51,7 @@ private:
   static void build_file_dialogs(UiState& state);
   void build_settings_window(UiState& state, SDLHost& host);
   void build_keybinds_window(UiState& state);
+  void build_about_window(UiState& state);
   static void build_notification_window(UiState& state);
 
   // Helpers
