@@ -173,7 +173,8 @@ void GbcImGui::build_main_menu_bar(UiState &state) const {
     }
 
     if (ImGui::BeginMenu("About")) {
-      state.show_about = true;
+      if (ImGui::MenuItem("About"))
+        state.show_about = true;
       ImGui::EndMenu();
     }
 
@@ -410,13 +411,13 @@ void GbcImGui::build_keybinds_window(UiState &state) {
 void GbcImGui::build_about_window(UiState &state) {
   // Set a default size and position (bottom right)
   ImGui::SetNextWindowSize(ImVec2(400, 300), ImGuiCond_FirstUseEver);
-  if (ImGui::Begin("About")) {
+  if (ImGui::Begin("About", &state.show_about)) {
     ImGui::SeparatorText("Source");
     ImGui::Text("%s", "github.com/AlexSutila/GBCEmulator");
     ImGui::SeparatorText("Cartridge Info");
     ImGui::Text("%s", state.cart_info.c_str());
-    ImGui::End();
   }
+  ImGui::End();
 }
 
 void GbcImGui::build_notification_window(UiState &state) {
