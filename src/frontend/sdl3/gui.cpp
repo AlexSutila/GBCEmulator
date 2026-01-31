@@ -238,7 +238,7 @@ void GbcImGui::build_status_bar(UiState &state) {
     // This is fake fps, real fps tbd
     const auto fps_fmt = "FPS: %.1f";
     char fps_text[32];
-    snprintf(fps_text, sizeof(fps_text), fps_fmt, ImGui::GetIO().Framerate);
+    snprintf(fps_text, sizeof(fps_text), fps_fmt, state.current_fps);
 
     const float text_width = ImGui::CalcTextSize(fps_text).x;
     constexpr float right_margin = 20.0f; // Padding from right edge

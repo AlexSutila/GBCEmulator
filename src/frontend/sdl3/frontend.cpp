@@ -36,8 +36,10 @@ void SDL3Frontend::put_pixel(const int x, const int y, const std::uint32_t c) {
 
   /* Frame completion can be indicated by the fact that we are placing
    * the last pixel in the frame, so we need to swap buffers here. */
-  if (x + 1 == framebuf_width && y + 1 == framebuf_height)
+  if (x + 1 == framebuf_width && y + 1 == framebuf_height) {
     front_index.store(back_index, std::memory_order_release);
+    emulated_frame_count.fetch_add(1, std::memory_order_relaxed);
+  }
 }
 
 void SDL3Frontend::clear(const std::uint32_t c) {
@@ -118,6 +120,21 @@ void SDL3Frontend::render_frame() {
   // 2. Send to GPU
   host.update_texture(raw_pixels, 160, 144, is_cgb,
                       gui.get_settings_c().force_mono_dmg);
+
+  // 3. FPS Calculation
+  const auto now = std::chrono::steady_clock::now();
+  const auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+      now - last_fps_check).count();
+
+  // Update FPS readout every 500ms
+  if (elapsed_ms >= 500) {
+    const uint64_t current_count = emulated_frame_count.load(std::memory_order_relaxed);
+    const uint64_t frames = current_count - last_frame_count;
+    ui_state.current_fps = static_cast<double>(frames) * 1000 / static_cast<double>(elapsed_ms);
+
+    last_frame_count = current_count;
+    last_fps_check = now;
+  }
 
   // --- PHASE 2: UI COMPOSITION ---
   // 1. Start the ImGui frame
