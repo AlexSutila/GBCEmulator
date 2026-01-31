@@ -97,8 +97,20 @@ static void bind_ppu(py::module_ &m) {
       .def("step", &PixelProcessingUnit::step);
 }
 
+static void bind_debugger(py::module_ &m) {
+  py::enum_<Debug::BreakReason>(m, "BreakReason")
+      .value("BRK_CONTINUE", Debug::BreakReason::BRK_CONTINUE)
+      .value("BRK_ADDRESS_EXECUTED", Debug::BreakReason::BRK_ADDRESS_EXECUTED)
+      .value("BRK_ADDRESS_READ", Debug::BreakReason::BRK_ADDRESS_READ)
+      .value("BRK_ADDRESS_WRITTEN", Debug::BreakReason::BRK_ADDRESS_WRITTEN)
+      .value("BRK_STEP_INSTRUCTION", Debug::BreakReason::BRK_STEP_INSTRUCTION)
+      .value("BRK_STEP_SCANLINE", Debug::BreakReason::BRK_STEP_SCANLINE)
+      .value("BRK_STEP_FRAME", Debug::BreakReason::BRK_STEP_FRAME);
+}
+
 static void bind_gbc(py::module_ &m) {
   py::class_<PyGameBoyColor>(m, "GameBoyColor")
+      .def(py::init<pybind11::function>())
       .def(py::init<>())
       .def("insert_cartridge", &PyGameBoyColor::insert_cartridge)
       .def("init_test_bed", &PyGameBoyColor::init_test_bed)
@@ -114,11 +126,14 @@ static void bind_gbc(py::module_ &m) {
       .def("get_timer", &PyGameBoyColor::get_timer,
            py::return_value_policy::reference_internal)
       .def("put_joyp_state", &PyGameBoyColor::put_joyp_state,
-           py::return_value_policy::reference_internal);
+           py::return_value_policy::reference_internal)
+      .def("breakpoint_add", &PyGameBoyColor::breakpoint_add)
+      .def("breakpoint_del", &PyGameBoyColor::breakpoint_del);
 }
 
 PYBIND11_MODULE(gbc_py, m) {
   m.doc() = "Game Boy Color emulator bindings";
+  bind_debugger(m);
   bind_gbc(m);
 
   // Expose components
