@@ -158,6 +158,8 @@ target_compile_options(gbc
 # Python bindings
 pybind11_add_module(gbc_py
     src/frontend/python/bindings.cpp
+    src/frontend/python/frontend.cpp
+    src/frontend/python/wrappers.cpp
     ${GBC_CORE_SOURCES}
 )
 target_link_libraries(gbc_py

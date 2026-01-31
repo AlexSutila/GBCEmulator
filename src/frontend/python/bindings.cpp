@@ -1,65 +1,9 @@
-#include <cstddef>
-#include <memory>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/stl/filesystem.h>
-
-#include "cart/cart.hpp"
-#include "cpu/interrupts.hpp"
-#include "cpu/lr35902.hpp"
-#include "cpu/registers/flags.hpp"
-#include "cpu/registers/register.hpp"
-#include "frontend/frontend.hpp"
-#include "gbc.hpp"
-#include "memory/bus.hpp"
-#include "memory/mmio/dmg.hpp"
-#include "memory/mmio/mmio.hpp"
+#include "frontend/python/wrappers.hpp"
 
 namespace py = pybind11;
-
-class PyFrontend final : public Frontend {
-public:
-  PyFrontend() : Frontend() {}
-  std::array<std::uint32_t, 160 * 144> get_frame() override {
-    return frame_data;
-  }
-  void put_pixel(int x, int y, std::uint32_t c) override {
-    static constexpr int frame_width = 160;
-    frame_data[y * frame_width + x] = c;
-  }
-  void clear(std::uint32_t c) override {}
-  void queue_audio_samples(const float *, std::size_t) override {}
-  void start() override {}
-
-private:
-  std::array<std::uint32_t, 160 * 144> frame_data{};
-};
-
-class PyGameBoyColor {
-public:
-  PyGameBoyColor() : fe_() {}
-  std::array<std::uint32_t, 160 * 144> get_frame() { return fe_.get_frame(); }
-  void insert_cartridge(cart c) { fe_.get()->insert_cartridge(c); }
-  void init_test_bed() { fe_.get()->init_test_bed(); }
-  void step_cycles(int cycles) {
-    for (int i{0}; i < cycles; i++)
-      step();
-  }
-  void step() { fe_.get()->step(); }
-
-  AddressBus *get_bus() { return fe_.get()->get_bus(); };
-  LR35902 *get_cpu() { return fe_.get()->get_cpu(); };
-  PixelProcessingUnit *get_ppu() { return fe_.get()->get_ppu(); }
-  TimerUnit *get_timer() { return fe_.get()->get_timer(); }
-  void put_joyp_state(std::uint8_t state) {
-    auto *joypad = dynamic_cast<Joypad::JOYP *>(
-        fe_.get()->get_bus()->get_mmio(IORegisterMapping::MMIO_JOYPAD));
-    joypad->set_state(state);
-  }
-
-private:
-  PyFrontend fe_;
-};
 
 bool poll_mooneye_test(PyGameBoyColor &gbc) {
   std::uint32_t max_cycles = 10000000, cycles = 0;
@@ -108,6 +52,8 @@ PYBIND11_MODULE(gbc_py, m) {
       .def("cgb_flag", &rom_header::cgb_flag)
       .def("title", &rom_header::title)
       .def("manufacturer_code", &rom_header::manufacturer_code);
+
+  // Cartridge context
   py::class_<cart>(m, "Cart")
       .def(py::init<>())
       .def_readonly("file_path", &cart::file_path)
@@ -124,18 +70,6 @@ PYBIND11_MODULE(gbc_py, m) {
           },
           "ROM contents as immutable bytes")
       .def_property_readonly("rom_size", &cart::rom_size);
-  m.def(
-      "load_cart_raw",
-      [](py::bytes data) {
-        std::string_view view = data;
-        std::vector<byte_t> rom(view.begin(), view.end());
-        return load_cart_raw(std::move(rom));
-      },
-      py::arg("rom_bytes"), "Load a Game Boy cartridge from raw ROM bytes");
-  m.def(
-      "load_cart_fs",
-      [](const fs::path &rom_path) { return load_cart_fs(rom_path); },
-      py::arg("rom_path"), "Load a Game Boy cartridge from filesystem");
 
   // Generic MMIO register
   py::class_<MMIORegister>(m, "MMIORegister")
@@ -174,8 +108,7 @@ PYBIND11_MODULE(gbc_py, m) {
       .def("load_state", &LR35902::load_state, py::arg("state"));
 
   // Timer class
-  py::class_<TimerUnit>(m, "TimerUnit")
-      .def("step", &TimerUnit::step);
+  py::class_<TimerUnit>(m, "TimerUnit").def("step", &TimerUnit::step);
 
   // Pixel Processor class
   py::class_<PixelProcessingUnit>(m, "PixelProcessor")
@@ -199,6 +132,18 @@ PYBIND11_MODULE(gbc_py, m) {
            py::return_value_policy::reference_internal)
       .def("put_joyp_state", &PyGameBoyColor::put_joyp_state,
            py::return_value_policy::reference_internal);
+
+  // Content loading
+  m.def("load_cart_raw",
+      [](py::bytes data) {
+        std::string_view view = data;
+        std::vector<byte_t> rom(view.begin(), view.end());
+        return load_cart_raw(std::move(rom));
+      },
+      py::arg("rom_bytes"), "Load a Game Boy cartridge from raw ROM bytes");
+  m.def("load_cart_fs",
+      [](const fs::path &rom_path) { return load_cart_fs(rom_path); },
+      py::arg("rom_path"), "Load a Game Boy cartridge from filesystem");
 
   // For testing
   m.def("poll_mooneye_test", &poll_mooneye_test, py::arg("gbc"),
