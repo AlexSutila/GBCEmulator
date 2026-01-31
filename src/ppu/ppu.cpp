@@ -533,7 +533,7 @@ void PixelProcessingUnit::update_stat() {
   /* Condition 4: We are in VBLANK and the STAT source bit is set. For some
    * reason, this condition is also met in OAM scan as per TCAGBD. */
   const bool cond_d = (stat_.get_mode() == PPU::StatModes::MODE_VBLANK) &&
-                      (stat_.int_enabled(PPU::StatIntFlags::MODE_0_SEL) ||
+                      (stat_.int_enabled(PPU::StatIntFlags::MODE_2_SEL) ||
                        stat_.int_enabled(PPU::StatIntFlags::MODE_1_SEL));
 
   // Detect rising edge, fire IRQ appropriately
