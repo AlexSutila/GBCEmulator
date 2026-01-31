@@ -111,6 +111,20 @@ PixelProcessingUnit::PixelProcessingUnit(
   stat_irq_signal_edge = false;
 }
 
+PixelProcessingUnit::PPUState
+PixelProcessingUnit::get_state() const {
+  PPUState state{};
+  state.lcdc = lcdc_.peek();
+  state.stat = stat_.peek();
+  state.scx = scx_.peek();
+  state.scy = scy_.peek();
+  state.wy = wy_.peek();
+  state.wx = wx_.peek();
+  state.lyc = lyc_.peek();
+  state.ly = ly_.peek();
+  return state;
+}
+
 bool PixelProcessingUnit::should_advance_ly() {
   constexpr std::size_t total_scanline_cycles = 456; // Fixed
   const byte_t cur_ly = ly_.peek();

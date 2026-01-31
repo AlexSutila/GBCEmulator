@@ -169,6 +169,8 @@ void GbcImGui::build_main_menu_bar(UiState &state) const {
         state.show_debug = true;
       if (ImGui::MenuItem("Edit Breakpoints"))
         state.show_breakpoints = true;
+      if (ImGui::MenuItem("Show PPU Viewer"))
+        state.show_ppu_viewer = true;
       ImGui::EndMenu();
     }
 

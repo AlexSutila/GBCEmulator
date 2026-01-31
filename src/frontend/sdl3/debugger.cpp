@@ -1,21 +1,24 @@
 #include "frontend/sdl3/debugger.hpp"
-#include <imgui.h>
 #include "debugger/print.hpp"
-
+#include <imgui.h>
+#include <mutex>
 
 // This is a public entry point called from the main GUI render loop
 // Replaces the build_ui functionality
-void DebuggerImGui::render(UiState& state, const std::unique_ptr<GameBoyColor>& core) {
-  if (state.show_debug) {
+void DebuggerImGui::render(UiState &state,
+                           const std::unique_ptr<GameBoyColor> &core) {
+  if (state.show_debug)
     build_debug_window(state);
-  }
-  if (state.show_breakpoints) {
+  if (state.show_breakpoints)
     build_breakpoints_window(state, core);
-  }
+  if (state.show_ppu_viewer)
+    build_ppu_viewer_window(state);
 }
 
 // Called by the emulator thread when a breakpoint is hit
-Debug::BreakReason DebuggerImGui::on_breakpoint(const std::stop_token& st, const std::unique_ptr<GameBoyColor>& core) {
+Debug::BreakReason
+DebuggerImGui::on_breakpoint(const std::stop_token &st,
+                             const std::unique_ptr<GameBoyColor> &core) {
   std::unique_lock lock(dbg_mutex);
   ctx.stopped = true;
   update_state_from_core(core);
@@ -26,9 +29,11 @@ Debug::BreakReason DebuggerImGui::on_breakpoint(const std::stop_token& st, const
 }
 
 // Call from main thread to update visual state
-void DebuggerImGui::update_state_from_core(const std::unique_ptr<GameBoyColor>& core) {
+void DebuggerImGui::update_state_from_core(
+    const std::unique_ptr<GameBoyColor> &core) {
   ctx.sys_state = Debug::to_string(core->get_sys());
   ctx.cpu_state = Debug::to_string(core->get_cpu()->get_state());
+  ctx.ppu_state = Debug::to_string(core->get_ppu()->get_state());
   ctx.disasm = core->get_cpu()->disasm();
 
   const InterruptBits *const ie_reg = dynamic_cast<InterruptBits *>(
@@ -39,7 +44,8 @@ void DebuggerImGui::update_state_from_core(const std::unique_ptr<GameBoyColor>& 
   ctx.if_state = Debug::to_string(*if_reg);
 }
 
-void DebuggerImGui::forward_stop(const std::unique_ptr<GameBoyColor>& core) const {
+void DebuggerImGui::forward_stop(
+    const std::unique_ptr<GameBoyColor> &core) const {
   std::lock_guard lock(dbg_mutex);
   if (ctx.stopped)
     core->get_debugger()->request_stop(ctx.reason);
@@ -113,7 +119,8 @@ void DebuggerImGui::build_debug_window(UiState &state) {
   ImGui::End();
 }
 
-void DebuggerImGui::build_breakpoints_window(UiState& state, const std::unique_ptr<GameBoyColor>& core) {
+void DebuggerImGui::build_breakpoints_window(
+    UiState &state, const std::unique_ptr<GameBoyColor> &core) {
   std::lock_guard lock(dbg_mutex);
   ImGui::Begin("Breakpoints", &state.show_breakpoints);
   ImGui::SeparatorText("Breakpoints");
@@ -126,7 +133,7 @@ void DebuggerImGui::build_breakpoints_window(UiState& state, const std::unique_p
   }
 
   for (const auto bps = debugger->get_breakpoints();
-    const auto &[addr, bp] : bps) {
+       const auto &[addr, bp] : bps) {
     ImGui::PushID(addr);
 
     ImGui::Text("%s", bp.to_string().c_str());
@@ -153,7 +160,16 @@ void DebuggerImGui::build_breakpoints_window(UiState& state, const std::unique_p
   ImGui::End();
 }
 
-void DebuggerImGui::build_config_breakpoint_window(const std::unique_ptr<GameBoyColor>& core) {
+void DebuggerImGui::build_ppu_viewer_window(UiState &state) {
+  std::lock_guard lock(dbg_mutex);
+  ImGui::Begin("Pixel Processor Viewer", &state.show_ppu_viewer);
+  ImGui::SeparatorText("Pixel Processor State");
+  ImGui::Text("%s", ctx.ppu_state.c_str());
+  ImGui::End();
+}
+
+void DebuggerImGui::build_config_breakpoint_window(
+    const std::unique_ptr<GameBoyColor> &core) {
   if (ImGui::BeginPopupModal("Configure breakpoint", nullptr,
                              ImGuiWindowFlags_AlwaysAutoResize)) {
 

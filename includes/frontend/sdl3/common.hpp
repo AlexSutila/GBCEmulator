@@ -115,6 +115,7 @@ struct UiState {
   bool show_settings{false};
   bool show_debug{false};
   bool show_breakpoints{false};
+  bool show_ppu_viewer{false};
   bool show_keybinds{false};
   bool show_about{false};
   bool fast_forward{false};

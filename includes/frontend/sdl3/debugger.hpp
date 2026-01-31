@@ -3,15 +3,15 @@
 
 #pragma once
 #include "common.hpp"
-#include "debugger/debugger.hpp"
 #include "gbc.hpp"
-#include <mutex>
 #include <condition_variable>
+#include <mutex>
 
 struct DebugContext {
   Debug::BreakReason reason{Debug::BRK_CONTINUE};
   std::string sys_state{};
   std::string cpu_state{};
+  std::string ppu_state{};
   std::string ie_state{};
   std::string if_state{};
   std::string disasm{};
@@ -28,16 +28,20 @@ struct BreakpointPrompt {
 
 class DebuggerImGui {
 public:
-  void render(UiState& state, const std::unique_ptr<GameBoyColor>& core);
-  Debug::BreakReason on_breakpoint(const std::stop_token& st, const std::unique_ptr<GameBoyColor>& core);
-  void update_state_from_core(const std::unique_ptr<GameBoyColor>& core);
-  void forward_stop(const std::unique_ptr<GameBoyColor>& core) const;
+  void render(UiState &state, const std::unique_ptr<GameBoyColor> &core);
+  Debug::BreakReason on_breakpoint(const std::stop_token &st,
+                                   const std::unique_ptr<GameBoyColor> &core);
+  void update_state_from_core(const std::unique_ptr<GameBoyColor> &core);
+  void forward_stop(const std::unique_ptr<GameBoyColor> &core) const;
   void request_stop();
 
 private:
-  void build_debug_window(UiState& state);
-  void build_breakpoints_window(UiState& state, const std::unique_ptr<GameBoyColor>& core);
-  void build_config_breakpoint_window(const std::unique_ptr<GameBoyColor>& core);
+  void build_debug_window(UiState &state);
+  void build_breakpoints_window(UiState &state,
+                                const std::unique_ptr<GameBoyColor> &core);
+  void
+  build_config_breakpoint_window(const std::unique_ptr<GameBoyColor> &core);
+  void build_ppu_viewer_window(UiState &state);
 
   DebugContext ctx;
   mutable std::mutex dbg_mutex;
@@ -45,4 +49,4 @@ private:
   BreakpointPrompt bp_prompt{};
 };
 
-#endif //GBC_DEBUGGER_HPP
+#endif // GBC_DEBUGGER_HPP

@@ -19,7 +19,6 @@ namespace Debug {
 }
 
 std::string to_string(const LR35902::ProcessorState &s) {
-
   std::ostringstream out;
   out << "PC: " << hex16(s.pc) << "  "
       << "SP: " << hex16(s.sp) << "\n\n"
@@ -28,6 +27,33 @@ std::string to_string(const LR35902::ProcessorState &s) {
       << " D: " << hex8(s.d) << "  E: " << hex8(s.e) << "\n"
       << " H: " << hex8(s.h) << "  L: " << hex8(s.l) << "\n\n"
       << "IME: " << (s.ime_enabled ? "enabled" : "disabled");
+  return out.str();
+}
+
+std::string to_string(const PixelProcessingUnit::PPUState &s) {
+  const char *mode_str = "";
+  std::ostringstream out;
+
+  switch (s.state) {
+  case PPU::StatModes::MODE_HBLANK:
+    mode_str = "HBLANK";
+    break;
+  case PPU::StatModes::MODE_VBLANK:
+    mode_str = "VBLANK";
+    break;
+  case PPU::StatModes::MODE_OAM_SCAN:
+    mode_str = "OAM_SCAN";
+    break;
+  case PPU::StatModes::MODE_DRAWING:
+    mode_str = "DRAWING";
+    break;
+  }
+  out << "PPU Mode: " << mode_str << "\n\n"
+      << "LCDC:  " << hex8(s.lcdc) << "  STAT: " << hex8(s.stat) << "\n"
+      << "SCX:   " << hex8(s.scx) << "  SCY:  " << hex8(s.scy) << "\n"
+      << "WX:    " << hex8(s.wx) << "  WY:   " << hex8(s.wy) << "\n"
+      << "LY:    " << static_cast<int>(s.ly)
+      << "  LYC:  " << static_cast<int>(s.lyc);
   return out.str();
 }
 

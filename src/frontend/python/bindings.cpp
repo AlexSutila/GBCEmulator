@@ -1,5 +1,6 @@
 #include "frontend/python/testing.hpp"
 #include "frontend/python/wrappers.hpp"
+#include "ppu/ppu.hpp"
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/stl/filesystem.h>
@@ -94,7 +95,26 @@ static void bind_timer(py::module_ &m) {
 
 static void bind_ppu(py::module_ &m) {
   py::class_<PixelProcessingUnit>(m, "PixelProcessor")
-      .def("step", &PixelProcessingUnit::step);
+      .def("step", &PixelProcessingUnit::step)
+      .def("get_state", &PixelProcessingUnit::get_state);
+
+  // Bind stateful enumerations
+  py::enum_<PPU::StatModes>(m, "StatModes")
+      .value("HBLANK", PPU::StatModes::MODE_HBLANK)
+      .value("VBLANK", PPU::StatModes::MODE_VBLANK)
+      .value("OAM_SCAN", PPU::StatModes::MODE_OAM_SCAN)
+      .value("DRAWING", PPU::StatModes::MODE_DRAWING)
+      .export_values();
+  py::class_<PixelProcessingUnit::PPUState>(m, "PPUState")
+      .def_readonly("state", &PixelProcessingUnit::PPUState::state)
+      .def_readonly("lcdc", &PixelProcessingUnit::PPUState::lcdc)
+      .def_readonly("stat", &PixelProcessingUnit::PPUState::stat)
+      .def_readonly("scx", &PixelProcessingUnit::PPUState::scx)
+      .def_readonly("scy", &PixelProcessingUnit::PPUState::scy)
+      .def_readonly("wx", &PixelProcessingUnit::PPUState::wx)
+      .def_readonly("wy", &PixelProcessingUnit::PPUState::wy)
+      .def_readonly("lyc", &PixelProcessingUnit::PPUState::lyc)
+      .def_readonly("ly", &PixelProcessingUnit::PPUState::ly);
 }
 
 static void bind_debugger(py::module_ &m) {

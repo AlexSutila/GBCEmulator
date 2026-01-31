@@ -4,6 +4,7 @@
 #include "cpu/interrupts.hpp"
 #include "cpu/lr35902.hpp"
 #include "gbc.hpp"
+#include "ppu/ppu.hpp"
 #include <string>
 
 namespace Debug {
@@ -12,6 +13,7 @@ namespace Debug {
 [[nodiscard]] std::string hex16(addr_t v);
 
 [[nodiscard]] std::string to_string(const LR35902::ProcessorState &s);
+[[nodiscard]] std::string to_string(const PixelProcessingUnit::PPUState &s);
 [[nodiscard]] std::string to_string(const InterruptBits &i);
 [[nodiscard]] std::string to_string(const runtime_sys_info &r);
 

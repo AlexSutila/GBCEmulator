@@ -136,9 +136,10 @@ void SDL3Frontend::render_frame() {
     running = false;
   }
   // 3. Build debugger windows (if active)
-  if (ui_state.show_debug || ui_state.show_breakpoints) {
+  if (ui_state.show_debug || ui_state.show_breakpoints ||
+      ui_state.show_ppu_viewer)
     debugger.render(ui_state, gbc);
-  }
+
   // 4. Finalize ImGui frame
   GbcImGui::end_frame();
 
