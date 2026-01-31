@@ -7,7 +7,7 @@ SDLHost::SDLHost(const int width, const int height, const int scale) {
   if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO))
     throw std::runtime_error(SDL_GetError());
 
-  window = SDL_CreateWindow("GBC", width * scale, height * scale,
+  window = SDL_CreateWindow("GBC", width * scale, height * scale + 19*2,
                             SDL_WINDOW_RESIZABLE);
   if (!window)
     throw std::runtime_error(SDL_GetError());
@@ -55,11 +55,11 @@ void SDLHost::update_texture(const std::uint32_t *pixels, const int width,
   SDL_UnlockTexture(texture);
 }
 
-void SDLHost::draw_texture(const float menu_bar_height) const {
+void SDLHost::draw_texture(const float menu_bar_height, const float bottom_bar_height) const {
   int window_w{}, window_h{};
   SDL_GetWindowSize(window, &window_w, &window_h);
   const auto avail_w = static_cast<float>(window_w);
-  const auto avail_h = static_cast<float>(window_h) - menu_bar_height;
+  const auto avail_h = static_cast<float>(window_h) - menu_bar_height - bottom_bar_height;
 
   // Scale texture so it doesn't warp with window size
   float tex_w{}, tex_h{};
