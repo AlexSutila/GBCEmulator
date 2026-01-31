@@ -2,13 +2,11 @@
 from gbc_py import (
     load_cart_fs,
     GameBoyColor,
-    Cart
 )
 from matplotlib.patches import Rectangle
-from typing import Optional, List
 import matplotlib.pyplot as plt
+from typing import List
 import numpy as np
-import requests
 
 
 def __run_and_get_frame(path: str, seconds: int) -> List[int]:
@@ -34,7 +32,8 @@ def __run_test_set(
     seconds: List[int],
     out_path: str,
 ):
-    images = [__render_from_path(path, second) for path, second in zip(paths, seconds)]
+    images = [__render_from_path(path, second)
+              for path, second in zip(paths, seconds)]
     n = len(images)
 
     rows, cols = 2, 4
@@ -102,4 +101,3 @@ def make_cgb_demo():
 if __name__ == '__main__':
     make_dmg_demo()
     make_cgb_demo()
-
