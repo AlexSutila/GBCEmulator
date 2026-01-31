@@ -31,7 +31,7 @@ struct runtime_sys_info {
   bool double_speed{};
 };
 
-class GameBoyColor {
+class GameBoyColor final : private Debug::Debuggable {
 public:
   GameBoyColor(Frontend &frontend, const std::string &bios_path);
   GameBoyColor(Frontend &frontend, const BootROM &rom);

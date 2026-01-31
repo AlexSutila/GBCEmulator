@@ -119,8 +119,9 @@ private:
   void request_lcd_irq() {
     if_reg->put_flag(InterruptFlagMask::INT_FLAG_LCD, true);
   }
+  void update_stat(PPU::StatModes mode);
+  CircularFifo<PPU::StatModes, 4> stat_delay{};
   bool stat_irq_signal_edge{};
-  void update_stat();
 
   /* Timing and FSM metadata */
   std::optional<std::size_t> total_mode_clks{};

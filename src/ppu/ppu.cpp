@@ -111,8 +111,7 @@ PixelProcessingUnit::PixelProcessingUnit(
   stat_irq_signal_edge = false;
 }
 
-PixelProcessingUnit::PPUState
-PixelProcessingUnit::get_state() const {
+PixelProcessingUnit::PPUState PixelProcessingUnit::get_state() const {
   PPUState state{};
   state.lcdc = lcdc_.peek();
   state.stat = stat_.peek();
@@ -506,17 +505,17 @@ bool PixelProcessingUnit::blank() {
   return true;
 }
 
-void PixelProcessingUnit::update_stat() {
+void PixelProcessingUnit::update_stat(PPU::StatModes mode) {
   /* The actual firing of the interrupt is fired on a rising edge of an internal
    * signal. That signal is set based on various conditions. */
   const bool old = stat_irq_signal_edge;
 
   /* Handle STAT mode bits reading wrong value for first scanline upon the PPU
    * being enabled after not being enabled. */
-  if (ppu_enable_oam_bug && state == PPU::StatModes::MODE_OAM_SCAN) [[unlikely]]
+  if (ppu_enable_oam_bug && mode == PPU::StatModes::MODE_OAM_SCAN) [[unlikely]]
     stat_.set_mode(PPU::StatModes::MODE_HBLANK); // Hardware bug
-  else
-    stat_.set_mode(state);
+  else [[likely]]
+    stat_.set_mode(mode);
 
   /* Condition 1: The LY register is equal to the LYC register */
   const bool cond_a = (ly_.peek() == lyc_.peek()) &&
@@ -546,6 +545,7 @@ void PixelProcessingUnit::update_stat() {
 void PixelProcessingUnit::reset() {
   ppu_enable_oam_bug = true;
   flush_on_disable = true;
+  stat_delay.clear();
   fetcher->reset();
   obj_fifo.flush();
   bg_fifo.flush();
@@ -588,7 +588,9 @@ void PixelProcessingUnit::step() {
   }
 
   /* Update status register */
-  update_stat();
+  stat_delay.push(state);
+  if (stat_delay.full())
+    update_stat(stat_delay.pop());
 }
 
 #undef DMG_COLOR_PRESERVE_HACK

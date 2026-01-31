@@ -23,9 +23,10 @@ enum BreakReason : std::uint32_t {
   BRK_ADDRESS_READ = 1 << 2,
   BRK_ADDRESS_WRITTEN = 1 << 3,
   // Hardware specified reasons only
-  BRK_STEP_INSTRUCTION = 1 << 4,
-  BRK_STEP_SCANLINE = 1 << 5,
-  BRK_STEP_FRAME = 1 << 6,
+  BRK_STEP_CLOCK_CYCLE = 1 << 4,
+  BRK_STEP_INSTRUCTION = 1 << 5,
+  BRK_STEP_SCANLINE = 1 << 6,
+  BRK_STEP_FRAME = 1 << 7,
 };
 
 constexpr BreakReason operator|(BreakReason a, BreakReason b) {

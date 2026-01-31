@@ -1,4 +1,5 @@
 #include "frontend/sdl3/debugger.hpp"
+#include "debugger/breakpoint.hpp"
 #include "debugger/print.hpp"
 #include <imgui.h>
 #include <mutex>
@@ -81,7 +82,16 @@ void DebuggerImGui::build_debug_window(UiState &state) {
     ctx.stopped = true;
   }
   ImGui::SameLine();
-  if (ImGui::Button("Step Instruction")) {
+  if (ImGui::Button("Step Cycle")) {
+    {
+      std::lock_guard lock(dbg_mutex);
+      ctx.reason = Debug::BRK_STEP_CLOCK_CYCLE;
+      ctx.stopped = false;
+    }
+    dbg_cv.notify_one();
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Step Instr")) {
     {
       std::lock_guard lock(dbg_mutex);
       ctx.reason = Debug::BRK_STEP_INSTRUCTION;
