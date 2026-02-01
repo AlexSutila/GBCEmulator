@@ -18,8 +18,9 @@ class GbcImGui {
     "Right", "Left", "Up", "Down", "A", "B", "Select", "Start"};
   static constexpr std::array<std::string_view, 5> general_labels{
     "FF Toggle", "FF (Hold)", "Vol Up" , "Vol Down", "Monochrome"};
-  static constexpr float max_font_scale = 2.0f;
+  static constexpr float max_font_scale = 3.0f;
   static constexpr float base_font_size = 16.0f;
+  const std::string font = "../fonts/TerminessNerdFontMono-Regular.ttf";
 
 public:
   void init(const SDLHost& host);
@@ -48,7 +49,6 @@ public:
 private:
   Settings settings;
   float dpi_scale{1.0f};
-  std::string font = "../fonts/3270NerdFontMono-Regular.ttf";
 
   void build_main_menu_bar(UiState& state) const;
   static void build_status_bar(UiState &state);

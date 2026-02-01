@@ -77,6 +77,18 @@ bool GbcImGui::process_event(const SDL_Event &e, UiState &ui_state) {
     if (SDL_Window* window = SDL_GetWindowFromID(e.window.windowID)) {
       if (const float new_scale = SDL_GetWindowDisplayScale(window);
         std::abs(new_scale - dpi_scale) > 0.001f) {
+        // We also want to resize the window to maintain physical size
+        if (const Uint32 flags = SDL_GetWindowFlags(window);
+          !(flags & (SDL_WINDOW_MAXIMIZED | SDL_WINDOW_FULLSCREEN))) {
+          int w, h;
+          SDL_GetWindowSize(window, &w, &h);
+
+          // If moving 2.0x -> 1.0x, ratio is 0.5.
+          // Window should shrink by half to look the same physical size.
+          const float ratio = new_scale / dpi_scale;
+          SDL_SetWindowSize(window, static_cast<int>(static_cast<float>(w) * ratio),
+                                    static_cast<int>(static_cast<float>(h) * ratio));
+        }
         update_dpi_scale(new_scale);
       }
     }
