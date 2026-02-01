@@ -162,11 +162,6 @@ pybind11_add_module(gbc_py
     src/frontend/python/wrappers.cpp
     ${GBC_CORE_SOURCES}
 )
-target_link_libraries(gbc_py
-    PRIVATE SDL3::SDL3
-    PRIVATE imgui
-    PRIVATE nlohmann_json::nlohmann_json
-)
 target_include_directories(gbc_py
     PRIVATE ${GBC_INCLUDE_DIR}
 )

@@ -33,6 +33,7 @@ void ObjAttrDMA::start(const byte_t addr_high) {
    * a single byte. This byte determines the upper byte of the source addres. */
   src_base_addr = static_cast<addr_t>(addr_high) * 0x100;
   state = STATE_OAMDMA_INIT;
+  clocks_remaining.reset();
   data_offset = 0;
 }
 
