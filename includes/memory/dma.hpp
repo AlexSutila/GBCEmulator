@@ -28,11 +28,18 @@ public:
 private:
   addr_t src_base_addr{}, data_offset{};
 
-  /* This is always fixed, although the time required for completion of the data
-   * transfer does seem to be impacted by double speed mode. */
-  static constexpr auto total_clock_cycles = 160 * 4; // T-cycles
+  enum State {
+    STATE_DISABLED,    // DMA is not active
+    STATE_OAMDMA_INIT, // Initialization
+    STATE_OAMDMA_TRAN, // Data Transfer
+  } state;
   DMA::DMA dma_;
 
+  /* Core OAM DMA logic implementation */
+  void do_oam_dma_init();
+  void do_oam_dma_tran();
+
+  /* Timing metadata */
   std::optional<std::size_t> clocks_remaining;
   AddressBus &bus_;
 };
@@ -115,6 +122,7 @@ private:
   void set_addr(MMIORegister &lo, MMIORegister &hi, const addr_t addr);
   const addr_t get_addr(MMIORegister &lo, MMIORegister &hi);
 
+  /* Timing metadata */
   std::optional<std::size_t> clocks_remaining;
   runtime_sys_info &sys_;
   AddressBus &bus_;
