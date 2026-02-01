@@ -4,8 +4,9 @@
 #pragma once
 #include "common.hpp"
 #include "sdl_host.hpp"
-#include "imgui.h"
-#include "ImGuiFileDialog.h"
+#include <imgui.h>
+#include <imgui_internal.h>
+#include <ImGuiFileDialog.h>
 #include <backends/imgui_impl_sdlrenderer3.h>
 #include <backends/imgui_impl_sdl3.h>
 
@@ -18,6 +19,9 @@ class GbcImGui {
     "Right", "Left", "Up", "Down", "A", "B", "Select", "Start"};
   static constexpr std::array<std::string_view, 5> general_labels{
     "FF Toggle", "FF (Hold)", "Vol Up" , "Vol Down", "Monochrome"};
+  static constexpr float max_font_scale = 3.0f;
+  static constexpr float base_font_size = 16.0f;
+  const std::string font = "../fonts/TerminessNerdFontMono-Regular.ttf";
 
 public:
   void init(const SDLHost& host);
@@ -45,19 +49,21 @@ public:
 
 private:
   Settings settings;
+  float dpi_scale{1.0f};
 
   void build_main_menu_bar(UiState& state) const;
-  static void build_status_bar(UiState &state);
-  static void build_file_dialogs(UiState& state);
+  void build_status_bar(UiState &state) const;
+  void build_file_dialogs(UiState& state) const;
   void build_settings_window(UiState& state, SDLHost& host);
   void build_keybinds_window(UiState& state);
   void build_about_window(UiState& state);
-  static void build_notification_window(UiState& state);
+  void build_notification_window(UiState& state) const;
 
   // Helpers
   IGFD::FileDialogConfig rom_sel_conf;
   IGFD::FileDialogConfig bios_sel_conf;
-  static std::tuple<ImVec2, ImVec2> get_min_dialog_size() ;
+  void update_dpi_scale(float new_scale);
+  [[nodiscard]] std::tuple<ImVec2, ImVec2> get_min_dialog_size() const ;
   static ImVec4 get_darkened_color(ImVec4 color, float factor);
   static void apply_keybind_preset(std::array<SDL_Keycode, 8>& array, int keybind_preset_index);
   static ImVec4 get_level_color(LogLevel level) ;

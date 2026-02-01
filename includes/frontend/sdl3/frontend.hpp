@@ -10,6 +10,8 @@
 #include <atomic>
 #include <thread>
 
+using Clock = std::chrono::steady_clock;
+
 class SDL3Frontend final : public Frontend {
   static constexpr int framebuf_height{144};
   static constexpr int framebuf_width{160};
@@ -50,6 +52,11 @@ private:
   std::atomic<bool> is_cgb{false};
   std::atomic<bool> fast_forward{true};
 
+  // FPS calculation
+  std::atomic<uint64_t> emulated_frame_count{0};
+  Clock::time_point last_fps_check = Clock::now();
+  uint64_t last_frame_count = 0;
+
   // Video buffers
   std::array<std::unique_ptr<std::uint32_t[]>, 2> framebuffers;
   std::atomic<int> front_index{0};
@@ -70,6 +77,7 @@ private:
   // Input helpers
   InputState input_state{};
   void handle_keypress(SDL_Keycode key, bool pressed);
+  static bool SDLCALL event_watcher(void* userdata, const SDL_Event* event);
 };
 
 #endif // GBC_FRONTEND_HPP

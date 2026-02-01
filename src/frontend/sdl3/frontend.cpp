@@ -4,6 +4,7 @@
 SDL3Frontend::SDL3Frontend() : host(framebuf_width, framebuf_height, scale) {
   host.init_audio();
   gui.init(host);
+  SDL_AddEventWatch(reinterpret_cast<SDL_EventFilter>(event_watcher), this);
   framebuffers[0] =
       std::make_unique<std::uint32_t[]>(framebuf_height * framebuf_width);
   framebuffers[1] =
@@ -13,6 +14,7 @@ SDL3Frontend::SDL3Frontend() : host(framebuf_width, framebuf_height, scale) {
 }
 
 SDL3Frontend::~SDL3Frontend() {
+  SDL_RemoveEventWatch(reinterpret_cast<SDL_EventFilter>(event_watcher), this);
   gui.shutdown();
   // The rest of destruction is handled in SDLHost destructor,
   // which should be called automatically at this point
@@ -37,8 +39,10 @@ void SDL3Frontend::put_pixel(const int x, const int y, const std::uint32_t c) {
 
   /* Frame completion can be indicated by the fact that we are placing
    * the last pixel in the frame, so we need to swap buffers here. */
-  if (x + 1 == framebuf_width && y + 1 == framebuf_height)
+  if (x + 1 == framebuf_width && y + 1 == framebuf_height) {
     front_index.store(back_index, std::memory_order_release);
+    emulated_frame_count.fetch_add(1, std::memory_order_relaxed);
+  }
 }
 
 void SDL3Frontend::clear(const std::uint32_t c) {
@@ -122,6 +126,21 @@ void SDL3Frontend::render_frame() {
   host.update_texture(raw_pixels, 160, 144, is_cgb,
                       gui.get_settings_c().force_mono_dmg);
 
+  // 3. FPS Calculation
+  const auto now = std::chrono::steady_clock::now();
+  const auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+      now - last_fps_check).count();
+
+  // Update FPS readout every 500ms
+  if (elapsed_ms >= 500) {
+    const uint64_t current_count = emulated_frame_count.load(std::memory_order_relaxed);
+    const uint64_t frames = current_count - last_frame_count;
+    ui_state.current_fps = static_cast<double>(frames) * 1000 / static_cast<double>(elapsed_ms);
+
+    last_frame_count = current_count;
+    last_fps_check = now;
+  }
+
   // --- PHASE 2: UI COMPOSITION ---
   // 1. Start the ImGui frame
   GbcImGui::new_frame();
@@ -147,7 +166,7 @@ void SDL3Frontend::render_frame() {
   // 1. Clear background
   host.clear_screen();
   // 2. Draw the Emulator Output
-  host.draw_texture(ImGui::GetFrameHeight());
+  host.draw_texture(ImGui::GetFrameHeight(), ImGui::GetFrameHeight());
   // 3. Draw the ImGui Overlay
   host.draw_overlay(ImGui::GetDrawData());
   // 4. Swap buffers
@@ -296,5 +315,26 @@ bool SDL3Frontend::consume_load_bios_request(
   bios_path = ui_state.load_bios_path;
 
   gui.update_bios_path(ui_state.load_bios_path);
+  return true;
+}
+
+bool SDLCALL SDL3Frontend::event_watcher(void* userdata, const SDL_Event* event) {
+  if (event->type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED ||
+      event->type == SDL_EVENT_WINDOW_MOVED ||
+      event->type == SDL_EVENT_WINDOW_EXPOSED) {
+
+    static auto last_draw = std::chrono::steady_clock::now();
+
+    // Force a frame update immediately
+    // When the main loop is blocked during windows resizing
+    if (const auto now = std::chrono::steady_clock::now();
+      std::chrono::duration_cast<std::chrono::milliseconds>(now - last_draw).count() >= 16) {
+      auto* self = static_cast<SDL3Frontend*>(userdata);
+      self->render_frame();
+      last_draw = now;
+    }
+  }
+
+  // Return true to allow the event to propagate to SDL_PollEvent queue
   return true;
 }

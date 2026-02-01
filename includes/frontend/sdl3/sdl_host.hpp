@@ -18,7 +18,7 @@ public:
   SDL_Renderer* get_renderer() const { return renderer; }
   void update_texture(const std::uint32_t *pixels, int width, int height,
     const std::atomic<bool>& is_cgb, bool force_mono) const;
-  void draw_texture(float menu_bar_height) const;
+  void draw_texture(float menu_bar_height, float bottom_bar_height) const;
   static std::uint32_t format_pixel_data(std::uint32_t px, bool is_cgb, bool force_mono);
   void draw_overlay(ImDrawData *draw_data) const {ImGui_ImplSDLRenderer3_RenderDrawData(draw_data, renderer);}
   void present() const {SDL_RenderPresent(renderer);}

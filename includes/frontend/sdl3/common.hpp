@@ -125,7 +125,7 @@ struct UiState {
   std::string load_rom_path;
   bool request_load_bios{false};
   std::string load_bios_path;
-  bool request_quit = false;
+  bool request_quit{false};
 
   // Audio Device Cache
   std::vector<std::string> audio_device_names;
@@ -134,8 +134,12 @@ struct UiState {
 
   // Notification (errors)
   std::vector<Notification> notifications;
-  bool show_notifications = false;
-  int next_notify_id = 0;
+  bool show_notifications{false};
+  int next_notify_id{};
+
+  // FPS Tracking
+  double current_fps{};
+  float frame_time_ms{};
 
   // Miscellaneous
   std::optional<std::size_t> waiting_for_bind{};
