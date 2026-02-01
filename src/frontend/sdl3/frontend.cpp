@@ -3,6 +3,7 @@
 SDL3Frontend::SDL3Frontend() : host(framebuf_width, framebuf_height, scale) {
   host.init_audio();
   gui.init(host);
+  SDL_AddEventWatch(reinterpret_cast<SDL_EventFilter>(event_watcher), this);
   framebuffers[0] =
       std::make_unique<std::uint32_t[]>(framebuf_height * framebuf_width);
   framebuffers[1] =
@@ -12,6 +13,7 @@ SDL3Frontend::SDL3Frontend() : host(framebuf_width, framebuf_height, scale) {
 }
 
 SDL3Frontend::~SDL3Frontend() {
+  SDL_RemoveEventWatch(reinterpret_cast<SDL_EventFilter>(event_watcher), this);
   gui.shutdown();
   // The rest of destruction is handled in SDLHost destructor,
   // which should be called automatically at this point
@@ -309,5 +311,26 @@ bool SDL3Frontend::consume_load_bios_request(
   bios_path = ui_state.load_bios_path;
 
   gui.update_bios_path(ui_state.load_bios_path);
+  return true;
+}
+
+bool SDLCALL SDL3Frontend::event_watcher(void* userdata, const SDL_Event* event) {
+  if (event->type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED ||
+      event->type == SDL_EVENT_WINDOW_MOVED ||
+      event->type == SDL_EVENT_WINDOW_EXPOSED) {
+
+    static auto last_draw = std::chrono::steady_clock::now();
+
+    // Force a frame update immediately
+    // When the main loop is blocked during windows resizing
+    if (const auto now = std::chrono::steady_clock::now();
+      std::chrono::duration_cast<std::chrono::milliseconds>(now - last_draw).count() >= 16) {
+      auto* self = static_cast<SDL3Frontend*>(userdata);
+      self->render_frame();
+      last_draw = now;
+    }
+  }
+
+  // Return true to allow the event to propagate to SDL_PollEvent queue
   return true;
 }

@@ -324,7 +324,7 @@ void GbcImGui::build_settings_window(UiState &state, SDLHost &host) {
                                    state.audio_device_ids);
     state.current_audio_dev_idx = 0;
   }
-  ImGui::SetNextItemWidth(260.0f * dpi_scale);
+  ImGui::SetNextItemWidth(150.0f * dpi_scale);
 
   std::vector<const char *> items;
   items.reserve(state.audio_device_names.size());
