@@ -16,15 +16,11 @@ inline std::size_t vdma_blks_to_bytes(byte_t blks) {
   return (blks * blk_size_bytes) + blk_size_bytes;
 }
 
-DirectMemoryAccess::DirectMemoryAccess(AddressBus &bus) : bus_(bus) {
-  clocks_remaining = std::nullopt;
-}
-
 /* ======================================================================
  * OAM DMA Transfer, applicable to both DMG and CGB
  * ====================================================================== */
 
-ObjAttrDMA::ObjAttrDMA(AddressBus &bus) : DirectMemoryAccess(bus), dma_(*this) {
+ObjAttrDMA::ObjAttrDMA(AddressBus &bus) : dma_(*this), bus_(bus) {
   src_base_addr = data_offset = 0;
 }
 
@@ -64,11 +60,11 @@ void ObjAttrDMA::step() {
  * ====================================================================== */
 
 VDMA::VDMA(AddressBus &bus, runtime_sys_info &sys)
-    : DirectMemoryAccess(bus), // To provide bus reading capabilities
-      vdma1_(), vdma2_(),      // Source low and high registers
-      vdma3_(), vdma4_(),      // Destination low and high registers
-      vdma5_(*this),           // The Vram DMA length/mode/start register
-      sys_(sys) {              // HDMA is paused in halt mode
+    : vdma1_(), vdma2_(), // Source low and high registers
+      vdma3_(), vdma4_(), // Destination low and high registers
+      vdma5_(*this),      // The Vram DMA length/mode/start register
+      sys_(sys),          // HDMA is paused in halt mode
+      bus_(bus) {
   src_base_addr = dest_base_addr = data_offset = transfer_size = 0;
   state = STATE_DISABLED;
 }

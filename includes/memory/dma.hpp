@@ -14,39 +14,33 @@ class AddressBus;
 [[nodiscard]] inline byte_t vdma_bytes_to_blks(std::size_t bytes);
 [[nodiscard]] inline std::size_t vdma_blks_to_bytes(byte_t blks);
 
-class DirectMemoryAccess {
-public:
-  explicit DirectMemoryAccess(AddressBus &bus);
-  virtual void step() = 0; // Drives data transfer if active
-
-protected:
-  std::optional<std::size_t> clocks_remaining;
-  AddressBus &bus_;
-};
-
 /*
  * OAM DMA Transfer, applicable to both DMG and CGB
  */
-class ObjAttrDMA : public DirectMemoryAccess {
+class ObjAttrDMA {
 public:
   DMA::DMA *const get_dma_reg();
   explicit ObjAttrDMA(AddressBus &bus);
 
   void start(const byte_t addr_high); // Begins the actual data transfer
-  void step() override;
+  void step();
 
 private:
   addr_t src_base_addr{}, data_offset{};
+
   /* This is always fixed, although the time required for completion of the data
    * transfer does seem to be impacted by double speed mode. */
   static constexpr auto total_clock_cycles = 160 * 4; // T-cycles
   DMA::DMA dma_;
+
+  std::optional<std::size_t> clocks_remaining;
+  AddressBus &bus_;
 };
 
 /*
  * VRAM DMA Transfer, applicable to only CGB
  */
-class VDMA : public DirectMemoryAccess {
+class VDMA {
 public:
   explicit VDMA(AddressBus &bus, runtime_sys_info &sys);
   MMIORegister *const get_vdma1() { return &vdma1_; }
@@ -59,7 +53,7 @@ public:
    * acutal transfer itself is not. Hence, `step_fast_cycle()` exists to run the
    * initial phase to completion twice as fast in double speed mode. */
   void step_fast_cycle();
-  void step() override;
+  void step();
 
   /* For enabling and observing the state of both HDMA and GDMA procedures. */
   bool enabled() const { return gdma_enabled() || hdma_enabled(); }
@@ -120,7 +114,10 @@ private:
   /* Helpers for working with source and destination address registers. */
   void set_addr(MMIORegister &lo, MMIORegister &hi, const addr_t addr);
   const addr_t get_addr(MMIORegister &lo, MMIORegister &hi);
+
+  std::optional<std::size_t> clocks_remaining;
   runtime_sys_info &sys_;
+  AddressBus &bus_;
 };
 
 #endif //__DMA_H
