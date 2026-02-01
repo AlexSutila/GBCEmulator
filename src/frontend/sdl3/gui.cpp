@@ -1,10 +1,7 @@
 #include "frontend/sdl3/gui.hpp"
-#include <backends/imgui_impl_sdl3.h>
-#include <backends/imgui_impl_sdlrenderer3.h>
+
 #include <sys/stat.h>
-
 #include <ranges>
-
 #include "memory/boot.hpp"
 
 void GbcImGui::init(const SDLHost &host) {
@@ -203,7 +200,7 @@ void GbcImGui::build_main_menu_bar(UiState &state) const {
   }
 }
 
-void GbcImGui::build_status_bar(UiState &state) {
+void GbcImGui::build_status_bar(UiState &state) const {
   const float height = ImGui::GetFrameHeight();
   const ImGuiViewport* viewport = ImGui::GetMainViewport();
 
@@ -217,7 +214,7 @@ void GbcImGui::build_status_bar(UiState &state) {
   // Style: No rounding, no border, nice padding
   ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
   ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-  ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(10.0f, 2.0f));
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(10.0f * dpi_scale, 2.0f * dpi_scale));
 
   // Flags: No title bar, no resizing, no moving, no saving settings
   constexpr ImGuiWindowFlags flags =
@@ -234,7 +231,7 @@ void GbcImGui::build_status_bar(UiState &state) {
       ImGui::TextDisabled("Ready");
     }
 
-    constexpr float right_items_width = 175.0f;
+    const float right_items_width = 175.0f * dpi_scale;
     ImGui::SameLine();
     ImGui::SetCursorPosX(ImGui::GetWindowWidth() - right_items_width);
 
@@ -275,7 +272,7 @@ void GbcImGui::build_status_bar(UiState &state) {
     snprintf(fps_text, sizeof(fps_text), fps_fmt, state.current_fps);
 
     const float text_width = ImGui::CalcTextSize(fps_text).x;
-    constexpr float right_margin = 20.0f; // Padding from right edge
+    const float right_margin = 20.0f * dpi_scale; // Padding from right edge
 
     ImGui::SameLine();
     ImGui::SetCursorPosX(ImGui::GetWindowWidth() - text_width - right_margin);
@@ -287,7 +284,7 @@ void GbcImGui::build_status_bar(UiState &state) {
   ImGui::PopStyleVar(3); // Pop Rounding, BorderSize, Padding
 }
 
-void GbcImGui::build_file_dialogs(UiState &state) {
+void GbcImGui::build_file_dialogs(UiState &state) const {
   auto [max_size, min_size] = get_min_dialog_size();
   if (ImGuiFileDialog::Instance()->Display(
           "RomFileDialog", ImGuiWindowFlags_NoCollapse, min_size, max_size)) {
@@ -321,7 +318,7 @@ void GbcImGui::build_settings_window(UiState &state, SDLHost &host) {
   ImGui::Checkbox("Force DMG monochrome", &settings.force_mono_dmg);
   ImGui::SeparatorText("Audio");
   // Volume slider
-  ImGui::SetNextItemWidth(200.0f);
+  ImGui::SetNextItemWidth(200.0f * dpi_scale);
   if (ImGui::SliderFloat("Volume", &settings.volume, 0.0f, 1.5f, "%.2f")) {
     host.set_volume(settings.volume);
   }
@@ -332,7 +329,7 @@ void GbcImGui::build_settings_window(UiState &state, SDLHost &host) {
                                    state.audio_device_ids);
     state.current_audio_dev_idx = 0;
   }
-  ImGui::SetNextItemWidth(260.0f);
+  ImGui::SetNextItemWidth(260.0f * dpi_scale);
 
   std::vector<const char *> items;
   items.reserve(state.audio_device_names.size());
@@ -374,7 +371,7 @@ void GbcImGui::build_keybinds_window(UiState &state) {
   }
 
   const int old_idx = settings.keybind_preset_index;
-  ImGui::SetNextItemWidth(100.0f);
+  ImGui::SetNextItemWidth(100.0f * dpi_scale);
   if (ImGui::Combo("Preset", &settings.keybind_preset_index,
                    preset_names.data(), preset_names.size())) {
     // Only apply immediately if not currently rebinding
@@ -389,7 +386,7 @@ void GbcImGui::build_keybinds_window(UiState &state) {
 
   for (std::size_t i = 0; i < control_labels.size(); ++i) {
     ImGui::Text("%s", control_labels[i].data());
-    ImGui::SameLine(120.0f);
+    ImGui::SameLine(120.0f * dpi_scale);
 
     const bool waiting = state.waiting_for_bind == static_cast<int>(i);
     std::string button_label =
@@ -398,14 +395,14 @@ void GbcImGui::build_keybinds_window(UiState &state) {
     if (ImGui::Button(button_label.c_str()))
       state.waiting_for_bind = static_cast<int>(i);
 
-    ImGui::SameLine(240.0f);
+    ImGui::SameLine(240.0f * dpi_scale);
     ImGui::Text("%s", SDL_GetKeyName(settings.keybinds[i]));
   }
 
   ImGui::SeparatorText("General");
   for (std::size_t i = 0; i < general_labels.size(); ++i) {
     ImGui::Text("%s", general_labels[i].data());
-    ImGui::SameLine(120.0f);
+    ImGui::SameLine(120.0f * dpi_scale);
 
     const bool waiting = state.waiting_for_bind == static_cast<int>(i + KCount);
     std::string button_label =
@@ -414,7 +411,7 @@ void GbcImGui::build_keybinds_window(UiState &state) {
     if (ImGui::Button(button_label.c_str()))
       state.waiting_for_bind = static_cast<int>(i + KCount);
 
-    ImGui::SameLine(240.0f);
+    ImGui::SameLine(240.0f * dpi_scale);
     ImGui::Text("%s", SDL_GetKeyName(settings.general_keybinds[i]));
   }
 
@@ -437,12 +434,28 @@ void GbcImGui::update_dpi_scale(const float new_scale) {
   // Example: On 2.0x screen, scale = 2.0 / 2.0 = 1.0 (Full size text)
   ImGui::GetIO().FontGlobalScale = new_scale / max_font_scale;
 
+  if (ImGuiContext* ctx = ImGui::GetCurrentContext()) {
+    for (int i = 0; i < ctx->Windows.Size; i++) {
+      ImGuiWindow* window = ctx->Windows[i];
+
+      // Rescale the window's size and position
+      window->Pos.x *= relative_scale;
+      window->Pos.y *= relative_scale;
+      window->Size.x *= relative_scale;
+      window->Size.y *= relative_scale;
+
+      // Also rescale the "SizeFull" (used for non-collapsed state)
+      window->SizeFull.x *= relative_scale;
+      window->SizeFull.y *= relative_scale;
+    }
+  }
+
   dpi_scale = new_scale;
 }
 
-void GbcImGui::build_notification_window(UiState& state) {
+void GbcImGui::build_notification_window(UiState& state) const {
     // Set a default size and position (bottom right)
-    ImGui::SetNextWindowSize(ImVec2(400, 300), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(400 * dpi_scale, 300 * dpi_scale), ImGuiCond_FirstUseEver);
 
     if (ImGui::Begin("Notifications", &state.show_notifications)) {
         // --- Header / Toolbar ---
@@ -507,11 +520,11 @@ void GbcImGui::apply_keybind_preset(std::array<SDL_Keycode, 8> &array,
   array = kPresets[keybind_preset_index].keys;
 }
 
-std::tuple<ImVec2, ImVec2> GbcImGui::get_min_dialog_size() {
+std::tuple<ImVec2, ImVec2> GbcImGui::get_min_dialog_size() const {
   const float display_w = ImGui::GetIO().DisplaySize.x;
   const float display_h = ImGui::GetIO().DisplaySize.y;
   return std::make_tuple(ImVec2(display_w, display_h),
-                         ImVec2(400.0f, 250.0f));
+                         ImVec2(400.0f * dpi_scale, 250.0f * dpi_scale));
 }
 
 ImVec4 GbcImGui::get_darkened_color(const ImVec4 color, const float factor) {
