@@ -30,12 +30,12 @@ enum BreakReason : std::uint32_t {
 };
 
 constexpr BreakReason operator|(BreakReason a, BreakReason b) {
-  return static_cast<BreakReason>(static_cast<uint8_t>(a) |
-                                  static_cast<uint8_t>(b));
+  return static_cast<BreakReason>(static_cast<std::uint32_t>(a) |
+                                  static_cast<std::uint32_t>(b));
 }
 
 constexpr bool operator&(BreakReason a, BreakReason b) {
-  return static_cast<uint8_t>(a) & static_cast<uint8_t>(b);
+  return static_cast<std::uint32_t>(a) & static_cast<std::uint32_t>(b);
 }
 
 /* The rationale here, is the user likely expects to see the `current` CPU state

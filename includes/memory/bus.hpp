@@ -10,12 +10,32 @@
 #include "memory/mmio/mmio.hpp"
 
 #include <array>
+#include <cstdint>
 #include <map>
 #include <memory>
 #include <optional>
 
 struct runtime_sys_info;
 class BootROM;
+
+enum BusConflictTypes : std::uint32_t {
+  BUS_CONFLICT_NONE = 0,
+  BUS_CONFLICT_OAM_DMA = 1 << 1,
+};
+
+constexpr BusConflictTypes operator|(BusConflictTypes a, BusConflictTypes b) {
+  return static_cast<BusConflictTypes>(static_cast<std::uint32_t>(a) |
+                                       static_cast<std::uint32_t>(b));
+}
+
+constexpr BusConflictTypes operator&(BusConflictTypes a, BusConflictTypes b) {
+  return static_cast<BusConflictTypes>(static_cast<std::uint32_t>(a) &
+                                       static_cast<std::uint32_t>(b));
+}
+
+constexpr BusConflictTypes operator~(BusConflictTypes a) {
+  return static_cast<BusConflictTypes>(~static_cast<std::uint32_t>(a));
+}
 
 /*
  * Game Boy Memory Map
@@ -35,7 +55,6 @@ class BootROM;
  *  FF80    FFFE    High RAM (HRAM)
  *  FFFF    FFFF    Interrupt Enable Register (IE)
  */
-
 class AddressBus final : private Debug::Debuggable {
 public:
   void write_byte(const addr_t addr, const byte_t value);
@@ -51,6 +70,11 @@ public:
   /* For attaching MMIO component interface registers */
   void connect_mmio(const addr_t addr, MMIORegister *const reg);
   MMIORegister *get_mmio(IORegisterMapping mapping) const;
+
+  /* Bus conflict management */
+  bool is_acquired(BusConflictTypes conflict_mask) const;
+  void acquire(BusConflictTypes conflict_mask);
+  void release(BusConflictTypes conflict_mask);
 
   /* Cartridge connections */
   void insert_cartridge(cart c);
@@ -82,12 +106,14 @@ private:
   WramBank wram_bank_ctrl{};
   BootROMCtrl boot_rom_ctrl{};
 
+  /* Denotes who is currently holding onto what address ranges. In the case
+   * of bus conflicts, one component will end up reading what we are basically
+   * going to be treating as `open bus`. */
   constexpr byte_t open_bus() { return 0xFF; }
-  const byte_t get_vram_bank() const;
-  const byte_t get_wram_bank() const;
-  bool is_boot_rom_range(const addr_t a);
+  BusConflictTypes bus_conflicts{};
 
   std::map<addr_t, MMIORegister *> io_registers{};
+  bool is_boot_rom_range(const addr_t a);
   std::optional<BootROM> &bios_;
   runtime_sys_info &sys_;
 };

@@ -511,7 +511,8 @@ void PixelProcessingUnit::update_stat(PPU::StatModes new_mode) {
 
   /* Handle STAT mode bits reading wrong value for first scanline upon the PPU
    * being enabled after not being enabled. */
-  if (ppu_enable_oam_bug && new_mode == PPU::StatModes::MODE_OAM_SCAN) [[unlikely]]
+  if (ppu_enable_oam_bug && new_mode == PPU::StatModes::MODE_OAM_SCAN)
+      [[unlikely]]
     stat_.set_mode(PPU::StatModes::MODE_HBLANK); // Hardware bug
   else [[likely]]
     stat_.set_mode(new_mode);

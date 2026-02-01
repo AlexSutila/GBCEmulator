@@ -31,6 +31,7 @@ ObjAttrDMA::ObjAttrDMA(AddressBus &bus) : DirectMemoryAccess(bus), dma_(*this) {
 DMA::DMA *const ObjAttrDMA::get_dma_reg() { return &dma_; }
 
 void ObjAttrDMA::start(const byte_t addr_high) {
+  bus_.acquire(BusConflictTypes::BUS_CONFLICT_OAM_DMA);
   clocks_remaining = total_clock_cycles;
   /* The value passed is what is recieved over the address bus, hence it is only
    * a single byte. This byte determines the upper byte of the source addres. */
@@ -52,8 +53,10 @@ void ObjAttrDMA::step() {
   --clocks_remaining.value();
 
   /* Transfer completion logic */
-  if (clocks_remaining.value() == 0)
+  if (clocks_remaining.value() == 0) {
+    bus_.release(BusConflictTypes::BUS_CONFLICT_OAM_DMA);
     clocks_remaining.reset();
+  }
 }
 
 /* ======================================================================
