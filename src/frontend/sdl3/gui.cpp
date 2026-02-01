@@ -12,15 +12,21 @@ void GbcImGui::init(const SDLHost &host) {
   ImGui::CreateContext();
   ImGui::StyleColorsDark();
 
-  // HiDPI scaling
-  dpi_scale = SDL_GetWindowDisplayScale(host.get_window());
-  update_dpi_scale(dpi_scale);
-
   if (!ImGui_ImplSDL3_InitForSDLRenderer(host.get_window(),
                                          host.get_renderer()))
     throw std::runtime_error("Failed to initialize ImGui SDL3 backend");
   if (!ImGui_ImplSDLRenderer3_Init(host.get_renderer()))
     throw std::runtime_error("Failed to initialize ImGui SDL renderer backend");
+
+  const ImGuiIO& io = ImGui::GetIO();
+
+  dpi_scale = SDL_GetWindowDisplayScale(host.get_window());
+  update_dpi_scale(dpi_scale);
+
+  // HiDPI scaling
+  if (fs::exists(font)) {
+    io.Fonts->AddFontFromFileTTF(font.c_str(), base_font_size);
+  }
 
   rom_sel_conf.path = settings.rom_dir;
   rom_sel_conf.flags = ImGuiFileDialogFlags_Modal | ImGuiFileDialogFlags_ReadOnlyFileNameField;
@@ -414,25 +420,16 @@ void GbcImGui::build_keybinds_window(UiState &state) {
 }
 
 void GbcImGui::update_dpi_scale(const float new_scale) {
+  ImGui::GetStyle() = ImGuiStyle();
+  ImGui::StyleColorsDark();
   ImGuiStyle& style = ImGui::GetStyle();
 
+  style.FontScaleDpi = new_scale;
   // Calculate relative change (e.g., moving 1.0 -> 2.0 means factor 2.0)
   const float relative_scale = new_scale / dpi_scale;
 
   // Scale all padding, rounding, and spacing
   style.ScaleAllSizes(relative_scale);
-
-  // Font reload
-  const ImGuiIO& io = ImGui::GetIO();
-  io.Fonts->Clear();
-  if (fs::exists(font)) {
-    io.Fonts->AddFontFromFileTTF(font.c_str(), base_font_size * new_scale);
-  } else {
-    // Fallback if file missing
-    ImFontConfig cfg;
-    cfg.SizePixels = base_font_size * new_scale;
-    io.Fonts->AddFontDefault(&cfg);
-  }
 
   if (ImGuiContext* ctx = ImGui::GetCurrentContext()) {
     for (int i = 0; i < ctx->Windows.Size; i++) {
