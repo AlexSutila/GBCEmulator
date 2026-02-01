@@ -14,6 +14,16 @@ void GbcImGui::init(const SDLHost &host) {
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
   ImGui::StyleColorsDark();
+
+  // HiDPI scaling
+  dpi_scale = SDL_GetWindowDisplayScale(host.get_window());
+  // Load a font at hires first then scale down accordingly- this prevents blurry text
+  const ImGuiIO &io = ImGui::GetIO();
+  if (fs::exists(font)) {
+    io.Fonts->AddFontFromFileTTF(font.c_str(), base_font_size * max_font_scale);
+  }
+  update_dpi_scale(dpi_scale);
+
   if (!ImGui_ImplSDL3_InitForSDLRenderer(host.get_window(),
                                          host.get_renderer()))
     throw std::runtime_error("Failed to initialize ImGui SDL3 backend");
@@ -59,6 +69,19 @@ void GbcImGui::render(UiState &state, SDLHost &host) {
 // game
 bool GbcImGui::process_event(const SDL_Event &e, UiState &ui_state) {
   ImGui_ImplSDL3_ProcessEvent(&e);
+
+  // Handle DPI changes
+  if (e.type == SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED) {
+    // The event data contains the new scale, but it's safer to query the window
+    // because SDL validates it against the specific display
+    if (SDL_Window* window = SDL_GetWindowFromID(e.window.windowID)) {
+      if (const float new_scale = SDL_GetWindowDisplayScale(window);
+        std::abs(new_scale - dpi_scale) > 0.001f) {
+        update_dpi_scale(new_scale);
+      }
+    }
+    return false; // Pass this event to the game (SDLHost might need it too)
+  }
 
   if (e.type == SDL_EVENT_KEY_DOWN || e.type == SDL_EVENT_KEY_UP) {
     // Handle key rebinding (highest priority - consumes input)
@@ -384,6 +407,25 @@ void GbcImGui::build_keybinds_window(UiState &state) {
   }
 
   ImGui::End();
+}
+
+void GbcImGui::update_dpi_scale(const float new_scale) {
+  ImGuiStyle& style = ImGui::GetStyle();
+
+  // Calculate relative change (e.g., moving 1.0 -> 2.0 means factor 2.0)
+  const float relative_scale = new_scale / dpi_scale;
+
+  // Scale all padding, rounding, and spacing
+  style.ScaleAllSizes(relative_scale);
+
+  // Adjust Font Scale
+  // Since we loaded the font at 'max_font_scale' (2.0),
+  // we scale it down relative to that max.
+  // Example: On 1.0x screen, scale = 1.0 / 2.0 = 0.5 (Half size text)
+  // Example: On 2.0x screen, scale = 2.0 / 2.0 = 1.0 (Full size text)
+  ImGui::GetIO().FontGlobalScale = new_scale / max_font_scale;
+
+  dpi_scale = new_scale;
 }
 
 void GbcImGui::build_notification_window(UiState& state) {

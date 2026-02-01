@@ -18,6 +18,8 @@ class GbcImGui {
     "Right", "Left", "Up", "Down", "A", "B", "Select", "Start"};
   static constexpr std::array<std::string_view, 5> general_labels{
     "FF Toggle", "FF (Hold)", "Vol Up" , "Vol Down", "Monochrome"};
+  static constexpr float max_font_scale = 2.0f;
+  static constexpr float base_font_size = 16.0f;
 
 public:
   void init(const SDLHost& host);
@@ -45,6 +47,8 @@ public:
 
 private:
   Settings settings;
+  float dpi_scale{1.0f};
+  std::string font = "../fonts/3270NerdFontMono-Regular.ttf";
 
   void build_main_menu_bar(UiState& state) const;
   static void build_status_bar(UiState &state);
@@ -56,6 +60,7 @@ private:
   // Helpers
   IGFD::FileDialogConfig rom_sel_conf;
   IGFD::FileDialogConfig bios_sel_conf;
+  void update_dpi_scale(float new_scale);
   static std::tuple<ImVec2, ImVec2> get_min_dialog_size() ;
   static ImVec4 get_darkened_color(ImVec4 color, float factor);
   static void apply_keybind_preset(std::array<SDL_Keycode, 8>& array, int keybind_preset_index);
