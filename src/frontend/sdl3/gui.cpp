@@ -14,11 +14,6 @@ void GbcImGui::init(const SDLHost &host) {
 
   // HiDPI scaling
   dpi_scale = SDL_GetWindowDisplayScale(host.get_window());
-  // Load a font at hires first then scale down accordingly- this prevents blurry text
-  const ImGuiIO &io = ImGui::GetIO();
-  if (fs::exists(font)) {
-    io.Fonts->AddFontFromFileTTF(font.c_str(), base_font_size * max_font_scale);
-  }
   update_dpi_scale(dpi_scale);
 
   if (!ImGui_ImplSDL3_InitForSDLRenderer(host.get_window(),
@@ -427,23 +422,26 @@ void GbcImGui::update_dpi_scale(const float new_scale) {
   // Scale all padding, rounding, and spacing
   style.ScaleAllSizes(relative_scale);
 
-  // Adjust Font Scale
-  // Since we loaded the font at 'max_font_scale' (2.0),
-  // we scale it down relative to that max.
-  // Example: On 1.0x screen, scale = 1.0 / 2.0 = 0.5 (Half size text)
-  // Example: On 2.0x screen, scale = 2.0 / 2.0 = 1.0 (Full size text)
-  ImGui::GetIO().FontGlobalScale = new_scale / max_font_scale;
+  // Font reload
+  const ImGuiIO& io = ImGui::GetIO();
+  io.Fonts->Clear();
+  if (fs::exists(font)) {
+    io.Fonts->AddFontFromFileTTF(font.c_str(), base_font_size * new_scale);
+  } else {
+    // Fallback if file missing
+    ImFontConfig cfg;
+    cfg.SizePixels = base_font_size * new_scale;
+    io.Fonts->AddFontDefault(&cfg);
+  }
 
   if (ImGuiContext* ctx = ImGui::GetCurrentContext()) {
     for (int i = 0; i < ctx->Windows.Size; i++) {
       ImGuiWindow* window = ctx->Windows[i];
-
       // Rescale the window's size and position
       window->Pos.x *= relative_scale;
       window->Pos.y *= relative_scale;
       window->Size.x *= relative_scale;
       window->Size.y *= relative_scale;
-
       // Also rescale the "SizeFull" (used for non-collapsed state)
       window->SizeFull.x *= relative_scale;
       window->SizeFull.y *= relative_scale;
