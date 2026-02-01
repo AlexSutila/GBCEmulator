@@ -85,9 +85,9 @@ set(GBC_CORE_SOURCES
     src/memory/mmio/mmio.cpp
     src/memory/dma.cpp
 
-    src/timer/timer.cpp
-    src/serial/serial.cpp
-    src/apu/apu.cpp
+    src/timer.cpp
+    src/serial.cpp
+    src/apu.cpp
 
     src/ppu/ppu.cpp
     src/ppu/attributes.cpp
@@ -97,7 +97,6 @@ set(GBC_CORE_SOURCES
     src/ppu/sprites.cpp
 
     src/cart/cart.cpp
-    src/cart/cart_display.cpp
     src/cart/mbc/no_mbc.cpp
     src/cart/mbc/mbc1.cpp
     src/cart/mbc/mbc2.cpp
@@ -140,7 +139,7 @@ endif()
 
 # Emulator executable
 add_executable(gbc
-    main.cpp
+    src/frontend/sdl3/main.cpp
     ${GBC_CORE_SOURCES}
     ${GBC_FRONTEND_SOURCES}
 )
@@ -158,7 +157,9 @@ target_compile_options(gbc
 
 # Python bindings
 pybind11_add_module(gbc_py
-    src/python/bindings.cpp
+    src/frontend/python/bindings.cpp
+    src/frontend/python/frontend.cpp
+    src/frontend/python/wrappers.cpp
     ${GBC_CORE_SOURCES}
 )
 target_link_libraries(gbc_py

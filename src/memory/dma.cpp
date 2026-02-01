@@ -16,31 +16,48 @@ inline std::size_t vdma_blks_to_bytes(byte_t blks) {
   return (blks * blk_size_bytes) + blk_size_bytes;
 }
 
-DirectMemoryAccess::DirectMemoryAccess(AddressBus &bus) : bus_(bus) {
-  clocks_remaining = std::nullopt;
-}
-
 /* ======================================================================
  * OAM DMA Transfer, applicable to both DMG and CGB
  * ====================================================================== */
 
-ObjAttrDMA::ObjAttrDMA(AddressBus &bus) : DirectMemoryAccess(bus), dma_(*this) {
+ObjAttrDMA::ObjAttrDMA(AddressBus &bus) : dma_(*this), bus_(bus) {
   src_base_addr = data_offset = 0;
+  clocks_remaining.reset();
+  state = STATE_DISABLED;
 }
 
 DMA::DMA *const ObjAttrDMA::get_dma_reg() { return &dma_; }
 
 void ObjAttrDMA::start(const byte_t addr_high) {
-  clocks_remaining = total_clock_cycles;
   /* The value passed is what is recieved over the address bus, hence it is only
    * a single byte. This byte determines the upper byte of the source addres. */
   src_base_addr = static_cast<addr_t>(addr_high) * 0x100;
+  state = STATE_OAMDMA_INIT;
   data_offset = 0;
 }
 
-void ObjAttrDMA::step() {
+void ObjAttrDMA::do_oam_dma_init() {
+  static constexpr auto total_clock_cycles = 4; // T-cycles
   if (!clocks_remaining.has_value())
-    return;
+    clocks_remaining = total_clock_cycles;
+  --clocks_remaining.value();
+
+  /* State transition logic */
+  if (clocks_remaining.value() == 0) {
+    state = STATE_OAMDMA_TRAN;
+    clocks_remaining.reset();
+  }
+}
+
+void ObjAttrDMA::do_oam_dma_tran() {
+  static constexpr auto total_clock_cycles = 160 * 4; // T-cycles
+
+  /* This is always fixed, although the time required for completion of the data
+   * transfer does seem to be impacted by double speed mode. */
+  if (!clocks_remaining.has_value()) {
+    bus_.acquire(BusConflictTypes::BUS_CONFLICT_OAM_DMA);
+    clocks_remaining = total_clock_cycles;
+  }
 
   /* Align data transfer perfectly with the M-cycle clock */
   if (clocks_remaining.value() % 4 == 0) {
@@ -52,8 +69,24 @@ void ObjAttrDMA::step() {
   --clocks_remaining.value();
 
   /* Transfer completion logic */
-  if (clocks_remaining.value() == 0)
+  if (clocks_remaining.value() == 0) {
+    bus_.release(BusConflictTypes::BUS_CONFLICT_OAM_DMA);
     clocks_remaining.reset();
+    state = STATE_DISABLED;
+  }
+}
+
+void ObjAttrDMA::step() {
+  switch (state) {
+  case STATE_OAMDMA_INIT:
+    do_oam_dma_init();
+    break;
+  case STATE_OAMDMA_TRAN:
+    do_oam_dma_tran();
+    break;
+  default:
+    break;
+  }
 }
 
 /* ======================================================================
@@ -61,11 +94,11 @@ void ObjAttrDMA::step() {
  * ====================================================================== */
 
 VDMA::VDMA(AddressBus &bus, runtime_sys_info &sys)
-    : DirectMemoryAccess(bus), // To provide bus reading capabilities
-      vdma1_(), vdma2_(),      // Source low and high registers
-      vdma3_(), vdma4_(),      // Destination low and high registers
-      vdma5_(*this),           // The Vram DMA length/mode/start register
-      sys_(sys) {              // HDMA is paused in halt mode
+    : vdma1_(), vdma2_(), // Source low and high registers
+      vdma3_(), vdma4_(), // Destination low and high registers
+      vdma5_(*this),      // The Vram DMA length/mode/start register
+      sys_(sys),          // HDMA is paused in halt mode
+      bus_(bus) {
   src_base_addr = dest_base_addr = data_offset = transfer_size = 0;
   state = STATE_DISABLED;
 }

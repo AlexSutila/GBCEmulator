@@ -1,4 +1,4 @@
-#include "serial/serial.hpp"
+#include "serial.hpp"
 #include "cpu/interrupts.hpp"
 #include "memory/bus.hpp"
 #include "memory/mmio/dmg.hpp"

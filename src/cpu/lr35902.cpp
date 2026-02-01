@@ -22,11 +22,9 @@ LR35902::LR35902(AddressBus *bus_ptr, std::optional<Debug::Debugger> &debugger,
       sys_(sys),                   // General operating mode info
       ime(),                       // Acts as interrupt master enable
       ie_reg(false),               // Enables individual interrupts
-      if_reg(true)                 // Requests individual interrupts
-{
-  using flags = InterruptFlagMask;
+      if_reg(true),                // Requests individual interrupts
+      isr(&reg_file, bus_ptr, ime, if_reg, ie_reg) {
   using mmio = IORegisterMapping;
-  using vecs = InterruptVector;
 
   /* Init fetch decode execute fsm */
   state = CpuStates::STATE_FETCH;
@@ -54,20 +52,6 @@ LR35902::LR35902(AddressBus *bus_ptr, std::optional<Debug::Debugger> &debugger,
     throw std::logic_error("LR35902::LR35902() bus_ptr is `nullptr`");
   bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_INT_FLAGS), &if_reg);
   bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_INT_ENABLE), &ie_reg);
-
-  /* Lastly, configure interrupt service routines */
-  isr_lookup = {
-      mk_isr<flags::INT_FLAG_VBLANK, vecs::INT_VECTOR_VBLANK>(),
-      mk_isr<flags::INT_FLAG_LCD, vecs::INT_VECTOR_LCD>(),
-      mk_isr<flags::INT_FLAG_TIMER, vecs::INT_VECTOR_TIMER>(),
-      mk_isr<flags::INT_FLAG_SERIAL, vecs::INT_VECTOR_SERIAL>(),
-      mk_isr<flags::INT_FLAG_JOYPAD, vecs::INT_VECTOR_JOYPAD>(),
-  };
-}
-
-template <InterruptFlagMask mask, InterruptVector vec>
-std::unique_ptr<ISR> LR35902::mk_isr() {
-  return std::make_unique<ISR>(mask, vec, &reg_file, bus, ime, if_reg);
 }
 
 void LR35902::load_state(LR35902::ProcessorState state) {
@@ -107,29 +91,24 @@ LR35902::ProcessorState LR35902::get_state() const {
   return state;
 }
 
-// Lower bits get higher priority, return the corresponding ISR
-std::optional<ISR *> LR35902::should_interrupt() {
-  for (byte_t shift{0}; shift < 5; shift++) {
-    const auto flag = static_cast<InterruptFlagMask>(1 << shift);
-    if (ie_reg.get_flag(flag) && if_reg.get_flag(flag))
-      return isr_lookup.at(shift).get();
-  }
-  return std::nullopt;
+// Lower bits get higher priority, return true if interrupted
+const bool LR35902::should_interrupt() const {
+  constexpr auto mask = 0x1F; // Only five interrupts
+  return (ie_reg.peek() & if_reg.peek() & mask) != 0;
 }
 
 /* Read opcode from PC, populate `ins_` instruction reference */
 void LR35902::do_fetch() {
 
   // Check for interrupts, delay fetch until after ISR
-  const auto isr = should_interrupt();
-  if (ime.is_enabled() && isr.has_value()) {
-    ins_ = isr.value();
+  const bool interrupted = should_interrupt();
+  if (ime.is_enabled() && interrupted) {
+    ins_ = &isr;
     return;
   }
+  ime.step();
 
   // Else continue with fetch/decode/exec as usual
-  ime.step(); // Only happens if we aren't interrupted
-
   const byte_t op = bus->read_byte(reg_file.reg_pc);
   std::unique_ptr<Instruction> &ins = lookup.at(op);
 
@@ -186,12 +165,12 @@ void LR35902::do_execute() {
 }
 
 void LR35902::do_halt() {
-  const auto isr = should_interrupt();
+  const bool interrupted = should_interrupt();
 
   /* The processor waits until an interrupt is requested, in other words two
    * bits are set in IE and IF such that the bitwise AND is non-zero. The
    * behavior varies when IME is enabled or disabled. */
-  if (!isr.has_value())
+  if (!interrupted)
     return;
 
   // Leave halt mode when an interrupt is pending
@@ -200,8 +179,8 @@ void LR35902::do_halt() {
   /* If IME is enabled, execution stops until the interrupt is requested, then
    * interrupt is serviced and execution resumes as normal. */
   if (ime.is_enabled()) {
-    isr.value()->incur_halt_delay();
-    ins_ = isr.value();
+    isr.incur_halt_delay();
+    ins_ = &isr;
     state = CpuStates::STATE_DECODE;
   }
 

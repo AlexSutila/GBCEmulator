@@ -6,6 +6,7 @@
 #include "instr/instr.hpp"
 #include "memory/mmio/mmio.hpp"
 #include <cassert>
+#include <tuple>
 
 enum class InterruptFlagMask : byte_t {
   INT_FLAG_JOYPAD = 1u << 4,
@@ -112,25 +113,27 @@ private:
  */
 class ISR final : public Instruction {
 public:
-  ISR(const InterruptFlagMask int_flag, const InterruptVector int_vector,
-      RegisterFile *reg_file_ptr, AddressBus *bus_ptr,
-      InterruptMasterEnable &ime, InterruptBits &if_reg)
+  ISR(RegisterFile *reg_file_ptr, AddressBus *bus_ptr,
+      InterruptMasterEnable &ime, InterruptBits &if_reg, InterruptBits &ie_reg)
       : Instruction(reg_file_ptr, bus_ptr),
-        ime_(ime),      // Needed to disable interrupt master enable
-        if_(if_reg),    // Needed to clear the corresponding flag bit
-        flag(int_flag), // Denotes which IE and IF flag bit is used
-        vec(int_vector) {}
-  void incur_halt_delay(); // Invoked by CPU to incur the when halted
+        ime_(ime),   // Needed to disable interrupt master enable
+        if_(if_reg), // Determines which vector to jump to
+        ie_(ie_reg) {}
   std::string describe() override;
   std::size_t exec() override;
+  void incur_halt_delay(); // Invoked by CPU to incur the when halted
+
+  // Compute new PC location, considers stack overflow leading to EI overwrite
+  // and the bizzare behavior that can emerge with that as well.
+  using isr_metadata = std::tuple<InterruptFlagMask, InterruptVector>;
+  const isr_metadata calc_effective_call_addr() const;
+  void handle_ei_push_bug(); // Occurs when interrupted with (SP == 0)
 
 private:
   InterruptMasterEnable &ime_;
-  InterruptBits &if_;
+  InterruptBits &if_, &ie_;
 
   // Interrupt source is described by these fields
-  const InterruptFlagMask flag;
-  const InterruptVector vec;
   bool halt_delay{false};
 };
 

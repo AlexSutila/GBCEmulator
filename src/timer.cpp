@@ -1,4 +1,4 @@
-#include "timer/timer.hpp"
+#include "timer.hpp"
 #include "cpu/interrupts.hpp"
 #include "memory/bus.hpp"
 #include "memory/mmio/dmg.hpp"

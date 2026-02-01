@@ -1,7 +1,7 @@
 #include "memory/mmio/dmg.hpp"
 #include "cpu/interrupts.hpp"
 #include "emu_types.hpp"
-#include "timer/timer.hpp"
+#include "timer.hpp"
 #include <cassert>
 
 namespace Serial {

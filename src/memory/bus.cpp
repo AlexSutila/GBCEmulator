@@ -79,6 +79,7 @@ AddressBus::AddressBus(runtime_sys_info &sys,
                 [&] { return make_zeroed<byte_t>(wram_bank_size); });
   hram = make_zeroed<byte_t>(hram_size);
   oam = make_zeroed<byte_t>(oam_size);
+  bus_conflicts = BUS_CONFLICT_NONE;
 
   /* Connect memory mapped IO owned by address bus */
   connect_mmio(static_cast<addr_t>(mmio::MMIO_JOYPAD), &joypad_);
@@ -101,14 +102,6 @@ void AddressBus::connect_mmio(const addr_t addr, MMIORegister *const reg) {
   if (!reg)
     throw std::logic_error("AddressBus::connect_mmio() connected `nullptr`");
   io_registers[addr] = reg;
-}
-
-const byte_t AddressBus::get_vram_bank() const {
-  return vram_bank_ctrl.get_bank();
-}
-
-const byte_t AddressBus::get_wram_bank() const {
-  return wram_bank_ctrl.get_bank();
 }
 
 void AddressBus::insert_cartridge(cart c) {
@@ -134,7 +127,7 @@ const byte_t AddressBus::read_byte(const addr_t addr) {
 
   /* Read from VRAM, only banked in CGB mode */
   else if (is_vram_range(addr)) {
-    const auto bank = get_vram_bank();
+    const auto bank = vram_bank_ctrl.get_bank();
     return vram.at(bank)[(addr - 0x8000) & VRAM_MASK];
   }
 
@@ -143,7 +136,7 @@ const byte_t AddressBus::read_byte(const addr_t addr) {
     if (addr < 0xD000)
       return wram.at(0)[(addr - 0xC000) & WRAM_MASK];
     else {
-      const auto bank = get_wram_bank();
+      const auto bank = wram_bank_ctrl.get_bank();
       return wram.at(bank)[(addr - 0xD000) & WRAM_MASK];
     }
   }
@@ -153,14 +146,17 @@ const byte_t AddressBus::read_byte(const addr_t addr) {
     if (addr < 0xF000)
       return wram.at(0)[(addr - 0xE000) & WRAM_MASK];
     else {
-      const auto bank = get_wram_bank();
+      const auto bank = wram_bank_ctrl.get_bank();
       return wram.at(bank)[(addr - 0xF000) & WRAM_MASK];
     }
   }
 
   /* Read from Object Attribute Memory */
-  else if (is_oam_range(addr))
+  else if (is_oam_range(addr)) {
+    if (is_acquired(BusConflictTypes::BUS_CONFLICT_OAM_DMA)) [[unlikely]]
+      return open_bus();
     return oam[addr - 0xFE00];
+  }
 
   /* Read from memory mapped IO register */
   else if (io_registers.contains(addr)) {
@@ -175,7 +171,6 @@ const byte_t AddressBus::read_byte(const addr_t addr) {
   else if (is_hram_range(addr))
     return hram[(addr - 0xFF80) & HRAM_MASK];
 
-  /* Not actually sure what happens here, assume reads all ones */
   return open_bus();
 }
 
@@ -187,7 +182,7 @@ void AddressBus::write_byte(const addr_t addr, const byte_t value) {
 
   /* Write to VRAM, only banked in CGB mode */
   else if (is_vram_range(addr)) {
-    const auto bank = get_vram_bank();
+    const auto bank = vram_bank_ctrl.get_bank();
     vram.at(bank)[(addr - 0x8000) & VRAM_MASK] = value;
   }
 
@@ -196,7 +191,7 @@ void AddressBus::write_byte(const addr_t addr, const byte_t value) {
     if (addr < 0xD000)
       wram.at(0)[(addr - 0xC000) & WRAM_MASK] = value;
     else {
-      const auto bank = get_wram_bank();
+      const auto bank = wram_bank_ctrl.get_bank();
       wram.at(bank)[(addr - 0xD000) & WRAM_MASK] = value;
     }
   }
@@ -206,7 +201,7 @@ void AddressBus::write_byte(const addr_t addr, const byte_t value) {
     if (addr < 0xF000)
       wram.at(0)[(addr - 0xE000) & WRAM_MASK] = value;
     else {
-      const auto bank = get_wram_bank();
+      const auto bank = wram_bank_ctrl.get_bank();
       wram.at(bank)[(addr - 0xF000) & WRAM_MASK] = value;
     }
   }
@@ -236,4 +231,16 @@ MMIORegister *AddressBus::get_mmio(IORegisterMapping mapping) const {
   assert(io_registers.contains(addr));
   /* The address bus maintains ownership, so raw pointers are fine. */
   return io_registers.at(addr);
+}
+
+bool AddressBus::is_acquired(BusConflictTypes conflict_mask) const {
+  return (bus_conflicts & conflict_mask) != 0;
+}
+
+void AddressBus::acquire(BusConflictTypes conflict_mask) {
+  bus_conflicts = bus_conflicts | conflict_mask;
+}
+
+void AddressBus::release(BusConflictTypes conflict_mask) {
+  bus_conflicts = bus_conflicts & ~conflict_mask;
 }

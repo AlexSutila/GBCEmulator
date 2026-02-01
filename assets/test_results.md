@@ -8,11 +8,13 @@
 | testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/halt_ime1_timing.gb                |      1 |      0 |        1 |
 | testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/if_ie_registers.gb                 |      1 |      0 |        1 |
 | testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/intr_timing.gb                     |      1 |      0 |        1 |
+| testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/ld_hl_sp_e_timing.gb               |      1 |      0 |        1 |
 | testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/rapid_di_ei.gb                     |      1 |      0 |        1 |
 | testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/reti_intr_timing.gb                |      1 |      0 |        1 |
 | testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/instr/daa.gb                       |      1 |      0 |        1 |
 | testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/bits/mem_oam.gb                    |      1 |      0 |        1 |
 | testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/bits/reg_f.gb                      |      1 |      0 |        1 |
+| testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/interrupts/ie_push.gb              |      1 |      0 |        1 |
 | testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/timer/div_write.gb                 |      1 |      0 |        1 |
 | testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/timer/tim00_div_trigger.gb         |      1 |      0 |        1 |
 | testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/timer/tim00.gb                     |      1 |      0 |        1 |
@@ -27,6 +29,7 @@
 | testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/timer/tma_write_reloading.gb       |      1 |      0 |        1 |
 | testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/ppu/intr_2_0_timing.gb             |      1 |      0 |        1 |
 | testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/ppu/intr_2_mode0_timing.gb         |      1 |      0 |        1 |
+| testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/ppu/intr_2_mode3_timing.gb         |      1 |      0 |        1 |
 | testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/ppu/stat_irq_blocking.gb           |      1 |      0 |        1 |
 | testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/ppu/stat_lyc_onoff.gb              |      1 |      0 |        1 |
 | testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/oam_dma/basic.gb                   |      1 |      0 |        1 |
@@ -58,20 +61,17 @@
 | testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/halt_ime0_nointr_timing.gb         |      0 |      1 |        1 |
 | testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/jp_cc_timing.gb                    |      0 |      1 |        1 |
 | testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/jp_timing.gb                       |      0 |      1 |        1 |
-| testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/ld_hl_sp_e_timing.gb               |      0 |      1 |        1 |
 | testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/pop_timing.gb                      |      0 |      1 |        1 |
 | testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/push_timing.gb                     |      0 |      1 |        1 |
 | testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/ret_cc_timing.gb                   |      0 |      1 |        1 |
 | testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/reti_timing.gb                     |      0 |      1 |        1 |
 | testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/ret_timing.gb                      |      0 |      1 |        1 |
 | testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/rst_timing.gb                      |      0 |      1 |        1 |
-| testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/interrupts/ie_push.gb              |      0 |      1 |        1 |
 | testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/timer/rapid_toggle.gb              |      0 |      1 |        1 |
 | testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/ppu/intr_2_mode0_timing_sprites.gb |      0 |      1 |        1 |
-| testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/ppu/intr_2_mode3_timing.gb         |      0 |      1 |        1 |
 | testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/ppu/intr_2_oam_ok_timing.gb        |      0 |      1 |        1 |
 | testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/oam_dma_restart.gb                 |      0 |      1 |        1 |
 | testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/oam_dma_start.gb                   |      0 |      1 |        1 |
 | testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/acceptance/oam_dma_timing.gb                  |      0 |      1 |        1 |
 | testing/test_mooneye.py | test_mooneye | mts-20240926-1737-443f6e1/emulator-only/mbc1/multicart_rom_8Mb.gb       |      0 |      1 |        1 |
-| TOTAL                   |              |                                                                         |     51 |     23 |       74 |
+| TOTAL                   |              |                                                                         |     54 |     20 |       74 |

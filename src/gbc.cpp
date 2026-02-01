@@ -1,19 +1,20 @@
 #include "gbc.hpp"
 #include "cart/cart.hpp"
 #include "cpu/lr35902.hpp"
+#include "debugger/breakpoint.hpp"
 #include "memory/bus.hpp"
 #include "memory/dma.hpp"
 #include "memory/mmio/dmg.hpp"
 #include "memory/mmio/mmio.hpp"
 #include "ppu/palette.hpp"
 #include "ppu/ppu.hpp"
-#include "timer/timer.hpp"
+#include "timer.hpp"
 #include <memory>
 #include <optional>
 #include <stdexcept>
 
 GameBoyColor::GameBoyColor(Frontend &frontend, const std::string &bios_path)
-    : debugger_(std::nullopt), fe_(frontend) {
+    : Debug::Debuggable(debugger_), debugger_(std::nullopt), fe_(frontend) {
   system_init(); // Connects all system components
 
   /* We set CGB mode mased on the size of the boot ROM. This is the best way
@@ -35,16 +36,16 @@ GameBoyColor::GameBoyColor(Frontend &frontend, const std::string &bios_path)
 }
 
 GameBoyColor::GameBoyColor(Frontend &frontend, const BootROM &rom)
-    : debugger_(std::nullopt), fe_(frontend) {
+    : Debug::Debuggable(debugger_), debugger_(std::nullopt), fe_(frontend) {
   system_init();
-  // We assume rom is already valid
-  bios_ = rom;
+  bios_ = rom; // We assume rom is already valid
   sys_.cgb_mode = bios_->is_large_rom();
   cram_init_mono();
 }
 
 GameBoyColor::GameBoyColor(Frontend &frontend)
-    : debugger_(std::nullopt), bios_(std::nullopt), fe_(frontend) {
+    : Debug::Debuggable(debugger_), debugger_(std::nullopt),
+      bios_(std::nullopt), fe_(frontend) {
   system_init(); // Connects all system components
   skip_bios();   // BIOS is left unconfigured
   /* We still kind of have to do this here in case we run DMG games. Will likely
@@ -213,6 +214,8 @@ void GameBoyColor::step_processor() {
 }
 
 void GameBoyColor::step() {
+  try_brk(Debug::BreakReason::BRK_STEP_CLOCK_CYCLE);
+
   step_processor();
   step_dma(false);
   ppu->step();

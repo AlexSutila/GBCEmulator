@@ -30,6 +30,19 @@ public:
   void reset();
   void step();
 
+  struct PPUState {
+    PPU::StatModes state;
+    byte_t lcdc;
+    byte_t stat;
+    byte_t scx;
+    byte_t scy;
+    byte_t wy;
+    byte_t wx;
+    byte_t lyc;
+    byte_t ly;
+  };
+  PPUState get_state() const;
+
 private:
   InterruptBits *if_reg{};
   runtime_sys_info &sys_;
@@ -106,8 +119,9 @@ private:
   void request_lcd_irq() {
     if_reg->put_flag(InterruptFlagMask::INT_FLAG_LCD, true);
   }
+  void update_stat(PPU::StatModes new_mode);
+  CircularFifo<PPU::StatModes, 4> stat_delay{};
   bool stat_irq_signal_edge{};
-  void update_stat();
 
   /* Timing and FSM metadata */
   std::optional<std::size_t> total_mode_clks{};
