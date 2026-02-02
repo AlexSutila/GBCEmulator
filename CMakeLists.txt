@@ -165,6 +165,11 @@ pybind11_add_module(gbc_py
 target_include_directories(gbc_py
     PRIVATE ${GBC_INCLUDE_DIR}
 )
+target_link_options(gbc_py PRIVATE
+    -static-libgcc
+    -static-libstdc++
+    -lpthread
+)
 target_compile_options(gbc_py
     PRIVATE ${GBC_COMPILE_OPTIONS}
 )
