@@ -138,20 +138,20 @@ if (MINGW AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 endif()
 
 # Emulator executable
-add_executable(gbc
+add_executable(gbc_full
     src/frontend/sdl3/main.cpp
     ${GBC_CORE_SOURCES}
     ${GBC_FRONTEND_SOURCES}
 )
-target_link_libraries(gbc
+target_link_libraries(gbc_full
     PRIVATE SDL3::SDL3
     PRIVATE imgui
     PRIVATE nlohmann_json::nlohmann_json
 )
-target_include_directories(gbc
+target_include_directories(gbc_full
     PRIVATE ${GBC_INCLUDE_DIR}
 )
-target_compile_options(gbc
+target_compile_options(gbc_full
     PRIVATE ${GBC_COMPILE_OPTIONS}
 )
 
@@ -173,9 +173,9 @@ include(CheckIPOSupported)
 check_ipo_supported(RESULT ipo_ok OUTPUT ipo_err LANGUAGES CXX)
 
 if(ipo_ok AND NOT MINGW)
-  set_property(TARGET imgui  PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
-  set_property(TARGET gbc    PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
-  set_property(TARGET gbc_py PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
+  set_property(TARGET imgui    PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
+  set_property(TARGET gbc_full PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
+  set_property(TARGET gbc_py   PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
 else()
   message(WARNING "IPO/LTO not supported: ${ipo_err}")
 endif()
