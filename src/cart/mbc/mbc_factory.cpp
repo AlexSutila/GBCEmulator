@@ -1,6 +1,8 @@
 #include "cart/cart.hpp"
 #include "cart/mbc.hpp"
 #include "cart/mbc_creator.hpp"
+#include "frontend/logger.hpp"
+#include <format>
 
 std::unique_ptr<Mbc> make_mbc(const cart &c) {
   switch (c.header.cartridge_type) {
@@ -32,8 +34,13 @@ std::unique_ptr<Mbc> make_mbc(const cart &c) {
   case 0x1D: // MBC5+RUMBLE+RAM
   case 0x1E: // MBC5+RUMBLE+RAM+BATTERY
     return make_mbc5(c);
+
+  case 0x20: // MBC6
+    return make_mbc6(c);
   default:
-    throw std::runtime_error("Unsupported cartridge type (mapper): " +
-                             std::to_string(c.header.cartridge_type));
+    Logger::push(LogLevel::Error, "ROM", "Unknown MBC Type",
+      std::format("{} uses an unknown MBC type {:x}, and the ROM cannot be loaded.",
+        c.header.title(), c.header.cartridge_type));
+    return nullptr;
   }
 }
