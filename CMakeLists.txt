@@ -1,4 +1,6 @@
 cmake_minimum_required(VERSION 3.15)
+# Silence old subprojects (raylib) that assume pre-3.5 policies
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 project(gbc LANGUAGES CXX)
 
 # Global settings
@@ -43,6 +45,12 @@ FetchContent_Declare(
     GIT_TAG        v3.12.0
 )
 FetchContent_MakeAvailable(json)
+FetchContent_Declare(
+    raylib
+    GIT_REPOSITORY https://github.com/raysan5/raylib.git
+    GIT_TAG        5.0
+)
+FetchContent_MakeAvailable(raylib)
 
 set(IMGUI_SOURCES
     ${imgui_SOURCE_DIR}/imgui.cpp
@@ -137,7 +145,7 @@ if (MINGW AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     list(APPEND GBC_COMPILE_OPTIONS -Wa,-mbig-obj)
 endif()
 
-# Emulator executable
+# Full SDL3+ImGui feature set executable
 add_executable(gbc_full
     src/frontend/sdl3/main.cpp
     ${GBC_CORE_SOURCES}
@@ -152,6 +160,22 @@ target_include_directories(gbc_full
     PRIVATE ${GBC_INCLUDE_DIR}
 )
 target_compile_options(gbc_full
+    PRIVATE ${GBC_COMPILE_OPTIONS}
+)
+
+# Simplified Raylib executable
+add_executable(gbc_simple
+    src/frontend/raylib/frontend.cpp
+    src/frontend/raylib/main.cpp
+    ${GBC_CORE_SOURCES}
+)
+target_link_libraries(gbc_simple
+    PRIVATE raylib
+)
+target_include_directories(gbc_simple
+    PRIVATE ${GBC_INCLUDE_DIR}
+)
+target_compile_options(gbc_simple
     PRIVATE ${GBC_COMPILE_OPTIONS}
 )
 
