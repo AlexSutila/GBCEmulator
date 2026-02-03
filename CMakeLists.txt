@@ -103,6 +103,7 @@ set(GBC_CORE_SOURCES
     src/cart/mbc/mbc3.cpp
     src/cart/mbc/mbc5.cpp
     src/cart/mbc/mbc6.cpp
+    src/cart/mbc/mbc_wt.cpp
     src/cart/mbc/test_mbc.cpp
     src/cart/mbc/mbc_factory.cpp
 
