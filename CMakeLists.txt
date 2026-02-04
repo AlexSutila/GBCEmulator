@@ -179,9 +179,10 @@ if(EMSCRIPTEN)
             -sMIN_WEBGL_VERSION=2
             -sMAX_WEBGL_VERSION=2
             -sUSE_PTHREADS=0
+            -sEXPORTED_FUNCTIONS=_emscripten_start,_malloc,_free
+            -sFORCE_FILESYSTEM=1
             -fno-rtti
             -flto
-            --preload-file /home/dorce/Documents/roms@/roms
             --shell-file ${CMAKE_SOURCE_DIR}/src/frontend/raylib/shell.html
     )
     target_include_directories(gbc_wasm

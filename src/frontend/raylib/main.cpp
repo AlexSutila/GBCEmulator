@@ -1,18 +1,28 @@
-#ifdef __EMSCRIPTEN__
-
-#include "frontend/raylib/frontend.hpp"
-
-int main() {
-  cart c = load_cart_fs("/roms/zelda.gbc");
-  RaylibFrontend fe(c);
-  fe.start();
-  return 0;
-}
-
-#else
-
 #include "cart/cart.hpp"
 #include "frontend/raylib/frontend.hpp"
+
+#ifdef __EMSCRIPTEN__
+
+#include <emscripten/emscripten.h>
+#include <iostream>
+#include <memory>
+
+extern "C" {
+EMSCRIPTEN_KEEPALIVE void emscripten_start() {
+  std::unique_ptr<RaylibFrontend> fe;
+
+  /* Emscripten uses a virtual filesystem inside the browser? So more or less,
+   * the way we handle ROM loading is by copying the rom into the VFS with a
+   * hardcoded path, hence we can rely on this naming convention shown here. */
+  cart c = load_cart_fs("/rom.bin");
+  fe = std::make_unique<RaylibFrontend>(c);
+  fe->start();
+}
+}
+
+int main() { return 0; }
+
+#else
 #include <iostream>
 
 static const char *usage_str = "gbc_simple <rom_path>";

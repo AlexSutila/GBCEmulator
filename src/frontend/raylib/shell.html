@@ -1,8 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
+  <meta charset="utf-8" />
   <title>GBC Emulator</title>
+
   <style>
     html, body {
       margin: 0;
@@ -12,11 +13,12 @@
       background: #111;
       font-family: sans-serif;
       color: #eee;
+
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
     }
+
     header {
       width: 100%;
       text-align: center;
@@ -33,25 +35,49 @@
       background: #000;
       max-width: 90%;
       max-height: 80%;
-      margin: 20px 0;
     }
   </style>
 </head>
 <body>
   <header>GBC Emulator</header>
+
+  <div id="controls">
+    <input type="file" id="romInput" accept=".gb,.gbc" />
+    <label id="romButton" for="romInput">Load ROM</label>
+  </div>
+
   <canvas id="canvas"></canvas>
-  <script type="text/javascript">
+
+  <script>
     var Module = {
-      canvas: (function() { return document.getElementById('canvas'); })(),
-      print: function(text) { console.log(text); },
-      printErr: function(text) { console.error(text); },
-      setStatus: function(text) { console.log(text); },
-      totalDependencies: 0,
-      monitorRunDependencies: function(left) {
-        this.totalDependencies = Math.max(this.totalDependencies, left);
+      canvas: document.getElementById("canvas"),
+      printErr(text) {
+        console.error(text);
+      },
+
+      onRuntimeInitialized() {
+        console.log("WASM runtime initialized");
+        const input = document.getElementById("romInput");
+        const button = document.getElementById("romButton");
+
+        input.addEventListener("change", async (e) => {
+          const file = e.target.files[0];
+          if (!file) return;
+
+          // I hate this stupid button, it is the bane of my existence
+          button.classList.add("disabled");
+          button.textContent = "ROM Loaded";
+          input.disabled = true;
+
+          // Copy rom to Emscripten FS and start emulation loop
+          const bytes = new Uint8Array(await file.arrayBuffer());
+          FS.writeFile("/rom.bin", bytes);
+          Module._emscripten_start();
+        });
       }
     };
   </script>
+
   {{{ SCRIPT }}}
 </body>
 </html>
