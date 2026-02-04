@@ -5,6 +5,30 @@
 #include <raylib.h>
 #include <stdexcept>
 
+// We are doing this specifically to cut out the need for this flag:
+//  -sASYNCIFY
+// when building the WASM target, since it kills performance, it kinda
+// sucks that it leads to implementing two emulation loops but eh.
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+static void frame_cb(void* user) {
+    auto* fe = static_cast<RaylibFrontend*>(user);
+
+    static double last_time = GetTime();
+    double now = GetTime();
+    double delta = now - last_time;
+
+    constexpr double target_dt = 1.0 / 60.0;
+    if (delta < target_dt)
+        return;
+    last_time = now;
+
+    fe->read_inputs();
+    fe->step_frame();
+    fe->present();
+}
+#endif // __EMSCRIPTEN__
+
 static std::uint32_t format_color(std::uint32_t c) {
   return ((c & 0x00FF0000) >> 16) | ((c & 0x0000FF00)) |
          ((c & 0x000000FF) << 16) | 0xFF000000;
@@ -58,6 +82,12 @@ void RaylibFrontend::read_inputs() {
   joyp->set_state(input_state);
 }
 
+void RaylibFrontend::step_frame() {
+  constexpr std::size_t cycles_per_frame = 70224;
+  for (std::size_t i{0}; i < cycles_per_frame; i++)
+    gbc->step();
+}
+
 void RaylibFrontend::present() {
   ::UpdateTexture(texture, frame_buf.data());
   ::BeginDrawing();
@@ -70,10 +100,7 @@ void RaylibFrontend::present() {
 }
 
 void RaylibFrontend::start() {
-  constexpr auto cycles_per_frame = 70224;
-  constexpr auto target_fps = 60;
   ::InitWindow(fb_width * 4, fb_height * 4, "GBC");
-  ::SetTargetFPS(target_fps);
 
   Image img{};
   img.data = frame_buf.data();
@@ -83,11 +110,18 @@ void RaylibFrontend::start() {
   img.format = ::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
   texture = ::LoadTextureFromImage(img);
 
-  // Here we have an extremely dumb emulation loop
+#ifdef __EMSCRIPTEN__
+  emscripten_set_main_loop_arg(frame_cb, this, 0, true);
+#else
+
+  constexpr auto target_fps = 60;
+  ::SetTargetFPS(target_fps);
+
+  // Desktop build is paced by using SetTargetFPS, nice and simple
   while (!::WindowShouldClose()) {
     read_inputs();
-    for (std::size_t i{0}; i < cycles_per_frame; ++i)
-      gbc->step();
+    step_frame();
     present();
   }
+#endif // __EMSCRIPTEN
 }

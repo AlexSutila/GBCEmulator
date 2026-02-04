@@ -18,6 +18,10 @@ public:
   void clear(std::uint32_t c) override;
   void start() override;
 
+  void read_inputs();
+  void step_frame();
+  void present();
+
   // TODO
   void queue_audio_samples(const float *samples,
                            std::size_t sample_count) override {}
@@ -29,9 +33,6 @@ private:
   // This was double buffered at one point but WASM is a pain in my ass so
   std::array<std::uint32_t, 144 * 160> frame_buf{};
   ::Texture2D texture{};
-
-  void read_inputs();
-  void present();
 };
 
 #endif // RAYLIB_FRONTEND_H

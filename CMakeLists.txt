@@ -175,6 +175,10 @@ if(EMSCRIPTEN)
             -sINITIAL_MEMORY=134217728
             -sMAXIMUM_MEMORY=1073741824
             -sTOTAL_STACK=67108864
+            -sBINARYEN_ASYNC_COMPILATION=0
+            -sMIN_WEBGL_VERSION=2
+            -sMAX_WEBGL_VERSION=2
+            -sUSE_PTHREADS=0
             -fno-rtti
             -flto
             --preload-file /home/dorce/Documents/roms@/roms
@@ -189,6 +193,8 @@ if(EMSCRIPTEN)
         PRIVATE
             ${GBC_COMPILE_OPTIONS}
             -sUSE_WEBGL2=1
+            -O3
+            -flto
     )
     set_target_properties(gbc_wasm PROPERTIES SUFFIX ".html")
 
