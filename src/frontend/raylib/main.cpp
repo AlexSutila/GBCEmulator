@@ -1,3 +1,15 @@
+#ifdef __EMSCRIPTEN__
+
+#include "frontend/raylib/frontend.hpp"
+#include <iostream>
+
+int main() {
+  std::cout << "Testing" << std::endl;
+  return 0;
+}
+
+#else
+
 #include "cart/cart.hpp"
 #include "frontend/raylib/frontend.hpp"
 #include <iostream>
@@ -16,3 +28,5 @@ int main(int argc, char **argv) {
   fe.start();
   return 0;
 }
+
+#endif
