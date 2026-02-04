@@ -1,6 +1,8 @@
 # Overview
 Lolyep. This repo presents yet another GameBoy Color emulator written entirely from scratch. It serves as a spiritual successor to an earlier (and very poorly written) [DMG GameBoy Emulator](https://github.com/AlexSutila/GBEmulator), aiming to be a cleaner, more accurate, and more modular foundation for both DMG and CGB emulation.
 
+- Try it out without compiling: [here](https://alexsutila.github.io/GBCEmulator/gbc_wasm.html)
+
 ## Compatability
 This emulator is designed to be compatible with **GameBoy Color (CGB)** games (obviously), and also implements the backwards compatability features CGB models provide. As such, this emulator can be used to emulate **original DMG GameBoy** games as well. The games shown in the screenshot below do not define the compatability limitations of this emulator, but they are known to play reasonably well.
 
@@ -31,27 +33,20 @@ To evaluate the accuracy of any emulator, the homebrew community has released a 
 ### Acid Visual Tests
 ![Visual Tests](assets/acid_tests.png)
 - Proves high level correctness of visual capabilities for both DMG and CGB
-- **Note:** An accurate pixel FIFO is not necessary for passing these tests, in fact [this emulator](https://github.com/AlexSutila/GBEmulator) manages to pass DMG acid with a rudimentary scanline renderer. This emulator goes a step further and implements a full pixel FIFO, just because :)
+- **Note:** An accurate pixel FIFO is not necessary for passing these tests, in fact [this older GB emulator](https://github.com/AlexSutila/GBEmulator) manages to pass DMG acid with a rudimentary scanline renderer. This emulator goes a step further and implements a full pixel FIFO, just because :)
 
 ### Mooneye Test Suite
 We cannot realistically expect to pass every single one of these tests, as not all of them are designed to pass on CGB hardware. The tests we actually evaluate and their pass/fail status can be seen [here](assets/test_results.md).
 
 ## Multiple Frontends
 This emulator currently supports two frontends:
-1. [A generic SDL3 + ImGUI frontend](https://github.com/AlexSutila/GBCEmulator/blob/develop/src/frontend/sdl3_frontend.cpp), which is designed to be user friendly. You can do what you would normally expect of a traditional emulator, such as remap controls, change settings, etc.
-2. [A comprehensive Python binding](https://github.com/AlexSutila/GBCEmulator/blob/develop/src/python/bindings.cpp), which can be used to step the emulation and interrogate the state of the system on a per-clock cycle basis. The python bindings were also used to generate the images we display above by loading the ROM programatically, stepping the thing for a couple seconds, and rendering the pixeldata after a set amount of time using [matplotlib](https://matplotlib.org/).
+1. A generic SDL3 + ImGUI frontend, which is designed to be user friendly. You can do what you would normally expect of a traditional emulator, such as remap controls, change settings, etc.
+2. A simplified Raylib frontend, which is basically just the previous frontend but with a reduced feature set. This frontend compiles to a desktop usable version, and also a WASM binary which can be hosted and used natively in a browser. 
+3. A comprehensive Python binding, which can be used to step the emulation and interrogate the state of the system on a per-clock cycle basis. The python bindings were also used to generate the images we display above by loading the ROM programatically, stepping the thing for a couple seconds, and rendering the pixeldata after a set amount of time using [matplotlib](https://matplotlib.org/).
 
 This codebase was designed intentionally to make writing new frontends and ports extremely easy.
 
 ## Building
-To support all frontends, the following dependencies are required:
-1. cmake
-2. pybind11
-3. python3
-4. dear-imgui
-5. SDL3
-6. The GNU Compiler Collection, supporting C++20 or newer
-
 To compile a release build:
 ```bash
 mkdir Release && cd Release
