@@ -90,6 +90,9 @@ std::unique_ptr<Mbc> make_mbc(const cart &c) {
   case 0x20: // MBC6
     return make_mbc6(c);
 
+  case 0x22:  // MBC7+SENSOR+RUMBLE+RAM+BATTERY
+    return make_mbc7(c);
+
   case 0xC0: // Wisdom Tree, need to check $014A too
     if (c.header.destination_code == 0xD1) return make_wisdom_tree(c);
   default:

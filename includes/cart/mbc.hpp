@@ -1,5 +1,5 @@
-#ifndef __GBC_MBC_HPP
-#define __GBC_MBC_HPP
+#ifndef GBC_MBC_HPP
+#define GBC_MBC_HPP
 
 #pragma once
 
@@ -61,4 +61,4 @@ static inline bool type_has_battery(const byte_t t) {
   }
 }
 
-#endif //__GBC_MBC_HPP
+#endif //GBC_MBC_HPP

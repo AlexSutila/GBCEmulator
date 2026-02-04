@@ -1,5 +1,5 @@
-#ifndef __CART_HPP
-#define __CART_HPP
+#ifndef CART_HPP
+#define CART_HPP
 
 #include "cart/mbc.hpp"
 #include "emu_types.hpp"
@@ -95,4 +95,4 @@ private:
 [[nodiscard]] std::size_t ram_bytes_from_code(byte_t code);
 [[nodiscard]] bool cgb_enabled(byte_t cgb_flag);
 
-#endif // __CART_HPP
+#endif // CART_HPP
