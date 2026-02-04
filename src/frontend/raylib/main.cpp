@@ -1,10 +1,11 @@
 #ifdef __EMSCRIPTEN__
 
 #include "frontend/raylib/frontend.hpp"
-#include <iostream>
 
 int main() {
-  std::cout << "Testing" << std::endl;
+  cart c = load_cart_fs("/roms/zelda.gbc");
+  RaylibFrontend fe(c);
+  fe.start();
   return 0;
 }
 
@@ -29,4 +30,4 @@ int main(int argc, char **argv) {
   return 0;
 }
 
-#endif
+#endif // __EMSCRIPTEN__

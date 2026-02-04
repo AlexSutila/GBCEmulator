@@ -3,10 +3,8 @@
 
 #include "frontend/frontend.hpp"
 #include <array>
-#include <atomic>
 #include <cstdint>
 #include <raylib.h>
-#include <thread>
 
 struct cart;
 
@@ -28,15 +26,10 @@ private:
   static constexpr int fb_height = 144;
   static constexpr int fb_width = 160;
 
-  std::array<std::array<std::uint32_t, 144 * 160>, 2> frame_buf{};
-  std::atomic<std::size_t> front_idx{0};
+  // This was double buffered at one point but WASM is a pain in my ass so
+  std::array<std::uint32_t, 144 * 160> frame_buf{};
   ::Texture2D texture{};
 
-  std::atomic<bool> frame_ready{false};
-  std::atomic<bool> running{false};
-  std::thread emu_thread;
-
-  void emulation_loop();
   void read_inputs();
   void present();
 };

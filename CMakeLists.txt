@@ -73,10 +73,8 @@ if(NOT EMSCRIPTEN)
 
 else()
 
-    # Try to force the usage of Emscripten WebGL backend???
-    set(CMAKE_SYSTEM_NAME Emscripten)
+    # Compiles raylib for Web platform
     set(PLATFORM Web CACHE STRING "" FORCE)
-    set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 
 endif()
 
@@ -170,21 +168,29 @@ if(EMSCRIPTEN)
     target_link_libraries(gbc_wasm
         PRIVATE raylib
     )
+    target_link_options(gbc_wasm
+        PRIVATE
+            -sUSE_GLFW=3 # Need this or else linker errors
+            -sALLOW_MEMORY_GROWTH=1
+            -sINITIAL_MEMORY=134217728
+            -sMAXIMUM_MEMORY=1073741824
+            -sTOTAL_STACK=67108864
+            -fno-rtti
+            -flto
+            --preload-file /home/dorce/Documents/roms@/roms
+    )
     target_include_directories(gbc_wasm
         PRIVATE ${GBC_INCLUDE_DIR}
     )
 
     # Lol our emulator is beeeg so we need to explicitly allow emscripten to
     # consume a boat load of memory when running
-    set_target_properties(gbc_wasm PROPERTIES
-        SUFFIX ".html"
-        LINK_FLAGS "-sASYNCIFY \
-                    -sUSE_WEBGL2=1 \
-                    -sALLOW_MEMORY_GROWTH=1 \
-                    -sTOTAL_STACK=67108864 \
-                    -sINITIAL_MEMORY=134217728 \
-                    -sMAXIMUM_MEMORY=1073741824"
+    target_compile_options(gbc_wasm
+        PRIVATE
+            ${GBC_COMPILE_OPTIONS}
+            -sUSE_WEBGL2=1
     )
+    set_target_properties(gbc_wasm PROPERTIES SUFFIX ".html")
 
 # ===========================================================================
 #  Non=WASM build target (including Raylib for desktop)
