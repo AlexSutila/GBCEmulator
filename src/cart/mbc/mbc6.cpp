@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <array>
+#include <bitset>
 #include <cstdint>
 #include <memory>
 #include <span>
@@ -124,6 +125,7 @@ private:
   static constexpr std::size_t kFlashBanks = kFlashSize / kRomBank8K; // 128 banks of 8 KiB
   static constexpr std::size_t kSectorSize = 0x20000;  // 128 KiB
   static constexpr std::size_t kHiddenSize = 256;
+  static constexpr std::size_t kProgChunk  = 0x80;  // 128 bytes
 
   enum class Window : std::uint8_t { A, B };
 
@@ -153,7 +155,26 @@ private:
 
     // After AA 55 77
     Hidden77_AA,
-    Hidden77_55
+    Hidden77_55,
+    Hidden77_Final
+    };
+
+    struct ProgramLatch {
+      bool active{false};
+      bool filled{false};          // all 128 bytes received
+      std::size_t base{0};         // chip address aligned to 128 bytes
+      std::array<byte_t, kProgChunk> buf{};
+      std::bitset<kProgChunk> written{};
+
+      ProgramLatch() { reset(); }
+
+      void reset() {
+        active = false;
+        filled = false;
+        base = 0;
+        buf.fill(0xFF);
+        written.reset();
+      }
   };
 
   std::span<const byte_t> rom_;
@@ -180,6 +201,9 @@ private:
 
   FlashMode flash_mode_{FlashMode::ReadArray};
   Seq seq_{Seq::Idle};
+
+  ProgramLatch prog_{};        // main flash 128-byte program buffer
+  ProgramLatch hidden_prog_{}; // hidden region 128-byte program buffer
 
   bool sector0_protected_{false};
 
@@ -236,6 +260,7 @@ private:
       if (!flash_ce_) {
         flash_mode_ = FlashMode::ReadArray;
         seq_ = Seq::Idle;
+        discard_program_buffers();
       }
       return;
     }
@@ -340,12 +365,90 @@ private:
     return flash_wp_;
   }
 
+    void discard_program_buffers() {
+    prog_.reset();
+    hidden_prog_.reset();
+  }
+
+  void commit_program_block(const ProgramLatch& p) {
+    for (std::size_t i = 0; i < kProgChunk; ++i) {
+      const std::size_t a = p.base + i;
+      if (a >= flash_.size()) break;
+
+      const std::size_t sector = a / kSectorSize;
+      if (sector == 0 && !can_modify_sector0()) continue;
+
+      // Flash programming typically can only clear bits (1->0)
+      flash_[a] = static_cast<byte_t>(flash_[a] & p.buf[i]);
+    }
+  }
+
+  void commit_hidden_block(const ProgramLatch& p) {
+    if (!can_modify_hidden()) return;
+    const std::size_t base = p.base & 0xFF;
+    for (std::size_t i = 0; i < kProgChunk; ++i) {
+      const std::size_t idx = base + i;
+      if (idx >= kHiddenSize) break;
+      hidden_[idx] = static_cast<byte_t>(hidden_[idx] & p.buf[i]);
+    }
+  }
+
+  void program_write_main(const std::size_t chip_addr, const byte_t val) {
+    const std::size_t base = chip_addr & ~(kProgChunk - 1);
+
+    if (!prog_.active || prog_.base != base) {
+      prog_.reset();
+      prog_.active = true;
+      prog_.base = base;
+    }
+
+    const std::size_t off = chip_addr - prog_.base;
+    if (off >= kProgChunk) return;
+
+    // Commit happens on second write to the final address after all 128 bytes were written.
+    if (prog_.filled && off == (kProgChunk - 1)) {
+      commit_program_block(prog_);
+      flash_mode_ = FlashMode::Status;
+      prog_.reset();
+      return;
+    }
+
+    prog_.buf[off] = val;
+    prog_.written.set(off);
+    if (prog_.written.all()) prog_.filled = true;
+  }
+
+  void program_write_hidden(const std::size_t hidden_idx, const byte_t val) {
+    const std::size_t base = hidden_idx & ~(kProgChunk - 1);
+
+    if (!hidden_prog_.active || hidden_prog_.base != base) {
+      hidden_prog_.reset();
+      hidden_prog_.active = true;
+      hidden_prog_.base = base;
+    }
+
+    const std::size_t off = hidden_idx - hidden_prog_.base;
+    if (off >= kProgChunk) return;
+
+    if (hidden_prog_.filled && off == (kProgChunk - 1)) {
+      commit_hidden_block(hidden_prog_);
+      flash_mode_ = FlashMode::Status;
+      hidden_prog_.reset();
+      return;
+    }
+
+    hidden_prog_.buf[off] = val;
+    hidden_prog_.written.set(off);
+    if (hidden_prog_.written.all()) hidden_prog_.filled = true;
+  }
+
   void flash_write(const Window w, const addr_t abs_addr, const std::size_t chip_addr,
                    const std::size_t off_in_window, const byte_t val) {
     // F0 exits any mode
     if (val == 0xF0) {
       flash_mode_ = FlashMode::ReadArray;
       seq_ = Seq::Idle;
+      discard_program_buffers();
       return;
     }
 
@@ -354,25 +457,15 @@ private:
       return;
     }
 
-    // Program mode: next write programs one byte (we simplify: immediate complete)
+    // Program mode: capture 128 bytes (aligned) into a buffer, then commit on a 2nd write to the final address
     if (flash_mode_ == FlashMode::Program) {
-      // If chip_addr lands in sector0 and it's write-protected, ignore
-      if (const std::size_t sector = chip_addr / kSectorSize;
-        sector != 0 || can_modify_sector0()) {
-        if (chip_addr < flash_.size()) {
-          // Flash programming typically can only clear bits (1->0)
-          flash_[chip_addr] = static_cast<byte_t>(flash_[chip_addr] & val);
-        }
-      }
-      flash_mode_ = FlashMode::Status;
+      program_write_main(chip_addr, val);
       return;
     }
 
+    // Hidden region program mode: same 128-byte buffer + commit behavior, but applied to the 256-byte hidden region
     if (flash_mode_ == FlashMode::HiddenProgram) {
-      if (can_modify_hidden()) {
-        hidden_[off_in_window & 0xFF] = static_cast<byte_t>(hidden_[off_in_window & 0xFF] & val);
-      }
-      flash_mode_ = FlashMode::Status;
+      program_write_hidden(off_in_window & 0xFF, val);
       return;
     }
 
@@ -403,8 +496,13 @@ private:
       }
       if (val == 0xE0) {
         // Program mode for hidden region* (requires flash_wp_)
-        if (can_modify_hidden()) flash_mode_ = FlashMode::HiddenProgram;
-        else flash_mode_ = FlashMode::Status;
+        if (can_modify_hidden()) {
+          flash_mode_ = FlashMode::HiddenProgram;
+          hidden_prog_.reset();
+          hidden_prog_.active = true;
+        } else {
+          flash_mode_ = FlashMode::Status;
+        }
         seq_ = Seq::Idle;
         return;
       }
@@ -431,6 +529,8 @@ private:
       }
       if (val == 0xA0) {
         flash_mode_ = FlashMode::Program;
+        prog_.reset();
+        prog_.active = true;
         seq_ = Seq::Idle;
         return;
       }
@@ -524,11 +624,19 @@ private:
       if (!s55_addr || val != 0x55) { seq_ = Seq::Idle; return; }
 
       // Next write at cmd addr should be 0x77 to enter HiddenRead
-      seq_ = Seq::Got55;
+      seq_ = Seq::Hidden77_Final;
+      return;
+
+    case Seq::Hidden77_Final:
+      if (aa_addr && val == 0x77) {
+        flash_mode_ = FlashMode::HiddenRead;
+        seq_ = Seq::Idle;
+        return;
+      }
+      seq_ = Seq::Idle;
       return;
     }
   }
-
   // We overload the AA/55/command decoding to also support the “* commands” listed
   // under the AA 55 60 ... category (hidden erase/program, protect/unprotect)
   // The simplest way: interpret those commands when we see them at the "cmd addr" in Got55,
@@ -540,6 +648,13 @@ private:
   // OR implement it directly by adding cases. To keep this file compact, we implement
   // them by exploiting the existing flow: after AA 55 60 AA 55, we land back in Got55,
   // so the "command byte" is processed here too
+
+  // Helpers for persisting MBC6's non-volatile flash/hidden storage
+  [[nodiscard]] std::span<const byte_t> flash() const noexcept { return flash_; }
+  std::span<byte_t> flash() noexcept { return flash_; }
+
+  [[nodiscard]] std::span<const byte_t> hidden() const noexcept { return {hidden_.data(), hidden_.size()}; }
+  std::span<byte_t> hidden() noexcept { return {hidden_.data(), hidden_.size()}; }
 };
 
 
