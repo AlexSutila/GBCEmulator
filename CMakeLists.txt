@@ -182,6 +182,7 @@ if(EMSCRIPTEN)
             -fno-rtti
             -flto
             --preload-file /home/dorce/Documents/roms@/roms
+            --shell-file ${CMAKE_SOURCE_DIR}/src/frontend/raylib/shell.html
     )
     target_include_directories(gbc_wasm
         PRIVATE ${GBC_INCLUDE_DIR}
