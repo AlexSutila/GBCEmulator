@@ -72,10 +72,11 @@ std::unique_ptr<Mbc> make_mbc(const cart &c) {
   case 0x06: // MBC2+BATTERY
     return make_mbc2(c);
 
+  // MMM01 should be correctly detected now with their offset header
   case 0x0B: // MMM01
   case 0x0C: // MMM01+RAM
   case 0x0D: // MMM01+RAM+BATTERY
-    // return make_mmm01(c);
+    return make_mmm01(c);
 
   case 0x0F: // MBC3+TIMER+BATTERY
   case 0x10: // MBC3+TIMER+RAM+BATTERY

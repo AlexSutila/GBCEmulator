@@ -57,7 +57,7 @@ static byte_t compute_header_checksum(const std::span<const byte_t> rom, const s
 static std::uint16_t compute_global_checksum(const std::span<const byte_t> rom, const size_t offset) {
   std::uint32_t sum = 0;
   for (std::size_t i = 0; i < rom.size(); ++i) {
-    if (i == 0x014E || i == 0x014F)
+    if (i == 0x014E + offset || i == 0x014F + offset)
       continue;
     sum += rom[i];
   }
