@@ -168,35 +168,37 @@ if(EMSCRIPTEN)
     target_link_libraries(gbc_wasm
         PRIVATE raylib
     )
+    target_include_directories(gbc_wasm
+        PRIVATE ${GBC_INCLUDE_DIR}
+    )
+
+    # If we ever have to debug the core, we will certainly not be doing so
+    # using this build target. Hence, we go pretty heavy with compiler flags
+    # here because performance on weaker machines tends to suffer.
     target_link_options(gbc_wasm
         PRIVATE
             -sUSE_GLFW=3 # Need this or else linker errors
-            -sALLOW_MEMORY_GROWTH=1
             -sINITIAL_MEMORY=134217728
-            -sMAXIMUM_MEMORY=1073741824
             -sTOTAL_STACK=67108864
             -sBINARYEN_ASYNC_COMPILATION=0
             -sMIN_WEBGL_VERSION=2
             -sMAX_WEBGL_VERSION=2
             -sUSE_PTHREADS=0
             -sEXPORTED_FUNCTIONS=_emscripten_start,_malloc,_free
+            -sSTACK_OVERFLOW_CHECK=0
             -sFORCE_FILESYSTEM=1
+            -sSAFE_HEAP=0
             -fno-rtti
             -flto
+            -O3
             --shell-file ${CMAKE_SOURCE_DIR}/src/frontend/raylib/shell.html
     )
-    target_include_directories(gbc_wasm
-        PRIVATE ${GBC_INCLUDE_DIR}
-    )
-
-    # Lol our emulator is beeeg so we need to explicitly allow emscripten to
-    # consume a boat load of memory when running
     target_compile_options(gbc_wasm
         PRIVATE
             ${GBC_COMPILE_OPTIONS}
             -sUSE_WEBGL2=1
-            -O3
             -flto
+            -O3
     )
     set_target_properties(gbc_wasm PROPERTIES SUFFIX ".html")
 
