@@ -54,6 +54,7 @@ struct cart {
 
   bool header_checksum_ok{};
   bool global_checksum_ok{};
+  bool is_mmm01{};
 
   [[nodiscard]] std::span<const byte_t> rom_span() const noexcept {
     return rom;
@@ -69,8 +70,8 @@ public:
   explicit Cartridge()
       : image_({}), mbc_(make_test_mbc()) {}
 
-  [[nodiscard]] byte_t read_byte(addr_t addr) { return mbc_->read(addr); }
-  void write(addr_t addr, byte_t v) { mbc_->write(addr, v); }
+  [[nodiscard]] byte_t read_byte(const addr_t addr) const { return mbc_->read(addr); }
+  void write(const addr_t addr, const byte_t v) const { mbc_->write(addr, v); }
 
   [[nodiscard]] const cart &image() const noexcept { return image_; }
 
@@ -87,8 +88,8 @@ private:
   std::unique_ptr<Mbc> mbc_;
 };
 
-[[nodiscard]] cart load_cart_raw(std::vector<byte_t> rom_bytes);
-[[nodiscard]] cart load_cart_fs(const fs::path &rom_path);
+[[nodiscard]] std::optional<cart> load_cart_raw(std::vector<byte_t> rom_bytes);
+[[nodiscard]] std::optional<cart> load_cart_fs(const fs::path &rom_path);
 
 // helpers
 [[nodiscard]] std::size_t rom_bytes_from_code(byte_t code);

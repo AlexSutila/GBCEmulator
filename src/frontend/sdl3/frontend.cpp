@@ -70,13 +70,11 @@ void SDL3Frontend::start() {
       join_emu_thread_if_running();
 
       /* Attempt to load cartridge, if it fails thread doesn't start */
-      try {
-        cart cart_ctx = load_cart_fs(rom_path.c_str());
+
+      if (const auto cart = load_cart_fs(rom_path.c_str()); cart != std::nullopt) {
         emulation_thread = std::jthread(&SDL3Frontend::emulation_thread_fn,
-                                        this, cart_ctx, bios_path);
-        ui_state.cart_info = Debug::describe_cart(cart_ctx);
-      } catch (std::exception &e) {
-        Logger::push(LogLevel::Warning, "ROM", "Failed to load ROM", e.what());
+                                      this, cart.value(), bios_path);
+        ui_state.cart_info = Debug::describe_cart(cart.value());
       }
     }
 
