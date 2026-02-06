@@ -54,6 +54,7 @@ static bool type_has_battery(const byte_t t) {
   case 0x1B: // MBC5+RAM+BATTERY
   case 0x1E: // MBC5+RUMBLE+RAM+BATTERY
   case 0x22: // MBC7+SENSOR+RUMBLE+RAM+BATTERY
+  case 0xFD: // TAMA5 (likely, needed for RTC)
   case 0xFE: // HuC3 (Pan Docs doesn't explicitly list it, but it does have a battery-backed RTC or something)
   case 0xFF: // HuC1+RAM+BATTERY
     return true;

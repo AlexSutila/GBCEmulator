@@ -62,7 +62,7 @@ std::unique_ptr<Mbc> make_mbc(const cart &c) {
   switch (c.header.cartridge_type) {
   case 0x00: {// ROM ONLY (some WT ROMs lie about this, we investigate further
     if (c.rom_size() <= 0x8000) return make_no_mbc(c);  // If strictly <= 32KiB, it's probably safe
-    if (maybe_wisdom_tree(c.rom)) {
+    if (c.header.title() == "WISDOM TREE" || maybe_wisdom_tree(c.rom)) {
       Logger::push(
         LogLevel::Warning, "ROM", "Mapper override",
     std::format("{} header type {:02X} looks inconsistent with ROM size {} and appears to be WT; "
@@ -124,6 +124,9 @@ std::unique_ptr<Mbc> make_mbc(const cart &c) {
 
   case 0xC0: // Wisdom Tree, need to check $014A too
     if (c.header.destination_code == 0xD1) return make_wisdom_tree(c);
+
+  case 0xFD: // TAMA5
+    return make_tama5(c);
 
   case 0xFE: // HuC3
     return make_huc3(c);
