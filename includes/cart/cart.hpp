@@ -19,6 +19,17 @@ constexpr std::size_t kHeaderEnd = 0x014F;
 // first opcode after header is typically at 0x0150
 constexpr std::size_t kMinRomSize = 0x0150;
 
+enum SpecialMbc {
+  None,
+  MBC1M,
+  MBC30,
+  MMM01,
+  M161,
+  WisdomTree,
+  Bung,
+  EMS,
+};
+
 struct rom_header {
   std::array<byte_t, 4> entry_point{};      // 0100-0103
   std::array<byte_t, 16>
@@ -54,7 +65,7 @@ struct cart {
 
   bool header_checksum_ok{};
   bool global_checksum_ok{};
-  bool is_mmm01{};
+  SpecialMbc special_mbc{None};
 
   [[nodiscard]] std::span<const byte_t> rom_span() const noexcept {
     return rom;
