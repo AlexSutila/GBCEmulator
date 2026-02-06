@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <fstream>
 #include <bitset>
+#include <csignal>
 
 static std::optional<std::vector<byte_t>> read_all_bytes(const fs::path& p) {
   std::ifstream f(p, std::ios::binary | std::ios::ate);
@@ -172,7 +173,7 @@ bool validate(cart& c) {
   for (const auto offset : {mmm01_offset, static_cast<size_t>(0x00)}) {
     if (offset == mmm01_offset && c.rom_size() < 0x8000) {
       fail_count += 1;
-      break;
+      continue;
     }
     if (auto header = parse_header(c.rom, offset); header != std::nullopt) {
       c.header = header.value();
@@ -269,7 +270,7 @@ SpecialMbc detect_special_mbc(const cart& c) {
     if (c.rom_size() <= 0x8000) return NotSpecial_t;  // If strictly <= 32KiB, it's probably safe
     if (c.header.title() == "WISDOM TREE" || maybe_wisdom_tree(c.rom_span())) {
       Logger::push(
-        LogLevel::Warning, "ROM", "Mapper override",
+        LogLevel::Info, "ROM", "Mapper override",
       std::format("{} header type {:02X} looks inconsistent with ROM size {} and appears to be WT; "
                   "forcing Wisdom Tree mapper.",
                   c.header.title(), c.header.cartridge_type, c.rom_span().size()));
@@ -277,7 +278,7 @@ SpecialMbc detect_special_mbc(const cart& c) {
     }
     if (maybe_m161(c.rom_span())) {
       Logger::push(
-        LogLevel::Warning, "ROM", "Mapper override",
+        LogLevel::Info, "ROM", "Mapper override",
       std::format("{} header type {:02X} looks inconsistent with ROM size {} and appears to be M161; "
                   "forcing M161 mapper.",
                   c.header.title(), c.header.cartridge_type, c.rom_span().size()));
@@ -298,20 +299,19 @@ SpecialMbc detect_special_mbc(const cart& c) {
   }
 }
 
-std::optional<cart> load_cart_fs(const fs::path& rom_path) {
+cart load_cart_fs(const fs::path& rom_path) {
   cart c{};
   c.file_path = rom_path;
   if (const auto rom = read_all_bytes(rom_path); rom != std::nullopt)
     c.rom = rom.value();
-  else
-    return std::nullopt;
-
-  if (validate(c)) {
-    c.special_mbc = detect_special_mbc(c);
-    return c;
+  else {
+    throw std::runtime_error{"Cannot read cartridge content"};
   }
 
-  return std::nullopt;
+  // We will load the cart even if it fails; the user should know what they are doing
+  validate(c);
+  c.special_mbc = detect_special_mbc(c);
+  return c;
 }
 
 cart load_cart_raw(std::vector<byte_t> rom_bytes) {

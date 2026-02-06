@@ -102,7 +102,7 @@ private:
 };
 
 [[nodiscard]] cart load_cart_raw(std::vector<byte_t> rom_bytes);
-[[nodiscard]] std::optional<cart> load_cart_fs(const fs::path &rom_path);
+[[nodiscard]] cart load_cart_fs(const fs::path &rom_path);
 
 // helpers
 [[nodiscard]] std::size_t rom_bytes_from_code(byte_t code);
