@@ -250,5 +250,5 @@ std::unique_ptr<Mbc> make_mbc3(const cart &c) {
       c.header.cartridge_type == 0x10;  // MBC3+TIMER+RAM+BATTERY
   return std::make_unique<Mbc3>(c.rom_span(), c.declared_ram_bytes,
                                 type_has_battery(c.header.cartridge_type),
-                                has_rtc, c.special_mbc == MBC30);
+                                has_rtc, c.special_mbc == MBC30_t);
 }

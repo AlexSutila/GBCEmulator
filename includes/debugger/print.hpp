@@ -1,5 +1,5 @@
-#ifndef __DEBUG_PRINT_H
-#define __DEBUG_PRINT_H
+#ifndef DEBUG_PRINT_H
+#define DEBUG_PRINT_H
 
 #include "cpu/interrupts.hpp"
 #include "cpu/lr35902.hpp"
@@ -19,7 +19,7 @@ namespace Debug {
 
 // Simple lookups (return "Unknown" if not recognized)
 std::string destination_name(byte_t code);
-std::string cartridge_type_name(byte_t code);
+std::string cartridge_type_name(byte_t code, SpecialMbc special);
 std::string cgb_flag_desc(byte_t cgb_flag);
 std::string sgb_flag_desc(byte_t sgb_flag);
 
@@ -36,4 +36,4 @@ std::string describe_cart(const cart &c);
 
 } // namespace Debug
 
-#endif // __DEBUG_PRINT_H
+#endif // DEBUG_PRINT_H

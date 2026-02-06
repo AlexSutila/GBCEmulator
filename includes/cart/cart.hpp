@@ -20,14 +20,14 @@ constexpr std::size_t kHeaderEnd = 0x014F;
 constexpr std::size_t kMinRomSize = 0x0150;
 
 enum SpecialMbc {
-  None,
-  MBC1M,
-  MBC30,
-  MMM01,
-  M161,
-  WisdomTree,
-  Bung,
-  EMS,
+  NotSpecial_t,
+  MBC1M_t,
+  MBC30_t,
+  MMM01_t,
+  M161_t,
+  WisdomTree_t,
+  Bung_t,
+  EMS_t,
 };
 
 struct rom_header {
@@ -65,7 +65,9 @@ struct cart {
 
   bool header_checksum_ok{};
   bool global_checksum_ok{};
-  SpecialMbc special_mbc{None};
+  byte_t computed_header_checksum{};
+  std::uint16_t computed_global_checksum{};
+  SpecialMbc special_mbc{};
 
   [[nodiscard]] std::span<const byte_t> rom_span() const noexcept {
     return rom;

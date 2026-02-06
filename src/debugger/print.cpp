@@ -4,14 +4,14 @@
 
 namespace Debug {
 
-[[nodiscard]] std::string hex8(byte_t v) {
+[[nodiscard]] std::string hex8(const byte_t v) {
   std::ostringstream o;
   o << "0x" << std::hex << std::uppercase // I hate writing UI lol
     << std::setw(2) << std::setfill('0') << +v;
   return o.str();
 }
 
-[[nodiscard]] std::string hex16(addr_t v) {
+[[nodiscard]] std::string hex16(const addr_t v) {
   std::ostringstream o;
   o << "0x" << std::hex << std::uppercase // I hate writing UI lol
     << std::setw(4) << std::setfill('0') << +v;
@@ -31,7 +31,7 @@ std::string to_string(const LR35902::ProcessorState &s) {
 }
 
 std::string to_string(const PixelProcessingUnit::PPUState &s) {
-  const char *mode_str = "";
+  auto mode_str = "";
   std::ostringstream out;
 
   switch (s.state) {
@@ -60,7 +60,7 @@ std::string to_string(const PixelProcessingUnit::PPUState &s) {
 std::string to_string(const InterruptBits &i) {
   std::ostringstream out;
 
-  auto flag = [&](InterruptFlagMask m) {
+  auto flag = [&](const InterruptFlagMask m) {
     return i.get_flag(m) ? "SET " : "clear";
   };
   out << "Raw: " << hex8(i.peek()) << "\n\n"
@@ -85,7 +85,7 @@ std::string to_string(const InterruptBits &i) {
   return out.str();
 }
 
-static std::string bytes_hex(std::span<const byte_t> s) {
+static std::string bytes_hex(const std::span<const byte_t> s) {
   std::ostringstream oss;
   oss << std::hex << std::uppercase << std::setfill('0');
   for (std::size_t i = 0; i < s.size(); ++i) {
@@ -96,9 +96,9 @@ static std::string bytes_hex(std::span<const byte_t> s) {
   return oss.str();
 }
 
-static std::string two_char_code(byte_t a, byte_t b) {
-  auto printable = [](byte_t x) {
-    return std::isprint(static_cast<unsigned char>(x)) != 0;
+static std::string two_char_code(const byte_t a, const byte_t b) {
+  auto printable = [](const byte_t x) {
+    return std::isprint(x) != 0;
   };
   if (printable(a) && printable(b)) {
     std::string s;
@@ -155,7 +155,7 @@ static constexpr std::array<std::pair<byte_t, std::string_view>, 28> kCartType =
     }};
 
 // Destination code (014A)
-std::string destination_name(byte_t code) {
+std::string destination_name(const byte_t code) {
   switch (code) {
   case 0x00:
     return "Japan";
@@ -167,8 +167,8 @@ std::string destination_name(byte_t code) {
 }
 
 // CGB flag (0143)
-std::string cgb_flag_desc(byte_t f) {
-  switch (f) {
+std::string cgb_flag_desc(const byte_t cgb_flag) {
+  switch (cgb_flag) {
   case 0x80:
     return "CGB supported (DMG compatible)";
   case 0xC0:
@@ -179,8 +179,8 @@ std::string cgb_flag_desc(byte_t f) {
 }
 
 // SGB flag (0146)
-std::string sgb_flag_desc(byte_t f) {
-  if (f == 0x03)
+std::string sgb_flag_desc(const byte_t sgb_flag) {
+  if (sgb_flag == 0x03)
     return "SGB functions supported";
   return "No SGB functions";
 }
@@ -406,11 +406,30 @@ static constexpr std::array<std::pair<std::string_view, std::string_view>, 255>
         {"DK", "Kodansha"},
     }};
 
-std::string cartridge_type_name(byte_t code) {
-  return lookup_or_unknown(kCartType, code);
+std::string cartridge_type_name(const byte_t code, const SpecialMbc special) {
+  switch (special) {
+  case WisdomTree_t:
+    return "Wisdom Tree";
+  case M161_t:
+    return "M161";
+  case Bung_t:
+    return "Bung";
+  case EMS_t:
+    return "EMS";
+  case MBC30_t: {
+    auto result = lookup_or_unknown(kCartType, code);
+    return result.insert(4, "0");
+  }
+  case MBC1M_t: {
+    auto result = lookup_or_unknown(kCartType, code);
+    return result.insert(4, "M");
+  }
+  default:
+    return lookup_or_unknown(kCartType, code);
+  }
 }
 
-std::string old_licensee_name(byte_t old_code) {
+std::string old_licensee_name(const byte_t old_code) {
   return lookup_or_unknown(kOldLicensee, old_code);
 }
 
@@ -424,15 +443,15 @@ std::string new_licensee_name(const std::string &two_chars) {
 }
 
 // ROM size tag (0148)
-std::string rom_size_pretty(byte_t code) {
-  if (code <= 0x08) {
-    const std::uint64_t bytes = (32ull * 1024ull) << code;
+std::string rom_size_pretty(const byte_t rom_size_code) {
+  if (rom_size_code <= 0x08) {
+    const std::uint64_t bytes = (32ull * 1024ull) << rom_size_code;
     const std::uint64_t banks = bytes / (16ull * 1024ull);
     std::ostringstream oss;
     oss << (bytes / 1024ull) << " KiB (" << banks << " ROM banks)";
     return oss.str();
   }
-  switch (code) {
+  switch (rom_size_code) {
   case 0x52:
     return "1.1 MiB (72 ROM banks)";
   case 0x53:
@@ -445,8 +464,8 @@ std::string rom_size_pretty(byte_t code) {
 }
 
 // RAM size tag (0149)
-std::string ram_size_pretty(byte_t code) {
-  switch (code) {
+std::string ram_size_pretty(const byte_t ram_size_code) {
+  switch (ram_size_code) {
   case 0x00:
     return "0 (No RAM)";
   case 0x01:
@@ -464,33 +483,14 @@ std::string ram_size_pretty(byte_t code) {
   }
 }
 
-// Checksums (duplicated here so the report can show expected vs computed)
-static byte_t compute_header_checksum(std::span<const byte_t> rom) {
-  byte_t checksum = 0;
-  for (std::uint16_t addr = 0x0134; addr <= 0x014C; ++addr) {
-    checksum = static_cast<byte_t>(checksum - rom[addr] - 1);
-  }
-  return checksum;
-}
-
-static std::uint16_t compute_global_checksum(std::span<const byte_t> rom) {
-  std::uint32_t sum = 0;
-  for (std::size_t i = 0; i < rom.size(); ++i) {
-    if (i == 0x014E || i == 0x014F)
-      continue;
-    sum += rom[i];
-  }
-  return static_cast<std::uint16_t>(sum & 0xFFFF);
-}
-
 std::string describe_cart(const cart &c) {
   const auto &h = c.header;
 
   const std::string new_code =
       two_char_code(h.new_licensee_code[0], h.new_licensee_code[1]);
 
-  const byte_t hdr_chk = compute_header_checksum(c.rom);
-  const std::uint16_t glob_chk = compute_global_checksum(c.rom);
+  const byte_t hdr_chk = c.computed_header_checksum;
+  const std::uint16_t glob_chk = c.computed_global_checksum;
 
   std::ostringstream os;
   os << "File: " << c.file_path.string() << "\n";
@@ -508,7 +508,7 @@ std::string describe_cart(const cart &c) {
      << sgb_flag_desc(h.sgb_flag) << "\n";
 
   os << "Cartridge type (0147): " << hex8(h.cartridge_type) << " -> "
-     << cartridge_type_name(h.cartridge_type) << "\n";
+     << cartridge_type_name(h.cartridge_type, c.special_mbc) << "\n";
 
   os << "ROM size tag (0148): " << hex8(h.rom_size_code) << " -> "
      << rom_size_pretty(h.rom_size_code) << "\n";

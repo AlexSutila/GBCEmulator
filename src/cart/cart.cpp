@@ -169,7 +169,7 @@ bool validate(cart& c) {
   // Offset (rom_size-0x8000) for MMM01
   short fail_count{};
   const auto mmm01_offset = c.rom_size() - 0x8000;
-  for (const auto offset : {static_cast<size_t>(0x00), mmm01_offset}) {
+  for (const auto offset : {mmm01_offset, static_cast<size_t>(0x00)}) {
     if (offset == mmm01_offset && c.rom_size() < 0x8000) {
       fail_count += 1;
       break;
@@ -182,16 +182,18 @@ bool validate(cart& c) {
     c.declared_ram_bytes = ram_bytes_from_code(c.header.ram_size_code);
 
     const byte_t computed_hchk = compute_header_checksum(c.rom, offset);
+    c.computed_header_checksum = computed_hchk;
     c.header_checksum_ok = (computed_hchk == c.header.header_checksum);
 
     const std::uint16_t computed_gchk = compute_global_checksum(c.rom, offset);
+    c.computed_global_checksum = computed_gchk;
     c.global_checksum_ok = (computed_gchk == c.header.global_checksum);
 
     if (!c.header_checksum_ok || !c.global_checksum_ok) {
       fail_count += 1;
     }
     else {
-      if (offset != 0) c.special_mbc = MMM01;
+      if (offset != 0) c.special_mbc = MMM01_t;
       // If declared size is known, ensure file is at least that big
       if (c.declared_rom_bytes != 0 && c.rom.size() < c.declared_rom_bytes) {
         Logger::push(LogLevel::Warning, "ROM", "ROM too small",
@@ -264,14 +266,14 @@ bool maybe_m161(const std::span<const byte_t> rom) {
 SpecialMbc detect_special_mbc(const cart& c) {
   switch (c.header.cartridge_type) {
   case 0x00: { // ROM ONLY, but some WT/M161 carts lie about this, we investigate further
-    if (c.rom_size() <= 0x8000) return None;  // If strictly <= 32KiB, it's probably safe
+    if (c.rom_size() <= 0x8000) return NotSpecial_t;  // If strictly <= 32KiB, it's probably safe
     if (c.header.title() == "WISDOM TREE" || maybe_wisdom_tree(c.rom_span())) {
       Logger::push(
         LogLevel::Warning, "ROM", "Mapper override",
       std::format("{} header type {:02X} looks inconsistent with ROM size {} and appears to be WT; "
                   "forcing Wisdom Tree mapper.",
                   c.header.title(), c.header.cartridge_type, c.rom_span().size()));
-      return WisdomTree;
+      return WisdomTree_t;
     }
     if (maybe_m161(c.rom_span())) {
       Logger::push(
@@ -279,20 +281,20 @@ SpecialMbc detect_special_mbc(const cart& c) {
       std::format("{} header type {:02X} looks inconsistent with ROM size {} and appears to be M161; "
                   "forcing M161 mapper.",
                   c.header.title(), c.header.cartridge_type, c.rom_span().size()));
-      return M161;
+      return M161_t;
     }
   }
   case 0x0F: case 0x10: case 0x11: case 0x12: case 0x13:  // Special MBC3 that has 64 KiB RAM
     if (c.declared_ram_bytes > 32 * 1024)
-      return MBC30;
+      return MBC30_t;
   case 0x1B:
     if (c.header.destination_code == 0xE1 || c.header.title() == "EMSMENU" || c.header.title() == "GB16M")
-      return EMS;
+      return EMS_t;
   case 0xC0:
     if (c.header.destination_code == 0xD1)
-      return WisdomTree;
+      return WisdomTree_t;
   default:
-    return None;
+    return NotSpecial_t;
   }
 }
 

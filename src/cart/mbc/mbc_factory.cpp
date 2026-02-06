@@ -6,11 +6,11 @@
 
 std::unique_ptr<Mbc> make_mbc(const cart &c) {
   switch (c.special_mbc) {
-  case WisdomTree:
+  case WisdomTree_t:
     return make_wisdom_tree(c);
-  case M161:
+  case M161_t:
     return make_m161(c);
-  case EMS:
+  case EMS_t:
     return make_ems(c);
   default:
     break;
