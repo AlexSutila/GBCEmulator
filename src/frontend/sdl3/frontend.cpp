@@ -11,6 +11,12 @@ SDL3Frontend::SDL3Frontend() : host(framebuf_width, framebuf_height, scale) {
       std::make_unique<std::uint32_t[]>(framebuf_height * framebuf_width);
   running = true;
   clear(black);
+
+  // We have to update this manually once because the emulation loop has not
+  // started yet to do it for us. If we don't do this, we may end up seeing a
+  // garbage value being used for the initial screen color.
+  const std::uint32_t *raw_pixels = get_front_buffer();
+  host.update_texture(raw_pixels, 160, 144, false, false);
 }
 
 SDL3Frontend::~SDL3Frontend() {
@@ -129,13 +135,16 @@ void SDL3Frontend::render_frame() {
   // 3. FPS Calculation
   const auto now = std::chrono::steady_clock::now();
   const auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-      now - last_fps_check).count();
+                              now - last_fps_check)
+                              .count();
 
   // Update FPS readout every 500ms
   if (elapsed_ms >= 500) {
-    const uint64_t current_count = emulated_frame_count.load(std::memory_order_relaxed);
+    const uint64_t current_count =
+        emulated_frame_count.load(std::memory_order_relaxed);
     const uint64_t frames = current_count - last_frame_count;
-    ui_state.current_fps = static_cast<double>(frames) * 1000 / static_cast<double>(elapsed_ms);
+    ui_state.current_fps =
+        static_cast<double>(frames) * 1000 / static_cast<double>(elapsed_ms);
 
     last_frame_count = current_count;
     last_fps_check = now;
@@ -318,7 +327,8 @@ bool SDL3Frontend::consume_load_bios_request(
   return true;
 }
 
-bool SDLCALL SDL3Frontend::event_watcher(void* userdata, const SDL_Event* event) {
+bool SDLCALL SDL3Frontend::event_watcher(void *userdata,
+                                         const SDL_Event *event) {
   if (event->type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED ||
       event->type == SDL_EVENT_WINDOW_MOVED ||
       event->type == SDL_EVENT_WINDOW_EXPOSED) {
@@ -328,8 +338,9 @@ bool SDLCALL SDL3Frontend::event_watcher(void* userdata, const SDL_Event* event)
     // Force a frame update immediately
     // When the main loop is blocked during windows resizing
     if (const auto now = std::chrono::steady_clock::now();
-      std::chrono::duration_cast<std::chrono::milliseconds>(now - last_draw).count() >= 16) {
-      auto* self = static_cast<SDL3Frontend*>(userdata);
+        std::chrono::duration_cast<std::chrono::milliseconds>(now - last_draw)
+            .count() >= 16) {
+      auto *self = static_cast<SDL3Frontend *>(userdata);
       self->render_frame();
       last_draw = now;
     }
