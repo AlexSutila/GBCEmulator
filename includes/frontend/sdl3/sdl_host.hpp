@@ -32,6 +32,7 @@ public:
   void set_volume(float volume) const;
   int get_queued_audio_bytes() const;
   void clear_audio_stream() const {SDL_ClearAudioStream(audio_stream);}
+  SDL_AudioSpec get_audio_spec() const { return audio_spec; }
 
 private:
   SDL_Window* window{nullptr};

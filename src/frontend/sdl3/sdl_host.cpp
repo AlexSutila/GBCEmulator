@@ -118,7 +118,11 @@ void SDLHost::queue_audio(const float *samples, const std::size_t count) const {
   if (!audio_device || !audio_stream)
     return;
 
-  constexpr std::size_t max_queue_bytes = 48000 * 2 * sizeof(float); // ~1s
+
+  const std::size_t bytes_per_frame =
+  static_cast<std::size_t>(audio_spec.channels) * sizeof(float);
+  const std::size_t max_queue_bytes =
+  static_cast<std::size_t>(audio_spec.freq) * bytes_per_frame; // ~1 second
   const int queued = SDL_GetAudioStreamQueued(audio_stream);
 
   if (queued < 0) {
