@@ -122,6 +122,9 @@ std::unique_ptr<Mbc> make_mbc(const cart &c) {
   case 0xC0: // Wisdom Tree, need to check $014A too
     if (c.header.destination_code == 0xD1) return make_wisdom_tree(c);
 
+  case 0xFE: // HuC3
+    return make_huc3(c);
+
   case 0xFF: // HuC1+RAM+BATTERY
     return make_huc1(c);
 
