@@ -113,6 +113,7 @@ set(GBC_CORE_SOURCES
     src/debugger/breakpoint.cpp
     src/debugger/debugger.cpp
     src/debugger/print.cpp
+        src/cart/mbc/huc1.cpp
 )
 
 ## UI/Frontend
