@@ -1,5 +1,6 @@
 imgui.ini
 build/
+build_wasm/
 debug/
 release/
 compile_commands.json
