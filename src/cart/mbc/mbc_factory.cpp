@@ -46,6 +46,18 @@ bool maybe_wisdom_tree(const std::span<const byte_t> rom) {
   return true;
 }
 
+// Noooo, not you M161 too :(
+bool maybe_m161(const std::span<const byte_t> rom) {
+  // M161 maps 32 KiB banks into 0000-7FFF, bank number is 3 bits (00-07)
+  // So if the ROM is bigger than 32 KiB but doesn't have a whole number of 32 KiB banks, it's likely not M161
+  // HOWEVER this is still not very foolproof. Need more research...
+  if (rom.size() <= 0x8000) return false;
+  if (rom.size() % 0x8000 != 0) return false;          // whole number of 32 KiB banks
+  if (rom.size() > 0x8000 * 8) return false;           // max 8 banks
+
+  return true;
+}
+
 std::unique_ptr<Mbc> make_mbc(const cart &c) {
   switch (c.header.cartridge_type) {
   case 0x00: {// ROM ONLY (some WT ROMs lie about this, we investigate further
@@ -57,6 +69,14 @@ std::unique_ptr<Mbc> make_mbc(const cart &c) {
                 "forcing Wisdom Tree mapper.",
                 c.header.title(), c.header.cartridge_type, c.rom_span().size()));
       return make_wisdom_tree(c);
+    }
+    if (maybe_m161(c.rom)) {
+      Logger::push(
+        LogLevel::Warning, "ROM", "Mapper override",
+    std::format("{} header type {:02X} looks inconsistent with ROM size {} and appears to be M161; "
+                "forcing M161 mapper.",
+                c.header.title(), c.header.cartridge_type, c.rom_span().size()));
+      return make_m161(c);
     }
   }
   case 0x08: // ROM+RAM

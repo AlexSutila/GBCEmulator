@@ -220,12 +220,10 @@ std::optional<cart> load_cart_fs(const fs::path& rom_path) {
   return std::nullopt;
 }
 
-std::optional<cart> load_cart_raw(std::vector<byte_t> rom_bytes) {
+cart load_cart_raw(std::vector<byte_t> rom_bytes) {
   cart c{};
   c.file_path.clear();
   c.rom = std::move(rom_bytes);
-  if (validate(c)) {
-    return c;
-  }
-  return std::nullopt;
+  validate(c);
+  return c;
 }

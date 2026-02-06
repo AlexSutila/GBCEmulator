@@ -16,6 +16,7 @@ std::unique_ptr<Mbc> make_mbc5(const cart &c);
 std::unique_ptr<Mbc> make_mbc6(const cart &c);
 std::unique_ptr<Mbc> make_mbc7(const cart &c);
 std::unique_ptr<Mbc> make_mmm01(const cart &c);
+std::unique_ptr<Mbc> make_m161(const cart &c);
 std::unique_ptr<Mbc> make_wisdom_tree(const cart& c);
 std::unique_ptr<Mbc> make_test_mbc();
 

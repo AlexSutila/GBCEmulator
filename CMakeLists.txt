@@ -105,6 +105,7 @@ set(GBC_CORE_SOURCES
     src/cart/mbc/mbc6.cpp
     src/cart/mbc/mbc7.cpp
     src/cart/mbc/mmm01.cpp
+    src/cart/mbc/m161.cpp
     src/cart/mbc/mbc_wt.cpp
     src/cart/mbc/test_mbc.cpp
     src/cart/mbc/mbc_factory.cpp

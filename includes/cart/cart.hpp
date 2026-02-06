@@ -88,7 +88,7 @@ private:
   std::unique_ptr<Mbc> mbc_;
 };
 
-[[nodiscard]] std::optional<cart> load_cart_raw(std::vector<byte_t> rom_bytes);
+[[nodiscard]] cart load_cart_raw(std::vector<byte_t> rom_bytes);
 [[nodiscard]] std::optional<cart> load_cart_fs(const fs::path &rom_path);
 
 // helpers
