@@ -108,7 +108,8 @@ set(GBC_CORE_SOURCES
     src/cart/mbc/m161.cpp
     src/cart/mbc/huc1.cpp
     src/cart/mbc/huc3.cpp
-    src/cart/mbc/mbc_wt.cpp
+    src/cart/mbc/wisdom_tree.cpp
+    src/cart/mbc/ems.cpp
     src/cart/mbc/test_mbc.cpp
     src/cart/mbc/mbc_factory.cpp
 

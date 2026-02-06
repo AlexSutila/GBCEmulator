@@ -99,7 +99,7 @@ private:
     const auto banks = rom_bank_count(rom_);
     const auto b = clamp_bank(bank, banks);
     const std::size_t idx = b * kRomBankSize + off;
-    return (idx < rom_.size()) ? rom_[idx] : open_bus();
+    return idx < rom_.size() ? rom_[idx] : open_bus();
   }
 
   [[nodiscard]] byte_t ram_at(std::size_t const bank, std::size_t const off) const {

@@ -108,6 +108,9 @@ std::unique_ptr<Mbc> make_mbc(const cart &c) {
   case 0x19: // MBC5
   case 0x1A: // MBC5+RAM
   case 0x1B: // MBC5+RAM+BATTERY
+    // EMS
+    if (c.header.destination_code == 0xE1 || c.header.title() == "EMSMENU" || c.header.title() == "GB16M")
+      return make_ems(c);
   case 0x1C: // MBC5+RUMBLE
   case 0x1D: // MBC5+RUMBLE+RAM
   case 0x1E: // MBC5+RUMBLE+RAM+BATTERY
