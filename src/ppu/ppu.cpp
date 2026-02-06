@@ -188,19 +188,20 @@ std::uint32_t PixelProcessingUnit::get_obj_rgb(const pixel &px) const {
 
 /* Determines if a sprite is visible on the current pixel being processed. This
  * method will ultimately end up determining when sprites need to be fetched. */
-const bool PixelProcessingUnit::next_sprite_visible() const {
+const bool PixelProcessingUnit::next_sprite_visible(std::size_t px_idx) const {
   constexpr auto max_sprites = 10; // Per-scanline hardware limitation
   if (sprites_fetched >= oam_data.size() || sprites_fetched >= max_sprites)
     return false;
 
   // We make the assumption that this sprite lies along the scanline vertically
   const Sprite &next_sprite = oam_data.at(sprites_fetched);
-  return sprite_visible(next_sprite.x_pos, row_pixels_rendered);
+  return sprite_visible(next_sprite.x_pos, px_idx);
 }
 
 /* Performs the fetcher stepping, FIFO popping, and all the logic behind what
  * happens when regarding the pixel FIFO madness that confuses everyone. */
-std::optional<std::uint32_t> PixelProcessingUnit::get_next_pixel() {
+std::optional<std::uint32_t>
+PixelProcessingUnit::get_next_pixel(std::size_t px_idx) {
 
   // If the window becomes visible, we have to reset the fetcher so it starts
   // fetching window data instead of BG data.
@@ -208,7 +209,7 @@ std::optional<std::uint32_t> PixelProcessingUnit::get_next_pixel() {
     fetcher->render_window();
 
   // No sprite interaction occurs with this pixel, so ignore OAM data.
-  if (!next_sprite_visible()) {
+  if (!next_sprite_visible(px_idx)) {
     fetcher->step();
     return try_fifo_pop();
   }
@@ -224,7 +225,7 @@ std::optional<std::uint32_t> PixelProcessingUnit::get_next_pixel() {
 
     // If no further sprite is to be rendered with this pixel, we can emit it.
     // There is still a change a sprite overlaps the same starting pixel.
-    if (!next_sprite_visible()) [[unlikely]]
+    if (!next_sprite_visible(px_idx)) [[unlikely]]
       return try_fifo_pop();
   }
 
@@ -425,7 +426,7 @@ void PixelProcessingUnit::do_draw() {
   ++cur_mode_clks;
 
   // Rendering step, try to pop pixels when ready from the fifo
-  if (auto px = get_next_pixel(); px.has_value()) {
+  if (auto px = get_next_pixel(row_pixels_rendered); px.has_value()) {
     const auto x = row_pixels_rendered++;
     const auto y = ly_.peek();
     const auto c = px.value();

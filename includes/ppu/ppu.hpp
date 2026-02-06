@@ -70,8 +70,8 @@ private:
 
   /* For tracking where we currently are in the rendering process */
   std::size_t row_pixels_rendered{}, sprites_fetched{};
-  const bool next_sprite_visible() const;
-  std::optional<std::uint32_t> get_next_pixel();
+  std::optional<std::uint32_t> get_next_pixel(std::size_t px_idx);
+  const bool next_sprite_visible(std::size_t px_idx) const;
 
   /* For popping and combining pixel data from both fifos */
   std::uint32_t resolve_px_priority(const pixel &bg_px,
