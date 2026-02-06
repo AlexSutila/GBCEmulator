@@ -119,6 +119,7 @@ void GameBoyColor::skip_bios() {
   bus->write_byte(static_cast<addr_t>(mmio::MMIO_LCD_Y_COMP), 0x00);
   bus->write_byte(static_cast<addr_t>(mmio::MMIO_LCD_Y_COMP), 0x00);
   // DMA (0xFF46) left blank intentionally - dont want to trigger it
+  bus->write_byte(static_cast<addr_t>(mmio::MMIO_LCD_BGP), 0xFC);
   bus->write_byte(static_cast<addr_t>(mmio::MMIO_LCD_WY), 0x00);
   bus->write_byte(static_cast<addr_t>(mmio::MMIO_LCD_WX), 0x00);
   // KEY0 (0xFF4C) left blank intentionally - primed during cart insertion

@@ -17,7 +17,7 @@ class SDL3Frontend final : public Frontend {
   static constexpr int framebuf_width{160};
   static constexpr int framebuf_size{framebuf_width * framebuf_height};
   static constexpr int scale{4};
-  static constexpr unsigned black{0xFF000000};
+  static constexpr std::uint32_t black{0xFF000000};
   static constexpr std::array<Joypad::JoypadButton, 8> button_order{
       Joypad::JoypadButton::RIGHT,  Joypad::JoypadButton::LEFT,
       Joypad::JoypadButton::UP,     Joypad::JoypadButton::DOWN,
