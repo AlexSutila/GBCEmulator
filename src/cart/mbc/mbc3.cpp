@@ -14,8 +14,9 @@
 class Mbc3 final : public Mbc {
 public:
   Mbc3(const std::span<const byte_t> rom, std::size_t const ram_bytes,
-       bool const battery, bool const has_rtc)
-      : rom_(rom), ram_(ram_bytes), battery_(battery), has_rtc_(has_rtc) {}
+       bool const battery, bool const has_rtc, bool const is_mbc30)
+      : rom_(rom), ram_(ram_bytes), battery_(battery), has_rtc_(has_rtc),
+        is_mbc30_(is_mbc30){}
 
   // TODO: currently there is no mechanism to keep the clock ticking after the
   // emulator is shut down. It is reasonable to calculate the delta between now
@@ -59,14 +60,20 @@ public:
       return;
     }
     if (addr <= 0x3FFF) {
-      byte_t b = (val & 0x7F);
+      const byte_t mask = is_mbc30_ ? 0xFF : 0x7F; // MBC30/MBC3
+      byte_t b = val & mask;
       if (b == 0)
         b = 1; // force 0b00 to 0b01, similar to MBC1
       rom_bank_ = b;
       return;
     }
     if (addr <= 0x5FFF) {
-      sel_ = val; // 00-07 RAM bank, 08-0C RTC reg
+      if (val <= 0x07) {
+        const byte_t mask = is_mbc30_ ? 0x07 : 0x03;
+        sel_ = val & mask;
+      } else {
+        sel_ = val; // 00-07 RAM bank, 08-0C RTC reg
+      }
       return;
     }
     if (addr <= 0x7FFF) {
@@ -108,6 +115,7 @@ private:
   std::vector<byte_t> ram_;
   bool battery_{};
   bool has_rtc_{};
+  bool is_mbc30_{};
 
   bool ram_rtc_enabled_{false}; // RAMR? 0b1010 enables RAM and RTC
   byte_t rom_bank_{
@@ -238,9 +246,9 @@ private:
 
 std::unique_ptr<Mbc> make_mbc3(const cart &c) {
   const bool has_rtc =
-      (c.header.cartridge_type == 0x0F || // MBC3+TIMER+BATTERY
-       c.header.cartridge_type == 0x10);  // MBC3+TIMER+RAM+BATTERY
+      c.header.cartridge_type == 0x0F || // MBC3+TIMER+BATTERY
+      c.header.cartridge_type == 0x10;  // MBC3+TIMER+RAM+BATTERY
   return std::make_unique<Mbc3>(c.rom_span(), c.declared_ram_bytes,
                                 type_has_battery(c.header.cartridge_type),
-                                has_rtc);
+                                has_rtc, c.special_mbc == MBC30_t);
 }

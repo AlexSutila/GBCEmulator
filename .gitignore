@@ -4,7 +4,7 @@ build_wasm/
 debug/
 release/
 compile_commands.json
-*build/
+*build*/
 *.mp4
 __pycache__/
 .cache/

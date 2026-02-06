@@ -1,5 +1,5 @@
-#ifndef __CART_HPP
-#define __CART_HPP
+#ifndef CART_HPP
+#define CART_HPP
 
 #include "cart/mbc.hpp"
 #include "emu_types.hpp"
@@ -18,6 +18,17 @@ constexpr std::size_t kHeaderStart = 0x0100;
 constexpr std::size_t kHeaderEnd = 0x014F;
 // first opcode after header is typically at 0x0150
 constexpr std::size_t kMinRomSize = 0x0150;
+
+enum SpecialMbc {
+  NotSpecial_t,
+  MBC1M_t,
+  MBC30_t,
+  MMM01_t,
+  M161_t,
+  WisdomTree_t,
+  Bung_t,
+  EMS_t,
+};
 
 struct rom_header {
   std::array<byte_t, 4> entry_point{};      // 0100-0103
@@ -54,6 +65,9 @@ struct cart {
 
   bool header_checksum_ok{};
   bool global_checksum_ok{};
+  byte_t computed_header_checksum{};
+  std::uint16_t computed_global_checksum{};
+  SpecialMbc special_mbc{};
 
   [[nodiscard]] std::span<const byte_t> rom_span() const noexcept {
     return rom;
@@ -69,8 +83,8 @@ public:
   explicit Cartridge()
       : image_({}), mbc_(make_test_mbc()) {}
 
-  [[nodiscard]] byte_t read_byte(addr_t addr) { return mbc_->read(addr); }
-  void write(addr_t addr, byte_t v) { mbc_->write(addr, v); }
+  [[nodiscard]] byte_t read_byte(const addr_t addr) const { return mbc_->read(addr); }
+  void write(const addr_t addr, const byte_t v) const { mbc_->write(addr, v); }
 
   [[nodiscard]] const cart &image() const noexcept { return image_; }
 
@@ -95,4 +109,4 @@ private:
 [[nodiscard]] std::size_t ram_bytes_from_code(byte_t code);
 [[nodiscard]] bool cgb_enabled(byte_t cgb_flag);
 
-#endif // __CART_HPP
+#endif // CART_HPP

@@ -1,5 +1,5 @@
-#ifndef __GBC_MBC_HPP
-#define __GBC_MBC_HPP
+#ifndef GBC_MBC_HPP
+#define GBC_MBC_HPP
 
 #pragma once
 
@@ -33,16 +33,16 @@ std::unique_ptr<Mbc> make_mbc(const cart &c);
 static constexpr std::size_t kRomBankSize = 0x4000;
 static constexpr std::size_t kRamBankSize = 0x2000;
 
-static inline std::size_t rom_bank_count(const std::span<const byte_t> rom) {
+inline std::size_t rom_bank_count(const std::span<const byte_t> rom) {
   return std::max<std::size_t>(1, rom.size() / kRomBankSize);
 }
-static inline std::size_t clamp_bank(const std::size_t bank,
-                                     const std::size_t count) {
-  return (count == 0) ? 0 : (bank % count);
+inline std::size_t clamp_bank(const std::size_t bank,
+                              const std::size_t count) {
+  return count == 0 ? 0 : bank % count;
 }
-static inline byte_t open_bus() { return 0xFF; }
+inline byte_t open_bus() { return 0xFF; }
 
-static inline bool type_has_battery(const byte_t t) {
+inline bool type_has_battery(const byte_t t) {
   switch (t) {
   case 0x03: // MBC1+RAM+BATTERY
   case 0x06: // MBC2+BATTERY
@@ -54,6 +54,8 @@ static inline bool type_has_battery(const byte_t t) {
   case 0x1B: // MBC5+RAM+BATTERY
   case 0x1E: // MBC5+RUMBLE+RAM+BATTERY
   case 0x22: // MBC7+SENSOR+RUMBLE+RAM+BATTERY
+  case 0xFD: // TAMA5 (likely, needed for RTC)
+  case 0xFE: // HuC3 (Pan Docs doesn't explicitly list it, but it does have a battery-backed RTC or something)
   case 0xFF: // HuC1+RAM+BATTERY
     return true;
   default:
@@ -61,4 +63,4 @@ static inline bool type_has_battery(const byte_t t) {
   }
 }
 
-#endif //__GBC_MBC_HPP
+#endif //GBC_MBC_HPP

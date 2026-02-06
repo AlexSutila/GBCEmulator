@@ -1,3 +1,4 @@
+
 cmake_minimum_required(VERSION 3.15)
 # Silence old subprojects (raylib) that assume pre-3.5 policies
 set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
@@ -128,6 +129,15 @@ set(GBC_CORE_SOURCES
     src/cart/mbc/mbc2.cpp
     src/cart/mbc/mbc3.cpp
     src/cart/mbc/mbc5.cpp
+    src/cart/mbc/mbc6.cpp
+    src/cart/mbc/mbc7.cpp
+    src/cart/mbc/mmm01.cpp
+    src/cart/mbc/m161.cpp
+    src/cart/mbc/huc1.cpp
+    src/cart/mbc/huc3.cpp
+    src/cart/mbc/tama5.cpp
+    src/cart/mbc/wisdom_tree.cpp
+    src/cart/mbc/ems.cpp
     src/cart/mbc/test_mbc.cpp
     src/cart/mbc/mbc_factory.cpp
 

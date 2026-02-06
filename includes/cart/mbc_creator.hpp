@@ -1,5 +1,5 @@
-#ifndef __GBC_MBC_CREATOR_HPP
-#define __GBC_MBC_CREATOR_HPP
+#ifndef GBC_MBC_CREATOR_HPP
+#define GBC_MBC_CREATOR_HPP
 
 #pragma once
 #include <memory>
@@ -13,6 +13,15 @@ std::unique_ptr<Mbc> make_mbc1(const cart &c);
 std::unique_ptr<Mbc> make_mbc2(const cart &c);
 std::unique_ptr<Mbc> make_mbc3(const cart &c);
 std::unique_ptr<Mbc> make_mbc5(const cart &c);
+std::unique_ptr<Mbc> make_mbc6(const cart &c);
+std::unique_ptr<Mbc> make_mbc7(const cart &c);
+std::unique_ptr<Mbc> make_mmm01(const cart &c);
+std::unique_ptr<Mbc> make_m161(const cart &c);
+std::unique_ptr<Mbc> make_huc1(const cart &c);
+std::unique_ptr<Mbc> make_huc3(const cart &c);
+std::unique_ptr<Mbc> make_tama5(const cart &c);
+std::unique_ptr<Mbc> make_wisdom_tree(const cart& c);
+std::unique_ptr<Mbc> make_ems(const cart& c);
 std::unique_ptr<Mbc> make_test_mbc();
 
-#endif //__GBC_MBC_CREATOR_HPP
+#endif //GBC_MBC_CREATOR_HPP
