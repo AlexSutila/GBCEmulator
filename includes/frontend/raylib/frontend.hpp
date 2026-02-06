@@ -22,16 +22,21 @@ public:
   void step_frame();
   void present();
 
-  // TODO
+  // TODO: WASM doesn't like heap allocated floats?????
   void queue_audio_samples(const float *samples,
                            std::size_t sample_count) override {}
 
 private:
-  static constexpr int fb_height = 144;
-  static constexpr int fb_width = 160;
+  static constexpr auto fb_height = 144;
+  static constexpr auto fb_width = 160;
 
-  // This was double buffered at one point but WASM is a pain in my ass so
-  std::array<std::uint32_t, 144 * 160> frame_buf{};
+  // We double buffer here, even though this is single threaded
+  static constexpr auto nbuf = 2;
+  std::size_t front_idx{0};
+  bool frame_ready{false};
+
+  // Double buffer, swap only when needed, prevents screen tears
+  std::array<std::array<std::uint32_t, 144 * 160>, nbuf> frame_buf{};
   ::Texture2D texture{};
 };
 

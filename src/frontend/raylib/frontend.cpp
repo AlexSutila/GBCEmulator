@@ -11,21 +11,11 @@
 // sucks that it leads to implementing two emulation loops but eh.
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
-static void frame_cb(void* user) {
-    auto* fe = static_cast<RaylibFrontend*>(user);
-
-    static double last_time = GetTime();
-    double now = GetTime();
-    double delta = now - last_time;
-
-    constexpr double target_dt = 1.0 / 60.0;
-    if (delta < target_dt)
-        return;
-    last_time = now;
-
-    fe->read_inputs();
-    fe->step_frame();
-    fe->present();
+static void frame_cb(void *user) {
+  auto *fe = static_cast<RaylibFrontend *>(user);
+  fe->read_inputs();
+  fe->step_frame();
+  fe->present();
 }
 #endif // __EMSCRIPTEN__
 
@@ -43,16 +33,27 @@ RaylibFrontend::~RaylibFrontend() {
 }
 
 std::array<std::uint32_t, 144 * 160> RaylibFrontend::get_frame() {
-  return frame_buf;
+  return frame_buf.at(front_idx);
 }
 
 void RaylibFrontend::put_pixel(int x, int y, std::uint32_t c) {
   if (x < 0 || x >= fb_width || y < 0 || y >= fb_height) [[unlikely]]
     return;
-  frame_buf.at(y * fb_width + x) = format_color(c);
+  frame_buf.at(front_idx).at(y * fb_width + x) = format_color(c);
+
+  // Swap as frame becomes ready to avoid screen tears
+  if (x == fb_width - 1 && y == fb_height - 1) {
+    front_idx = (front_idx + 1) % nbuf;
+    frame_ready = true;
+  }
 }
 
-void RaylibFrontend::clear(std::uint32_t c) { frame_buf.fill(format_color(c)); }
+void RaylibFrontend::clear(std::uint32_t c) {
+  for (auto &buf : frame_buf)
+    buf.fill(format_color(c));
+  frame_ready = false;
+  front_idx = 0;
+}
 
 void RaylibFrontend::read_inputs() {
   std::uint8_t input_state{};
@@ -89,9 +90,16 @@ void RaylibFrontend::step_frame() {
 }
 
 void RaylibFrontend::present() {
-  ::UpdateTexture(texture, frame_buf.data());
+  if (!frame_ready)
+    return;
+
+  // Pull oppositing buffer than the buffer being rendered to
+  const auto back_idx = (front_idx + 1) % nbuf;
+  frame_ready = false;
+
+  // Rendering
+  ::UpdateTexture(texture, frame_buf.at(back_idx).data());
   ::BeginDrawing();
-  ::ClearBackground(BLACK);
   ::DrawTexturePro(
       texture, Rectangle{0, 0, (float)fb_width, (float)fb_height},
       Rectangle{0, 0, (float)::GetScreenWidth(), (float)::GetScreenHeight()},
@@ -101,6 +109,8 @@ void RaylibFrontend::present() {
 
 void RaylibFrontend::start() {
   ::InitWindow(fb_width * 4, fb_height * 4, "GBC");
+  ::SetAudioStreamBufferSizeDefault(2048);
+  ::InitAudioDevice();
 
   Image img{};
   img.data = frame_buf.data();
@@ -110,12 +120,13 @@ void RaylibFrontend::start() {
   img.format = ::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
   texture = ::LoadTextureFromImage(img);
 
+  // Controls timing for both desktop and WASM builds
+  constexpr auto target_fps = 60;
+  ::SetTargetFPS(target_fps);
+
 #ifdef __EMSCRIPTEN__
   emscripten_set_main_loop_arg(frame_cb, this, 0, true);
 #else
-
-  constexpr auto target_fps = 60;
-  ::SetTargetFPS(target_fps);
 
   // Desktop build is paced by using SetTargetFPS, nice and simple
   while (!::WindowShouldClose()) {
