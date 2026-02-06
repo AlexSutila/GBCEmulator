@@ -33,16 +33,16 @@ std::unique_ptr<Mbc> make_mbc(const cart &c);
 static constexpr std::size_t kRomBankSize = 0x4000;
 static constexpr std::size_t kRamBankSize = 0x2000;
 
-static std::size_t rom_bank_count(const std::span<const byte_t> rom) {
+inline std::size_t rom_bank_count(const std::span<const byte_t> rom) {
   return std::max<std::size_t>(1, rom.size() / kRomBankSize);
 }
-static std::size_t clamp_bank(const std::size_t bank,
+inline std::size_t clamp_bank(const std::size_t bank,
                               const std::size_t count) {
   return count == 0 ? 0 : bank % count;
 }
-static byte_t open_bus() { return 0xFF; }
+inline byte_t open_bus() { return 0xFF; }
 
-static bool type_has_battery(const byte_t t) {
+inline bool type_has_battery(const byte_t t) {
   switch (t) {
   case 0x03: // MBC1+RAM+BATTERY
   case 0x06: // MBC2+BATTERY
