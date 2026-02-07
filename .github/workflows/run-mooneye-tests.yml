@@ -1,0 +1,35 @@
+name: mooneye_tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake build-essential python3 python3-pip
+          python3 -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Configure
+        run: |
+          mkdir build
+          cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build gbc_py
+        run: |
+          cd build
+          make gbc_py -j6
+
+      - name: Run pytest
+        run: |
+          PYTHONPATH=build pytest testing/test_mooneye.py
