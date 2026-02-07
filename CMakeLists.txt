@@ -1,4 +1,3 @@
-
 cmake_minimum_required(VERSION 3.15)
 # Silence old subprojects (raylib) that assume pre-3.5 policies
 set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
