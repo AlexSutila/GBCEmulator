@@ -233,3 +233,8 @@ void GameBoyColor::step() {
     timer->step();
   }
 }
+
+void GameBoyColor::set_reduce_audio_pops(const bool enable) const {
+  if (!apu) return;
+  apu->set_pop_behavior(enable ? APU::PopBehavior::Reduced : APU::PopBehavior::Original);
+}
