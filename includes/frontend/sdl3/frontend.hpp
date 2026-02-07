@@ -51,6 +51,7 @@ private:
   std::atomic<bool> running{true};
   std::atomic<bool> is_cgb{false};
   std::atomic<bool> fast_forward{true};
+  std::atomic<bool> reduce_audio_pops{false};
 
   // FPS calculation
   std::atomic<uint64_t> emulated_frame_count{0};
