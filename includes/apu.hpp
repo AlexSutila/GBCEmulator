@@ -1,10 +1,11 @@
-#ifndef __APU_H
-#define __APU_H
+#ifndef APU_H
+#define APU_H
 
 #include "emu_types.hpp"
 #include "memory/mmio/dmg.hpp"
 #include <array>
 #include <cstddef>
+#include <cstdint>
 #include <vector>
 
 class AddressBus;
@@ -15,26 +16,39 @@ public:
   APU(AddressBus &bus, Frontend &frontend);
   void step();
 
+  enum class PopBehavior : std::uint8_t { Original = 0, Reduced = 1 };
+
+  void set_pop_behavior(PopBehavior behavior);
+  [[nodiscard]] PopBehavior pop_behavior() const { return pop_behavior_; }
+
 private:
   void register_mmio();
   void generate_sample();
 
+  void sync_mixer_targets_from_regs(bool immediate);
+  void set_master_targets_from_nr50(bool immediate);
+  void set_route_targets_from_nr51(bool immediate);
+  void advance_mixer_smoothing();
+
+  void start_declick_tail(std::size_t ch, float start_sample);
+  float apply_declick_tail(std::size_t ch, float current_sample);
+
   // Ch1 helpers
   void trigger_channel1();
   void disable_channel1();
-  float channel1_sample() const;
+  [[nodiscard]] float channel1_sample() const;
   // Ch2 helpers
   void trigger_channel2();
   void disable_channel2();
-  float channel2_sample() const;
+  [[nodiscard]] float channel2_sample() const;
   // Ch3 helpers
   void trigger_channel3();
   void disable_channel3();
-  float channel3_sample() const;
+  [[nodiscard]] float channel3_sample() const;
   // Ch4 helpers
   void trigger_channel4();
   void disable_channel4();
-  float channel4_sample() const;
+  [[nodiscard]] float channel4_sample() const;
 
   // APU frame sequencer
   void step_frame_sequencer();
@@ -42,27 +56,26 @@ private:
   void clock_ch1_length();
   void clock_ch1_envelope();
   void clock_ch1_sweep();
-  bool ch1_dac_enabled() const;
-  std::uint16_t ch1_frequency() const;
+  [[nodiscard]] bool ch1_dac_enabled() const;
+  [[nodiscard]] std::uint16_t ch1_frequency() const;
   void ch1_set_frequency(std::uint16_t freq);
   bool ch1_sweep_overflow_check();
   std::uint16_t ch1_sweep_calculate(bool &overflow);
   // --> Ch2
   void clock_ch2_length();
   void clock_ch2_envelope();
-  bool ch2_dac_enabled() const;
-  std::uint16_t ch2_frequency() const;
+  [[nodiscard]] bool ch2_dac_enabled() const;
+  [[nodiscard]] std::uint16_t ch2_frequency() const;
   void ch2_set_frequency(std::uint16_t freq);
   // --> Ch3
   void clock_ch3_length();
-  std::uint16_t ch3_frequency() const;
-  void ch3_set_frequency(std::uint16_t f);
-  bool ch3_dac_enabled() const;
+  [[nodiscard]] std::uint16_t ch3_frequency() const;
+  [[nodiscard]] bool ch3_dac_enabled() const;
   // --> Ch4
   void clock_ch4_length();
   void clock_ch4_envelope();
-  bool ch4_dac_enabled() const;
-  double ch4_clock_hz() const;
+  [[nodiscard]] bool ch4_dac_enabled() const;
+  [[nodiscard]] double ch4_clock_hz() const;
   void ch4_clock_lfsr();
 
   static constexpr int sample_rate_hz = 48000;
@@ -159,9 +172,25 @@ private:
   // LFSR
   std::uint16_t ch4_lfsr{0x7FFF};
 
+  // Pop/click behavior
+  static constexpr int pop_ramp_ms = 2;
+  static constexpr int pop_ramp_samples = sample_rate_hz * pop_ramp_ms / 1000;
+
+  PopBehavior pop_behavior_{PopBehavior::Original};
+
+  // Smoothed mixer controls (to reduce DC-offset step pops)
+  float master_left_cur_{1.0f}, master_left_target_{1.0f}, master_left_step_{0.0f};
+  float master_right_cur_{1.0f}, master_right_target_{1.0f}, master_right_step_{0.0f};
+  std::array<float, 4> route_l_cur_{}, route_l_target_{}, route_l_step_{};
+  std::array<float, 4> route_r_cur_{}, route_r_target_{}, route_r_step_{};
+
+  // Per-channel declick tails when a channel is abruptly disabled
+  std::array<float, 4> declick_start_{};
+  std::array<int, 4> declick_remaining_{};
+
   // Highpass filter
   float dc_x1_l{}, dc_y1_l{};
   float dc_x1_r{}, dc_y1_r{};
 };
 
-#endif // __APU_H
+#endif // APU_H

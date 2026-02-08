@@ -131,6 +131,7 @@ struct UiState {
   std::vector<std::string> audio_device_names;
   std::vector<SDL_AudioDeviceID> audio_device_ids;
   int current_audio_dev_idx{};
+  bool reduce_audio_pops{false};
 
   // Notification (errors)
   std::vector<Notification> notifications;

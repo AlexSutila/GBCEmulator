@@ -159,6 +159,7 @@ void SDL3Frontend::render_frame() {
     gui.render(ui_state, host);
   }
   fast_forward = ui_state.fast_forward;
+  reduce_audio_pops.store(ui_state.reduce_audio_pops, std::memory_order_relaxed);
   if (ui_state.request_quit) {
     ui_state.request_quit = false;
     running = false;
@@ -224,13 +225,15 @@ void SDL3Frontend::emulation_thread_fn(const std::stop_token &st, const cart &c,
 
     // If we are ahead of the target (and not fast-forwarding), sleep briefly.
     // 1ms should be short enough to prevent underruns
-    if (const int queued_ms =
-            static_cast<int>(queued_bytes * 1000 / (sizeof(float) * 2 * 48000));
-        !ff && queued_ms > target_queue_ms) {
+    const int bytes_per_frame = host.get_audio_spec().channels * static_cast<int>(sizeof(float));
+    const int bytes_per_sec   = host.get_audio_spec().freq * bytes_per_frame;
+    const int queued_ms       = bytes_per_sec > 0 ? queued_bytes * 1000 / bytes_per_sec : 0;
+    if (!ff && queued_ms > target_queue_ms) {
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
       continue;
     }
 
+    gbc->set_reduce_audio_pops(reduce_audio_pops.load(std::memory_order_relaxed));
     /* Read input state and catch up with audio stream, the max_catchup_cycles
      * is ~17556 cycles (~4ms of emulated time) */
     joypad->set_state(input_state.buttons.load(std::memory_order_relaxed));

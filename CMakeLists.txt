@@ -14,14 +14,12 @@ include(FetchContent)
 
 # Non-WASM build dependencies
 if(NOT EMSCRIPTEN)
-
     FetchContent_Declare(
         pybind11
         GIT_REPOSITORY https://github.com/pybind/pybind11.git
-        GIT_TAG        v2.12.0
-    )
+        GIT_TAG         v3.0.1
+)
     FetchContent_MakeAvailable(pybind11)
-
     FetchContent_Declare(
         SDL3
         GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
@@ -72,10 +70,8 @@ if(NOT EMSCRIPTEN)
     target_link_libraries(imgui PRIVATE SDL3::SDL3)
 
 else()
-
     # Compiles raylib for Web platform
     set(PLATFORM Web CACHE STRING "" FORCE)
-
 endif()
 
 # WASM and Non-WASM common build dependencies
@@ -167,7 +163,6 @@ endif()
 #  WASM (Raylib) build target
 # ===========================================================================
 if(EMSCRIPTEN)
-
     # Raylib simplistic WASM frontend
     add_executable(gbc_wasm
         src/frontend/raylib/frontend.cpp
@@ -265,6 +260,12 @@ else()
     )
     target_compile_options(gbc_py
         PRIVATE ${GBC_COMPILE_OPTIONS}
+    )
+    ## Windows fix
+    target_link_options(gbc_py PRIVATE
+        -static-libgcc
+        -static-libstdc++
+        -lpthread
     )
 
     # TODO: Why do we need this? Is it also an mingw large objfile size cope?
