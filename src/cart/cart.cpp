@@ -4,6 +4,7 @@
 #include <fstream>
 #include <bitset>
 #include <csignal>
+#include <cstring>
 
 static std::optional<std::vector<byte_t>> read_all_bytes(const fs::path& p) {
   std::ifstream f(p, std::ios::binary | std::ios::ate);
@@ -264,6 +265,16 @@ bool maybe_m161(const std::span<const byte_t> rom) {
   return true;
 }
 
+// MBC1M uhhhhgh
+static bool maybe_mbc1m(const std::span<const byte_t> rom) {
+  // Typical for 1 MiB MBC1 multicarts
+  if (rom.size() < 1 * 1024 * 1024)
+    return false;
+  if (std::memcmp(&rom[0x104], &rom[0x40104], 0x30) == 0)
+    return true;
+  return false;
+}
+
 SpecialMbc detect_special_mbc(const cart& c) {
   switch (c.header.cartridge_type) {
   case 0x00: { // ROM ONLY, but some WT/M161 carts lie about this, we investigate further
@@ -285,6 +296,15 @@ SpecialMbc detect_special_mbc(const cart& c) {
       return M161_t;
     }
   }
+  case 0x01: case 0x02: case 0x03:  // MBC1M possibility
+    if (maybe_mbc1m(c.rom_span())) {
+      Logger::push(
+        LogLevel::Info, "ROM", "Mapper override",
+      std::format("{} header type {:02X} looks inconsistent with ROM size {} and appears to be MBC1M; "
+                  "forcing MBC1M mapper.",
+                  c.header.title(), c.header.cartridge_type, c.rom_span().size()));
+      return MBC1M_t;
+    }
   case 0x0F: case 0x10: case 0x11: case 0x12: case 0x13:  // Special MBC3 that has 64 KiB RAM
     if (c.declared_ram_bytes > 32 * 1024)
       return MBC30_t;

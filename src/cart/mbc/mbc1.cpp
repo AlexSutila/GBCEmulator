@@ -3,7 +3,7 @@
 #include "cart/mbc_creator.hpp"
 
 // ---------------------------
-// MBC1
+// MBC1 / MBC1M
 // ---------------------------
 // RAM enable (0000-1FFF)
 // ROM bank (2000-3FFF)
@@ -13,12 +13,12 @@
 class Mbc1 final : public Mbc {
 public:
   Mbc1(const std::span<const byte_t> rom, const std::size_t ram_bytes,
-       const bool battery)
-      : rom_(rom), ram_(ram_bytes), battery_(battery) {}
+       const bool battery, const bool is_mbc1m)
+      : rom_(rom), ram_(ram_bytes), battery_(battery), is_mbc1m_(is_mbc1m) {}
 
   byte_t read(const addr_t addr) override {
     if (addr <= 0x3FFF) {
-      const std::size_t bank0 = (mode_ ? (upper2_ << 5) : 0);
+      const std::size_t bank0 = mode_ ? (static_cast<std::size_t>(upper2_ & 0x03) << bank2_shift_()) : 0;
       return rom_at(bank0, addr);
     }
     if (addr <= 0x7FFF) {
@@ -28,7 +28,7 @@ public:
     if (addr >= 0xA000 && addr <= 0xBFFF) {
       if (!ram_enabled_ || ram_.empty())
         return open_bus(); // RAM only accessible if enabled
-      const std::size_t rbank = (mode_ ? (upper2_ & 0x03) : 0);
+      const std::size_t rbank = mode_ && !is_mbc1m_ ? upper2_ & 0x03 : 0;
       return ram_at(rbank, addr - 0xA000);
     }
     return open_bus();
@@ -37,22 +37,19 @@ public:
   void write(const addr_t addr, const byte_t val) override {
     if (addr <= 0x1FFF) {
       ram_enabled_ =
-          ((val & 0x0F) == 0x0A); // any value with low nibble A (0101) enables
+          (val & 0x0F) == 0x0A; // any value with low nibble A (0101) enables
       return;
     }
     if (addr <= 0x3FFF) {
-      rom_low5_ = (val & 0x1F);
-      // IMPORTANT: value 0b00000 is not allowed, forcing it to 0b00001
-      if (rom_low5_ == 0)
-        rom_low5_ = 1;
+      rom_bank1_ = static_cast<byte_t>(val & 0x1F);   // keep only low 5 bits
       return;
     }
     if (addr <= 0x5FFF) {
-      upper2_ = (val & 0x03);
+      upper2_ = val & 0x03;
       return;
     }
     if (addr <= 0x7FFF) {
-      mode_ = (val & 0x01); // 0=simple, 1=advanced
+      mode_ = val & 0x01; // 0=simple, 1=advanced
       return;
     }
     if (addr >= 0xA000 && addr <= 0xBFFF) {
@@ -64,38 +61,39 @@ public:
     }
   }
 
-  bool has_battery() const noexcept override { return battery_; }
-  std::span<const byte_t> ram() const noexcept override { return ram_; }
+  [[nodiscard]] bool has_battery() const noexcept override { return battery_; }
+  [[nodiscard]] std::span<const byte_t> ram() const noexcept override { return ram_; }
   std::span<byte_t> ram() noexcept override { return ram_; }
 
 private:
-  byte_t rom_low5_{0b00001}; // BANK1: lower 5 bits of rom bank number. 5 bits,
-                             // never contain zero value
   byte_t upper2_{0b00}; // BANK2: upper 2 bits of rom bank number or ram bank
                         // number, depending on mode
   byte_t mode_{0b0};    // MODE: 1: BANK2 affects 0x0000-0x3FFF, 0x4000-0x7FFF,
                         // 0xA000-0xBFFF/ 0: only 0x4000-0x7FFF
   bool ram_enabled_{false}; // RAMG: 0b1010 enables, other values disables. This
                             // represents the state after writing
+  byte_t rom_bank1_{0x01};
 
   std::span<const byte_t> rom_;
   std::vector<byte_t> ram_;
   bool battery_{};
+  bool is_mbc1m_{false};
 
-  std::size_t effective_rom_bank() const {
-    // Selected ROM bank = (upper2 << 5) + rom_low5
-    return (static_cast<std::size_t>(upper2_ & 0x03) << 5) |
-           static_cast<std::size_t>(rom_low5_ & 0x1F);
+  [[nodiscard]] std::size_t effective_rom_bank() const {
+    const std::size_t hi =
+        static_cast<std::size_t>(upper2_ & 0x03) << bank2_shift_();
+    const auto lo = static_cast<std::size_t>(bank1_low_for_addr_());
+    return hi | lo;
   }
 
-  byte_t rom_at(const std::size_t bank, const std::size_t off) const {
+  [[nodiscard]] byte_t rom_at(const std::size_t bank, const std::size_t off) const {
     const auto banks = rom_bank_count(rom_);
     const auto b = clamp_bank(bank, banks);
     const std::size_t idx = b * kRomBankSize + off;
     return (idx < rom_.size()) ? rom_[idx] : open_bus();
   }
 
-  byte_t ram_at(const std::size_t bank, const std::size_t off) const {
+  [[nodiscard]] byte_t ram_at(const std::size_t bank, const std::size_t off) const {
     if (ram_.empty())
       return open_bus();
     const std::size_t banks =
@@ -117,9 +115,21 @@ private:
     const std::size_t idx = (b * kRamBankSize + off) % ram_.size();
     ram_[idx] = v;
   }
+
+  [[nodiscard]] std::size_t bank2_shift_() const { return is_mbc1m_ ? 4 : 5; }
+
+  [[nodiscard]] byte_t bank1_low_for_addr_() const {
+    // 00→01 translation depends on the full 5-bit BANK1 value
+    auto v = static_cast<byte_t>(rom_bank1_ & 0x1F);
+    if (v == 0)
+      v = 1;
+
+    // In MBC1M, bit4 of BANK1 is physically not connected for addressing
+    return is_mbc1m_ ? static_cast<byte_t>(v & 0x0F) : v;
+  }
 };
 
 std::unique_ptr<Mbc> make_mbc1(const cart& c) {
   const bool battery = type_has_battery(c.header.cartridge_type);
-  return std::make_unique<Mbc1>(c.rom_span(), c.declared_ram_bytes, battery);
+  return std::make_unique<Mbc1>(c.rom_span(), c.declared_ram_bytes, battery, c.special_mbc == MBC1M_t);
 }
