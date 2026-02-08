@@ -328,7 +328,7 @@ void Fetcher::do_push_data() {
           bg_fifo_.push({
               .color_idx = color_idx,
               .palette_idx = palette_idx,
-              .oam_index = 0,     // Unused by the background
+              .oam_index = 0, // Unused by the background
               .take_priority = take_priority,
           });
       }
@@ -374,8 +374,15 @@ bool Fetcher::do_sprite_fetch(const Sprite &sprite) {
   const bool flip = get_obj_attrib_x_flip(sprite.tile_attr);
   obj_fifo_.fill_transparent();
 
-  for (std::size_t shift{0}; shift < 8; shift++) {
-    pixel &cur_px = obj_fifo_.at(shift);
+  // To handle sprites clipping with the left side of the screen, we introduce
+  // the `fifo_idx` to determine which pixel in the object fifo to "poke". If
+  // the pixel is off-screen, we skip it, and only start emplacing pixels as
+  // they actually become visible. TODO: This is likely not accurate.
+  for (std::size_t shift{0}, fifo_idx{0}; shift < 8; shift++) {
+    if (sprite.x_pos + shift < 8)
+      continue;
+    pixel &cur_px = obj_fifo_.at(fifo_idx);
+    fifo_idx++;
 
     // Color idx calculation needs to consider horizontal flip attribute bit
     const byte_t color_idx = calc_color_idx(data_lo, data_hi, shift, flip);
