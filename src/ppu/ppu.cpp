@@ -258,12 +258,8 @@ std::optional<std::uint32_t> PixelProcessingUnit::try_fifo_pop() {
   // Pop the background pixel, try to pop the sprite FIFO. If the sprite FIFO
   // is empty, just proceed. The sprtie FIFO will be populated on demand.
   const pixel bg_px = bg_fifo.pop();
-  if (!obj_fifo.can_pop()) {
-    if (bg_px.discard) // Don't render, for fine SCX scrolling
-      return std::nullopt;
-    else // Show actual color conversion
-      return get_bgwin_rgb(bg_px);
-  }
+  if (!obj_fifo.can_pop())
+    return get_bgwin_rgb(bg_px);
 
   // If we can pop a pixel from the sprite FIFO, we merge it with the background
   // pixel in the background FIFO. This is why we must have a background pixel
@@ -273,9 +269,7 @@ std::optional<std::uint32_t> PixelProcessingUnit::try_fifo_pop() {
     obj_px.color_idx = 0;
 
   // May need to discard the pixel due to SCX fine scrolling
-  if (bg_px.discard || obj_px.discard)
-    return std::nullopt;
-  else if (is_transparent(obj_px)) // If object is transparent use BG
+  if (is_transparent(obj_px)) // If object is transparent use BG
     return get_bgwin_rgb(bg_px);
 
   // Otherwise, render what ever, let the two pixels fight over priority.

@@ -12,11 +12,6 @@ struct pixel {
    * swapped out in CGB mode to prioritize based on OAM index instead. */
   byte_t oam_index;
 
-  /* This pixel attribute is required for the background. Horizontal scroll via
-   * the SCX register has a fine and a coarse component. Specifically, this is
-   * needed to implement fine scrolling. See details with usage. */
-  bool discard;
-
   /* Is used by both sprite and background pixels to resolve priority conflicts.
    * This flag will always represent what was sampled from the tile (or sprite)
    * attribute byte. */

@@ -324,13 +324,13 @@ void Fetcher::do_push_data() {
         // the background enable bit is set. Otherwise, just show color zero.
         const byte_t color_idx =
             calc_color_idx(data.data_lo, data.data_hi, shift, flip);
-        bg_fifo_.push({
-            .color_idx = color_idx,
-            .palette_idx = palette_idx,
-            .oam_index = 0,     // Unused by the background
-            .discard = discard, // Hide of SCX discard required
-            .take_priority = take_priority,
-        });
+        if (!discard)
+          bg_fifo_.push({
+              .color_idx = color_idx,
+              .palette_idx = palette_idx,
+              .oam_index = 0,     // Unused by the background
+              .take_priority = take_priority,
+          });
       }
       data.x_coor = (data.x_coor + 1) & 0x1F;
     }
@@ -388,7 +388,6 @@ bool Fetcher::do_sprite_fetch(const Sprite &sprite) {
           .color_idx = color_idx,
           .palette_idx = palette_idx,
           .oam_index = oam_idx,
-          .discard = false, // Never discard obj FIFO pixels
           .take_priority = take_priority,
       };
   }
