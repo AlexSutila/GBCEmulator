@@ -2,7 +2,11 @@ name: Build & Deploy WASM to GitHub Pages
 
 on:
   push:
-    branches: [ develop ]
+    branches:
+      - release
+  pull_request:
+    branches:
+      - release
 
 permissions:
   contents: read
