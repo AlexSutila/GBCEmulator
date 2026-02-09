@@ -216,6 +216,12 @@ float APU::apply_declick_tail(const std::size_t ch, float current_sample) {
   return current_sample;
 }
 
+bool APU::next_step_clocks_length() const {
+  const auto next =
+      static_cast<std::uint8_t>((frame_seq_step + 1) & 0x07);
+  return (next & 0x01u) == 0;
+}
+
 void APU::register_mmio() {
   nr50 = power_on_nr50;
   nr51 = power_on_nr51;
@@ -291,10 +297,21 @@ void APU::register_mmio() {
   audio_registers[0x04].configure(
     0x00,
     [this](const byte_t value) {
+      const bool prev_len_en = (nr14 & 0x40) != 0;
+      const bool new_len_en = (value & 0x40) != 0;
+      const bool trigger = (value & 0x80) != 0;
       if (!apu_on_())
         return;
       nr14 = value;
-      if (value & 0x80)
+      // Extra length clocking: happens when the next frame-sequencer step does NOT clock length
+      // On most models, this only occurs when length is transitioned 0->1; on CGB-02 it can occur even if it remains 0
+      if (!next_step_clocks_length() && !prev_len_en && (new_len_en || cgb02_length_quirk_) &&
+          ch1_length_counter != 0) {
+        --ch1_length_counter;
+        if (ch1_length_counter == 0 && !trigger)
+          disable_channel1();
+      }
+      if (trigger)
         trigger_channel1();
     },
     [this](byte_t) { return static_cast<byte_t>(nr14 | 0xBF); }
@@ -349,10 +366,21 @@ void APU::register_mmio() {
   audio_registers[0x09].configure(
     0x00,
     [this](const byte_t value) {
+      const bool prev_len_en = (nr24 & 0x40) != 0;
+      const bool new_len_en = (value & 0x40) != 0;
+      const bool trigger = (value & 0x80) != 0;
       if (!apu_on_())
         return;
       nr24 = value;
-      if (value & 0x80)
+
+      // Extra length clocking
+      if (!next_step_clocks_length() && !prev_len_en && (new_len_en || cgb02_length_quirk_) &&
+          ch2_length_counter != 0) {
+        --ch2_length_counter;
+        if (ch2_length_counter == 0 && !trigger)
+          disable_channel2();
+      }
+      if (trigger)
         trigger_channel2();
     },
     [this](byte_t) { return static_cast<byte_t>(nr24 | 0xBF); }
@@ -412,10 +440,21 @@ void APU::register_mmio() {
   audio_registers[0x0E].configure(
     0x00,
     [this](const byte_t v) {
+      const bool prev_len_en = (nr34 & 0x40) != 0;
+      const bool new_len_en = (v & 0x40) != 0;
+      const bool trigger = (v & 0x80) != 0;
       if (!apu_on_())
         return;
       nr34 = v;
-      if (v & 0x80)
+
+      // Extra length clocking
+      if (!next_step_clocks_length() && !prev_len_en && (new_len_en || cgb02_length_quirk_) &&
+          ch3_length_counter != 0) {
+        --ch3_length_counter;
+        if (ch3_length_counter == 0 && !trigger)
+          disable_channel3();
+      }
+      if (trigger)
         trigger_channel3();
     },
     [this](byte_t) { return static_cast<byte_t>(nr34 | 0xBF); }
@@ -469,10 +508,21 @@ void APU::register_mmio() {
   audio_registers[0x13].configure(
     0x00,
     [this](const byte_t v) {
+      const bool prev_len_en = (nr44 & 0x40) != 0;
+      const bool new_len_en = (v & 0x40) != 0;
+      const bool trigger = (v & 0x80) != 0;
       if (!apu_on_())
         return;
       nr44 = v;
-      if (v & 0x80)
+      // Extra length clocking
+      if (!next_step_clocks_length() && !prev_len_en && (new_len_en || cgb02_length_quirk_) &&
+          ch4_length_counter != 0) {
+        --ch4_length_counter;
+        if (ch4_length_counter == 0 && !trigger)
+          disable_channel4();
+      }
+
+      if (trigger)
         trigger_channel4();
     },
     [this](byte_t) { return static_cast<byte_t>(nr44 | 0xBF); }
@@ -537,12 +587,6 @@ void APU::trigger_channel1() {
     return;
   }
 
-  // If DAC disabled, hardware immediately disables the channel
-  if (!ch1_dac_enabled()) {
-    disable_channel1();
-    return;
-  }
-
   channel1_enabled = true;
   channel1_phase = 0.0;
 
@@ -550,9 +594,12 @@ void APU::trigger_channel1() {
   declick_remaining_[0] = 0;
   declick_start_[0] = 0.0f;
 
-  // Length: if zero on trigger, load max (64)
-  if (ch1_length_counter == 0)
-    ch1_length_counter = 64;
+  // Length: if zero on trigger, load max (64) (or 63 in the obscure case)
+  if (ch1_length_counter == 0) {
+    const bool length_enabled = (nr14 & 0x40) != 0;
+    ch1_length_counter = static_cast<std::uint8_t>(
+        length_enabled && !next_step_clocks_length() ? 63 : 64);
+  }
 
   // Envelope
   ch1_env_volume = static_cast<std::uint8_t>((nr12 >> 4) & 0x0F);
@@ -572,6 +619,10 @@ void APU::trigger_channel1() {
 
   // Overflow check on trigger
   (void)ch1_sweep_overflow_check();
+
+  // Disabled DAC doesn't prevent length reload/etc, but it does force channel off
+  if (!ch1_dac_enabled())
+    disable_channel1();
 }
 
 void APU::disable_channel1() {
@@ -735,10 +786,6 @@ void APU::trigger_channel2() {
     disable_channel2();
     return;
   }
-  if (!ch2_dac_enabled()) {
-    disable_channel2();
-    return;
-  }
 
   channel2_enabled = true;
   channel2_phase = 0.0;
@@ -746,8 +793,11 @@ void APU::trigger_channel2() {
   declick_remaining_[1] = 0;
   declick_start_[1] = 0.0f;
 
-  if (ch2_length_counter == 0)
-    ch2_length_counter = 64;
+  if (ch2_length_counter == 0) {
+    const bool length_enabled = (nr24 & 0x40) != 0;
+    ch2_length_counter = static_cast<std::uint8_t>(
+        length_enabled && !next_step_clocks_length() ? 63 : 64);
+  }
 
   // Envelope (NR22)
   ch2_env_volume = static_cast<std::uint8_t>(nr22 >> 4 & 0x0F);
@@ -755,6 +805,9 @@ void APU::trigger_channel2() {
   ch2_env_period = static_cast<std::uint8_t>(nr22 & 0x07);
   ch2_env_timer = ch2_env_period == 0 ? 8 : ch2_env_period;
   ch2_env_enabled = ch2_env_period != 0;
+
+  if (!ch2_dac_enabled())
+    disable_channel2();
 }
 
 void APU::clock_ch2_length() {
@@ -821,10 +874,6 @@ void APU::trigger_channel3() {
     disable_channel3();
     return;
   }
-  if (!ch3_dac_enabled()) {
-    disable_channel3();
-    return;
-  }
 
   channel3_enabled = true;
   channel3_pos = 0.0;
@@ -832,7 +881,14 @@ void APU::trigger_channel3() {
   declick_remaining_[2] = 0;
   declick_start_[2] = 0.0f;
 
-  if (ch3_length_counter == 0) ch3_length_counter = 256;
+  if (ch3_length_counter == 0) {
+    const bool length_enabled = (nr34 & 0x40) != 0;
+    ch3_length_counter = static_cast<std::uint16_t>(
+        length_enabled && !next_step_clocks_length() ? 255 : 256);
+  }
+
+  if (!ch3_dac_enabled())
+    disable_channel3();
 }
 
 // ----------- Channel 4 Helpers -----------
@@ -879,10 +935,6 @@ void APU::trigger_channel4() {
     disable_channel4();
     return;
   }
-  if (!ch4_dac_enabled()) {
-    disable_channel4();
-    return;
-  }
 
   channel4_enabled = true;
   ch4_phase = 0.0;
@@ -891,7 +943,11 @@ void APU::trigger_channel4() {
   declick_remaining_[3] = 0;
   declick_start_[3] = 0.0f;
 
-  if (ch4_length_counter == 0) ch4_length_counter = 64;
+  if (ch4_length_counter == 0) {
+    const bool length_enabled = (nr44 & 0x40) != 0;
+    ch4_length_counter = static_cast<std::uint8_t>(
+        length_enabled && !next_step_clocks_length() ? 63 : 64);
+  }
 
   // Envelope from NR42
   ch4_env_volume = nr42 >> 4 & 0x0F;
@@ -899,6 +955,9 @@ void APU::trigger_channel4() {
   ch4_env_period = nr42 & 0x07;
   ch4_env_timer = ch4_env_period == 0 ? 8 : ch4_env_period;
   ch4_env_enabled = ch4_env_period != 0;
+
+  if (!ch4_dac_enabled())
+    disable_channel4();
 }
 
 double APU::ch4_clock_hz() const {

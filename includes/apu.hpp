@@ -16,6 +16,10 @@ public:
   APU(AddressBus &bus, Frontend &frontend);
   void step();
 
+  // Enable the CGB-02 extra-length-clocking quirk (default: off)
+  // When disabled, extra length clocking only happens on a 0->1 transition of NRx4 bit 6
+  void set_cgb02_length_quirk(const bool enable) { cgb02_length_quirk_ = enable; }
+
   enum class PopBehavior : std::uint8_t { Original = 0, Reduced = 1 };
 
   void set_pop_behavior(PopBehavior behavior);
@@ -55,6 +59,8 @@ private:
 
   // APU frame sequencer
   void step_frame_sequencer();
+  // Used for obscure length-counter behavior (Blargg cgb_sound 03-trigger)
+  [[nodiscard]] bool next_step_clocks_length() const;
   // --> Ch1
   void clock_ch1_length();
   void clock_ch1_envelope();
@@ -99,6 +105,7 @@ private:
   // Frame sequencer
   unsigned frame_seq_accum_tcycles{};
   std::uint8_t frame_seq_step{}; // 0..7
+  bool cgb02_length_quirk_{};
 
   // Shadow audio registers
   // NR10-NR14: Channel 1
