@@ -22,6 +22,9 @@ public:
   [[nodiscard]] PopBehavior pop_behavior() const { return pop_behavior_; }
 
 private:
+  [[nodiscard]] bool apu_on_() const { return (nr52 & 0x80) != 0; }
+  void power_off_reset_regs_();
+
   void register_mmio();
   void generate_sample();
 
@@ -86,6 +89,7 @@ private:
   AddressBus &bus_;
   Frontend &frontend_;
   std::array<Audio::AudioRegister, 0x17> audio_registers{};
+  std::array<Audio::AudioRegister, 0x09> audio_unused{}; // FF27-FF2F
   std::array<MMIORegister, 0x10> wave_ram{};
 
   std::vector<float> mix_buffer{};

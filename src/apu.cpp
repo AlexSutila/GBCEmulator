@@ -10,6 +10,7 @@ namespace {
   constexpr addr_t wave_ram_base =
     static_cast<addr_t>(IORegisterMapping::MMIO_WAVE_RAM_BASE);
   constexpr std::size_t audio_register_count = 0x17;
+  constexpr std::size_t audio_unused_count = 0x09; // FF27-FF2F
   constexpr std::size_t wave_ram_size = 0x10;
   constexpr float master_gain = 0.25f;
   constexpr byte_t power_on_nr50 = 0x77;
@@ -72,6 +73,54 @@ void APU::set_pop_behavior(const PopBehavior behavior) {
     std::ranges::fill(declick_remaining_, 0);
   }
 }
+
+void APU::power_off_reset_regs_() {
+  // When NR52 is turned off, hardware clears all APU regs (wave RAM unaffected).
+  nr10 = nr11 = nr12 = nr13 = nr14 = 0;
+  nr21 = nr22 = nr23 = nr24 = 0;
+  nr30 = nr31 = nr32 = nr33 = nr34 = 0;
+  nr41 = nr42 = nr43 = nr44 = 0;
+  nr50 = nr51 = 0;
+
+  disable_channel1();
+  disable_channel2();
+  disable_channel3();
+  disable_channel4();
+
+  channel1_phase = 0.0;
+  channel2_phase = 0.0;
+  channel3_pos = 0.0;
+  ch4_phase = 0.0;
+  ch4_lfsr = 0x7FFF;
+
+  ch1_length_counter = 0;
+  ch2_length_counter = 0;
+  ch3_length_counter = 0;
+  ch4_length_counter = 0;
+
+  ch1_env_volume = ch1_env_period = ch1_env_timer = 0;
+  ch1_env_increase = false;
+  ch1_env_enabled = false;
+  ch2_env_volume = ch2_env_period = ch2_env_timer = 0;
+  ch2_env_increase = false;
+  ch2_env_enabled = false;
+  ch4_env_volume = ch4_env_period = ch4_env_timer = 0;
+  ch4_env_increase = false;
+  ch4_env_enabled = false;
+
+  ch1_sweep_shadow_freq = 0;
+  ch1_sweep_period = ch1_sweep_timer = ch1_sweep_shift = 0;
+  ch1_sweep_negate = false;
+  ch1_sweep_enabled = false;
+  ch1_sweep_negate_used = false;
+
+  frame_seq_accum_tcycles = 0;
+  frame_seq_step = 0;
+
+  // Keep mixer smoothing in sync with cleared regs
+  sync_mixer_targets_from_regs(true);
+}
+
 
 static void advance_ramp(float& cur, const float target, float& step) {
   if (step == 0.0f)
@@ -173,190 +222,309 @@ void APU::register_mmio() {
   nr52 = power_on_nr52;
 
   for (std::size_t i = 0; i < audio_register_count; ++i)
-    bus_.connect_mmio(static_cast<addr_t>(audio_base + i),
-                      &audio_registers[i]);
+    bus_.connect_mmio(static_cast<addr_t>(audio_base + i), &audio_registers[i]);
+  for (std::size_t i = 0; i < audio_unused_count; ++i)
+    bus_.connect_mmio(static_cast<addr_t>(audio_base + audio_register_count + i),
+                      &audio_unused[i]);
   for (std::size_t i = 0; i < wave_ram_size; ++i)
     bus_.connect_mmio(static_cast<addr_t>(wave_ram_base + i), &wave_ram[i]);
 
+  // Unused audio area FF27-FF2F reads back as $FF and ignores writes
+  for (auto& r : audio_unused)
+    r.configure(0xFF, [](byte_t) {
+                }, [](byte_t) {
+                  return static_cast<byte_t>(0xFF);
+                });
+
   // --- Channel 1 (NR10-NR14 / FF10-FF14) ---
-  // Index mapping: FF10 - FF10 = 0x00
-  // NR10: sweep
-  audio_registers[0x00].configure(0x00, [this](const byte_t value) {
-    nr10 = value;
-  });
+  audio_registers[0x00].configure(
+    0x00,
+    [this](const byte_t value) {
+      if (!apu_on_())
+        return;
+      nr10 = value;
+    },
+    [this](byte_t) { return static_cast<byte_t>(nr10 | 0x80); }
+  );
 
-  // NR11: length + duty
-  audio_registers[0x01].configure(0x00, [this](const byte_t value) {
-    nr11 = value;
-    // length load: 64 - N (N in low 6 bits)
-    ch1_length_counter = static_cast<std::uint8_t>(64 - (value & 0x3F));
-  });
+  audio_registers[0x01].configure(
+    0x00,
+    [this](const byte_t value) {
+      if (!apu_on_())
+        return;
+      nr11 = value;
+      ch1_length_counter = static_cast<std::uint8_t>(64 - (value & 0x3F));
+    },
+    [this](byte_t) { return static_cast<byte_t>(nr11 | 0x3F); }
+  );
 
-  // NR12: envelope
-  audio_registers[0x02].configure(0x00, [this](const byte_t value) {
-    // If this write disables the DAC, capture the current output sample first
-    // so Reduced pop mode can declick the abrupt DC offset change
-    if (pop_behavior_ == PopBehavior::Reduced && channel1_enabled &&
-      (value & 0xF8) == 0 && ch1_dac_enabled()) {
-      start_declick_tail(0, channel1_sample());
-    }
-    nr12 = value;
+  audio_registers[0x02].configure(
+    0x00,
+    [this](const byte_t value) {
+      if (!apu_on_())
+        return;
+      // If this write disables the DAC, capture the current output sample first
+      // so Reduced pop mode can declick the abrupt DC offset change
+      if (pop_behavior_ == PopBehavior::Reduced && channel1_enabled &&
+        (value & 0xF8) == 0 && ch1_dac_enabled()) {
+        start_declick_tail(0, channel1_sample());
+      }
 
-    // If DAC is disabled, channel is forced off
-    if (!ch1_dac_enabled())
-      disable_channel1();
-  });
+      nr12 = value;
+      if (!ch1_dac_enabled())
+        disable_channel1();
+    },
+    [this](byte_t) { return nr12; }
+  );
 
-  // NR13: frequency low
+  // NR13: write-only (read back as $FF)
   audio_registers[0x03].configure(
     0x00,
-    [this](const byte_t value) { nr13 = value; },
-    // treat as readable shadow to keep internal freq updates visible
-    [this](byte_t) { return nr13; });
+    [this](const byte_t value) {
+      if (!apu_on_())
+        return;
+      nr13 = value;
+    },
+    [](byte_t) { return static_cast<byte_t>(0xFF); }
+  );
 
-  // NR14: frequency high + length enable + trigger
   audio_registers[0x04].configure(
     0x00,
     [this](const byte_t value) {
+      if (!apu_on_())
+        return;
       nr14 = value;
       if (value & 0x80)
         trigger_channel1();
     },
-    [this](byte_t) { return static_cast<byte_t>(nr14 & 0xBF); });
+    [this](byte_t) { return static_cast<byte_t>(nr14 | 0xBF); }
+  );
+
+  // FF15 (NR20) is unused
+  audio_registers[0x05].configure(
+    0xFF, [](byte_t) {
+    }, [](byte_t) { return static_cast<byte_t>(0xFF); }
+  );
 
   // --- Channel 2 (NR21-NR24 / FF16-FF19) ---
-  // Index mapping: FF16 - FF10 = 0x06
-  // NR21: length + duty
-  audio_registers[0x06].configure(0x00, [this](const byte_t value) {
-    nr21 = value;
-    ch2_length_counter = static_cast<std::uint8_t>(64 - (value & 0x3F));
-  });
+  audio_registers[0x06].configure(
+    0x00,
+    [this](const byte_t value) {
+      if (!apu_on_())
+        return;
+      nr21 = value;
+      ch2_length_counter = static_cast<std::uint8_t>(64 - (value & 0x3F));
+    },
+    [this](byte_t) { return static_cast<byte_t>(nr21 | 0x3F); }
+  );
 
-  // NR22: envelope
-  audio_registers[0x07].configure(0x00, [this](const byte_t value) {
-    if (pop_behavior_ == PopBehavior::Reduced && channel2_enabled &&
-      (value & 0xF8) == 0 && ch2_dac_enabled()) {
-      start_declick_tail(1, channel2_sample());
-    }
+  audio_registers[0x07].configure(
+    0x00,
+    [this](const byte_t value) {
+      if (!apu_on_())
+        return;
+      if (pop_behavior_ == PopBehavior::Reduced && channel2_enabled &&
+        (value & 0xF8) == 0 && ch2_dac_enabled()) {
+        start_declick_tail(1, channel2_sample());
+      }
 
-    nr22 = value;
-    if (!ch2_dac_enabled())
-      disable_channel2();
-  });
+      nr22 = value;
+      if (!ch2_dac_enabled())
+        disable_channel2();
+    },
+    [this](byte_t) { return nr22; }
+  );
 
-  // NR23: freq low
-  audio_registers[0x08].configure(0x00, [this](const byte_t value) { nr23 = value; },
-                                  [this](byte_t) { return nr23; });
+  // NR23: write-only (read back as $FF)
+  audio_registers[0x08].configure(
+    0x00,
+    [this](const byte_t value) {
+      if (!apu_on_())
+        return;
+      nr23 = value;
+    },
+    [](byte_t) { return static_cast<byte_t>(0xFF); }
+  );
 
-  // NR24: freq high + length enable + trigger
   audio_registers[0x09].configure(
     0x00,
     [this](const byte_t value) {
+      if (!apu_on_())
+        return;
       nr24 = value;
       if (value & 0x80)
         trigger_channel2();
     },
-    [this](byte_t) { return static_cast<byte_t>(nr24 & 0xBF); });
+    [this](byte_t) { return static_cast<byte_t>(nr24 | 0xBF); }
+  );
 
   // --- Channel 3 (NR30-NR34 / FF1A-FF1E) ---
-  // Index mapping: FF1A - FF10 = 0x0A
-  // NR30: DAC power
-  audio_registers[0x0A].configure(0x00, [this](const byte_t v) {
-                                    if (pop_behavior_ == PopBehavior::Reduced && channel3_enabled &&
-                                      (v & 0x80) == 0 && ch3_dac_enabled()) {
-                                      start_declick_tail(2, channel3_sample());
-                                    }
-                                    nr30 = v;
-                                    if (!ch3_dac_enabled()) disable_channel3();
-                                  }, [this](byte_t) { return (nr30 & 0x80) | 0x7F; });
+  audio_registers[0x0A].configure(
+    0x00,
+    [this](const byte_t v) {
+      if (!apu_on_())
+        return;
+      if (pop_behavior_ == PopBehavior::Reduced && channel3_enabled &&
+        (v & 0x80) == 0 && ch3_dac_enabled()) {
+        start_declick_tail(2, channel3_sample());
+      }
 
-  // NR31: length (256 - value)
-  audio_registers[0x0B].configure(0x00, [this](const byte_t v) {
-    nr31 = v;
-    ch3_length_counter = 256u - v;
-  });
+      nr30 = v;
+      if (!ch3_dac_enabled())
+        disable_channel3();
+    },
+    [this](byte_t) { return static_cast<byte_t>(nr30 | 0x7F); }
+  );
 
-  // NR32: output level (bits 6-5)
-  audio_registers[0x0C].configure(0x00, [this](const byte_t v) {
-                                    nr32 = v;
-                                  }, [this](byte_t) { return (nr32 & 0x60) | 0x9F; });
+  // NR31: write-only (read back as $FF)
+  audio_registers[0x0B].configure(
+    0x00,
+    [this](const byte_t v) {
+      if (!apu_on_())
+        return;
+      nr31 = v;
+      ch3_length_counter = 256u - v;
+    },
+    [](byte_t) { return static_cast<byte_t>(0xFF); }
+  );
 
-  // NR33: freq low
-  audio_registers[0x0D].configure(0x00, [this](const byte_t v) { nr33 = v; },
-                                  [this](byte_t) { return nr33; });
+  audio_registers[0x0C].configure(
+    0x00,
+    [this](const byte_t v) {
+      if (!apu_on_())
+        return;
+      nr32 = v;
+    },
+    [this](byte_t) { return static_cast<byte_t>(nr32 | 0x9F); }
+  );
 
-  // NR34: freq high + length enable + trigger
-  audio_registers[0x0E].configure(0x00, [this](const byte_t v) {
-                                    nr34 = v;
-                                    if (v & 0x80) trigger_channel3();
-                                  }, [this](byte_t) { return (nr34 & 0xBF); });
+  // NR33: write-only (read back as $FF)
+  audio_registers[0x0D].configure(
+    0x00,
+    [this](const byte_t v) {
+      if (!apu_on_())
+        return;
+      nr33 = v;
+    },
+    [](byte_t) { return static_cast<byte_t>(0xFF); }
+  );
 
-  // --- Channel 4 (NR40-NR44 / FF20-FF23) ---
-  // NR41 (FF20): length (6 bits)
-  audio_registers[0x10].configure(0x00, [this](const byte_t v) {
-    nr41 = v;
-    ch4_length_counter = static_cast<std::uint8_t>(64 - (v & 0x3F));
-  });
+  audio_registers[0x0E].configure(
+    0x00,
+    [this](const byte_t v) {
+      if (!apu_on_())
+        return;
+      nr34 = v;
+      if (v & 0x80)
+        trigger_channel3();
+    },
+    [this](byte_t) { return static_cast<byte_t>(nr34 | 0xBF); }
+  );
 
-  // NR42 (FF21): envelope + DAC gate
-  audio_registers[0x11].configure(0x00, [this](const byte_t v) {
-    if (pop_behavior_ == PopBehavior::Reduced && channel4_enabled &&
-      (v & 0xF8) == 0 && ch4_dac_enabled()) {
-      start_declick_tail(3, channel4_sample());
-    }
+  // FF1F (NR40) is unused
+  audio_registers[0x0F].configure(
+    0xFF, [](byte_t) {
+    }, [](byte_t) { return static_cast<byte_t>(0xFF); }
+  );
 
-    nr42 = v;
-    if (!ch4_dac_enabled()) disable_channel4();
-  });
+  // --- Channel 4 (NR41-NR44 / FF20-FF23) ---
+  // NR41: write-only (read back as $FF)
+  audio_registers[0x10].configure(
+    0x00,
+    [this](const byte_t v) {
+      if (!apu_on_())
+        return;
+      nr41 = v;
+      ch4_length_counter = static_cast<std::uint8_t>(64 - (v & 0x3F));
+    },
+    [](byte_t) { return static_cast<byte_t>(0xFF); }
+  );
 
-  // NR43 (FF22): polynomial counter (shift/divisor/width)
-  audio_registers[0x12].configure(0x00, [this](const byte_t v) {
-    nr43 = v;
-  });
+  audio_registers[0x11].configure(
+    0x00,
+    [this](const byte_t v) {
+      if (!apu_on_())
+        return;
+      if (pop_behavior_ == PopBehavior::Reduced && channel4_enabled &&
+        (v & 0xF8) == 0 && ch4_dac_enabled()) {
+        start_declick_tail(3, channel4_sample());
+      }
 
-  // NR44 (FF23): trigger + length enable
-  audio_registers[0x13].configure(0x00, [this](const byte_t v) {
-                                    nr44 = v;
-                                    if (v & 0x80) trigger_channel4();
-                                  }, [this](byte_t) {
-                                    return static_cast<byte_t>(nr44 & 0xBF);
-                                  });
+      nr42 = v;
+      if (!ch4_dac_enabled())
+        disable_channel4();
+    },
+    [this](byte_t) { return nr42; });
+
+  audio_registers[0x12].configure(
+    0x00,
+    [this](const byte_t v) {
+      if (!apu_on_())
+        return;
+      nr43 = v;
+    },
+    [this](byte_t) { return nr43; }
+  );
+
+  audio_registers[0x13].configure(
+    0x00,
+    [this](const byte_t v) {
+      if (!apu_on_())
+        return;
+      nr44 = v;
+      if (v & 0x80)
+        trigger_channel4();
+    },
+    [this](byte_t) { return static_cast<byte_t>(nr44 | 0xBF); }
+  );
 
   // --- Mixer / power (NR50-NR52 / FF24-FF26) ---
-  // Index mapping: FF24 - FF10 = 0x14
-  audio_registers[0x14].configure(power_on_nr50,
-                                  [this](const byte_t value) {
-                                    nr50 = value;
-                                    set_master_targets_from_nr50(false);
-                                  });
-  audio_registers[0x15].configure(power_on_nr51,
-                                  [this](const byte_t value) {
-                                    nr51 = value;
-                                    set_route_targets_from_nr51(false);
-                                  });
+  audio_registers[0x14].configure(
+    power_on_nr50,
+    [this](const byte_t value) {
+      if (!apu_on_())
+        return;
+      nr50 = value;
+      set_master_targets_from_nr50(false);
+    },
+    [this](byte_t) { return nr50; }
+  );
+
+  audio_registers[0x15].configure(
+    power_on_nr51,
+    [this](const byte_t value) {
+      if (!apu_on_())
+        return;
+      nr51 = value;
+      set_route_targets_from_nr51(false);
+    },
+    [this](byte_t) { return nr51; }
+  );
+
   audio_registers[0x16].configure(
     power_on_nr52,
     [this](const byte_t value) {
-      // Only bit 7 is writable
-      const bool want_on = (value & 0x80) != 0;
-      nr52 = static_cast<byte_t>(want_on ? 0x80 : 0x00);
+      const bool was_on = apu_on_();
 
-      if (!want_on) {
-        // Power off: disable channels and reset sequencer state
-        disable_channel1();
-        disable_channel2();
-        disable_channel3();
-        disable_channel4();
+      // Only bit 7 is writable
+      if (const bool want_on = (value & 0x80) != 0; !want_on) {
+        nr52 = 0x00;
+        power_off_reset_regs_();
+        return;
+      }
+
+      nr52 = 0x80;
+      if (!was_on) {
+        // Frame sequencer restarts when the APU is turned on
         frame_seq_accum_tcycles = 0;
         frame_seq_step = 0;
       }
     },
     [this](byte_t) {
-      return static_cast<byte_t>((nr52 & 0x80) |
-        (channel1_enabled ? 0x01 : 0x00) |
-        (channel2_enabled ? 0x02 : 0x00) |
-        (channel3_enabled ? 0x04 : 0x00) |
-        (channel4_enabled ? 0x08 : 0x00));
+      const auto status = static_cast<byte_t>(
+        (channel1_enabled ? 0x01 : 0x00) | (channel2_enabled ? 0x02 : 0x00) |
+        (channel3_enabled ? 0x04 : 0x00) | (channel4_enabled ? 0x08 : 0x00));
+      return static_cast<byte_t>(0x70 | (nr52 & 0x80) | status);
     });
 }
 
@@ -977,6 +1145,5 @@ void APU::step() {
       }
     }
   }
-
   generate_sample();
 }
