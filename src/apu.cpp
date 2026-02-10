@@ -114,9 +114,6 @@ void APU::power_off_reset_regs_() {
   ch1_sweep_enabled = false;
   ch1_sweep_negate_used = false;
 
-  frame_seq_accum_tcycles = 0;
-  frame_seq_step = 0;
-
   // Keep mixer smoothing in sync with cleared regs
   sync_mixer_targets_from_regs(true);
 }
@@ -576,18 +573,19 @@ void APU::register_mmio() {
     [this](const byte_t value) {
       const bool was_on = apu_on_();
 
-      // Only bit 7 is writable
-      if (const bool want_on = (value & 0x80) != 0; !want_on) {
-        nr52 = 0x00;
-        power_off_reset_regs_();
+      // Only bit 7 is writable. Resets only happen on edges
+      if ((value & 0x80) != 0) {
+        nr52 = 0x80;
+        if (!was_on) {
+          // 0->1: restart sequencer step, but keep the current 8192-cycle phase
+          frame_seq_step = 7;
+        }
         return;
       }
-
-      nr52 = 0x80;
-      if (!was_on) {
-        // Frame sequencer restarts when the APU is turned on
-        frame_seq_accum_tcycles = 0;
+      if (was_on) {
+        nr52 = 0x00;
         frame_seq_step = 0;
+        power_off_reset_regs_();
       }
     },
     [this](byte_t) {
@@ -1145,14 +1143,15 @@ void APU::generate_sample() {
 }
 
 void APU::step_frame_sequencer() {
-  if ((nr52 & 0x80) == 0)
-    return;
-
+  // 512 Hz clock phase keeps running even when APU is off
   frame_seq_accum_tcycles += 1;
   while (frame_seq_accum_tcycles >= frame_sequencer_period_tcycles) {
     frame_seq_accum_tcycles -= frame_sequencer_period_tcycles;
-    frame_seq_step = static_cast<std::uint8_t>((frame_seq_step + 1) & 0x07);
+    // When off, ignore the clock (step stays reset), but keep phase
+    if (!apu_on_())
+        continue;
 
+    frame_seq_step = static_cast<std::uint8_t>((frame_seq_step + 1) & 0x07);
     // Frame sequencer schedule:
     // 0,2,4,6: length
     // 2,6: sweep (ch1 only)
