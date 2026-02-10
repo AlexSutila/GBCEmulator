@@ -88,7 +88,8 @@ private:
   Frontend &frontend_;
   std::array<Audio::AudioRegister, 0x17> audio_registers{};
   std::array<Audio::AudioRegister, 0x09> audio_unused{}; // FF27-FF2F
-  std::array<MMIORegister, 0x10> wave_ram{};
+  std::array<Audio::AudioRegister, 0x10> wave_ram{};
+  std::array<byte_t, 0x10> wave_ram_bytes{};
 
   std::vector<float> mix_buffer{};
   std::size_t frame_cursor{};
@@ -133,7 +134,8 @@ private:
   bool channel2_enabled{};
   double channel2_phase{};
   bool channel3_enabled{};
-  double channel3_pos{};    // 0..32
+  std::uint8_t ch3_wave_pos{};   // 0..31 (4-bit samples)
+  std::uint16_t ch3_timer{};     // t-cycles until next sample step
   bool channel4_enabled{};
   double ch4_phase{};       // fractional clocks accumulator
 

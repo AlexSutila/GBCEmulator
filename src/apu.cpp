@@ -7,8 +7,6 @@
 namespace {
   constexpr addr_t audio_base =
     static_cast<addr_t>(IORegisterMapping::MMIO_AUDIO_BASE);
-  constexpr addr_t wave_ram_base =
-    static_cast<addr_t>(IORegisterMapping::MMIO_WAVE_RAM_BASE);
   constexpr std::size_t audio_register_count = 0x17;
   constexpr std::size_t audio_unused_count = 0x09; // FF27-FF2F
   constexpr std::size_t wave_ram_size = 0x10;
@@ -76,7 +74,6 @@ void APU::power_off_reset_regs_() {
 
   channel1_phase = 0.0;
   channel2_phase = 0.0;
-  channel3_pos = 0.0;
   ch4_phase = 0.0;
   ch4_lfsr = 0x7FFF;
 
@@ -182,8 +179,36 @@ void APU::register_mmio() {
   for (std::size_t i = 0; i < audio_unused_count; ++i)
     bus_.connect_mmio(static_cast<addr_t>(audio_base + audio_register_count + i),
                       &audio_unused[i]);
-  for (std::size_t i = 0; i < wave_ram_size; ++i)
-    bus_.connect_mmio(static_cast<addr_t>(wave_ram_base + i), &wave_ram[i]);
+  for (std::size_t i = 0; i < wave_ram_size; ++i) {
+      bus_.connect_mmio(
+        static_cast<addr_t>(audio_base + audio_register_count + audio_unused_count + i),
+        &wave_ram[i]
+      );
+  }
+  for (auto& b : wave_ram_bytes) b = 0;
+
+  // Wave RAM is accessible even when NR52 is off
+  // On CGB, while CH3 is playing, accesses are redirected to the byte selected
+  // by the current waveform position
+  for (std::size_t i = 0; i < wave_ram_size; ++i) {
+    wave_ram[i].configure(
+      0x00,
+      [this, i](const byte_t v) {
+        const std::size_t dst =
+          channel3_enabled
+            ? static_cast<std::size_t>(ch3_wave_pos >> 1 & 0x0F)
+            : i;
+        wave_ram_bytes[dst] = v;
+      },
+      [this, i](byte_t) -> byte_t {
+        const std::size_t src =
+          channel3_enabled
+            ? static_cast<std::size_t>(ch3_wave_pos >> 1 & 0x0F)
+            : i;
+        return wave_ram_bytes[src];
+      }
+    );
+  }
 
   // Unused audio area FF27-FF2F reads back as $FF and ignores writes
   for (auto& r : audio_unused)
@@ -813,7 +838,12 @@ void APU::trigger_channel3() {
     return;
   }
   channel3_enabled = true;
-  channel3_pos = 0.0;
+  ch3_wave_pos = 0;
+
+  const auto f = ch3_frequency();
+  const std::uint16_t period =
+    (f < 2048) ? static_cast<std::uint16_t>((2048u - f) * 2u) : 1u;
+  ch3_timer = period ? period : 1u;
 
   if (ch3_length_counter == 0) {
     const bool length_enabled = (nr34 & 0x40) != 0;
@@ -957,8 +987,8 @@ float APU::channel3_sample() const {
   const std::uint8_t level = nr32 >> 5 & 0x03;
   if (level == 0) return 0.0f;
 
-  const int idx = static_cast<int>(channel3_pos) & 31;
-  const byte_t b = wave_ram[idx >> 1].peek();
+  const int idx = static_cast<int>(ch3_wave_pos) & 31;
+  const byte_t b = wave_ram_bytes[idx >> 1];
   const std::uint8_t raw4 = (idx & 1) ? (b & 0x0F) : (b >> 4);
 
   // Center the 4-bit DAC output around 0, then apply the output level scaling.
@@ -1073,6 +1103,17 @@ void APU::step_frame_sequencer() {
 void APU::step() {
   step_frame_sequencer();
 
+  if ((nr52 & 0x80) != 0 && channel3_enabled && ch3_dac_enabled()) {
+    if (ch3_timer > 0) --ch3_timer;
+    if (ch3_timer == 0) {
+      const auto f = ch3_frequency();
+      const std::uint16_t period =
+        f < 2048 ? static_cast<std::uint16_t>((2048u - f) * 2u) : 1u;
+      ch3_timer = period ? period : 1u;
+      ch3_wave_pos = static_cast<std::uint8_t>((ch3_wave_pos + 1u) & 31u);
+    }
+  }
+
   constexpr double cycles_per_sample = cpu_clock_hz / sample_rate_hz;
   cycle_accumulator += 1.0;
   if (cycle_accumulator < cycles_per_sample)
@@ -1102,15 +1143,7 @@ void APU::step() {
       }
     }
     // CH3 phase
-    if (channel3_enabled) {
-      const auto f = ch3_frequency();
-      if (f < 2048) {
-        // CH3 sample-step rate: 2097152 / (2048 - f) steps/sec
-        const double step_hz = 2097152.0 / (2048.0 - f);
-        channel3_pos += step_hz / sample_rate_hz;
-        while (channel3_pos >= 32.0) channel3_pos -= 32.0;
-      }
-    }
+
     // CH4 phase
     if (channel4_enabled) {
       const double hz = ch4_clock_hz();
