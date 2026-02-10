@@ -760,18 +760,27 @@ void APU::clock_ch1_sweep() {
 
   ch1_sweep_timer = ch1_sweep_period == 0 ? 8 : ch1_sweep_period;
 
-  // Sweep calculation always occurs when the sweep unit clocks (if enabled),
-  // even if shift==0. With shift==0, the result is NOT applied, but overflow
-  // can still disable the channel (Blargg 04-sweep test #3)
+  // period==0: timer runs, but NO sweep calculation/update occurs
+  // (Blargg 04-sweep #4/#12, 05-sweep details #6)
+  if (ch1_sweep_period == 0)
+    return;
+  // shift==0: does NOT calculate on trigger (04-sweep #3),
+  // but on sweep clocks it still performs the calc/overflow-disable when period>0
+  // It must NOT update channel frequency (NR13/NR14) when shift==0
+  if (ch1_sweep_shift == 0) {
+    bool overflow = false;
+    (void)ch1_sweep_calculate(overflow); // may set negate_used if negate is active
+    if (overflow)
+      disable_channel1();
+    return;
+  }
+
   bool overflow = false;
   const std::uint16_t new_freq = ch1_sweep_calculate(overflow);
   if (overflow) {
     disable_channel1();
     return;
   }
-  // shift==0: don't update frequency/shadow; only the overflow check matters (04-sweep test #12)
-  if (ch1_sweep_shift == 0 || ch1_sweep_period == 0)
-    return;
 
   // Apply frequency and update shadow
   ch1_sweep_shadow_freq = new_freq;
