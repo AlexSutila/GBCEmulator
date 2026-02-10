@@ -20,11 +20,6 @@ public:
   // When disabled, extra length clocking only happens on a 0->1 transition of NRx4 bit 6
   void set_cgb02_length_quirk(const bool enable) { cgb02_length_quirk_ = enable; }
 
-  enum class PopBehavior : std::uint8_t { Original = 0, Reduced = 1 };
-
-  void set_pop_behavior(PopBehavior behavior);
-  [[nodiscard]] PopBehavior pop_behavior() const { return pop_behavior_; }
-
 private:
   [[nodiscard]] bool apu_on_() const { return (nr52 & 0x80) != 0; }
   void power_off_reset_regs_();
@@ -32,13 +27,10 @@ private:
   void register_mmio();
   void generate_sample();
 
-  void sync_mixer_targets_from_regs(bool immediate);
-  void set_master_targets_from_nr50(bool immediate);
-  void set_route_targets_from_nr51(bool immediate);
+  void sync_mixer_targets_from_regs();
+  void set_master_targets_from_nr50();
+  void set_route_targets_from_nr51();
   void advance_mixer_smoothing();
-
-  void start_declick_tail(std::size_t ch, float start_sample);
-  float apply_declick_tail(std::size_t ch, float current_sample);
 
   // Ch1 helpers
   void trigger_channel1();
@@ -183,21 +175,11 @@ private:
   // LFSR
   std::uint16_t ch4_lfsr{0x7FFF};
 
-  // Pop/click behavior
-  static constexpr int pop_ramp_ms = 2;
-  static constexpr int pop_ramp_samples = sample_rate_hz * pop_ramp_ms / 1000;
-
-  PopBehavior pop_behavior_{PopBehavior::Original};
-
   // Smoothed mixer controls (to reduce DC-offset step pops)
   float master_left_cur_{1.0f}, master_left_target_{1.0f}, master_left_step_{0.0f};
   float master_right_cur_{1.0f}, master_right_target_{1.0f}, master_right_step_{0.0f};
   std::array<float, 4> route_l_cur_{}, route_l_target_{}, route_l_step_{};
   std::array<float, 4> route_r_cur_{}, route_r_target_{}, route_r_step_{};
-
-  // Per-channel declick tails when a channel is abruptly disabled
-  std::array<float, 4> declick_start_{};
-  std::array<int, 4> declick_remaining_{};
 
   // Highpass filter
   float dc_x1_l{}, dc_y1_l{};

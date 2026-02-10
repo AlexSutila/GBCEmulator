@@ -46,8 +46,6 @@ public:
   }
   std::optional<Debug::Debugger> &get_debugger() { return debugger_; }
 
-  void set_reduce_audio_pops(bool enable) const;
-
   /* Getters mainly for python bindings */
   AddressBus *get_bus() { return bus.get(); };
   LR35902 *get_cpu() { return cpu.get(); };

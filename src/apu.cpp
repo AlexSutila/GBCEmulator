@@ -58,20 +58,7 @@ APU::APU(AddressBus& bus, Frontend& frontend)
   register_mmio();
 
   // Initialize smoothed mixer state from power-on register values
-  sync_mixer_targets_from_regs(true);
-}
-
-void APU::set_pop_behavior(const PopBehavior behavior) {
-  pop_behavior_ = behavior;
-
-  // Snap mixer state to the current register values to avoid a mode-switch
-  // transient; future changes will be smoothed in Reduced mode.
-  sync_mixer_targets_from_regs(true);
-
-  if (pop_behavior_ == PopBehavior::Original) {
-    std::ranges::fill(declick_start_, 0.0f);
-    std::ranges::fill(declick_remaining_, 0);
-  }
+  sync_mixer_targets_from_regs();
 }
 
 void APU::power_off_reset_regs_() {
@@ -115,7 +102,7 @@ void APU::power_off_reset_regs_() {
   ch1_sweep_negate_used = false;
 
   // Keep mixer smoothing in sync with cleared regs
-  sync_mixer_targets_from_regs(true);
+  sync_mixer_targets_from_regs();
 }
 
 
@@ -132,40 +119,30 @@ static void advance_ramp(float& cur, const float target, float& step) {
   cur = next;
 }
 
-void APU::sync_mixer_targets_from_regs(const bool immediate) {
-  set_master_targets_from_nr50(immediate);
-  set_route_targets_from_nr51(immediate);
+void APU::sync_mixer_targets_from_regs() {
+  set_master_targets_from_nr50();
+  set_route_targets_from_nr51();
 }
 
-void APU::set_master_targets_from_nr50(const bool immediate) {
+void APU::set_master_targets_from_nr50() {
   const float master_left = static_cast<float>(nr50 >> 4 & 0x07) / 7.0f;
   const float master_right = static_cast<float>(nr50 & 0x07) / 7.0f;
 
   auto set = [&](float& cur, float& target, float& step, const float new_target) {
     target = new_target;
-    if (immediate || pop_behavior_ == PopBehavior::Original) {
-      cur = target;
-      step = 0.0f;
-    }
-    else {
-      step = (target - cur) / static_cast<float>(pop_ramp_samples);
-    }
+    cur = target;
+    step = 0.0f;
   };
 
   set(master_left_cur_, master_left_target_, master_left_step_, master_left);
   set(master_right_cur_, master_right_target_, master_right_step_, master_right);
 }
 
-void APU::set_route_targets_from_nr51(const bool immediate) {
+void APU::set_route_targets_from_nr51() {
   auto set = [&](float& cur, float& target, float& step, const float new_target) {
     target = new_target;
-    if (immediate || pop_behavior_ == PopBehavior::Original) {
-      cur = target;
-      step = 0.0f;
-    }
-    else {
-      step = (target - cur) / static_cast<float>(pop_ramp_samples);
-    }
+    cur = target;
+    step = 0.0f;
   };
 
   // Right: bit0=CH1, bit1=CH2, bit2=CH3, bit3=CH4
@@ -187,31 +164,7 @@ void APU::advance_mixer_smoothing() {
   }
 }
 
-void APU::start_declick_tail(const std::size_t ch, const float start_sample) {
-  if (pop_behavior_ != PopBehavior::Reduced)
-    return;
 
-  declick_start_[ch] = start_sample;
-  declick_remaining_[ch] = pop_ramp_samples;
-}
-
-float APU::apply_declick_tail(const std::size_t ch, float current_sample) {
-  if (pop_behavior_ != PopBehavior::Reduced)
-    return current_sample;
-
-  int& rem = declick_remaining_[ch];
-  if (rem <= 0)
-    return current_sample;
-
-  const float frac = static_cast<float>(rem) / static_cast<float>(pop_ramp_samples);
-  current_sample += declick_start_[ch] * frac;
-
-  --rem;
-  if (rem <= 0)
-    declick_start_[ch] = 0.0f;
-
-  return current_sample;
-}
 
 bool APU::next_step_clocks_length() const {
   const auto next =
@@ -286,13 +239,6 @@ void APU::register_mmio() {
     [this](const byte_t value) {
       if (!apu_on_())
         return;
-      // If this write disables the DAC, capture the current output sample first
-      // so Reduced pop mode can declick the abrupt DC offset change
-      if (pop_behavior_ == PopBehavior::Reduced && channel1_enabled &&
-        (value & 0xF8) == 0 && ch1_dac_enabled()) {
-        start_declick_tail(0, channel1_sample());
-      }
-
       nr12 = value;
       if (!ch1_dac_enabled())
         disable_channel1();
@@ -357,11 +303,6 @@ void APU::register_mmio() {
     [this](const byte_t value) {
       if (!apu_on_())
         return;
-      if (pop_behavior_ == PopBehavior::Reduced && channel2_enabled &&
-        (value & 0xF8) == 0 && ch2_dac_enabled()) {
-        start_declick_tail(1, channel2_sample());
-      }
-
       nr22 = value;
       if (!ch2_dac_enabled())
         disable_channel2();
@@ -409,11 +350,6 @@ void APU::register_mmio() {
     [this](const byte_t v) {
       if (!apu_on_())
         return;
-      if (pop_behavior_ == PopBehavior::Reduced && channel3_enabled &&
-        (v & 0x80) == 0 && ch3_dac_enabled()) {
-        start_declick_tail(2, channel3_sample());
-      }
-
       nr30 = v;
       if (!ch3_dac_enabled())
         disable_channel3();
@@ -501,11 +437,6 @@ void APU::register_mmio() {
     [this](const byte_t v) {
       if (!apu_on_())
         return;
-      if (pop_behavior_ == PopBehavior::Reduced && channel4_enabled &&
-        (v & 0xF8) == 0 && ch4_dac_enabled()) {
-        start_declick_tail(3, channel4_sample());
-      }
-
       nr42 = v;
       if (!ch4_dac_enabled())
         disable_channel4();
@@ -552,7 +483,7 @@ void APU::register_mmio() {
       if (!apu_on_())
         return;
       nr50 = value;
-      set_master_targets_from_nr50(false);
+      set_master_targets_from_nr50();
     },
     [this](byte_t) { return nr50; }
   );
@@ -563,7 +494,7 @@ void APU::register_mmio() {
       if (!apu_on_())
         return;
       nr51 = value;
-      set_route_targets_from_nr51(false);
+      set_route_targets_from_nr51();
     },
     [this](byte_t) { return nr51; }
   );
@@ -604,13 +535,8 @@ void APU::trigger_channel1() {
     disable_channel1();
     return;
   }
-
   channel1_enabled = true;
   channel1_phase = 0.0;
-
-  // Cancel any pending declick tail if the channel is retriggered
-  declick_remaining_[0] = 0;
-  declick_start_[0] = 0.0f;
 
   // Length: if zero on trigger, load max (64) (or 63 in the obscure case)
   if (ch1_length_counter == 0) {
@@ -644,11 +570,6 @@ void APU::trigger_channel1() {
 }
 
 void APU::disable_channel1() {
-  if (pop_behavior_ == PopBehavior::Reduced && channel1_enabled &&
-    declick_remaining_[0] == 0) {
-    start_declick_tail(0, channel1_sample());
-  }
-
   channel1_enabled = false;
   ch1_sweep_enabled = false;
   ch1_env_enabled = false;
@@ -802,11 +723,6 @@ void APU::ch2_set_frequency(std::uint16_t freq) {
 }
 
 void APU::disable_channel2() {
-  if (pop_behavior_ == PopBehavior::Reduced && channel2_enabled &&
-    declick_remaining_[1] == 0) {
-    start_declick_tail(1, channel2_sample());
-  }
-
   channel2_enabled = false;
   ch2_env_enabled = false;
 }
@@ -816,12 +732,8 @@ void APU::trigger_channel2() {
     disable_channel2();
     return;
   }
-
   channel2_enabled = true;
   channel2_phase = 0.0;
-
-  declick_remaining_[1] = 0;
-  declick_start_[1] = 0.0f;
 
   if (ch2_length_counter == 0) {
     const bool length_enabled = (nr24 & 0x40) != 0;
@@ -892,10 +804,6 @@ std::uint16_t APU::ch3_frequency() const {
 }
 
 void APU::disable_channel3() {
-  if (pop_behavior_ == PopBehavior::Reduced && channel3_enabled &&
-    declick_remaining_[2] == 0) {
-    start_declick_tail(2, channel3_sample());
-  }
   channel3_enabled = false;
 }
 
@@ -904,12 +812,8 @@ void APU::trigger_channel3() {
     disable_channel3();
     return;
   }
-
   channel3_enabled = true;
   channel3_pos = 0.0;
-
-  declick_remaining_[2] = 0;
-  declick_start_[2] = 0.0f;
 
   if (ch3_length_counter == 0) {
     const bool length_enabled = (nr34 & 0x40) != 0;
@@ -951,11 +855,6 @@ void APU::clock_ch4_envelope() {
 bool APU::ch4_dac_enabled() const { return (nr42 & 0xF8) != 0; }
 
 void APU::disable_channel4() {
-  if (pop_behavior_ == PopBehavior::Reduced && channel4_enabled &&
-    declick_remaining_[3] == 0) {
-    start_declick_tail(3, channel4_sample());
-  }
-
   channel4_enabled = false;
   ch4_env_enabled = false;
 }
@@ -965,13 +864,9 @@ void APU::trigger_channel4() {
     disable_channel4();
     return;
   }
-
   channel4_enabled = true;
   ch4_phase = 0.0;
   ch4_lfsr = 0x7FFF; // reset all 1s
-
-  declick_remaining_[3] = 0;
-  declick_start_[3] = 0.0f;
 
   if (ch4_length_counter == 0) {
     const bool length_enabled = (nr44 & 0x40) != 0;
@@ -1100,15 +995,8 @@ void APU::generate_sample() {
 
   // When APU is powered off, the output is forced to 0 (and tails are cleared)
   if ((nr52 & 0x80) == 0) {
-    std::ranges::fill(declick_start_, 0.0f);
-    std::ranges::fill(declick_remaining_, 0);
     ch1 = ch2 = ch3 = ch4 = 0.0f;
   }
-
-  ch1 = apply_declick_tail(0, ch1);
-  ch2 = apply_declick_tail(1, ch2);
-  ch3 = apply_declick_tail(2, ch3);
-  ch4 = apply_declick_tail(3, ch4);
 
   const std::array<float, 4> ch{ch1, ch2, ch3, ch4};
 

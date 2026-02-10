@@ -377,8 +377,6 @@ void GbcImGui::build_settings_window(UiState &state, SDLHost &host) {
         std::min(state.current_audio_dev_idx,
                  static_cast<int>(state.audio_device_names.size()) - 1);
   }
-
-  ImGui::Checkbox("Reduce Pops", &state.reduce_audio_pops);
   ImGui::End();
 }
 
