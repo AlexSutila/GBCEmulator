@@ -248,7 +248,27 @@ void APU::register_mmio() {
     [this](const byte_t value) {
       if (!apu_on_())
         return;
+
+      const byte_t old = nr10;
       nr10 = value;
+
+      // Sweep negate quirk: if negation was used, clearing negate disables CH1
+      if (channel1_enabled) {
+        const bool old_neg = (old & 0x08) != 0;
+        if (const bool new_neg = (value & 0x08) != 0;
+          ch1_sweep_negate_used && old_neg && !new_neg) {
+          disable_channel1();
+          return;
+        }
+      }
+      // Sweep enabled is latched on trigger; NR10 writes can't enable it later
+      // If it WAS enabled, NR10 writes update sweep parameters
+      if (ch1_sweep_enabled) {
+        ch1_sweep_period = static_cast<std::uint8_t>((nr10 >> 4) & 0x07);
+        ch1_sweep_shift  = static_cast<std::uint8_t>(nr10 & 0x07);
+        ch1_sweep_negate = (nr10 & 0x08) != 0;
+        // Don't reload ch1_sweep_timer here (hardware doesn't)
+      }
     },
     [this](byte_t) { return static_cast<byte_t>(nr10 | 0x80); }
   );
@@ -749,8 +769,8 @@ void APU::clock_ch1_sweep() {
     disable_channel1();
     return;
   }
-  // shift==0: don't update frequency/shadow; only the overflow check matters
-  if (ch1_sweep_shift == 0)
+  // shift==0: don't update frequency/shadow; only the overflow check matters (04-sweep test #12)
+  if (ch1_sweep_shift == 0 || ch1_sweep_period == 0)
     return;
 
   // Apply frequency and update shadow
