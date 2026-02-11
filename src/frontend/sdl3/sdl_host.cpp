@@ -1,14 +1,17 @@
 #include "frontend/sdl3/sdl_host.hpp"
 #include "SDL3/SDL_render.h"
+#include "frontend/logger.hpp"
 #include "ppu/palette.hpp"
 #include <algorithm>
+#include <stdexcept>
 
 SDLHost::SDLHost(const int width, const int height, const int scale) {
   if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO))
     throw std::runtime_error(SDL_GetError());
 
-  window = SDL_CreateWindow("GBC", width * scale, height * scale + 19*2,
-                            SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
+  window =
+      SDL_CreateWindow("GBC", width * scale, height * scale + 19 * 2,
+                       SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
   if (!window)
     throw std::runtime_error(SDL_GetError());
 
@@ -55,11 +58,13 @@ void SDLHost::update_texture(const std::uint32_t *pixels, const int width,
   SDL_UnlockTexture(texture);
 }
 
-void SDLHost::draw_texture(const float menu_bar_height, const float bottom_bar_height) const {
+void SDLHost::draw_texture(const float menu_bar_height,
+                           const float bottom_bar_height) const {
   int window_w{}, window_h{};
   SDL_GetWindowSize(window, &window_w, &window_h);
   const auto avail_w = static_cast<float>(window_w);
-  const auto avail_h = static_cast<float>(window_h) - menu_bar_height - bottom_bar_height;
+  const auto avail_h =
+      static_cast<float>(window_h) - menu_bar_height - bottom_bar_height;
 
   // Scale texture so it doesn't warp with window size
   float tex_w{}, tex_h{};
@@ -70,11 +75,10 @@ void SDLHost::draw_texture(const float menu_bar_height, const float bottom_bar_h
   const float dst_w = tex_w * scale;
   const float dst_h = tex_h * scale;
 
-  const SDL_FRect dst_rect{
-      (avail_w - dst_w) * 0.5f,                   // center X
-      menu_bar_height + (avail_h - dst_h) * 0.5f, // Center Y under menu
-      dst_w, dst_h
-  };
+  const SDL_FRect dst_rect{(avail_w - dst_w) * 0.5f, // center X
+                           menu_bar_height +
+                               (avail_h - dst_h) * 0.5f, // Center Y under menu
+                           dst_w, dst_h};
   SDL_RenderTexture(renderer, texture, nullptr, &dst_rect);
 }
 
@@ -118,11 +122,10 @@ void SDLHost::queue_audio(const float *samples, const std::size_t count) const {
   if (!audio_device || !audio_stream)
     return;
 
-
   const std::size_t bytes_per_frame =
-  static_cast<std::size_t>(audio_spec.channels) * sizeof(float);
+      static_cast<std::size_t>(audio_spec.channels) * sizeof(float);
   const std::size_t max_queue_bytes =
-  static_cast<std::size_t>(audio_spec.freq) * bytes_per_frame; // ~1 second
+      static_cast<std::size_t>(audio_spec.freq) * bytes_per_frame; // ~1 second
   const int queued = SDL_GetAudioStreamQueued(audio_stream);
 
   if (queued < 0) {
@@ -162,12 +165,12 @@ bool SDLHost::set_audio_device(const int device_index,
   audio_device = SDL_OpenAudioDevice(desired, &audio_spec);
   if (!audio_device) {
     Logger::push(LogLevel::Error, "Audio", "Failed to open audio device",
-      "Failed to open audio device: " + std::string(SDL_GetError()));
+                 "Failed to open audio device: " + std::string(SDL_GetError()));
     return false;
   }
   if (!SDL_BindAudioStream(audio_device, audio_stream)) {
     Logger::push(LogLevel::Error, "Audio", "Failed to bind audio stream",
-      "Failed to bind audio stream: " + std::string(SDL_GetError()));
+                 "Failed to bind audio stream: " + std::string(SDL_GetError()));
     SDL_CloseAudioDevice(audio_device);
     audio_device = 0;
     return false;
@@ -191,7 +194,7 @@ void SDLHost::refresh_audio_devices(std::vector<std::string> &names,
   SDL_AudioDeviceID *devs = SDL_GetAudioPlaybackDevices(&count);
   if (!devs) {
     Logger::push(LogLevel::Error, "Audio", "Failed to get audio devices",
-      "Failed to get audio devices: " + std::string(SDL_GetError()));
+                 "Failed to get audio devices: " + std::string(SDL_GetError()));
     return;
   }
 

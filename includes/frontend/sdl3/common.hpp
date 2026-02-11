@@ -13,7 +13,6 @@
 #include "emu_types.hpp"
 #include "frontend/logger.hpp"
 
-namespace fs = std::filesystem;
 /* ---------- Settings ---------- */
 /**
  * For future reference: to add a new setting

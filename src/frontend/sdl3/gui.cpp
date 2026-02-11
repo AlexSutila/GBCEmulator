@@ -1,8 +1,10 @@
 #include "frontend/sdl3/gui.hpp"
 
-#include <sys/stat.h>
-#include <ranges>
 #include "memory/boot.hpp"
+#include <ranges>
+#include <sys/stat.h>
+
+namespace fs = std::filesystem;
 
 void GbcImGui::init(const SDLHost &host) {
   settings = Settings::load();
@@ -18,7 +20,7 @@ void GbcImGui::init(const SDLHost &host) {
   if (!ImGui_ImplSDLRenderer3_Init(host.get_renderer()))
     throw std::runtime_error("Failed to initialize ImGui SDL renderer backend");
 
-  const ImGuiIO& io = ImGui::GetIO();
+  const ImGuiIO &io = ImGui::GetIO();
 
   dpi_scale = SDL_GetWindowDisplayScale(host.get_window());
   update_dpi_scale(dpi_scale);
@@ -29,7 +31,8 @@ void GbcImGui::init(const SDLHost &host) {
   }
 
   rom_sel_conf.path = settings.rom_dir;
-  rom_sel_conf.flags = ImGuiFileDialogFlags_Modal | ImGuiFileDialogFlags_ReadOnlyFileNameField;
+  rom_sel_conf.flags =
+      ImGuiFileDialogFlags_Modal | ImGuiFileDialogFlags_ReadOnlyFileNameField;
   bios_sel_conf.path = settings.bios_dir;
   bios_sel_conf.flags = rom_sel_conf.flags =
       ImGuiFileDialogFlags_Modal | ImGuiFileDialogFlags_ReadOnlyFileNameField;
@@ -74,20 +77,21 @@ bool GbcImGui::process_event(const SDL_Event &e, UiState &ui_state) {
   if (e.type == SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED) {
     // The event data contains the new scale, but it's safer to query the window
     // because SDL validates it against the specific display
-    if (SDL_Window* window = SDL_GetWindowFromID(e.window.windowID)) {
+    if (SDL_Window *window = SDL_GetWindowFromID(e.window.windowID)) {
       if (const float new_scale = SDL_GetWindowDisplayScale(window);
-        std::abs(new_scale - dpi_scale) > 0.001f) {
+          std::abs(new_scale - dpi_scale) > 0.001f) {
         // We also want to resize the window to maintain physical size
         if (const Uint32 flags = SDL_GetWindowFlags(window);
-          !(flags & (SDL_WINDOW_MAXIMIZED | SDL_WINDOW_FULLSCREEN))) {
+            !(flags & (SDL_WINDOW_MAXIMIZED | SDL_WINDOW_FULLSCREEN))) {
           int w, h;
           SDL_GetWindowSize(window, &w, &h);
 
           // If moving 2.0x -> 1.0x, ratio is 0.5.
           // Window should shrink by half to look the same physical size.
           const float ratio = new_scale / dpi_scale;
-          SDL_SetWindowSize(window, static_cast<int>(static_cast<float>(w) * ratio),
-                                    static_cast<int>(static_cast<float>(h) * ratio));
+          SDL_SetWindowSize(window,
+                            static_cast<int>(static_cast<float>(w) * ratio),
+                            static_cast<int>(static_cast<float>(h) * ratio));
         }
         update_dpi_scale(new_scale);
       }
@@ -229,7 +233,8 @@ void GbcImGui::build_status_bar(UiState &state) const {
   // Style: No rounding, no border, nice padding
   ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
   ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-  ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(10.0f * dpi_scale, 2.0f * dpi_scale));
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,
+                      ImVec2(10.0f * dpi_scale, 2.0f * dpi_scale));
 
   // Flags: No title bar, no resizing, no moving, no saving settings
   constexpr ImGuiWindowFlags flags =
@@ -445,7 +450,7 @@ void GbcImGui::build_keybinds_window(UiState &state) {
 void GbcImGui::update_dpi_scale(const float new_scale) {
   ImGui::GetStyle() = ImGuiStyle();
   ImGui::StyleColorsDark();
-  ImGuiStyle& style = ImGui::GetStyle();
+  ImGuiStyle &style = ImGui::GetStyle();
 
   style.FontScaleDpi = new_scale;
   // Calculate relative change (e.g., moving 1.0 -> 2.0 means factor 2.0)
@@ -454,9 +459,9 @@ void GbcImGui::update_dpi_scale(const float new_scale) {
   // Scale all padding, rounding, and spacing
   style.ScaleAllSizes(relative_scale);
 
-  if (ImGuiContext* ctx = ImGui::GetCurrentContext()) {
+  if (ImGuiContext *ctx = ImGui::GetCurrentContext()) {
     for (int i = 0; i < ctx->Windows.Size; i++) {
-      ImGuiWindow* window = ctx->Windows[i];
+      ImGuiWindow *window = ctx->Windows[i];
       // Rescale the window's size and position
       window->Pos.x *= relative_scale;
       window->Pos.y *= relative_scale;
@@ -483,9 +488,10 @@ void GbcImGui::build_about_window(UiState &state) {
   ImGui::End();
 }
 
-void GbcImGui::build_notification_window(UiState& state) const {
-    // Set a default size and position (bottom right)
-    ImGui::SetNextWindowSize(ImVec2(400 * dpi_scale, 300 * dpi_scale), ImGuiCond_FirstUseEver);
+void GbcImGui::build_notification_window(UiState &state) const {
+  // Set a default size and position (bottom right)
+  ImGui::SetNextWindowSize(ImVec2(400 * dpi_scale, 300 * dpi_scale),
+                           ImGuiCond_FirstUseEver);
 
   if (ImGui::Begin("Notifications", &state.show_notifications)) {
     // --- Header / Toolbar ---
@@ -562,7 +568,7 @@ std::tuple<ImVec2, ImVec2> GbcImGui::get_min_dialog_size() const {
 
 ImVec4 GbcImGui::get_darkened_color(const ImVec4 color, const float factor) {
   return {std::max(0.0f, color.x * factor), std::max(0.0f, color.y * factor),
-             std::max(0.0f, color.z * factor), color.w};
+          std::max(0.0f, color.z * factor), color.w};
 }
 
 ImVec4 GbcImGui::get_level_color(const LogLevel level) {
