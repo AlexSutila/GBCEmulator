@@ -136,6 +136,8 @@ private:
   bool channel3_enabled{};
   std::uint8_t ch3_wave_pos{};   // 0..31 (4-bit samples)
   std::uint16_t ch3_timer{};     // t-cycles until next sample step
+  std::uint8_t ch3_wave_byte_index{}; // 0..15, last wave RAM byte read by CH3
+  byte_t ch3_sample_buffer{};         // last byte fetched from wave RAM (persists across retriggers)
   bool channel4_enabled{};
   double ch4_phase{};       // fractional clocks accumulator
 

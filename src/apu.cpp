@@ -30,12 +30,25 @@ static float dc_block(const float x, float& x1, float& y1) {
   return y;
 }
 
-
+// ReSharper disable CppDFAUnreachableCode
 void Audio::AudioRegister::configure(const byte_t initial, WriteCallback on_write_cb,
                                      ReadCallback on_read_cb) {
   state = initial;
   on_write = std::move(on_write_cb);
   on_read = std::move(on_read_cb);
+}
+
+static void advance_ramp(float& cur, const float target, float& step) {
+  if (step == 0.0f)
+    return;
+
+  const float next = cur + step;
+  if ((step > 0.0f && next >= target) || (step < 0.0f && next <= target)) {
+    cur = target;
+    step = 0.0f;
+    return;
+  }
+  cur = next;
 }
 
 void Audio::AudioRegister::write(const byte_t value) {
@@ -77,6 +90,11 @@ void APU::power_off_reset_regs_() {
   ch4_phase = 0.0;
   ch4_lfsr = 0x7FFF;
 
+  ch3_wave_pos = 0;
+  ch3_timer = 0;
+  ch3_wave_byte_index = 0;
+  ch3_sample_buffer = 0;
+
   ch1_length_counter = 0;
   ch2_length_counter = 0;
   ch3_length_counter = 0;
@@ -100,20 +118,6 @@ void APU::power_off_reset_regs_() {
 
   // Keep mixer smoothing in sync with cleared regs
   sync_mixer_targets_from_regs();
-}
-
-
-static void advance_ramp(float& cur, const float target, float& step) {
-  if (step == 0.0f)
-    return;
-
-  const float next = cur + step;
-  if ((step > 0.0f && next >= target) || (step < 0.0f && next <= target)) {
-    cur = target;
-    step = 0.0f;
-    return;
-  }
-  cur = next;
 }
 
 void APU::sync_mixer_targets_from_regs() {
@@ -194,17 +198,15 @@ void APU::register_mmio() {
     wave_ram[i].configure(
       0x00,
       [this, i](const byte_t v) {
+        // CGB: while CH3 is active, all wave RAM accesses are redirected to
+        // the *currently selected* waveform byte.
         const std::size_t dst =
-          channel3_enabled
-            ? static_cast<std::size_t>(ch3_wave_pos >> 1 & 0x0F)
-            : i;
+          channel3_enabled? static_cast<std::size_t>(ch3_wave_pos >> 1 & 0x0Fu) : i;
         wave_ram_bytes[dst] = v;
       },
       [this, i](byte_t) -> byte_t {
         const std::size_t src =
-          channel3_enabled
-            ? static_cast<std::size_t>(ch3_wave_pos >> 1 & 0x0F)
-            : i;
+          channel3_enabled? static_cast<std::size_t>(ch3_wave_pos >> 1 & 0x0Fu) : i;
         return wave_ram_bytes[src];
       }
     );
@@ -839,11 +841,15 @@ void APU::trigger_channel3() {
   }
   channel3_enabled = true;
   ch3_wave_pos = 0;
+  ch3_wave_byte_index = 0;
+  // On trigger, CH3 outputs sample index 0 immediately, but the first timer
+  // tick is delayed by an additional 3 APU cycles
+  // Here: +6 T-cycles (4 MHz units)
+  ch3_sample_buffer = wave_ram_bytes[0];
 
   const auto f = ch3_frequency();
-  const std::uint16_t period =
-    (f < 2048) ? static_cast<std::uint16_t>((2048u - f) * 2u) : 1u;
-  ch3_timer = period ? period : 1u;
+  const auto period_tcycles = static_cast<std::uint16_t>((2048u - (f & 0x7FFu)) * 2u);
+  ch3_timer = static_cast<std::uint16_t>(period_tcycles + 6u);
 
   if (ch3_length_counter == 0) {
     const bool length_enabled = (nr34 & 0x40) != 0;
@@ -987,9 +993,10 @@ float APU::channel3_sample() const {
   const std::uint8_t level = nr32 >> 5 & 0x03;
   if (level == 0) return 0.0f;
 
-  const int idx = static_cast<int>(ch3_wave_pos) & 31;
-  const byte_t b = wave_ram_bytes[idx >> 1];
-  const std::uint8_t raw4 = (idx & 1) ? (b & 0x0F) : (b >> 4);
+  // Each wave RAM byte contains two 4-bit samples: high nibble first, then low
+  const std::uint8_t raw4 = (ch3_wave_pos & 1u)
+   ? static_cast<std::uint8_t>(ch3_sample_buffer & 0x0Fu)
+   : static_cast<std::uint8_t>((ch3_sample_buffer >> 4) & 0x0Fu);
 
   // Center the 4-bit DAC output around 0, then apply the output level scaling.
   float s = (static_cast<float>(raw4) - 7.5f) / 7.5f; // ~[-1, +1]
@@ -1106,11 +1113,16 @@ void APU::step() {
   if ((nr52 & 0x80) != 0 && channel3_enabled && ch3_dac_enabled()) {
     if (ch3_timer > 0) --ch3_timer;
     if (ch3_timer == 0) {
+      // CH3 advances its 0..31 sample index every timer tick and refreshes the
+      // 8-bit sample buffer from the currently selected wave RAM byte. This is
+      // also the byte that CPU reads/writes are redirected to on CGB
       const auto f = ch3_frequency();
-      const std::uint16_t period =
-        f < 2048 ? static_cast<std::uint16_t>((2048u - f) * 2u) : 1u;
-      ch3_timer = period ? period : 1u;
+      const auto period_tcycles = static_cast<std::uint16_t>((2048u - (f & 0x7FFu)) * 2u);
+      ch3_timer = period_tcycles;
+
       ch3_wave_pos = static_cast<std::uint8_t>((ch3_wave_pos + 1u) & 31u);
+      ch3_wave_byte_index = static_cast<std::uint8_t>((ch3_wave_pos >> 1) & 0x0Fu);
+      ch3_sample_buffer = wave_ram_bytes[ch3_wave_byte_index];
     }
   }
 
@@ -1124,8 +1136,7 @@ void APU::step() {
   if ((nr52 & 0x80) != 0) {
     // CH1 phase
     if (channel1_enabled) {
-      const std::uint16_t f = ch1_frequency();
-      if (f < 2048) {
+      if (const std::uint16_t f = ch1_frequency(); f < 2048) {
         const double hz = 131072.0 / (2048.0 - f);
         channel1_phase += hz / sample_rate_hz;
         if (channel1_phase >= 1.0)
@@ -1134,8 +1145,7 @@ void APU::step() {
     }
     // CH2 phase
     if (channel2_enabled) {
-      const std::uint16_t f = ch2_frequency();
-      if (f < 2048) {
+      if (const std::uint16_t f = ch2_frequency(); f < 2048) {
         const double hz = 131072.0 / (2048.0 - f);
         channel2_phase += hz / sample_rate_hz;
         if (channel2_phase >= 1.0)
@@ -1146,8 +1156,7 @@ void APU::step() {
 
     // CH4 phase
     if (channel4_enabled) {
-      const double hz = ch4_clock_hz();
-      if (hz > 0.0) {
+      if (const double hz = ch4_clock_hz(); hz > 0.0) {
         ch4_phase += hz / sample_rate_hz;
         while (ch4_phase >= 1.0) {
           ch4_phase -= 1.0;
