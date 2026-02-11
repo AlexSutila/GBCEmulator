@@ -7,9 +7,8 @@
 namespace {
   constexpr addr_t audio_base =
     static_cast<addr_t>(IORegisterMapping::MMIO_AUDIO_BASE);
-  constexpr addr_t wave_ram_base =
-    static_cast<addr_t>(IORegisterMapping::MMIO_WAVE_RAM_BASE);
   constexpr std::size_t audio_register_count = 0x17;
+  constexpr std::size_t audio_unused_count = 0x09; // FF27-FF2F
   constexpr std::size_t wave_ram_size = 0x10;
   constexpr float master_gain = 0.25f;
   constexpr byte_t power_on_nr50 = 0x77;
@@ -31,12 +30,25 @@ static float dc_block(const float x, float& x1, float& y1) {
   return y;
 }
 
-
+// ReSharper disable CppDFAUnreachableCode
 void Audio::AudioRegister::configure(const byte_t initial, WriteCallback on_write_cb,
                                      ReadCallback on_read_cb) {
   state = initial;
   on_write = std::move(on_write_cb);
   on_read = std::move(on_read_cb);
+}
+
+static void advance_ramp(float& cur, const float target, float& step) {
+  if (step == 0.0f)
+    return;
+
+  const float next = cur + step;
+  if ((step > 0.0f && next >= target) || (step < 0.0f && next <= target)) {
+    cur = target;
+    step = 0.0f;
+    return;
+  }
+  cur = next;
 }
 
 void Audio::AudioRegister::write(const byte_t value) {
@@ -57,69 +69,81 @@ APU::APU(AddressBus& bus, Frontend& frontend)
   register_mmio();
 
   // Initialize smoothed mixer state from power-on register values
-  sync_mixer_targets_from_regs(true);
+  sync_mixer_targets_from_regs();
 }
 
-void APU::set_pop_behavior(const PopBehavior behavior) {
-  pop_behavior_ = behavior;
+void APU::power_off_reset_regs_() {
+  // When NR52 is turned off, hardware clears all APU regs (wave RAM unaffected).
+  nr10 = nr11 = nr12 = nr13 = nr14 = 0;
+  nr21 = nr22 = nr23 = nr24 = 0;
+  nr30 = nr31 = nr32 = nr33 = nr34 = 0;
+  nr41 = nr42 = nr43 = nr44 = 0;
+  nr50 = nr51 = 0;
 
-  // Snap mixer state to the current register values to avoid a mode-switch
-  // transient; future changes will be smoothed in Reduced mode.
-  sync_mixer_targets_from_regs(true);
+  disable_channel1();
+  disable_channel2();
+  disable_channel3();
+  disable_channel4();
 
-  if (pop_behavior_ == PopBehavior::Original) {
-    std::ranges::fill(declick_start_, 0.0f);
-    std::ranges::fill(declick_remaining_, 0);
-  }
+  channel1_phase = 0.0;
+  channel2_phase = 0.0;
+  ch4_phase = 0.0;
+  ch4_lfsr = 0x7FFF;
+
+  ch3_wave_pos = 0;
+  ch3_timer = 0;
+  ch3_wave_byte_index = 0;
+  ch3_sample_buffer = 0;
+
+  ch1_length_counter = 0;
+  ch2_length_counter = 0;
+  ch3_length_counter = 0;
+  ch4_length_counter = 0;
+
+  ch1_env_volume = ch1_env_period = ch1_env_timer = 0;
+  ch1_env_increase = false;
+  ch1_env_enabled = false;
+  ch2_env_volume = ch2_env_period = ch2_env_timer = 0;
+  ch2_env_increase = false;
+  ch2_env_enabled = false;
+  ch4_env_volume = ch4_env_period = ch4_env_timer = 0;
+  ch4_env_increase = false;
+  ch4_env_enabled = false;
+
+  ch1_sweep_shadow_freq = 0;
+  ch1_sweep_period = ch1_sweep_timer = ch1_sweep_shift = 0;
+  ch1_sweep_negate = false;
+  ch1_sweep_enabled = false;
+  ch1_sweep_negate_used = false;
+
+  // Keep mixer smoothing in sync with cleared regs
+  sync_mixer_targets_from_regs();
 }
 
-static void advance_ramp(float& cur, const float target, float& step) {
-  if (step == 0.0f)
-    return;
-
-  const float next = cur + step;
-  if ((step > 0.0f && next >= target) || (step < 0.0f && next <= target)) {
-    cur = target;
-    step = 0.0f;
-    return;
-  }
-  cur = next;
+void APU::sync_mixer_targets_from_regs() {
+  set_master_targets_from_nr50();
+  set_route_targets_from_nr51();
 }
 
-void APU::sync_mixer_targets_from_regs(const bool immediate) {
-  set_master_targets_from_nr50(immediate);
-  set_route_targets_from_nr51(immediate);
-}
-
-void APU::set_master_targets_from_nr50(const bool immediate) {
+void APU::set_master_targets_from_nr50() {
   const float master_left = static_cast<float>(nr50 >> 4 & 0x07) / 7.0f;
   const float master_right = static_cast<float>(nr50 & 0x07) / 7.0f;
 
   auto set = [&](float& cur, float& target, float& step, const float new_target) {
     target = new_target;
-    if (immediate || pop_behavior_ == PopBehavior::Original) {
-      cur = target;
-      step = 0.0f;
-    }
-    else {
-      step = (target - cur) / static_cast<float>(pop_ramp_samples);
-    }
+    cur = target;
+    step = 0.0f;
   };
 
   set(master_left_cur_, master_left_target_, master_left_step_, master_left);
   set(master_right_cur_, master_right_target_, master_right_step_, master_right);
 }
 
-void APU::set_route_targets_from_nr51(const bool immediate) {
+void APU::set_route_targets_from_nr51() {
   auto set = [&](float& cur, float& target, float& step, const float new_target) {
     target = new_target;
-    if (immediate || pop_behavior_ == PopBehavior::Original) {
-      cur = target;
-      step = 0.0f;
-    }
-    else {
-      step = (target - cur) / static_cast<float>(pop_ramp_samples);
-    }
+    cur = target;
+    step = 0.0f;
   };
 
   // Right: bit0=CH1, bit1=CH2, bit2=CH3, bit3=CH4
@@ -141,30 +165,12 @@ void APU::advance_mixer_smoothing() {
   }
 }
 
-void APU::start_declick_tail(const std::size_t ch, const float start_sample) {
-  if (pop_behavior_ != PopBehavior::Reduced)
-    return;
 
-  declick_start_[ch] = start_sample;
-  declick_remaining_[ch] = pop_ramp_samples;
-}
 
-float APU::apply_declick_tail(const std::size_t ch, float current_sample) {
-  if (pop_behavior_ != PopBehavior::Reduced)
-    return current_sample;
-
-  int& rem = declick_remaining_[ch];
-  if (rem <= 0)
-    return current_sample;
-
-  const float frac = static_cast<float>(rem) / static_cast<float>(pop_ramp_samples);
-  current_sample += declick_start_[ch] * frac;
-
-  --rem;
-  if (rem <= 0)
-    declick_start_[ch] = 0.0f;
-
-  return current_sample;
+bool APU::next_step_clocks_length() const {
+  const auto next =
+      static_cast<std::uint8_t>((frame_seq_step + 1) & 0x07);
+  return (next & 0x01u) == 0;
 }
 
 void APU::register_mmio() {
@@ -173,190 +179,378 @@ void APU::register_mmio() {
   nr52 = power_on_nr52;
 
   for (std::size_t i = 0; i < audio_register_count; ++i)
-    bus_.connect_mmio(static_cast<addr_t>(audio_base + i),
-                      &audio_registers[i]);
-  for (std::size_t i = 0; i < wave_ram_size; ++i)
-    bus_.connect_mmio(static_cast<addr_t>(wave_ram_base + i), &wave_ram[i]);
+    bus_.connect_mmio(static_cast<addr_t>(audio_base + i), &audio_registers[i]);
+  for (std::size_t i = 0; i < audio_unused_count; ++i)
+    bus_.connect_mmio(static_cast<addr_t>(audio_base + audio_register_count + i),
+                      &audio_unused[i]);
+  for (std::size_t i = 0; i < wave_ram_size; ++i) {
+      bus_.connect_mmio(
+        static_cast<addr_t>(audio_base + audio_register_count + audio_unused_count + i),
+        &wave_ram[i]
+      );
+  }
+  for (auto& b : wave_ram_bytes) b = 0;
+
+  // Wave RAM is accessible even when NR52 is off
+  // On CGB, while CH3 is playing, accesses are redirected to the byte selected
+  // by the current waveform position
+  for (std::size_t i = 0; i < wave_ram_size; ++i) {
+    wave_ram[i].configure(
+      0x00,
+      [this, i](const byte_t v) {
+        // CGB: while CH3 is active, all wave RAM accesses are redirected to
+        // the *currently selected* waveform byte.
+        const std::size_t dst =
+          channel3_enabled? static_cast<std::size_t>(ch3_wave_pos >> 1 & 0x0Fu) : i;
+        wave_ram_bytes[dst] = v;
+      },
+      [this, i](byte_t) -> byte_t {
+        const std::size_t src =
+          channel3_enabled? static_cast<std::size_t>(ch3_wave_pos >> 1 & 0x0Fu) : i;
+        return wave_ram_bytes[src];
+      }
+    );
+  }
+
+  // Unused audio area FF27-FF2F reads back as $FF and ignores writes
+  for (auto& r : audio_unused)
+    r.configure(0xFF, [](byte_t) {
+                }, [](byte_t) {
+                  return static_cast<byte_t>(0xFF);
+                });
 
   // --- Channel 1 (NR10-NR14 / FF10-FF14) ---
-  // Index mapping: FF10 - FF10 = 0x00
-  // NR10: sweep
-  audio_registers[0x00].configure(0x00, [this](const byte_t value) {
-    nr10 = value;
-  });
+  audio_registers[0x00].configure(
+    0x00,
+    [this](const byte_t value) {
+      if (!apu_on_())
+        return;
 
-  // NR11: length + duty
-  audio_registers[0x01].configure(0x00, [this](const byte_t value) {
-    nr11 = value;
-    // length load: 64 - N (N in low 6 bits)
-    ch1_length_counter = static_cast<std::uint8_t>(64 - (value & 0x3F));
-  });
+      const byte_t old = nr10;
+      nr10 = value;
 
-  // NR12: envelope
-  audio_registers[0x02].configure(0x00, [this](const byte_t value) {
-    // If this write disables the DAC, capture the current output sample first
-    // so Reduced pop mode can declick the abrupt DC offset change
-    if (pop_behavior_ == PopBehavior::Reduced && channel1_enabled &&
-      (value & 0xF8) == 0 && ch1_dac_enabled()) {
-      start_declick_tail(0, channel1_sample());
-    }
-    nr12 = value;
+      // Sweep negate quirk: if negation was used, clearing negate disables CH1
+      if (channel1_enabled) {
+        const bool old_neg = (old & 0x08) != 0;
+        if (const bool new_neg = (value & 0x08) != 0;
+          ch1_sweep_negate_used && old_neg && !new_neg) {
+          disable_channel1();
+          return;
+        }
+      }
+      // Sweep enabled is latched on trigger; NR10 writes can't enable it later
+      // If it WAS enabled, NR10 writes update sweep parameters
+      if (ch1_sweep_enabled) {
+        ch1_sweep_period = static_cast<std::uint8_t>((nr10 >> 4) & 0x07);
+        ch1_sweep_shift  = static_cast<std::uint8_t>(nr10 & 0x07);
+        ch1_sweep_negate = (nr10 & 0x08) != 0;
+        // Don't reload ch1_sweep_timer here (hardware doesn't)
+      }
+    },
+    [this](byte_t) { return static_cast<byte_t>(nr10 | 0x80); }
+  );
 
-    // If DAC is disabled, channel is forced off
-    if (!ch1_dac_enabled())
-      disable_channel1();
-  });
+  audio_registers[0x01].configure(
+    0x00,
+    [this](const byte_t value) {
+      if (!apu_on_())
+        return;
+      nr11 = value;
+      ch1_length_counter = static_cast<std::uint8_t>(64 - (value & 0x3F));
+    },
+    [this](byte_t) { return static_cast<byte_t>(nr11 | 0x3F); }
+  );
 
-  // NR13: frequency low
+  audio_registers[0x02].configure(
+    0x00,
+    [this](const byte_t value) {
+      if (!apu_on_())
+        return;
+      nr12 = value;
+      if (!ch1_dac_enabled())
+        disable_channel1();
+    },
+    [this](byte_t) { return nr12; }
+  );
+
+  // NR13: write-only (read back as $FF)
   audio_registers[0x03].configure(
     0x00,
-    [this](const byte_t value) { nr13 = value; },
-    // treat as readable shadow to keep internal freq updates visible
-    [this](byte_t) { return nr13; });
+    [this](const byte_t value) {
+      if (!apu_on_())
+        return;
+      nr13 = value;
+    },
+    [](byte_t) { return static_cast<byte_t>(0xFF); }
+  );
 
-  // NR14: frequency high + length enable + trigger
   audio_registers[0x04].configure(
     0x00,
     [this](const byte_t value) {
+      const bool prev_len_en = (nr14 & 0x40) != 0;
+      const bool new_len_en = (value & 0x40) != 0;
+      const bool trigger = (value & 0x80) != 0;
+      if (!apu_on_())
+        return;
       nr14 = value;
-      if (value & 0x80)
+      // Extra length clocking: happens when the next frame-sequencer step does NOT clock length
+      // On most models, this only occurs when length is transitioned 0->1; on CGB-02 it can occur even if it remains 0
+      if (!next_step_clocks_length() && !prev_len_en && (new_len_en || cgb02_length_quirk_) &&
+          ch1_length_counter != 0) {
+        --ch1_length_counter;
+        if (ch1_length_counter == 0 && !trigger)
+          disable_channel1();
+      }
+      if (trigger)
         trigger_channel1();
     },
-    [this](byte_t) { return static_cast<byte_t>(nr14 & 0xBF); });
+    [this](byte_t) { return static_cast<byte_t>(nr14 | 0xBF); }
+  );
+
+  // FF15 (NR20) is unused
+  audio_registers[0x05].configure(
+    0xFF, [](byte_t) {
+    }, [](byte_t) { return static_cast<byte_t>(0xFF); }
+  );
 
   // --- Channel 2 (NR21-NR24 / FF16-FF19) ---
-  // Index mapping: FF16 - FF10 = 0x06
-  // NR21: length + duty
-  audio_registers[0x06].configure(0x00, [this](const byte_t value) {
-    nr21 = value;
-    ch2_length_counter = static_cast<std::uint8_t>(64 - (value & 0x3F));
-  });
+  audio_registers[0x06].configure(
+    0x00,
+    [this](const byte_t value) {
+      if (!apu_on_())
+        return;
+      nr21 = value;
+      ch2_length_counter = static_cast<std::uint8_t>(64 - (value & 0x3F));
+    },
+    [this](byte_t) { return static_cast<byte_t>(nr21 | 0x3F); }
+  );
 
-  // NR22: envelope
-  audio_registers[0x07].configure(0x00, [this](const byte_t value) {
-    if (pop_behavior_ == PopBehavior::Reduced && channel2_enabled &&
-      (value & 0xF8) == 0 && ch2_dac_enabled()) {
-      start_declick_tail(1, channel2_sample());
-    }
+  audio_registers[0x07].configure(
+    0x00,
+    [this](const byte_t value) {
+      if (!apu_on_())
+        return;
+      nr22 = value;
+      if (!ch2_dac_enabled())
+        disable_channel2();
+    },
+    [this](byte_t) { return nr22; }
+  );
 
-    nr22 = value;
-    if (!ch2_dac_enabled())
-      disable_channel2();
-  });
+  // NR23: write-only (read back as $FF)
+  audio_registers[0x08].configure(
+    0x00,
+    [this](const byte_t value) {
+      if (!apu_on_())
+        return;
+      nr23 = value;
+    },
+    [](byte_t) { return static_cast<byte_t>(0xFF); }
+  );
 
-  // NR23: freq low
-  audio_registers[0x08].configure(0x00, [this](const byte_t value) { nr23 = value; },
-                                  [this](byte_t) { return nr23; });
-
-  // NR24: freq high + length enable + trigger
   audio_registers[0x09].configure(
     0x00,
     [this](const byte_t value) {
+      const bool prev_len_en = (nr24 & 0x40) != 0;
+      const bool new_len_en = (value & 0x40) != 0;
+      const bool trigger = (value & 0x80) != 0;
+      if (!apu_on_())
+        return;
       nr24 = value;
-      if (value & 0x80)
+
+      // Extra length clocking
+      if (!next_step_clocks_length() && !prev_len_en && (new_len_en || cgb02_length_quirk_) &&
+          ch2_length_counter != 0) {
+        --ch2_length_counter;
+        if (ch2_length_counter == 0 && !trigger)
+          disable_channel2();
+      }
+      if (trigger)
         trigger_channel2();
     },
-    [this](byte_t) { return static_cast<byte_t>(nr24 & 0xBF); });
+    [this](byte_t) { return static_cast<byte_t>(nr24 | 0xBF); }
+  );
 
   // --- Channel 3 (NR30-NR34 / FF1A-FF1E) ---
-  // Index mapping: FF1A - FF10 = 0x0A
-  // NR30: DAC power
-  audio_registers[0x0A].configure(0x00, [this](const byte_t v) {
-                                    if (pop_behavior_ == PopBehavior::Reduced && channel3_enabled &&
-                                      (v & 0x80) == 0 && ch3_dac_enabled()) {
-                                      start_declick_tail(2, channel3_sample());
-                                    }
-                                    nr30 = v;
-                                    if (!ch3_dac_enabled()) disable_channel3();
-                                  }, [this](byte_t) { return (nr30 & 0x80) | 0x7F; });
+  audio_registers[0x0A].configure(
+    0x00,
+    [this](const byte_t v) {
+      if (!apu_on_())
+        return;
+      nr30 = v;
+      if (!ch3_dac_enabled())
+        disable_channel3();
+    },
+    [this](byte_t) { return static_cast<byte_t>(nr30 | 0x7F); }
+  );
 
-  // NR31: length (256 - value)
-  audio_registers[0x0B].configure(0x00, [this](const byte_t v) {
-    nr31 = v;
-    ch3_length_counter = 256u - v;
-  });
+  // NR31: write-only (read back as $FF)
+  audio_registers[0x0B].configure(
+    0x00,
+    [this](const byte_t v) {
+      if (!apu_on_())
+        return;
+      nr31 = v;
+      ch3_length_counter = 256u - v;
+    },
+    [](byte_t) { return static_cast<byte_t>(0xFF); }
+  );
 
-  // NR32: output level (bits 6-5)
-  audio_registers[0x0C].configure(0x00, [this](const byte_t v) {
-                                    nr32 = v;
-                                  }, [this](byte_t) { return (nr32 & 0x60) | 0x9F; });
+  audio_registers[0x0C].configure(
+    0x00,
+    [this](const byte_t v) {
+      if (!apu_on_())
+        return;
+      nr32 = v;
+    },
+    [this](byte_t) { return static_cast<byte_t>(nr32 | 0x9F); }
+  );
 
-  // NR33: freq low
-  audio_registers[0x0D].configure(0x00, [this](const byte_t v) { nr33 = v; },
-                                  [this](byte_t) { return nr33; });
+  // NR33: write-only (read back as $FF)
+  audio_registers[0x0D].configure(
+    0x00,
+    [this](const byte_t v) {
+      if (!apu_on_())
+        return;
+      nr33 = v;
+    },
+    [](byte_t) { return static_cast<byte_t>(0xFF); }
+  );
 
-  // NR34: freq high + length enable + trigger
-  audio_registers[0x0E].configure(0x00, [this](const byte_t v) {
-                                    nr34 = v;
-                                    if (v & 0x80) trigger_channel3();
-                                  }, [this](byte_t) { return (nr34 & 0xBF); });
+  audio_registers[0x0E].configure(
+    0x00,
+    [this](const byte_t v) {
+      const bool prev_len_en = (nr34 & 0x40) != 0;
+      const bool new_len_en = (v & 0x40) != 0;
+      const bool trigger = (v & 0x80) != 0;
+      if (!apu_on_())
+        return;
+      nr34 = v;
 
-  // --- Channel 4 (NR40-NR44 / FF20-FF23) ---
-  // NR41 (FF20): length (6 bits)
-  audio_registers[0x10].configure(0x00, [this](const byte_t v) {
-    nr41 = v;
-    ch4_length_counter = static_cast<std::uint8_t>(64 - (v & 0x3F));
-  });
+      // Extra length clocking
+      if (!next_step_clocks_length() && !prev_len_en && (new_len_en || cgb02_length_quirk_) &&
+          ch3_length_counter != 0) {
+        --ch3_length_counter;
+        if (ch3_length_counter == 0 && !trigger)
+          disable_channel3();
+      }
+      if (trigger)
+        trigger_channel3();
+    },
+    [this](byte_t) { return static_cast<byte_t>(nr34 | 0xBF); }
+  );
 
-  // NR42 (FF21): envelope + DAC gate
-  audio_registers[0x11].configure(0x00, [this](const byte_t v) {
-    if (pop_behavior_ == PopBehavior::Reduced && channel4_enabled &&
-      (v & 0xF8) == 0 && ch4_dac_enabled()) {
-      start_declick_tail(3, channel4_sample());
-    }
+  // FF1F (NR40) is unused
+  audio_registers[0x0F].configure(
+    0xFF, [](byte_t) {
+    }, [](byte_t) { return static_cast<byte_t>(0xFF); }
+  );
 
-    nr42 = v;
-    if (!ch4_dac_enabled()) disable_channel4();
-  });
+  // --- Channel 4 (NR41-NR44 / FF20-FF23) ---
+  // NR41: write-only (read back as $FF)
+  audio_registers[0x10].configure(
+    0x00,
+    [this](const byte_t v) {
+      if (!apu_on_())
+        return;
+      nr41 = v;
+      ch4_length_counter = static_cast<std::uint8_t>(64 - (v & 0x3F));
+    },
+    [](byte_t) { return static_cast<byte_t>(0xFF); }
+  );
 
-  // NR43 (FF22): polynomial counter (shift/divisor/width)
-  audio_registers[0x12].configure(0x00, [this](const byte_t v) {
-    nr43 = v;
-  });
+  audio_registers[0x11].configure(
+    0x00,
+    [this](const byte_t v) {
+      if (!apu_on_())
+        return;
+      nr42 = v;
+      if (!ch4_dac_enabled())
+        disable_channel4();
+    },
+    [this](byte_t) { return nr42; });
 
-  // NR44 (FF23): trigger + length enable
-  audio_registers[0x13].configure(0x00, [this](const byte_t v) {
-                                    nr44 = v;
-                                    if (v & 0x80) trigger_channel4();
-                                  }, [this](byte_t) {
-                                    return static_cast<byte_t>(nr44 & 0xBF);
-                                  });
+  audio_registers[0x12].configure(
+    0x00,
+    [this](const byte_t v) {
+      if (!apu_on_())
+        return;
+      nr43 = v;
+    },
+    [this](byte_t) { return nr43; }
+  );
+
+  audio_registers[0x13].configure(
+    0x00,
+    [this](const byte_t v) {
+      const bool prev_len_en = (nr44 & 0x40) != 0;
+      const bool new_len_en = (v & 0x40) != 0;
+      const bool trigger = (v & 0x80) != 0;
+      if (!apu_on_())
+        return;
+      nr44 = v;
+      // Extra length clocking
+      if (!next_step_clocks_length() && !prev_len_en && (new_len_en || cgb02_length_quirk_) &&
+          ch4_length_counter != 0) {
+        --ch4_length_counter;
+        if (ch4_length_counter == 0 && !trigger)
+          disable_channel4();
+      }
+
+      if (trigger)
+        trigger_channel4();
+    },
+    [this](byte_t) { return static_cast<byte_t>(nr44 | 0xBF); }
+  );
 
   // --- Mixer / power (NR50-NR52 / FF24-FF26) ---
-  // Index mapping: FF24 - FF10 = 0x14
-  audio_registers[0x14].configure(power_on_nr50,
-                                  [this](const byte_t value) {
-                                    nr50 = value;
-                                    set_master_targets_from_nr50(false);
-                                  });
-  audio_registers[0x15].configure(power_on_nr51,
-                                  [this](const byte_t value) {
-                                    nr51 = value;
-                                    set_route_targets_from_nr51(false);
-                                  });
+  audio_registers[0x14].configure(
+    power_on_nr50,
+    [this](const byte_t value) {
+      if (!apu_on_())
+        return;
+      nr50 = value;
+      set_master_targets_from_nr50();
+    },
+    [this](byte_t) { return nr50; }
+  );
+
+  audio_registers[0x15].configure(
+    power_on_nr51,
+    [this](const byte_t value) {
+      if (!apu_on_())
+        return;
+      nr51 = value;
+      set_route_targets_from_nr51();
+    },
+    [this](byte_t) { return nr51; }
+  );
+
   audio_registers[0x16].configure(
     power_on_nr52,
     [this](const byte_t value) {
-      // Only bit 7 is writable
-      const bool want_on = (value & 0x80) != 0;
-      nr52 = static_cast<byte_t>(want_on ? 0x80 : 0x00);
+      const bool was_on = apu_on_();
 
-      if (!want_on) {
-        // Power off: disable channels and reset sequencer state
-        disable_channel1();
-        disable_channel2();
-        disable_channel3();
-        disable_channel4();
-        frame_seq_accum_tcycles = 0;
+      // Only bit 7 is writable. Resets only happen on edges
+      if ((value & 0x80) != 0) {
+        nr52 = 0x80;
+        if (!was_on) {
+          // 0->1: restart sequencer step, but keep the current 8192-cycle phase
+          frame_seq_step = 7;
+        }
+        return;
+      }
+      if (was_on) {
+        nr52 = 0x00;
         frame_seq_step = 0;
+        power_off_reset_regs_();
       }
     },
     [this](byte_t) {
-      return static_cast<byte_t>((nr52 & 0x80) |
-        (channel1_enabled ? 0x01 : 0x00) |
-        (channel2_enabled ? 0x02 : 0x00) |
-        (channel3_enabled ? 0x04 : 0x00) |
-        (channel4_enabled ? 0x08 : 0x00));
+      const auto status = static_cast<byte_t>(
+        (channel1_enabled ? 0x01 : 0x00) | (channel2_enabled ? 0x02 : 0x00) |
+        (channel3_enabled ? 0x04 : 0x00) | (channel4_enabled ? 0x08 : 0x00));
+      return static_cast<byte_t>(0x70 | (nr52 & 0x80) | status);
     });
 }
 
@@ -368,23 +562,15 @@ void APU::trigger_channel1() {
     disable_channel1();
     return;
   }
-
-  // If DAC disabled, hardware immediately disables the channel
-  if (!ch1_dac_enabled()) {
-    disable_channel1();
-    return;
-  }
-
   channel1_enabled = true;
   channel1_phase = 0.0;
 
-  // Cancel any pending declick tail if the channel is retriggered
-  declick_remaining_[0] = 0;
-  declick_start_[0] = 0.0f;
-
-  // Length: if zero on trigger, load max (64)
-  if (ch1_length_counter == 0)
-    ch1_length_counter = 64;
+  // Length: if zero on trigger, load max (64) (or 63 in the obscure case)
+  if (ch1_length_counter == 0) {
+    const bool length_enabled = (nr14 & 0x40) != 0;
+    ch1_length_counter = static_cast<std::uint8_t>(
+        length_enabled && !next_step_clocks_length() ? 63 : 64);
+  }
 
   // Envelope
   ch1_env_volume = static_cast<std::uint8_t>((nr12 >> 4) & 0x0F);
@@ -404,14 +590,13 @@ void APU::trigger_channel1() {
 
   // Overflow check on trigger
   (void)ch1_sweep_overflow_check();
+
+  // Disabled DAC doesn't prevent length reload/etc, but it does force channel off
+  if (!ch1_dac_enabled())
+    disable_channel1();
 }
 
 void APU::disable_channel1() {
-  if (pop_behavior_ == PopBehavior::Reduced && channel1_enabled &&
-    declick_remaining_[0] == 0) {
-    start_declick_tail(0, channel1_sample());
-  }
-
   channel1_enabled = false;
   ch1_sweep_enabled = false;
   ch1_env_enabled = false;
@@ -521,8 +706,20 @@ void APU::clock_ch1_sweep() {
 
   ch1_sweep_timer = ch1_sweep_period == 0 ? 8 : ch1_sweep_period;
 
-  if (ch1_sweep_shift == 0)
+  // period==0: timer runs, but NO sweep calculation/update occurs
+  // (Blargg 04-sweep #4/#12, 05-sweep details #6)
+  if (ch1_sweep_period == 0)
     return;
+  // shift==0: does NOT calculate on trigger (04-sweep #3),
+  // but on sweep clocks it still performs the calc/overflow-disable when period>0
+  // It must NOT update channel frequency (NR13/NR14) when shift==0
+  if (ch1_sweep_shift == 0) {
+    bool overflow = false;
+    (void)ch1_sweep_calculate(overflow); // may set negate_used if negate is active
+    if (overflow)
+      disable_channel1();
+    return;
+  }
 
   bool overflow = false;
   const std::uint16_t new_freq = ch1_sweep_calculate(overflow);
@@ -553,11 +750,6 @@ void APU::ch2_set_frequency(std::uint16_t freq) {
 }
 
 void APU::disable_channel2() {
-  if (pop_behavior_ == PopBehavior::Reduced && channel2_enabled &&
-    declick_remaining_[1] == 0) {
-    start_declick_tail(1, channel2_sample());
-  }
-
   channel2_enabled = false;
   ch2_env_enabled = false;
 }
@@ -567,19 +759,14 @@ void APU::trigger_channel2() {
     disable_channel2();
     return;
   }
-  if (!ch2_dac_enabled()) {
-    disable_channel2();
-    return;
-  }
-
   channel2_enabled = true;
   channel2_phase = 0.0;
 
-  declick_remaining_[1] = 0;
-  declick_start_[1] = 0.0f;
-
-  if (ch2_length_counter == 0)
-    ch2_length_counter = 64;
+  if (ch2_length_counter == 0) {
+    const bool length_enabled = (nr24 & 0x40) != 0;
+    ch2_length_counter = static_cast<std::uint8_t>(
+        length_enabled && !next_step_clocks_length() ? 63 : 64);
+  }
 
   // Envelope (NR22)
   ch2_env_volume = static_cast<std::uint8_t>(nr22 >> 4 & 0x0F);
@@ -587,6 +774,9 @@ void APU::trigger_channel2() {
   ch2_env_period = static_cast<std::uint8_t>(nr22 & 0x07);
   ch2_env_timer = ch2_env_period == 0 ? 8 : ch2_env_period;
   ch2_env_enabled = ch2_env_period != 0;
+
+  if (!ch2_dac_enabled())
+    disable_channel2();
 }
 
 void APU::clock_ch2_length() {
@@ -641,10 +831,6 @@ std::uint16_t APU::ch3_frequency() const {
 }
 
 void APU::disable_channel3() {
-  if (pop_behavior_ == PopBehavior::Reduced && channel3_enabled &&
-    declick_remaining_[2] == 0) {
-    start_declick_tail(2, channel3_sample());
-  }
   channel3_enabled = false;
 }
 
@@ -653,18 +839,26 @@ void APU::trigger_channel3() {
     disable_channel3();
     return;
   }
-  if (!ch3_dac_enabled()) {
-    disable_channel3();
-    return;
+  channel3_enabled = true;
+  ch3_wave_pos = 0;
+  ch3_wave_byte_index = 0;
+  // On trigger, CH3 outputs sample index 0 immediately, but the first timer
+  // tick is delayed by an additional 3 APU cycles
+  // Here: +6 T-cycles (4 MHz units)
+  ch3_sample_buffer = wave_ram_bytes[0];
+
+  const auto f = ch3_frequency();
+  const auto period_tcycles = static_cast<std::uint16_t>((2048u - (f & 0x7FFu)) * 2u);
+  ch3_timer = static_cast<std::uint16_t>(period_tcycles + 6u);
+
+  if (ch3_length_counter == 0) {
+    const bool length_enabled = (nr34 & 0x40) != 0;
+    ch3_length_counter = static_cast<std::uint16_t>(
+        length_enabled && !next_step_clocks_length() ? 255 : 256);
   }
 
-  channel3_enabled = true;
-  channel3_pos = 0.0;
-
-  declick_remaining_[2] = 0;
-  declick_start_[2] = 0.0f;
-
-  if (ch3_length_counter == 0) ch3_length_counter = 256;
+  if (!ch3_dac_enabled())
+    disable_channel3();
 }
 
 // ----------- Channel 4 Helpers -----------
@@ -697,11 +891,6 @@ void APU::clock_ch4_envelope() {
 bool APU::ch4_dac_enabled() const { return (nr42 & 0xF8) != 0; }
 
 void APU::disable_channel4() {
-  if (pop_behavior_ == PopBehavior::Reduced && channel4_enabled &&
-    declick_remaining_[3] == 0) {
-    start_declick_tail(3, channel4_sample());
-  }
-
   channel4_enabled = false;
   ch4_env_enabled = false;
 }
@@ -711,19 +900,15 @@ void APU::trigger_channel4() {
     disable_channel4();
     return;
   }
-  if (!ch4_dac_enabled()) {
-    disable_channel4();
-    return;
-  }
-
   channel4_enabled = true;
   ch4_phase = 0.0;
   ch4_lfsr = 0x7FFF; // reset all 1s
 
-  declick_remaining_[3] = 0;
-  declick_start_[3] = 0.0f;
-
-  if (ch4_length_counter == 0) ch4_length_counter = 64;
+  if (ch4_length_counter == 0) {
+    const bool length_enabled = (nr44 & 0x40) != 0;
+    ch4_length_counter = static_cast<std::uint8_t>(
+        length_enabled && !next_step_clocks_length() ? 63 : 64);
+  }
 
   // Envelope from NR42
   ch4_env_volume = nr42 >> 4 & 0x0F;
@@ -731,6 +916,9 @@ void APU::trigger_channel4() {
   ch4_env_period = nr42 & 0x07;
   ch4_env_timer = ch4_env_period == 0 ? 8 : ch4_env_period;
   ch4_env_enabled = ch4_env_period != 0;
+
+  if (!ch4_dac_enabled())
+    disable_channel4();
 }
 
 double APU::ch4_clock_hz() const {
@@ -805,9 +993,10 @@ float APU::channel3_sample() const {
   const std::uint8_t level = nr32 >> 5 & 0x03;
   if (level == 0) return 0.0f;
 
-  const int idx = static_cast<int>(channel3_pos) & 31;
-  const byte_t b = wave_ram[idx >> 1].peek();
-  const std::uint8_t raw4 = (idx & 1) ? (b & 0x0F) : (b >> 4);
+  // Each wave RAM byte contains two 4-bit samples: high nibble first, then low
+  const std::uint8_t raw4 = (ch3_wave_pos & 1u)
+   ? static_cast<std::uint8_t>(ch3_sample_buffer & 0x0Fu)
+   : static_cast<std::uint8_t>((ch3_sample_buffer >> 4) & 0x0Fu);
 
   // Center the 4-bit DAC output around 0, then apply the output level scaling.
   float s = (static_cast<float>(raw4) - 7.5f) / 7.5f; // ~[-1, +1]
@@ -843,15 +1032,8 @@ void APU::generate_sample() {
 
   // When APU is powered off, the output is forced to 0 (and tails are cleared)
   if ((nr52 & 0x80) == 0) {
-    std::ranges::fill(declick_start_, 0.0f);
-    std::ranges::fill(declick_remaining_, 0);
     ch1 = ch2 = ch3 = ch4 = 0.0f;
   }
-
-  ch1 = apply_declick_tail(0, ch1);
-  ch2 = apply_declick_tail(1, ch2);
-  ch3 = apply_declick_tail(2, ch3);
-  ch4 = apply_declick_tail(3, ch4);
 
   const std::array<float, 4> ch{ch1, ch2, ch3, ch4};
 
@@ -886,14 +1068,15 @@ void APU::generate_sample() {
 }
 
 void APU::step_frame_sequencer() {
-  if ((nr52 & 0x80) == 0)
-    return;
-
+  // 512 Hz clock phase keeps running even when APU is off
   frame_seq_accum_tcycles += 1;
   while (frame_seq_accum_tcycles >= frame_sequencer_period_tcycles) {
     frame_seq_accum_tcycles -= frame_sequencer_period_tcycles;
-    frame_seq_step = static_cast<std::uint8_t>((frame_seq_step + 1) & 0x07);
+    // When off, ignore the clock (step stays reset), but keep phase
+    if (!apu_on_())
+        continue;
 
+    frame_seq_step = static_cast<std::uint8_t>((frame_seq_step + 1) & 0x07);
     // Frame sequencer schedule:
     // 0,2,4,6: length
     // 2,6: sweep (ch1 only)
@@ -927,6 +1110,22 @@ void APU::step_frame_sequencer() {
 void APU::step() {
   step_frame_sequencer();
 
+  if ((nr52 & 0x80) != 0 && channel3_enabled && ch3_dac_enabled()) {
+    if (ch3_timer > 0) --ch3_timer;
+    if (ch3_timer == 0) {
+      // CH3 advances its 0..31 sample index every timer tick and refreshes the
+      // 8-bit sample buffer from the currently selected wave RAM byte. This is
+      // also the byte that CPU reads/writes are redirected to on CGB
+      const auto f = ch3_frequency();
+      const auto period_tcycles = static_cast<std::uint16_t>((2048u - (f & 0x7FFu)) * 2u);
+      ch3_timer = period_tcycles;
+
+      ch3_wave_pos = static_cast<std::uint8_t>((ch3_wave_pos + 1u) & 31u);
+      ch3_wave_byte_index = static_cast<std::uint8_t>((ch3_wave_pos >> 1) & 0x0Fu);
+      ch3_sample_buffer = wave_ram_bytes[ch3_wave_byte_index];
+    }
+  }
+
   constexpr double cycles_per_sample = cpu_clock_hz / sample_rate_hz;
   cycle_accumulator += 1.0;
   if (cycle_accumulator < cycles_per_sample)
@@ -937,8 +1136,7 @@ void APU::step() {
   if ((nr52 & 0x80) != 0) {
     // CH1 phase
     if (channel1_enabled) {
-      const std::uint16_t f = ch1_frequency();
-      if (f < 2048) {
+      if (const std::uint16_t f = ch1_frequency(); f < 2048) {
         const double hz = 131072.0 / (2048.0 - f);
         channel1_phase += hz / sample_rate_hz;
         if (channel1_phase >= 1.0)
@@ -947,8 +1145,7 @@ void APU::step() {
     }
     // CH2 phase
     if (channel2_enabled) {
-      const std::uint16_t f = ch2_frequency();
-      if (f < 2048) {
+      if (const std::uint16_t f = ch2_frequency(); f < 2048) {
         const double hz = 131072.0 / (2048.0 - f);
         channel2_phase += hz / sample_rate_hz;
         if (channel2_phase >= 1.0)
@@ -956,19 +1153,10 @@ void APU::step() {
       }
     }
     // CH3 phase
-    if (channel3_enabled) {
-      const auto f = ch3_frequency();
-      if (f < 2048) {
-        // CH3 sample-step rate: 2097152 / (2048 - f) steps/sec
-        const double step_hz = 2097152.0 / (2048.0 - f);
-        channel3_pos += step_hz / sample_rate_hz;
-        while (channel3_pos >= 32.0) channel3_pos -= 32.0;
-      }
-    }
+
     // CH4 phase
     if (channel4_enabled) {
-      const double hz = ch4_clock_hz();
-      if (hz > 0.0) {
+      if (const double hz = ch4_clock_hz(); hz > 0.0) {
         ch4_phase += hz / sample_rate_hz;
         while (ch4_phase >= 1.0) {
           ch4_phase -= 1.0;
@@ -977,6 +1165,5 @@ void APU::step() {
       }
     }
   }
-
   generate_sample();
 }
