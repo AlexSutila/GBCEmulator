@@ -34,9 +34,9 @@ public:
 
   byte_t read(addr_t const addr) override {
     if (addr <= 0x3FFF)
-      return rom_at(rom0_bank_, addr);
+      return rom_at(rom_, rom0_bank_, addr);
     if (addr <= 0x7FFF)
-      return rom_at(rom1_bank_, addr - 0x4000);
+      return rom_at(rom_, rom1_bank_, addr - 0x4000);
 
     return open_bus();
   }
@@ -125,13 +125,6 @@ private:
 
   std::size_t rom0_bank_{0};
   std::size_t rom1_bank_{1};
-
-  [[nodiscard]] byte_t rom_at(std::size_t const bank, std::size_t const off) const {
-    const auto banks = rom_bank_count(rom_);
-    const auto b = clamp_bank(bank, banks);
-    const std::size_t idx = b * kRomBankSize + off;
-    return (idx < rom_.size()) ? rom_[idx] : open_bus();
-  }
 };
 
 std::unique_ptr<Mbc> make_ems(const cart &c) {

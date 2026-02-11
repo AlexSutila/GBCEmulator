@@ -36,8 +36,8 @@ public:
       }
 
       if (addr <= 0x3FFF)
-        return rom_at(rom_bank_0000(), addr);
-      return rom_at(rom_bank_4000(), addr - 0x4000);
+        return rom_at(rom_, rom_bank_0000(), addr);
+      return rom_at(rom_, rom_bank_4000(), addr - 0x4000);
     }
 
     // External RAM
@@ -241,13 +241,6 @@ private:
     const std::size_t bank = (hi << 2) | low;
     const std::size_t banks = std::max<std::size_t>(1, ram_.size() / kRamBankSize);
     return clamp_bank(bank, banks);
-  }
-
-  [[nodiscard]] byte_t rom_at(std::size_t const bank, std::size_t const off) const {
-    const auto banks = rom_bank_count(rom_);
-    const auto b = clamp_bank(bank, banks);
-    const std::size_t idx = b * kRomBankSize + off;
-    return (idx < rom_.size()) ? rom_[idx] : open_bus();
   }
 };
 

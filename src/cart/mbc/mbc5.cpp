@@ -19,9 +19,9 @@ public:
 
   byte_t read(addr_t const addr) override {
     if (addr <= 0x3FFF)
-      return rom_at(0, addr);
+      return rom_at(rom_, 0, addr);
     if (addr <= 0x7FFF)
-      return rom_at(rom_bank_, addr - 0x4000);
+      return rom_at(rom_, rom_bank_, addr - 0x4000);
 
     if (addr >= 0xA000 && addr <= 0xBFFF) {
       if (!ram_enabled_ || ram_.empty())
@@ -89,14 +89,6 @@ private:
   bool rumble_on_{false}; // This is the physical state of rumble. Turning it on
                           // has no effect. If we somehow port it to a handset
                           // then this can be hooked up to some motors
-
-  [[nodiscard]] byte_t rom_at(std::size_t const bank,
-                              std::size_t const off) const {
-    const auto banks = rom_bank_count(rom_);
-    const auto b = clamp_bank(bank, banks);
-    const std::size_t idx = b * kRomBankSize + off;
-    return (idx < rom_.size()) ? rom_[idx] : open_bus();
-  }
 };
 
 std::unique_ptr<Mbc> make_mbc5(const cart &c) {

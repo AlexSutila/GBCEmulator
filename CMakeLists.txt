@@ -90,7 +90,6 @@ FetchContent_MakeAvailable(raylib)
 set(GBC_CORE_SOURCES
     src/timer.cpp
     src/serial.cpp
-    src/apu.cpp
     src/gbc.cpp
 
     src/cpu/lr35902.cpp
@@ -117,6 +116,10 @@ set(GBC_CORE_SOURCES
     src/ppu/fetcher.cpp
     src/ppu/fifo.cpp
     src/ppu/sprites.cpp
+
+    src/apu/apu_core.cpp
+    src/apu/apu_mmio.cpp
+    src/apu/apu_channels.cpp
 
     src/cart/cart.cpp
     src/cart/mbc/no_mbc.cpp
