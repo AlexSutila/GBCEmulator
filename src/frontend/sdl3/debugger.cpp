@@ -1,8 +1,28 @@
 #include "frontend/sdl3/debugger.hpp"
+#include "SDL3/SDL_pixels.h"
+#include "SDL3/SDL_render.h"
 #include "debugger/breakpoint.hpp"
 #include "debugger/print.hpp"
+#include "frontend/sdl3/sdl_host.hpp"
+#include <algorithm>
 #include <imgui.h>
 #include <mutex>
+#include <stdexcept>
+
+constexpr auto tile_data_height_px = 12 * 8;
+constexpr auto tile_data_width_px = 32 * 8;
+constexpr auto black = 0xFF000000;
+
+void DebuggerImGui::init(SDLHost &host) {
+  ctx.tile_data_texture = SDL_CreateTexture(
+      host.get_renderer(), SDL_PIXELFORMAT_ARGB8888,
+      SDL_TEXTUREACCESS_STREAMING, tile_data_width_px, tile_data_height_px);
+  if (!ctx.tile_data_texture)
+    throw std::runtime_error("Failed to initialize debug textures");
+
+  tile_data_buf.resize(tile_data_height_px * tile_data_width_px);
+  std::fill(tile_data_buf.begin(), tile_data_buf.end(), black);
+}
 
 // This is a public entry point called from the main GUI render loop
 // Replaces the build_ui functionality
@@ -172,9 +192,22 @@ void DebuggerImGui::build_breakpoints_window(
 
 void DebuggerImGui::build_ppu_viewer_window(UiState &state) {
   std::lock_guard lock(dbg_mutex);
+  constexpr float scale = 1.5f;
+
+  // Update tile data texture
+  SDL_UpdateTexture(ctx.tile_data_texture, nullptr, tile_data_buf.data(),
+                    tile_data_width_px * sizeof(std::uint32_t));
+
   ImGui::Begin("Pixel Processor Viewer", &state.show_ppu_viewer);
   ImGui::SeparatorText("Pixel Processor State");
   ImGui::Text("%s", ctx.ppu_state.c_str());
+
+  // Render tile data to debug view
+  ImGui::SeparatorText("Tile Data");
+  ImVec2 tile_data_size(tile_data_width_px * scale,
+                        tile_data_height_px * scale);
+  ImGui::Image((ImTextureID)ctx.tile_data_texture, tile_data_size);
+
   ImGui::End();
 }
 

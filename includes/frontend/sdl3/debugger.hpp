@@ -2,13 +2,17 @@
 #define GBC_DEBUGGER_HPP
 
 #pragma once
+#include "SDL3/SDL_render.h"
 #include "common.hpp"
+#include "frontend/sdl3/sdl_host.hpp"
 #include "gbc.hpp"
 #include <condition_variable>
 #include <mutex>
 
 struct DebugContext {
   Debug::BreakReason reason{Debug::BRK_CONTINUE};
+  SDL_Texture *tile_data_texture{};
+
   std::string sys_state{};
   std::string cpu_state{};
   std::string ppu_state{};
@@ -28,6 +32,7 @@ struct BreakpointPrompt {
 
 class DebuggerImGui {
 public:
+  void init(SDLHost &host);
   void render(UiState &state, const std::unique_ptr<GameBoyColor> &core);
   Debug::BreakReason on_breakpoint(const std::stop_token &st,
                                    const std::unique_ptr<GameBoyColor> &core);
@@ -43,7 +48,9 @@ private:
   build_config_breakpoint_window(const std::unique_ptr<GameBoyColor> &core);
   void build_ppu_viewer_window(UiState &state);
 
+  std::vector<std::uint32_t> tile_data_buf;
   DebugContext ctx;
+
   mutable std::mutex dbg_mutex;
   std::condition_variable dbg_cv;
   BreakpointPrompt bp_prompt{};
