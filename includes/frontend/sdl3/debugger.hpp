@@ -6,12 +6,13 @@
 #include "common.hpp"
 #include "frontend/sdl3/sdl_host.hpp"
 #include "gbc.hpp"
+#include <array>
 #include <condition_variable>
 #include <mutex>
 
 struct DebugContext {
   Debug::BreakReason reason{Debug::BRK_CONTINUE};
-  SDL_Texture *tile_data_texture{};
+  std::array<SDL_Texture *, 2> tile_data_texture{};
 
   std::string sys_state{};
   std::string cpu_state{};
@@ -49,8 +50,11 @@ private:
   void build_ppu_viewer_window(UiState &state,
                                const std::unique_ptr<GameBoyColor> &core);
 
-  void read_vram_tile_data(const std::unique_ptr<GameBoyColor> &core);
-  std::vector<std::uint32_t> tile_data_buf;
+  void render_vram_tile_data(const std::unique_ptr<GameBoyColor> &core,
+                             const std::size_t vram_bank_idx);
+  void read_vram_tile_data(const std::unique_ptr<GameBoyColor> &core,
+                           const std::size_t vram_bank_idx);
+  std::array<std::vector<std::uint32_t>, 2> tile_data_buf{};
   DebugContext ctx; // Debugger context
 
   mutable std::mutex dbg_mutex;

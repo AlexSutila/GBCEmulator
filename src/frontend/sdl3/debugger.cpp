@@ -6,25 +6,31 @@
 #include "frontend/sdl3/sdl_host.hpp"
 #include "ppu/palette.hpp"
 #include <algorithm>
+#include <cassert>
 #include <imgui.h>
 #include <mutex>
 #include <stdexcept>
 
-constexpr auto tile_data_height_tiles = 12;
-constexpr auto tile_data_width_tiles = 32;
+constexpr auto tile_data_height_tiles = 24;
+constexpr auto tile_data_width_tiles = 16;
 constexpr auto tile_data_height_px = tile_data_height_tiles * 8;
 constexpr auto tile_data_width_px = tile_data_width_tiles * 8;
 constexpr auto black = 0xFF000000;
 
 void DebuggerImGui::init(SDLHost &host) {
-  ctx.tile_data_texture = SDL_CreateTexture(
-      host.get_renderer(), SDL_PIXELFORMAT_ARGB8888,
-      SDL_TEXTUREACCESS_STREAMING, tile_data_width_px, tile_data_height_px);
-  if (!ctx.tile_data_texture)
-    throw std::runtime_error("Failed to initialize debug textures");
+  for (auto &texture : ctx.tile_data_texture) {
+    texture = SDL_CreateTexture(host.get_renderer(), SDL_PIXELFORMAT_ARGB8888,
+                                SDL_TEXTUREACCESS_STREAMING, tile_data_width_px,
+                                tile_data_height_px);
+    if (!texture)
+      throw std::runtime_error("Failed to initialize debug textures");
+  }
 
-  tile_data_buf.resize(tile_data_height_px * tile_data_width_px);
-  std::fill(tile_data_buf.begin(), tile_data_buf.end(), black);
+  // Clears buffers used to update textures
+  for (auto &buf : tile_data_buf) {
+    buf.resize(tile_data_height_px * tile_data_width_px);
+    std::fill(buf.begin(), buf.end(), black);
+  }
 }
 
 // This is a public entry point called from the main GUI render loop
@@ -196,23 +202,16 @@ void DebuggerImGui::build_breakpoints_window(
 void DebuggerImGui::build_ppu_viewer_window(
     UiState &state, const std::unique_ptr<GameBoyColor> &core) {
   std::lock_guard lock(dbg_mutex);
-  constexpr float scale = 1.5f;
-
-  // Update tile data texture
-  read_vram_tile_data(core);
-  SDL_UpdateTexture(ctx.tile_data_texture, nullptr, tile_data_buf.data(),
-                    tile_data_width_px * sizeof(std::uint32_t));
 
   ImGui::Begin("Pixel Processor Viewer", &state.show_ppu_viewer);
   ImGui::SeparatorText("Pixel Processor State");
   ImGui::Text("%s", ctx.ppu_state.c_str());
 
-  // Render tile data to debug view
-  ImGui::SeparatorText("Tile Data");
-  ImVec2 tile_data_size(tile_data_width_px * scale,
-                        tile_data_height_px * scale);
-  ImGui::Image((ImTextureID)ctx.tile_data_texture, tile_data_size);
-
+  // Render tile data to debug view for both banks
+  ImGui::SeparatorText("Tile Data: (VRAM banks 0, 1)");
+  render_vram_tile_data(core, 0);
+  ImGui::SameLine();
+  render_vram_tile_data(core, 1);
   ImGui::End();
 }
 
@@ -253,33 +252,50 @@ void DebuggerImGui::build_config_breakpoint_window(
   }
 }
 
+void DebuggerImGui::render_vram_tile_data(
+    const std::unique_ptr<GameBoyColor> &core,
+    const std::size_t vram_bank_idx) {
+  constexpr float scale = 1.5f; // Lol, hardcoded bc idc
+  constexpr ImVec2 size(tile_data_width_px * scale,
+                        tile_data_height_px * scale);
+
+  // Fetch tile data from VRAM, as is, and render to texture
+  read_vram_tile_data(core, vram_bank_idx);
+  SDL_UpdateTexture(ctx.tile_data_texture.at(vram_bank_idx), nullptr,
+                    tile_data_buf.at(vram_bank_idx).data(),
+                    tile_data_width_px * sizeof(std::uint32_t));
+  ImGui::Image((ImTextureID)ctx.tile_data_texture.at(vram_bank_idx), size);
+}
+
 void DebuggerImGui::read_vram_tile_data(
-    const std::unique_ptr<GameBoyColor> &core) {
+    const std::unique_ptr<GameBoyColor> &core,
+    const std::size_t vram_bank_idx) {
   constexpr std::size_t tile_width = 8;
   constexpr std::size_t tile_height = 8;
   constexpr std::size_t bytes_per_tile = 16;
   constexpr std::size_t tiles_per_row = tile_data_width_tiles;
   constexpr std::size_t tile_count = 384;
+  assert(vram_bank_idx >= 0 && vram_bank_idx <= 1);
 
-  // TODO: Need to hit the second VRAM bank
-  const auto &vram = core->get_bus()->get_vram();
-  const auto &bank_0 = vram.at(0);
+  // Isolate to a single VRAM bank
+  const auto &vram_bank = core->get_bus()->get_vram().at(vram_bank_idx);
+  auto &buf = tile_data_buf.at(vram_bank_idx);
 
-  // For get any PPU timing, just render what is in VRAM as is
+  // For get any PPU timing, just copy what is in VRAM as is
   for (std::size_t tile = 0; tile < tile_count; ++tile) {
     const std::size_t tile_x = (tile % tiles_per_row) * tile_width;
     const std::size_t tile_y = (tile / tiles_per_row) * tile_height;
     const std::size_t base = tile * bytes_per_tile;
     for (std::size_t row = 0; row < tile_height; ++row) {
-      const byte_t lo = bank_0[base + row * 2];
-      const byte_t hi = bank_0[base + row * 2 + 1];
+      const byte_t lo = vram_bank[base + row * 2];
+      const byte_t hi = vram_bank[base + row * 2 + 1];
 
       for (std::size_t col = 0; col < tile_width; ++col) {
         const std::size_t bit = 7 - col;
         const byte_t color_idx = (((hi >> bit) & 1) << 1) | ((lo >> bit) & 1);
 
         const std::size_t x = tile_x + col, y = tile_y + row;
-        tile_data_buf[y * tile_data_width_px + x] = get_mono_color(color_idx);
+        buf[y * tile_data_width_px + x] = get_mono_color(color_idx);
       }
     }
   }
