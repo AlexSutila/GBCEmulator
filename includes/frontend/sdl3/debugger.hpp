@@ -46,10 +46,12 @@ private:
                                 const std::unique_ptr<GameBoyColor> &core);
   void
   build_config_breakpoint_window(const std::unique_ptr<GameBoyColor> &core);
-  void build_ppu_viewer_window(UiState &state);
+  void build_ppu_viewer_window(UiState &state,
+                               const std::unique_ptr<GameBoyColor> &core);
 
+  void read_vram_tile_data(const std::unique_ptr<GameBoyColor> &core);
   std::vector<std::uint32_t> tile_data_buf;
-  DebugContext ctx;
+  DebugContext ctx; // Debugger context
 
   mutable std::mutex dbg_mutex;
   std::condition_variable dbg_cv;
