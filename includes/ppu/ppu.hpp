@@ -40,6 +40,7 @@ public:
     byte_t wx;
     byte_t lyc;
     byte_t ly;
+    std::size_t dots;
   };
   PPUState get_state() const;
 

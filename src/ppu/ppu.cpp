@@ -121,6 +121,7 @@ PixelProcessingUnit::PPUState PixelProcessingUnit::get_state() const {
   state.wx = wx_.peek();
   state.lyc = lyc_.peek();
   state.ly = ly_.peek();
+  state.dots = cur_scanline_clks;
   return state;
 }
 

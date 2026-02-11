@@ -6,14 +6,14 @@ namespace Debug {
 
 [[nodiscard]] std::string hex8(const byte_t v) {
   std::ostringstream o;
-  o << "0x" << std::hex << std::uppercase // I hate writing UI lol
+  o << "0x" << std::hex << std::uppercase // ...
     << std::setw(2) << std::setfill('0') << +v;
   return o.str();
 }
 
 [[nodiscard]] std::string hex16(const addr_t v) {
   std::ostringstream o;
-  o << "0x" << std::hex << std::uppercase // I hate writing UI lol
+  o << "0x" << std::hex << std::uppercase // ...
     << std::setw(4) << std::setfill('0') << +v;
   return o.str();
 }
@@ -48,7 +48,7 @@ std::string to_string(const PixelProcessingUnit::PPUState &s) {
     mode_str = "DRAWING";
     break;
   }
-  out << "PPU Mode: " << mode_str << "\n\n"
+  out << "PPU Mode: " << mode_str << ", dot: " << s.dots << "\n\n"
       << "LCDC:  " << hex8(s.lcdc) << "  STAT: " << hex8(s.stat) << "\n"
       << "SCX:   " << hex8(s.scx) << "  SCY:  " << hex8(s.scy) << "\n"
       << "WX:    " << hex8(s.wx) << "  WY:   " << hex8(s.wy) << "\n"
