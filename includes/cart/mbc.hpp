@@ -42,6 +42,13 @@ inline std::size_t clamp_bank(const std::size_t bank,
 }
 inline byte_t open_bus() { return 0xFF; }
 
+inline byte_t rom_at(const std::span<const byte_t> rom, const std::size_t bank, const std::size_t off) {
+  const auto banks = rom_bank_count(rom);
+  const auto b = clamp_bank(bank, banks);
+  const std::size_t idx = b * kRomBankSize + off;
+  return idx < rom.size() ? rom[idx] : open_bus();
+}
+
 inline bool type_has_battery(const byte_t t) {
   switch (t) {
   case 0x03: // MBC1+RAM+BATTERY

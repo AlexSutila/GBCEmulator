@@ -17,10 +17,10 @@ public:
 
   byte_t read(addr_t const addr) override {
     if (addr <= 0x3FFF) {
-      return rom_at(0, addr);
+      return rom_at(rom_, 0, addr);
     }
     if (addr <= 0x7FFF) {
-      return rom_at(rom_bank_, addr - 0x4000);
+      return rom_at(rom_, rom_bank_, addr - 0x4000);
     }
     if (addr >= 0xA000 && addr <= 0xBFFF) {
       if (!ram_enabled_)
@@ -54,14 +54,14 @@ public:
     }
   }
 
-  bool has_battery() const noexcept override { return battery_; }
+  [[nodiscard]] bool has_battery() const noexcept override { return battery_; }
 
   // expose "RAM" as 512 bytes (low nibble meaningful)
-  std::span<const byte_t> ram() const noexcept override {
-    return std::span<const byte_t>(ram_.data(), ram_.size());
+  [[nodiscard]] std::span<const byte_t> ram() const noexcept override {
+    return {ram_.data(), ram_.size()};
   }
   std::span<byte_t> ram() noexcept override {
-    return std::span<byte_t>(ram_.data(), ram_.size());
+    return {ram_.data(), ram_.size()};
   }
 
 private:
@@ -71,15 +71,7 @@ private:
 
   bool ram_enabled_{false}; // RAMG: 0b1010 enables, other values disables. This
                             // represents the state after writing
-  byte_t rom_bank_{
-      1}; // ROMB: 4-bit for ROM bank number. Never contain zero value
-
-  byte_t rom_at(std::size_t const bank, std::size_t const off) const {
-    const auto banks = rom_bank_count(rom_);
-    const auto b = clamp_bank(bank, banks);
-    const std::size_t idx = b * kRomBankSize + off;
-    return (idx < rom_.size()) ? rom_[idx] : open_bus();
-  }
+  byte_t rom_bank_{1};      // ROMB: 4-bit for ROM bank number. Never contain zero value
 };
 
 std::unique_ptr<Mbc> make_mbc2(const cart &c) {

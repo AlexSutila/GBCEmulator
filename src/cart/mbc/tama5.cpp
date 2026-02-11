@@ -79,9 +79,9 @@ public:
 
   byte_t read(addr_t const addr) override {
     if (addr <= 0x3FFF)
-      return rom_at(0, addr);
+      return rom_at(rom_, 0, addr);
     if (addr <= 0x7FFF)
-      return rom_at(rom_bank_, addr - 0x4000);
+      return rom_at(rom_, rom_bank_, addr - 0x4000);
 
     if (addr >= 0xA000 && addr <= 0xBFFF) {
       if (!unlocked_ && !unlock_pending_) {
@@ -673,17 +673,6 @@ private:
     }
 
     encode_time_(sec, min, hour, dow, day, month, year);
-  }
-
-  // ---------------------------
-  // ROM helpers
-  // ---------------------------
-  [[nodiscard]] byte_t rom_at(std::size_t const bank,
-                              std::size_t const off) const {
-    const auto banks = rom_bank_count(rom_);
-    const auto b = clamp_bank(bank, banks);
-    const std::size_t idx = b * kRomBankSize + off;
-    return (idx < rom_.size()) ? rom_[idx] : open_bus();
   }
 };
 

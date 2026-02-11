@@ -19,11 +19,11 @@ public:
   byte_t read(const addr_t addr) override {
     if (addr <= 0x3FFF) {
       const std::size_t bank0 = mode_ ? (static_cast<std::size_t>(upper2_ & 0x03) << bank2_shift_()) : 0;
-      return rom_at(bank0, addr);
+      return rom_at(rom_, bank0, addr);
     }
     if (addr <= 0x7FFF) {
       const std::size_t bank = effective_rom_bank();
-      return rom_at(bank, addr - 0x4000);
+      return rom_at(rom_, bank, addr - 0x4000);
     }
     if (addr >= 0xA000 && addr <= 0xBFFF) {
       if (!ram_enabled_ || ram_.empty())
@@ -84,13 +84,6 @@ private:
         static_cast<std::size_t>(upper2_ & 0x03) << bank2_shift_();
     const auto lo = static_cast<std::size_t>(bank1_low_for_addr_());
     return hi | lo;
-  }
-
-  [[nodiscard]] byte_t rom_at(const std::size_t bank, const std::size_t off) const {
-    const auto banks = rom_bank_count(rom_);
-    const auto b = clamp_bank(bank, banks);
-    const std::size_t idx = b * kRomBankSize + off;
-    return (idx < rom_.size()) ? rom_[idx] : open_bus();
   }
 
   [[nodiscard]] byte_t ram_at(const std::size_t bank, const std::size_t off) const {
