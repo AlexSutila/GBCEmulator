@@ -1,7 +1,7 @@
-#ifndef __GBC_H
-#define __GBC_H
+#ifndef GBC_H
+#define GBC_H
 
-#include "apu.hpp"
+#include "apu/apu.hpp"
 #include "cart/cart.hpp"
 #include "cpu/lr35902.hpp"
 #include "debugger/debugger.hpp"
@@ -80,4 +80,4 @@ private:
   Frontend &fe_;
 };
 
-#endif // __GBC_H
+#endif // GBC_H
