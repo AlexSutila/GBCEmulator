@@ -72,6 +72,10 @@ void DebuggerImGui::update_state_from_core(
       core->get_bus()->get_mmio(IORegisterMapping::MMIO_INT_FLAGS));
   ctx.ie_state = Debug::to_string(*ie_reg);
   ctx.if_state = Debug::to_string(*if_reg);
+
+  // Populates the tile data buffers in ctx
+  read_vram_tile_data(core, 0);
+  read_vram_tile_data(core, 1);
 }
 
 void DebuggerImGui::forward_stop(
@@ -260,7 +264,6 @@ void DebuggerImGui::render_vram_tile_data(
                         tile_data_height_px * scale);
 
   // Fetch tile data from VRAM, as is, and render to texture
-  read_vram_tile_data(core, vram_bank_idx);
   SDL_UpdateTexture(ctx.tile_data_texture.at(vram_bank_idx), nullptr,
                     tile_data_buf.at(vram_bank_idx).data(),
                     tile_data_width_px * sizeof(std::uint32_t));
