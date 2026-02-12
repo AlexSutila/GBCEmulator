@@ -33,17 +33,18 @@ RaylibFrontend::~RaylibFrontend() {
 }
 
 std::array<std::uint32_t, 144 * 160> RaylibFrontend::get_frame() {
-  return frame_buf.at(front_idx);
+  return frame_buf.at(display_idx);
 }
 
 void RaylibFrontend::put_pixel(int x, int y, std::uint32_t c) {
   if (x < 0 || x >= fb_width || y < 0 || y >= fb_height) [[unlikely]]
     return;
-  frame_buf.at(front_idx).at(y * fb_width + x) = format_color(c);
+  frame_buf.at(write_idx).at(y * fb_width + x) = format_color(c);
 
   // Swap as frame becomes ready to avoid screen tears
   if (x == fb_width - 1 && y == fb_height - 1) {
-    front_idx = (front_idx + 1) % nbuf;
+    display_idx = write_idx;
+    write_idx = (write_idx + 1) % nbuf;
     frame_ready = true;
   }
 }
@@ -52,10 +53,11 @@ void RaylibFrontend::clear(std::uint32_t c) {
   for (auto &buf : frame_buf)
     buf.fill(format_color(c));
   frame_ready = false;
-  front_idx = 0;
+  write_idx = 0;
+  display_idx = 0;
 }
 
-void RaylibFrontend::read_inputs() {
+void RaylibFrontend::read_inputs() const {
   std::uint8_t input_state{};
 
   if (::IsKeyDown(KEY_UP))
@@ -76,14 +78,14 @@ void RaylibFrontend::read_inputs() {
     input_state |= static_cast<std::uint8_t>(Joypad::JoypadButton::START);
 
   // This will never fail... Can't wait to eat these words though
-  Joypad::JOYP *const joyp = static_cast<Joypad::JOYP *>(
+  auto *const joyp = dynamic_cast<Joypad::JOYP *>(
       gbc->get_bus()->get_mmio(IORegisterMapping::MMIO_JOYPAD));
   if (!joyp) [[unlikely]]
     throw std::runtime_error("RaylibFrontend::read_inputs()");
   joyp->set_state(input_state);
 }
 
-void RaylibFrontend::step_frame() {
+void RaylibFrontend::step_frame() const {
   constexpr std::size_t cycles_per_frame = 70224;
   for (std::size_t i{0}; i < cycles_per_frame; i++)
     gbc->step();
@@ -92,17 +94,14 @@ void RaylibFrontend::step_frame() {
 void RaylibFrontend::present() {
   if (!frame_ready)
     return;
-
-  // Pull oppositing buffer than the buffer being rendered to
-  const auto back_idx = (front_idx + 1) % nbuf;
   frame_ready = false;
 
   // Rendering
-  ::UpdateTexture(texture, frame_buf.at(back_idx).data());
+  ::UpdateTexture(texture, frame_buf.at(display_idx).data());
   ::BeginDrawing();
   ::DrawTexturePro(
-      texture, Rectangle{0, 0, (float)fb_width, (float)fb_height},
-      Rectangle{0, 0, (float)::GetScreenWidth(), (float)::GetScreenHeight()},
+      texture, Rectangle{0, 0, static_cast<float>(fb_width), static_cast<float>(fb_height)},
+      Rectangle{0, 0, static_cast<float>(::GetScreenWidth()), static_cast<float>(::GetScreenHeight())},
       Vector2{0, 0}, 0.0f, WHITE);
   ::EndDrawing();
 }
@@ -113,7 +112,7 @@ void RaylibFrontend::start() {
   ::InitAudioDevice();
 
   Image img{};
-  img.data = frame_buf.data();
+  img.data = frame_buf.at(0).data();
   img.width = fb_width;
   img.height = fb_height;
   img.mipmaps = 1;

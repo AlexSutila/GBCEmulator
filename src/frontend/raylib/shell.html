@@ -112,6 +112,15 @@
       onRuntimeInitialized() {
         console.log("WASM runtime initialized");
 
+        // Ensure keys go to the canvas and browser doesn't steal them
+        Module.canvas.tabIndex = 0;
+        Module.canvas.focus();
+        window.addEventListener("mousedown", () => Module.canvas.focus());
+        window.addEventListener("keydown", (e) => {
+          const block = ["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Backspace","Space","Enter","J","K"];
+          if (block.includes(e.code)) e.preventDefault();
+        }, { passive: false });
+
         const input = document.getElementById("romInput");
         const button = document.getElementById("romButton");
 

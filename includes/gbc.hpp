@@ -12,7 +12,6 @@
 #include "serial.hpp"
 #include "timer.hpp"
 
-#include <cstdint>
 #include <memory>
 #include <optional>
 
@@ -31,13 +30,13 @@ struct runtime_sys_info {
   bool double_speed{};
 };
 
-class GameBoyColor final : private Debug::Debuggable {
+class GameBoyColor final : Debug::Debuggable {
 public:
   GameBoyColor(Frontend &frontend, const std::string &bios_path);
   GameBoyColor(Frontend &frontend, const BootROM &rom);
-  GameBoyColor(Frontend &frontend);
-  void insert_cartridge(cart c);
-  void init_test_bed();
+  explicit GameBoyColor(Frontend &frontend);
+  void insert_cartridge(const cart& c);
+  void init_test_bed() const;
   void step();
 
   /* Optional debugger configurable by frontend */
@@ -47,11 +46,11 @@ public:
   std::optional<Debug::Debugger> &get_debugger() { return debugger_; }
 
   /* Getters mainly for python bindings */
-  AddressBus *get_bus() { return bus.get(); };
-  LR35902 *get_cpu() { return cpu.get(); };
-  PixelProcessingUnit *get_ppu() { return ppu.get(); }
-  TimerUnit *get_timer() { return timer.get(); }
-  const runtime_sys_info &get_sys() { return sys_; }
+  [[nodiscard]] AddressBus *get_bus() const { return bus.get(); };
+  [[nodiscard]] LR35902 *get_cpu() const { return cpu.get(); };
+  [[nodiscard]] PixelProcessingUnit *get_ppu() const { return ppu.get(); }
+  [[nodiscard]] TimerUnit *get_timer() const { return timer.get(); }
+  [[nodiscard]] const runtime_sys_info &get_sys() const { return sys_; }
 
 private:
   std::unique_ptr<AddressBus> bus{};
@@ -63,16 +62,16 @@ private:
 
   /* Top-level system initialization helpers */
   void system_init(); // Connects all components in the system
-  void skip_bios();   // Skips bios when unconfigured
+  void skip_bios() const;   // Skips bios when unconfigured
 
   /* Helpers for initializing emulator state to skip the BIOS */
-  void cram_init_mono(IORegisterMapping index, IORegisterMapping data);
-  void cram_init_mono();
+  void cram_init_mono(IORegisterMapping index, IORegisterMapping data) const;
+  void cram_init_mono() const;
 
   /* For moving emulation state along */
-  void step_dma(bool fast_cycle);
-  bool vdma_enabled() const;
-  void step_processor();
+  void step_dma(bool fast_cycle) const;
+  [[nodiscard]] bool vdma_enabled() const;
+  void step_processor() const;
 
   std::optional<Debug::Debugger> debugger_{};
   std::optional<BootROM> bios_{};

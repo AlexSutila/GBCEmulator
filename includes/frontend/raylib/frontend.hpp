@@ -3,7 +3,6 @@
 
 #include "frontend/frontend.hpp"
 #include <array>
-#include <cstdint>
 #include <raylib.h>
 
 struct cart;
@@ -11,15 +10,15 @@ struct cart;
 class RaylibFrontend final : public Frontend {
 public:
   explicit RaylibFrontend(const cart &c);
-  ~RaylibFrontend();
+  ~RaylibFrontend() override;
 
   std::array<std::uint32_t, 144 * 160> get_frame() override;
   void put_pixel(int x, int y, std::uint32_t c) override;
   void clear(std::uint32_t c) override;
   void start() override;
 
-  void read_inputs();
-  void step_frame();
+  void read_inputs() const;
+  void step_frame() const;
   void present();
 
   // TODO: WASM doesn't like heap allocated floats?????
@@ -32,7 +31,8 @@ private:
 
   // We double buffer here, even though this is single threaded
   static constexpr auto nbuf = 2;
-  std::size_t front_idx{0};
+  std::size_t write_idx{0};
+  std::size_t display_idx{0};
   bool frame_ready{false};
 
   // Double buffer, swap only when needed, prevents screen tears

@@ -271,7 +271,6 @@ else()
         -lpthread
     )
 
-    # TODO: Why do we need this? Is it also an mingw large objfile size cope?
     include(CheckIPOSupported)
     check_ipo_supported(RESULT ipo_ok OUTPUT ipo_err LANGUAGES CXX)
     if(ipo_ok AND NOT MINGW)

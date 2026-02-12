@@ -7,16 +7,16 @@
 #include <iostream>
 #include <memory>
 
+static std::unique_ptr<RaylibFrontend> g_frontend;
+
 extern "C" {
 EMSCRIPTEN_KEEPALIVE void emscripten_start() {
-  std::unique_ptr<RaylibFrontend> fe;
-
   /* Emscripten uses a virtual filesystem inside the browser? So more or less,
    * the way we handle ROM loading is by copying the rom into the VFS with a
    * hardcoded path, hence we can rely on this naming convention shown here. */
   cart c = load_cart_fs("/rom.bin");
-  fe = std::make_unique<RaylibFrontend>(c);
-  fe->start();
+  g_frontend = std::make_unique<RaylibFrontend>(c);
+  g_frontend->start();
 }
 }
 
