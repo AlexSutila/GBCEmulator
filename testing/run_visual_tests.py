@@ -106,20 +106,24 @@ def run_blargg_cpu_tests():
             'https://github.com/retrio/gb-test-roms/raw/refs/heads/master/cpu_instrs/cpu_instrs.gb',
             'https://github.com/retrio/gb-test-roms/raw/refs/heads/master/mem_timing/mem_timing.gb',
             'https://github.com/retrio/gb-test-roms/raw/refs/heads/master/mem_timing-2/mem_timing.gb',
+            'https://github.com/retrio/gb-test-roms/raw/refs/heads/master/cgb_sound/cgb_sound.gb',
             'https://github.com/retrio/gb-test-roms/raw/refs/heads/master/instr_timing/instr_timing.gb',
             'https://github.com/retrio/gb-test-roms/raw/refs/heads/master/interrupt_time/interrupt_time.gb',
             'https://github.com/retrio/gb-test-roms/raw/refs/heads/master/halt_bug.gb',
+            'https://github.com/retrio/gb-test-roms/raw/refs/heads/master/oam_bug/oam_bug.gb',
         ],
         titles=[
             'cpu_instrs',
             'mem_timing',
             'mem_timing2',
+            'cgb_sound',
             'instr_timing',
             'interrupt_time',
-            'halt_bug'
+            'halt_bug',
+            'oam_bug'
         ],
         rows=2,
-        cols=3,
+        cols=4,
         out_path='assets/blargg_cpu_mem.png'
     )
 
