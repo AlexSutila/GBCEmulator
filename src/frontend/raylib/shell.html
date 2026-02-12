@@ -2,106 +2,411 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>GBC Emulator</title>
 
   <style>
-    * {
-      box-sizing: border-box;
+    :root {
+      --bg0: #070a0f;
+      --bg1: #0b1020;
+      --card: rgba(255, 255, 255, 0.06);
+      --border: rgba(255, 255, 255, 0.10);
+      --text: rgba(255, 255, 255, 0.92);
+      --muted: rgba(255, 255, 255, 0.68);
+      --shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+      --radius: 18px;
+      --touchbar-h: 0px; /* overridden on touch */
     }
+
+    * { box-sizing: border-box; }
 
     html, body {
       margin: 0;
       padding: 0;
       width: 100%;
       height: 100%;
-      background: #111;
-      font-family: sans-serif;
-      color: #eee;
+      background: radial-gradient(1200px 700px at 50% -20%, rgba(99, 102, 241, 0.24), transparent 60%),
+                  radial-gradient(900px 600px at 10% 110%, rgba(34, 211, 238, 0.10), transparent 55%),
+                  linear-gradient(180deg, var(--bg1), var(--bg0));
+      color: var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Apple Color Emoji", "Segoe UI Emoji";
       overflow: hidden;
     }
 
-    body {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
+    .app {
+      height: 100dvh;
+      height: 100vh; /* fallback */
+      display: grid;
+      grid-template-rows: auto 1fr;
     }
 
-    #canvas-container {
-      flex: 1 1 auto;
-      width: 100%;
+    .topbar {
+      padding: 14px 14px 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .brand {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+
+    .brand .title {
+      font-size: 0.98rem;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .brand .subtitle {
+      font-size: 0.82rem;
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    .btn {
+      appearance: none;
+      border: 1px solid var(--border);
+      background: linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.06));
+      color: var(--text);
+      padding: 10px 12px;
+      border-radius: 12px;
+      font-size: 0.92rem;
+      font-weight: 650;
+      letter-spacing: 0.15px;
+      cursor: pointer;
+      user-select: none;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.25);
+      transition: transform 0.05s ease, background 0.12s ease, border-color 0.12s ease;
+    }
+
+    .btn:active { transform: translateY(1px); }
+    .btn:hover { border-color: rgba(255,255,255,0.18); }
+
+    .btn.primary {
+      border-color: rgba(99, 102, 241, 0.55);
+      background: linear-gradient(180deg, rgba(99, 102, 241, 0.40), rgba(99, 102, 241, 0.18));
+    }
+
+    .btn.disabled {
+      opacity: 0.6;
+      cursor: default;
+      pointer-events: none;
+    }
+
+    #romInput { display: none; }
+
+    .stage {
+      padding: 0 14px calc(14px + var(--touchbar-h));
+      min-height: 0;
+      display: grid;
+      place-items: center;
+    }
+
+    .canvas-card {
+      width: min(92vw, 860px);
+      height: min(calc(100dvh - 120px - var(--touchbar-h)), 92vw);
+      max-height: 900px;
+      aspect-ratio: 10 / 9;
+      border-radius: var(--radius);
+      background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03));
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      padding: 12px;
       display: flex;
       align-items: center;
       justify-content: center;
-      padding-bottom: 16px;
+      position: relative;
       min-height: 0;
     }
 
     canvas {
+      width: 100%;
+      height: 100%;
+      border-radius: calc(var(--radius) - 10px);
       image-rendering: pixelated;
       background: #000;
-      border: 2px solid #555;
-      aspect-ratio: 10 / 9;
-      width: 100%;
-      max-width: 95vmin;
-      max-height: 95vmin;
-      height: auto;
+      outline: none;
+      border: 1px solid rgba(255,255,255,0.10);
     }
 
-    #controls {
-      margin: 12px 0;
-      flex-shrink: 0;
+    .hint {
+      margin-top: 10px;
+      font-size: 0.85rem;
+      color: var(--muted);
+      text-align: center;
+      max-width: min(92vw, 860px);
+      line-height: 1.35;
     }
 
-    #romInput {
+    .hint code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 0.92em;
+      padding: 1px 6px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.10);
+      background: rgba(0,0,0,0.22);
+    }
+
+    /* Touch controls (phones/tablets) */
+    #touch-controls {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      padding: 12px 14px calc(12px + env(safe-area-inset-bottom));
       display: none;
+      gap: 12px;
+      align-items: end;
+      justify-content: space-between;
+      pointer-events: none; /* enable only on children */
     }
 
-    #romButton {
-      display: inline-block;
-      padding: 10px 18px;
-      background: linear-gradient(#3a3a3a, #2a2a2a);
-      border: 1px solid #555;
-      border-radius: 6px;
-      color: #fff;
-      font-size: 0.95rem;
-      font-weight: 600;
-      letter-spacing: 0.3px;
-      cursor: pointer;
+    #touch-controls .cluster {
+      pointer-events: auto;
+      background: rgba(0,0,0,0.18);
+      border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 22px;
+      padding: 10px;
+      box-shadow: 0 10px 24px rgba(0,0,0,0.40);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+
+    .dpad {
+      display: grid;
+      grid-template-columns: 56px 56px 56px;
+      grid-template-rows: 56px 56px 56px;
+      gap: 8px;
+      align-items: center;
+      justify-items: center;
+    }
+
+    .dpad .spacer { width: 56px; height: 56px; }
+
+    .touch-btn {
+      touch-action: none;
+      -webkit-tap-highlight-color: transparent;
       user-select: none;
-      transition: background 0.15s ease, transform 0.05s ease, box-shadow 0.15s ease;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.6);
+      border: 1px solid rgba(255,255,255,0.14);
+      background: linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.05));
+      color: var(--text);
+      box-shadow: 0 3px 10px rgba(0,0,0,0.25);
+      font-weight: 750;
     }
 
-    #romButton:hover {
-      background: linear-gradient(#444, #333);
+    .touch-btn:active { transform: translateY(1px); }
+
+    .touch-btn.square {
+      width: 56px;
+      height: 56px;
+      border-radius: 16px;
+      font-size: 1.05rem;
     }
 
-    #romButton:active {
-      transform: translateY(1px);
-      box-shadow: 0 1px 2px rgba(0,0,0,0.8);
+    .touch-btn.pill {
+      height: 44px;
+      padding: 0 14px;
+      border-radius: 999px;
+      font-size: 0.92rem;
+      letter-spacing: 0.2px;
     }
 
-    #romButton.disabled {
-      background: #222;
-      border-color: #444;
-      color: #888;
-      cursor: default;
-      box-shadow: none;
+    .touch-btn.round {
+      width: 72px;
+      height: 72px;
+      border-radius: 999px;
+      font-size: 1.25rem;
+    }
+
+    .touch-btn.round.b {
+      width: 64px;
+      height: 64px;
+      font-size: 1.1rem;
+      opacity: 0.95;
+    }
+
+    .meta {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .ab {
+      display: flex;
+      gap: 12px;
+      align-items: end;
+      justify-content: center;
+    }
+
+    @media (pointer: coarse), (max-width: 900px) {
+      :root { --touchbar-h: 190px; }
+      #touch-controls { display: flex; }
+      .hint.desktop-only { display: none; }
     }
   </style>
 </head>
 
 <body>
-  <header>GBC Emulator</header>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <div class="title" id="title">GBC Emulator</div>
+        <div class="subtitle" id="status">Load a ROM to begin</div>
+      </div>
 
-  <div id="controls">
-    <input type="file" id="romInput" accept=".gb,.gbc" />
-    <label id="romButton" for="romInput">Load ROM</label>
+      <div class="actions">
+        <input type="file" id="romInput" accept=".gb,.gbc" />
+        <label id="romButton" class="btn primary" for="romInput">Load ROM</label>
+        <button id="fsButton" class="btn" type="button">Fullscreen</button>
+      </div>
+    </header>
+
+    <main class="stage">
+      <div>
+        <div class="canvas-card" id="canvasCard">
+          <canvas id="canvas"></canvas>
+        </div>
+        <div class="hint desktop-only" id="hint">
+          Keyboard: <code>Arrows</code> <code>Z</code>=A <code>X</code>=B <code>Enter</code>=Start <code>Backspace</code>=Select
+        </div>
+      </div>
+    </main>
+
+    <div id="touch-controls" aria-label="On-screen controller">
+      <div class="cluster">
+        <div class="dpad" aria-label="D-pad">
+          <div class="spacer"></div>
+          <button class="touch-btn square" data-btn="2" aria-label="Up">▲</button>
+          <div class="spacer"></div>
+
+          <button class="touch-btn square" data-btn="1" aria-label="Left">◀</button>
+          <div class="spacer"></div>
+          <button class="touch-btn square" data-btn="0" aria-label="Right">▶</button>
+
+          <div class="spacer"></div>
+          <button class="touch-btn square" data-btn="3" aria-label="Down">▼</button>
+          <div class="spacer"></div>
+        </div>
+      </div>
+
+      <div class="cluster">
+        <div class="meta" aria-label="Start/Select">
+          <button class="touch-btn pill" data-btn="6" aria-label="Select">Select</button>
+          <button class="touch-btn pill" data-btn="7" aria-label="Start">Start</button>
+        </div>
+      </div>
+
+      <div class="cluster">
+        <div class="ab" aria-label="A/B">
+          <button class="touch-btn round b" data-btn="5" aria-label="B">B</button>
+          <button class="touch-btn round" data-btn="4" aria-label="A">A</button>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <canvas id="canvas"></canvas>
-
   <script>
+    function isTouchDevice() {
+      return window.matchMedia("(pointer: coarse)").matches || window.matchMedia("(max-width: 900px)").matches;
+    }
+
+    function setupCanvasFocus(canvas) {
+      canvas.tabIndex = 0;
+      canvas.focus();
+
+      window.addEventListener(
+        "keydown",
+        (e) => {
+          const block = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space", "Enter", "Backspace"]);
+          if (block.has(e.code)) e.preventDefault();
+        },
+        { passive: false }
+      );
+
+      window.addEventListener("pointerdown", () => canvas.focus());
+    }
+
+    function bindTouchButtons(Module) {
+      const callSetBtn = (btn, pressed) => {
+        if (typeof Module._emscripten_set_button === "function") {
+          Module._emscripten_set_button(btn, pressed ? 1 : 0);
+        }
+      };
+
+      const clearAll = () => {
+        if (typeof Module._emscripten_clear_buttons === "function") {
+          Module._emscripten_clear_buttons();
+        }
+      };
+
+      const buttons = document.querySelectorAll("[data-btn]");
+      for (const el of buttons) {
+        const btn = Number(el.dataset.btn);
+
+        const down = (e) => {
+          e.preventDefault();
+          el.setPointerCapture?.(e.pointerId);
+          callSetBtn(btn, true);
+        };
+
+        const up = (e) => {
+          e.preventDefault();
+          callSetBtn(btn, false);
+        };
+
+        el.addEventListener("pointerdown", down, { passive: false });
+        el.addEventListener("pointerup", up, { passive: false });
+        el.addEventListener("pointercancel", up, { passive: false });
+        el.addEventListener("contextmenu", (e) => e.preventDefault());
+      }
+
+      window.addEventListener("blur", clearAll);
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden) clearAll();
+      });
+
+      return { clearAll };
+    }
+
+    function setupFullscreen(canvas) {
+      const btn = document.getElementById("fsButton");
+      const card = document.getElementById("canvasCard");
+
+      const request = async () => {
+        try {
+          if (!document.fullscreenElement) {
+            await (card.requestFullscreen?.() || canvas.requestFullscreen?.());
+          } else {
+            await document.exitFullscreen?.();
+          }
+        } catch (err) {
+          console.warn("Fullscreen failed:", err);
+        }
+      };
+
+      btn.addEventListener("click", request);
+      document.addEventListener("fullscreenchange", () => {
+        btn.textContent = document.fullscreenElement ? "Exit" : "Fullscreen";
+      });
+    }
+
     var Module = {
       canvas: document.getElementById("canvas"),
 
@@ -110,34 +415,53 @@
       },
 
       onRuntimeInitialized() {
-        console.log("WASM runtime initialized");
-
-        // Ensure keys go to the canvas and browser doesn't steal them
-        Module.canvas.tabIndex = 0;
-        Module.canvas.focus();
-        window.addEventListener("mousedown", () => Module.canvas.focus());
-        window.addEventListener("keydown", (e) => {
-          const block = ["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Backspace","Space","Enter","J","K"];
-          if (block.includes(e.code)) e.preventDefault();
-        }, { passive: false });
-
+        const canvas = Module.canvas;
         const input = document.getElementById("romInput");
-        const button = document.getElementById("romButton");
+        const romButton = document.getElementById("romButton");
+        const status = document.getElementById("status");
+
+        setupCanvasFocus(canvas);
+        setupFullscreen(canvas);
+        const touch = bindTouchButtons(Module);
+
+        const setLoadedUI = (fileName) => {
+          romButton.classList.add("disabled");
+          romButton.textContent = "ROM Loaded";
+          input.disabled = true;
+          status.textContent = fileName ? fileName : "Running";
+        };
 
         input.addEventListener("change", async (e) => {
           const file = e.target.files[0];
           if (!file) return;
 
-          // I hate this stupid button, it is the bane of my existence
-          button.classList.add("disabled");
-          button.textContent = "ROM Loaded";
-          input.disabled = true;
+          touch.clearAll();
+          setLoadedUI(file.name);
 
-          // Copy rom to Emscripten FS and start emulation loop
           const bytes = new Uint8Array(await file.arrayBuffer());
           FS.writeFile("/rom.bin", bytes);
           Module._emscripten_start();
         });
+
+        window.addEventListener("dragover", (e) => e.preventDefault());
+        window.addEventListener("drop", async (e) => {
+          e.preventDefault();
+          if (!e.dataTransfer?.files?.length || input.disabled) return;
+          const file = e.dataTransfer.files[0];
+          if (!file) return;
+          if (!/\.(gb|gbc)$/i.test(file.name)) return;
+
+          touch.clearAll();
+          setLoadedUI(file.name);
+
+          const bytes = new Uint8Array(await file.arrayBuffer());
+          FS.writeFile("/rom.bin", bytes);
+          Module._emscripten_start();
+        });
+
+        if (isTouchDevice()) {
+          status.textContent = "Tap Load ROM (or drop a file)";
+        }
       }
     };
   </script>
