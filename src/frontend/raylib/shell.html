@@ -143,34 +143,37 @@
       padding: 0 14px calc(14px + var(--touchbar-h));
       min-height: 0;
       display: grid;
-      place-items: center;
+      justify-items: center;
+      align-content: start;
     }
 
     .canvas-card {
-      width: min(92vw, 860px);
-      height: min(calc(100dvh - 120px - var(--touchbar-h)), 92vw);
-      max-height: 900px;
+      width: min(92vw, calc((100dvh - 160px) * (10 / 9)));
       aspect-ratio: 10 / 9;
       border-radius: var(--radius);
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.03));
+      background: linear-gradient(
+        180deg,
+        rgba(255,255,255,0.06),
+        rgba(255,255,255,0.03)
+      );
       border: 1px solid var(--border);
       box-shadow: var(--shadow);
       padding: 12px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      position: relative;
-      min-height: 0;
+      display: grid;
+      place-items: center;
     }
 
     canvas {
       width: 100%;
-      height: 100%;
-      border-radius: calc(var(--radius) - 10px);
-      image-rendering: pixelated;
+      height: auto;
+      aspect-ratio: 160 / 144;
+      display: block;
       background: #000;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      border-radius: calc(var(--radius) - 10px);
+      border: 1px solid rgba(255,255,255,0.10);
       outline: none;
-      border: 1px solid rgba(255, 255, 255, 0.10);
     }
 
     .hint {
@@ -288,6 +291,19 @@
       border-top: 1px solid rgba(255, 255, 255, 0.10);
     }
 
+    canvas:fullscreen {
+      width: min(100vw, calc(100vh * (10 / 9)));
+      height: auto;
+      aspect-ratio: 10 / 9;
+      border: none;
+      border-radius: 0;
+      background: #000;
+    }
+
+    :fullscreen .app {
+      grid-template-rows: 1fr;
+    }
+
     @media (pointer: coarse), (max-width: 900px) {
       .topbar {
         flex-direction: column;
@@ -323,13 +339,12 @@
     </div>
 
     <div class="actions">
-      <input accept=".gb,.gbc,.zip" id="romInput" type="file"/>
+      <input id="romInput" type="file"/>
       <label class="btn primary" for="romInput" id="romButton">Load File</label>
 
       <input autocomplete="off" class="urlbox" id="romUrl" inputmode="url"
              placeholder="https://example.gg/game.gbc or .zip" spellcheck="false" type="url"/>
       <button class="btn" id="romUrlButton" type="button">Load URL</button>
-
       <button class="btn" id="fsButton" type="button">Fullscreen</button>
     </div>
   </header>
@@ -386,14 +401,12 @@
 
   function setupFullscreen(canvas) {
     const btn = document.getElementById("fsButton");
-    const card = document.getElementById("canvasCard");
-
     const request = async () => {
       try {
         if (!document.fullscreenElement) {
-          await (card.requestFullscreen?.() || canvas.requestFullscreen?.());
+          await canvas.requestFullscreen();
         } else {
-          await document.exitFullscreen?.();
+          await document.exitFullscreen();
         }
       } catch (err) {
         console.warn("Fullscreen failed:", err);
