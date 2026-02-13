@@ -20,6 +20,7 @@ public:
   void read_inputs() const;
   void step_frame() const;
   void present();
+  void pump_audio();
 
   // TODO: WASM doesn't like heap allocated floats?????
   void queue_audio_samples(const float *samples,

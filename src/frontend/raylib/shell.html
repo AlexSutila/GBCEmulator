@@ -9,12 +9,13 @@
     :root {
       --bg0: #070a0f;
       --bg1: #0b1020;
+      --card: rgba(255, 255, 255, 0.06);
       --border: rgba(255, 255, 255, 0.10);
       --text: rgba(255, 255, 255, 0.92);
       --muted: rgba(255, 255, 255, 0.68);
       --shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
       --radius: 18px;
-      --touchbar-h: 0px;
+      --touchbar-h: 0px; /* overridden on touch */
     }
 
     * {
@@ -36,7 +37,7 @@
 
     .app {
       height: 100dvh;
-      height: 100vh;
+      height: 100vh; /* fallback */
       display: grid;
       grid-template-rows: auto 1fr;
     }
@@ -93,7 +94,7 @@
       cursor: pointer;
       user-select: none;
       box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25);
-      transition: transform 0.05s ease, background 0.12s ease, border-color 0.12s ease, opacity 0.12s ease;
+      transition: transform 0.05s ease, background 0.12s ease, border-color 0.12s ease;
     }
 
     .btn:active {
@@ -117,26 +118,6 @@
 
     #romInput {
       display: none;
-    }
-
-    #romUrl.urlbox {
-      width: min(44vw, 420px);
-      height: 42px;
-      padding: 0 12px;
-      border-radius: 12px;
-      border: 1px solid var(--border);
-      background: rgba(0, 0, 0, 0.22);
-      color: var(--text);
-      outline: none;
-      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.20);
-    }
-
-    #romUrl.urlbox::placeholder {
-      color: rgba(255, 255, 255, 0.45);
-    }
-
-    #romUrl.urlbox:focus {
-      border-color: rgba(99, 102, 241, 0.55);
     }
 
     .stage {
@@ -191,117 +172,194 @@
       background: rgba(0, 0, 0, 0.22);
     }
 
-    /* Modal */
-    .modal {
+    /* Touch controls (phones/tablets) */
+    #touch-controls {
       position: fixed;
-      inset: 0;
-      display: grid;
-      place-items: center;
-      padding: 18px;
-      background: rgba(0, 0, 0, 0.62);
+      left: 0;
+      right: 0;
+      bottom: 0;
+      padding: 12px 14px calc(12px + env(safe-area-inset-bottom));
+      display: none;
+      gap: 12px;
+      align-items: end;
+      justify-content: space-between;
+      pointer-events: none; /* enable only on children */
+    }
+
+    #touch-controls .cluster {
+      pointer-events: auto;
+      background: rgba(0, 0, 0, 0.18);
+      border: 1px solid rgba(255, 255, 255, 0.10);
+      border-radius: 22px;
+      padding: 10px;
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.40);
       backdrop-filter: blur(10px);
       -webkit-backdrop-filter: blur(10px);
-      z-index: 1000;
     }
 
-    .modal.hidden {
-      display: none;
+    .dpad {
+      display: grid;
+      grid-template-columns: 56px 56px 56px;
+      grid-template-rows: 56px 56px 56px;
+      gap: 8px;
+      align-items: center;
+      justify-items: center;
     }
 
-    .modal-card {
-      width: min(92vw, 560px);
-      border-radius: 18px;
+    .dpad .spacer {
+      width: 56px;
+      height: 56px;
+    }
+
+    .touch-btn {
+      touch-action: none;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
       border: 1px solid rgba(255, 255, 255, 0.14);
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.06));
-      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
-      overflow: hidden;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.05));
+      color: var(--text);
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25);
+      font-weight: 750;
     }
 
-    .modal-head {
-      padding: 14px 14px 10px;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+    .touch-btn:active {
+      transform: translateY(1px);
     }
 
-    .modal-title {
-      font-size: 0.98rem;
-      font-weight: 800;
+    .touch-btn.square {
+      width: 56px;
+      height: 56px;
+      border-radius: 16px;
+      font-size: 1.05rem;
+    }
+
+    .touch-btn.pill {
+      height: 44px;
+      padding: 0 14px;
+      border-radius: 999px;
+      font-size: 0.92rem;
       letter-spacing: 0.2px;
     }
 
-    .modal-sub {
-      font-size: 0.85rem;
-      color: var(--muted);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+    .touch-btn.round {
+      width: 72px;
+      height: 72px;
+      border-radius: 999px;
+      font-size: 1.25rem;
+    }
+
+    .touch-btn.round.b {
+      width: 64px;
+      height: 64px;
+      font-size: 1.1rem;
+      opacity: 0.95;
+    }
+
+    .meta {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .ab {
+      display: flex;
+      gap: 12px;
+      align-items: end;
+      justify-content: center;
+    }
+
+    .dlg {
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 16px;
+      background: rgba(12,16,28,.96);
+      color: rgba(255,255,255,.92);
+      padding: 14px;
+      width: min(92vw, 560px);
+      box-shadow: 0 18px 40px rgba(0,0,0,.55);
+    }
+
+    .dlg::backdrop {
+      background: rgba(0,0,0,.55);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+    }
+
+    .dlg-form { display: grid; gap: 12px; margin: 0; }
+    .dlg-title { font-weight: 800; letter-spacing: .2px; }
+    .dlg-sub { color: var(--muted); font-size: .92rem; }
+
+    .dlg-section { display: grid; gap: 8px; }
+    .dlg-label { font-weight: 700; font-size: .92rem; color: rgba(255,255,255,.88); }
+    .dlg-help { color: var(--muted); font-size: .88rem; line-height: 1.35; }
+    .dlg-help code { padding: 1px 6px; border-radius: 999px; border: 1px solid rgba(255,255,255,.10); background: rgba(0,0,0,.22); }
+
+    .dlg-divider {
+      display: grid;
+      place-items: center;
+      color: rgba(255,255,255,.55);
+      font-size: .85rem;
+      padding: 2px 0;
+    }
+
+    .dlg-file,
+    .dlg-url {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.06);
+      color: rgba(255,255,255,.92);
+      outline: none;
+    }
+
+    .dlg-urlrow { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; }
+
+    .dlg-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      padding: 0;
+      margin: 0;
     }
 
     .rom-list {
-      max-height: min(52vh, 420px);
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.04);
+      border-radius: 14px;
+      padding: 8px;
+      margin: 0;
+      max-height: min(46vh, 360px);
       overflow: auto;
-      padding: 10px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
+      display: grid;
+      gap: 6px;
     }
 
     .rom-item {
-      display: flex;
+      display: grid;
+      grid-template-columns: 18px 1fr auto;
+      gap: 10px;
       align-items: center;
-      justify-content: space-between;
-      gap: 10px;
       padding: 10px 10px;
-      border-radius: 14px;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      background: rgba(0, 0, 0, 0.18);
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,.10);
+      background: rgba(0,0,0,.12);
+      cursor: pointer;
     }
 
-    .rom-left {
-      min-width: 0;
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
+    .rom-item:hover { border-color: rgba(255,255,255,.18); }
 
-    .rom-name {
-      font-size: 0.92rem;
-      font-weight: 750;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      max-width: 44ch;
-    }
-
-    .rom-meta {
-      font-size: 0.82rem;
-      color: var(--muted);
-    }
-
-    .modal-actions {
-      padding: 12px 14px;
-      display: flex;
-      justify-content: flex-end;
-      gap: 10px;
-      border-top: 1px solid rgba(255, 255, 255, 0.10);
-    }
+    .rom-item input[type="radio"] { margin: 0; }
+    .rom-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .rom-size { color: var(--muted); font-size: .88rem; }
 
     @media (pointer: coarse), (max-width: 900px) {
-      .topbar {
-        flex-direction: column;
-        align-items: stretch;
+      :root {
+        --touchbar-h: 190px;
       }
 
-      .actions {
-        width: 100%;
-        justify-content: space-between;
-        flex-wrap: wrap;
-      }
-
-      #romUrl.urlbox {
-        width: 100%;
+      #touch-controls {
+        display: flex;
       }
 
       .hint.desktop-only {
@@ -309,9 +367,6 @@
       }
     }
   </style>
-
-  <!-- ZIP support (global `fflate`) -->
-  <script src="https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.js"></script>
 </head>
 
 <body>
@@ -319,19 +374,13 @@
   <header class="topbar">
     <div class="brand">
       <div class="title" id="title">GBC Emulator</div>
-      <div class="subtitle" id="status">Load a ROM or ZIP to begin</div>
+      <div class="subtitle" id="status">Load a ROM to begin</div>
     </div>
 
-    <div class="actions">
-      <input accept=".gb,.gbc,.zip" id="romInput" type="file"/>
-      <label class="btn primary" for="romInput" id="romButton">Load File</label>
-
-      <input autocomplete="off" class="urlbox" id="romUrl" inputmode="url"
-             placeholder="https://example.gg/game.gbc or .zip" spellcheck="false" type="url"/>
-      <button class="btn" id="romUrlButton" type="button">Load URL</button>
-
-      <button class="btn" id="fsButton" type="button">Fullscreen</button>
-    </div>
+  <div class="actions">
+    <button class="btn primary" id="loadButton" type="button">Load ROM...</button>
+    <button class="btn" id="fsButton" type="button">Fullscreen</button>
+  </div>
   </header>
 
   <main class="stage">
@@ -339,49 +388,150 @@
       <div class="canvas-card" id="canvasCard">
         <canvas id="canvas"></canvas>
       </div>
-      <div class="hint desktop-only">
-        Keyboard: <code>Arrows</code>=D-pad <code>Z</code>=A <code>X</code>=B <code>Enter</code>=Start <code>Backspace</code>=Select
+      <div class="hint desktop-only" id="hint">
+        Keyboard: <code>Arrows</code> <code>Z</code>=A <code>X</code>=B <code>Enter</code>=Start <code>Backspace</code>=Select
       </div>
     </div>
   </main>
-</div>
 
-<!-- ROM picker modal -->
-<div aria-labelledby="romPickerTitle" aria-modal="true" class="modal hidden" id="romPicker" role="dialog">
-  <div class="modal-card">
-    <div class="modal-head">
-      <div class="modal-title" id="romPickerTitle">Multiple ROMs found</div>
-      <div class="modal-sub" id="romPickerSub">Choose a ROM to load</div>
+  <div aria-label="On-screen controller" id="touch-controls">
+    <div class="cluster">
+      <div aria-label="D-pad" class="dpad">
+        <div class="spacer"></div>
+        <button aria-label="Up" class="touch-btn square" data-btn="2">▲</button>
+        <div class="spacer"></div>
+
+        <button aria-label="Left" class="touch-btn square" data-btn="1">◀</button>
+        <div class="spacer"></div>
+        <button aria-label="Right" class="touch-btn square" data-btn="0">▶</button>
+
+        <div class="spacer"></div>
+        <button aria-label="Down" class="touch-btn square" data-btn="3">▼</button>
+        <div class="spacer"></div>
+      </div>
     </div>
-    <div class="rom-list" id="romList"></div>
-    <div class="modal-actions">
-      <button class="btn" id="romCancel" type="button">Cancel</button>
+
+    <div class="cluster">
+      <div aria-label="Start/Select" class="meta">
+        <button aria-label="Select" class="touch-btn pill" data-btn="6">Select</button>
+        <button aria-label="Start" class="touch-btn pill" data-btn="7">Start</button>
+      </div>
+    </div>
+
+    <div class="cluster">
+      <div aria-label="A/B" class="ab">
+        <button aria-label="B" class="touch-btn round b" data-btn="5">B</button>
+        <button aria-label="A" class="touch-btn round" data-btn="4">A</button>
+      </div>
     </div>
   </div>
 </div>
 
+<dialog id="loadDialog" class="dlg">
+  <form method="dialog" class="dlg-form" id="loadDialogForm">
+    <div class="dlg-title">Load ROM</div>
+
+    <div class="dlg-section">
+      <div class="dlg-label">Local file</div>
+      <input id="loadFileInput" type="file" accept=".gb,.gbc,.zip" class="dlg-file"/>
+      <div class="dlg-help">Accepts <code>.gb</code>, <code>.gbc</code>, or <code>.zip</code></div>
+    </div>
+
+    <div class="dlg-divider">or</div>
+
+    <div class="dlg-section">
+      <div class="dlg-label">URL</div>
+      <div class="dlg-urlrow">
+        <input id="loadUrlInput" type="url" inputmode="url" placeholder="https://example.com/game.zip"
+               autocomplete="off" spellcheck="false" class="dlg-url"/>
+        <button id="loadUrlGo" class="btn primary" type="button">Load</button>
+      </div>
+      <div class="dlg-help">Remote hosting must allow CORS.</div>
+    </div>
+
+    <menu class="dlg-actions">
+      <button class="btn" value="cancel">Close</button>
+    </menu>
+  </form>
+</dialog>
+
+<dialog id="romPicker" class="dlg">
+  <form method="dialog" class="dlg-form" id="romPickerForm">
+    <div class="dlg-title">Choose a ROM</div>
+    <div class="dlg-sub" id="romPickerCount"></div>
+
+    <fieldset class="rom-list" id="romList" aria-label="ROM list">
+      <!-- radios injected here -->
+    </fieldset>
+
+    <menu class="dlg-actions">
+      <button class="btn" value="cancel">Cancel</button>
+      <button class="btn primary" value="ok" id="romPickerOk">Load</button>
+    </menu>
+  </form>
+</dialog>
+
 <script>
+  function isTouchDevice() {
+    return window.matchMedia("(pointer: coarse)").matches || window.matchMedia("(max-width: 900px)").matches;
+  }
+
   function setupCanvasFocus(canvas) {
     canvas.tabIndex = 0;
     canvas.focus();
-    const isTypingTarget = (t) => {
-      if (!t) return false;
-      const tag = (t.tagName || "").toLowerCase();
-      return tag === "input" || tag === "textarea" || t.isContentEditable === true;
-    };
 
     window.addEventListener(
       "keydown",
       (e) => {
-        // If the user is typing in the URL box (or any input), do NOT block keys
-        if (isTypingTarget(e.target) || isTypingTarget(document.activeElement)) return;
-        const block = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space", "Enter", "Backspace", "J", "K"]);
+        const block = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space", "Enter", "Backspace"]);
         if (block.has(e.code)) e.preventDefault();
       },
-      {passive: false}
+      { passive: false }
     );
 
     window.addEventListener("pointerdown", () => canvas.focus());
+  }
+
+  function bindTouchButtons(Module) {
+    const callSetBtn = (btn, pressed) => {
+      if (typeof Module._emscripten_set_button === "function") {
+        Module._emscripten_set_button(btn, pressed ? 1 : 0);
+      }
+    };
+
+    const clearAll = () => {
+      if (typeof Module._emscripten_clear_buttons === "function") {
+        Module._emscripten_clear_buttons();
+      }
+    };
+
+    const buttons = document.querySelectorAll("[data-btn]");
+    for (const el of buttons) {
+      const btn = Number(el.dataset.btn);
+
+      const down = (e) => {
+        e.preventDefault();
+        el.setPointerCapture?.(e.pointerId);
+        callSetBtn(btn, true);
+      };
+
+      const up = (e) => {
+        e.preventDefault();
+        callSetBtn(btn, false);
+      };
+
+      el.addEventListener("pointerdown", down, { passive: false });
+      el.addEventListener("pointerup", up, { passive: false });
+      el.addEventListener("pointercancel", up, { passive: false });
+      el.addEventListener("contextmenu", (e) => e.preventDefault());
+    }
+
+    window.addEventListener("blur", clearAll);
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) clearAll();
+    });
+
+    return { clearAll };
   }
 
   function setupFullscreen(canvas) {
@@ -406,132 +556,149 @@
     });
   }
 
-  function formatBytes(n) {
+  // ---- Added helpers: remote fetch + zip unzip + ROM picking ----
+
+  const ROM_RE = /\.(gb|gbc)$/i;
+  const ZIP_RE = /\.zip$/i;
+
+  function basename(path) {
+    const s = String(path).replace(/\\/g, "/");
+    const parts = s.split("/");
+    return parts[parts.length - 1] || s;
+  }
+
+  function prettyBytes(n) {
+    if (!Number.isFinite(n)) return "";
     const units = ["B", "KB", "MB", "GB"];
-    let i = 0;
-    let x = n;
-    while (x >= 1024 && i < units.length - 1) {
-      x /= 1024;
-      i++;
+    let i = 0, v = n;
+    while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
+    return `${v.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+  }
+
+  function guessNameFromUrl(u) {
+    try {
+      const url = new URL(u, window.location.href);
+      const name = decodeURIComponent(url.pathname.split("/").pop() || "");
+      return name || "remote";
+    } catch {
+      return "remote";
     }
-    const v = (i === 0) ? String(Math.round(x)) : x.toFixed(x >= 10 ? 1 : 2);
-    return `${v} ${units[i]}`;
   }
 
-  function isZipBytes(bytes) {
-    // ZIP signatures:
-    // local file header: 50 4B 03 04
-    // empty archive:     50 4B 05 06
-    // spanned:           50 4B 07 08
-    return bytes && bytes.length >= 4 &&
-      bytes[0] === 0x50 && bytes[1] === 0x4B &&
-      (bytes[2] === 0x03 || bytes[2] === 0x05 || bytes[2] === 0x07) &&
-      (bytes[3] === 0x04 || bytes[3] === 0x06 || bytes[3] === 0x08);
+  async function ensureFflateLoaded() {
+    if (window.fflate?.unzip) return;
+
+    await new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = "https://unpkg.com/fflate/umd/index.js";
+      s.async = true;
+      s.onload = resolve;
+      s.onerror = () => reject(new Error("Failed to load unzip library (fflate)."));
+      document.head.appendChild(s);
+    });
+
+    if (!window.fflate?.unzip) {
+      throw new Error("Unzip library loaded, but API missing.");
+    }
   }
 
-  async function unzipEntries(zipBytes) {
-    if (!window.fflate) throw new Error("Zip library failed to load.");
-    return await new Promise((resolve, reject) => {
-      // fflate expects Uint8Array
-      window.fflate.unzip(zipBytes, (err, data) => {
+  function pickRomFromMany(entries) {
+    const dlg = document.getElementById("romPicker");
+    const supportsDialog = !!dlg?.showModal;
+
+    // Default to largest file
+    let defaultIdx = 0;
+    for (let i = 1; i < entries.length; i++) {
+      if (entries[i].size > entries[defaultIdx].size) defaultIdx = i;
+    }
+
+    if (!supportsDialog) {
+      const list = entries.map((e, i) => `${i}: ${e.name} (${prettyBytes(e.size)})`).join("\n");
+      const ans = window.prompt(`Multiple ROMs found.\n\n${list}\n\nEnter the number to load:`, String(defaultIdx));
+      if (ans == null) throw new Error("Cancelled.");
+      const idx = Number(ans);
+      if (!Number.isInteger(idx) || idx < 0 || idx >= entries.length) throw new Error("Invalid selection.");
+      return Promise.resolve(entries[idx]);
+    }
+
+    const listEl = document.getElementById("romList");
+    const countEl = document.getElementById("romPickerCount");
+
+    countEl.textContent = `${entries.length} ROMs found`;
+    listEl.innerHTML = "";
+
+    entries.forEach((e, i) => {
+      const id = `romradio_${i}`;
+      const label = document.createElement("label");
+      label.className = "rom-item";
+      label.htmlFor = id;
+
+      const radio = document.createElement("input");
+      radio.type = "radio";
+      radio.name = "rompick";
+      radio.value = String(i);
+      radio.id = id;
+      radio.checked = (i === defaultIdx);
+
+      const name = document.createElement("div");
+      name.className = "rom-name";
+      name.textContent = e.name;
+
+      const size = document.createElement("div");
+      size.className = "rom-size";
+      size.textContent = prettyBytes(e.size);
+
+      label.appendChild(radio);
+      label.appendChild(name);
+      label.appendChild(size);
+
+      // double-click / double-tap loads immediately
+      label.addEventListener("dblclick", () => {
+        dlg.returnValue = "ok";
+        dlg.close();
+      });
+
+      listEl.appendChild(label);
+    });
+
+    dlg.showModal();
+
+    return new Promise((resolve, reject) => {
+      dlg.addEventListener("close", () => {
+        if (dlg.returnValue === "cancel") return reject(new Error("Cancelled."));
+        const chosen = dlg.querySelector('input[name="rompick"]:checked');
+        const idx = Number(chosen?.value ?? defaultIdx);
+        resolve(entries[idx]);
+      }, { once: true });
+    });
+  }
+
+  async function unzipAndSelectRom(zipBytes) {
+    await ensureFflateLoaded();
+
+    const files = await new Promise((resolve, reject) => {
+      window.fflate.unzip(zipBytes, (err, out) => {
         if (err) reject(err);
-        else resolve(data); // { filename: Uint8Array }
+        else resolve(out);
       });
     });
-  }
 
-  function findRomCandidates(entriesObj) {
-    const out = [];
-    for (const [name, data] of Object.entries(entriesObj)) {
-      const lower = name.toLowerCase();
-      const isDir = lower.endsWith("/");
-      if (isDir) continue;
-      if (lower.endsWith(".gb") || lower.endsWith(".gbc")) {
-        out.push({name, data});
-      }
-    }
-    // Stable-ish ordering: prefer .gbc, then larger files, then name
-    out.sort((a, b) => {
-      const agbc = a.name.toLowerCase().endsWith(".gbc") ? 1 : 0;
-      const bgbc = b.name.toLowerCase().endsWith(".gbc") ? 1 : 0;
-      if (agbc !== bgbc) return bgbc - agbc;
-      if (a.data.length !== b.data.length) return b.data.length - a.data.length;
-      return a.name.localeCompare(b.name);
-    });
-    return out;
-  }
-
-  function showRomPicker(candidates, subtext) {
-    const modal = document.getElementById("romPicker");
-    const list = document.getElementById("romList");
-    const sub = document.getElementById("romPickerSub");
-    const cancel = document.getElementById("romCancel");
-
-    sub.textContent = subtext || "Choose a ROM to load";
-    list.innerHTML = "";
-
-    let resolveFn, rejectFn;
-    const p = new Promise((resolve, reject) => {
-      resolveFn = resolve;
-      rejectFn = reject;
-    });
-
-    const close = () => {
-      modal.classList.add("hidden");
-      list.innerHTML = "";
-      window.removeEventListener("keydown", onKey);
-    };
-
-    const onKey = (e) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        close();
-        rejectFn(new Error("Canceled"));
-      }
-    };
-
-    window.addEventListener("keydown", onKey);
-
-    for (const c of candidates) {
-      const row = document.createElement("div");
-      row.className = "rom-item";
-
-      const left = document.createElement("div");
-      left.className = "rom-left";
-
-      const nm = document.createElement("div");
-      nm.className = "rom-name";
-      nm.textContent = c.name;
-
-      const meta = document.createElement("div");
-      meta.className = "rom-meta";
-      meta.textContent = `${formatBytes(c.data.length)}`;
-
-      left.appendChild(nm);
-      left.appendChild(meta);
-
-      const btn = document.createElement("button");
-      btn.className = "btn primary";
-      btn.type = "button";
-      btn.textContent = "Load";
-      btn.addEventListener("click", () => {
-        close();
-        resolveFn(c);
-      });
-
-      row.appendChild(left);
-      row.appendChild(btn);
-      list.appendChild(row);
+    const roms = [];
+    for (const [path, bytes] of Object.entries(files)) {
+      if (!bytes || !bytes.length) continue;
+      if (path.endsWith("/")) continue;
+      if (!ROM_RE.test(path)) continue;
+      roms.push({ name: basename(path), bytes, size: bytes.length });
     }
 
-    cancel.onclick = () => {
-      close();
-      rejectFn(new Error("Canceled"));
-    };
-
-    modal.classList.remove("hidden");
-    return p;
+    if (roms.length === 0) {
+      throw new Error("No .gb/.gbc files found in the ZIP.");
+    }
+    if (roms.length === 1) return roms[0];
+    return await pickRomFromMany(roms);
   }
+
+  // ---- Emscripten module ----
 
   var Module = {
     canvas: document.getElementById("canvas"),
@@ -542,169 +709,179 @@
 
     onRuntimeInitialized() {
       const canvas = Module.canvas;
-      const romInput = document.getElementById("romInput");
-      const romButton = document.getElementById("romButton");
-      const romUrl = document.getElementById("romUrl");
-      const romUrlButton = document.getElementById("romUrlButton");
+      const loadButton = document.getElementById("loadButton");
+      const loadDlg = document.getElementById("loadDialog");
+      const loadFileInput = document.getElementById("loadFileInput");
+      const loadUrlInput = document.getElementById("loadUrlInput");
+      const loadUrlGo = document.getElementById("loadUrlGo");
       const status = document.getElementById("status");
 
       setupCanvasFocus(canvas);
       setupFullscreen(canvas);
+      const touch = bindTouchButtons(Module);
 
-      const setBusy = (busy, msg) => {
-        if (msg) status.textContent = msg;
-        romButton.classList.toggle("disabled", busy);
-        romUrlButton.classList.toggle("disabled", busy);
-        romInput.disabled = busy;
-        romUrl.disabled = busy;
+      const setTempDisabled = (disabled) => {
+        loadButton.disabled = disabled;
+        loadButton.classList.toggle("disabled", disabled);
+        loadFileInput.disabled = disabled;
+        loadUrlInput.disabled = disabled;
+        loadUrlGo.disabled = disabled;
       };
 
-      const setLoadedUI = (label) => {
-        romButton.classList.add("disabled");
-        romButton.textContent = "ROM Loaded";
-        romUrlButton.classList.add("disabled");
-        romInput.disabled = true;
-        romUrl.disabled = true;
-        status.textContent = label ? label : "Running";
+      const setLoadedUI = (fileName) => {
+        setTempDisabled(true);
+        loadButton.textContent = "Loaded";
+        status.textContent = fileName ? fileName : "Running";
       };
 
-      const normalizeUrl = (s) => {
-        const trimmed = (s || "").trim();
-        if (!trimmed) return null;
-        const u = new URL(trimmed, window.location.href);
-        if (u.protocol !== "http:" && u.protocol !== "https:") {
-          throw new Error("Only http/https URLs are supported.");
-        }
-        return u.toString();
-      };
-
-      const isEmscriptenUnwind = (e) => {
-        const msg = (typeof e === "string") ? e : (e && e.message) ? e.message : "";
-        return msg === "unwind" || msg.toLowerCase().includes("unwind");
-      };
-
-      const writeAndStart = (bytes, label) => {
+      const loadRomBytes = async (bytes, nameForUi) => {
+        touch.clearAll();
+        setLoadedUI(nameForUi);
         FS.writeFile("/rom.bin", bytes);
-        setLoadedUI(label);
-        try {
-          Module._emscripten_start();
-        } catch (e) {
-          // Emscripten can throw "unwind" when it hands control to the main loop.
-          if (isEmscriptenUnwind(e)) return;
-          throw e;
-        }
+        Module._emscripten_start();
       };
 
-      const processRomOrZip = async (bytes, sourceLabel) => {
-        // Zip path
-        if (isZipBytes(bytes)) {
-          setBusy(true, "Unzipping…");
-          const entries = await unzipEntries(bytes);
-          const candidates = findRomCandidates(entries);
+      const handleBlobOrFile = async (blob, displayName) => {
+        const name = displayName || blob?.name || "file";
+        const bytes = new Uint8Array(await blob.arrayBuffer());
 
-          if (candidates.length === 0) {
-            setBusy(false, "ZIP contained no .gb/.gbc ROMs");
-            return;
-          }
-
-          if (candidates.length === 1) {
-            const c = candidates[0];
-            writeAndStart(c.data, `${sourceLabel} — ${c.name}`);
-            return;
-          }
-
-          // Multiple: show modal picker
-          setBusy(false, "Choose a ROM from the ZIP");
-          try {
-            const chosen = await showRomPicker(
-              candidates,
-              sourceLabel ? `From: ${sourceLabel}` : "Choose a ROM to load"
-            );
-            setBusy(true, "Loading ROM…");
-            writeAndStart(chosen.data, `${sourceLabel} — ${chosen.name}`);
-          } catch (e) {
-            // canceled
-            setBusy(false, "Canceled");
-          }
+        if (ZIP_RE.test(name)) {
+          status.textContent = "Unzipping…";
+          const picked = await unzipAndSelectRom(bytes);
+          await loadRomBytes(picked.bytes, picked.name);
           return;
         }
 
-        // Plain ROM path
-        writeAndStart(bytes, sourceLabel);
-      };
-
-      const loadFromLocalFile = async (file) => {
-        if (!file) return;
-        setBusy(true, "Reading file…");
-        try {
-          const bytes = new Uint8Array(await file.arrayBuffer());
-          const label = file.name || "Local file";
-          await processRomOrZip(bytes, label);
-        } catch (err) {
-          console.error(err);
-          setBusy(false, `Failed to read file: ${String(err.message || err)}`);
+        if (ROM_RE.test(name)) {
+          await loadRomBytes(bytes, name);
+          return;
         }
+
+        throw new Error("Unsupported file type. Use .gb, .gbc, or .zip");
       };
 
-      const loadFromUrl = async (urlStr) => {
-        const url = normalizeUrl(urlStr);
+      const fetchRemote = async (url) => {
+        const name = guessNameFromUrl(url);
+        status.textContent = "Downloading…";
+
+        // NOTE: Remote hosting must allow CORS for this to work.
+        const resp = await fetch(url, { mode: "cors" });
+        if (!resp.ok) throw new Error(`Download failed: HTTP ${resp.status}`);
+
+        const ab = await resp.arrayBuffer();
+        const bytes = new Uint8Array(ab);
+
+        // Zip detection: by extension OR content-type
+        const ct = resp.headers.get("content-type") || "";
+        const looksZip = ZIP_RE.test(name) || ct.includes("zip");
+
+        if (looksZip) {
+          status.textContent = "Unzipping…";
+          const picked = await unzipAndSelectRom(bytes);
+          await loadRomBytes(picked.bytes, picked.name);
+          return;
+        }
+
+        if (ROM_RE.test(name)) {
+          await loadRomBytes(bytes, name);
+          return;
+        }
+
+        throw new Error("Remote file must be .gb/.gbc or .zip");
+      };
+
+      loadButton.addEventListener("click", () => {
+        if (loadButton.disabled) return;
+        // reset fields each open
+        loadFileInput.value = "";
+        loadUrlInput.value = "";
+        loadDlg.showModal?.();
+        // focus URL field for paste convenience
+        setTimeout(() => loadUrlInput.focus(), 0);
+      });
+
+      // Load local file immediately when selected
+      loadFileInput.addEventListener("change", async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        try {
+          setTempDisabled(true);
+          status.textContent = "Loading…";
+          await handleBlobOrFile(file, file.name);
+          loadDlg.close?.();
+        } catch (err) {
+          console.warn(err);
+          status.textContent = (err && err.message) ? err.message : "Failed to load file";
+          setTempDisabled(false);
+        }
+      });
+
+      // Load URL when pressing the dialog Load button
+      loadUrlGo.addEventListener("click", async () => {
+        const url = (loadUrlInput.value || "").trim();
         if (!url) return;
 
-        setBusy(true, "Fetching…");
         try {
-          const res = await fetch(url, {mode: "cors"});
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const buf = await res.arrayBuffer();
-          const bytes = new Uint8Array(buf);
-
-          // If it looks like a zip, unzip. Otherwise treat as ROM.
-          await processRomOrZip(bytes, url);
+          setTempDisabled(true);
+          await fetchRemote(url);
+          loadDlg.close?.();
         } catch (err) {
-          console.error(err);
-          setBusy(false, `Failed to load URL: ${String(err.message || err)}`);
+          console.warn(err);
+          status.textContent = (err && err.message) ? err.message : "Failed to load URL";
+          setTempDisabled(false);
         }
-      };
-
-      // Local picker (.gb/.gbc/.zip)
-      romInput.addEventListener("change", async (e) => {
-        const file = e.target.files?.[0];
-        await loadFromLocalFile(file);
       });
 
-      // URL textbox (.gb/.gbc/.zip)
-      romUrlButton.addEventListener("click", async () => {
-        await loadFromUrl(romUrl.value);
-      });
-
-      romUrl.addEventListener("keydown", async (e) => {
+      // Enter key in URL box triggers Load
+      loadUrlInput.addEventListener("keydown", (e) => {
         if (e.key === "Enter") {
           e.preventDefault();
-          await loadFromUrl(romUrl.value);
+          loadUrlGo.click();
         }
       });
 
-      // Drag & drop
+      // Drag/drop: accept .gb/.gbc/.zip
       window.addEventListener("dragover", (e) => e.preventDefault());
       window.addEventListener("drop", async (e) => {
         e.preventDefault();
-        if (!e.dataTransfer?.files?.length || romInput.disabled) return;
+        if (!e.dataTransfer?.files?.length || loadButton.disabled) return;
+
         const file = e.dataTransfer.files[0];
-        await loadFromLocalFile(file);
+        if (!file) return;
+
+        if (!ROM_RE.test(file.name) && !ZIP_RE.test(file.name)) return;
+
+        try {
+          setTempDisabled(true);
+          await handleBlobOrFile(file, file.name);
+        } catch (err) {
+          console.warn(err);
+          status.textContent = (err && err.message) ? err.message : "Failed to load file";
+          setTempDisabled(false);
+        }
       });
 
-      // URL parameter auto-load:
-      //   ?rom=https://example.com/game.gbc
-      //   ?rom=https://example.com/archive.zip
-      const params = new URLSearchParams(window.location.search);
-      const qp = params.get("rom") || params.get("romUrl");
-      if (qp) {
-        try {
-          const normalized = normalizeUrl(qp);
-          romUrl.value = normalized;
-          loadFromUrl(normalized);
-        } catch (err) {
-          status.textContent = `Bad rom URL: ${String(err.message || err)}`;
+      // Optional: auto-load via ?rom=URL
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const auto = params.get("rom");
+        if (auto) {
+          (async () => {
+            try {
+              setTempDisabled(true);
+              await fetchRemote(auto);
+            } catch (err) {
+              console.warn(err);
+              status.textContent = (err && err.message) ? err.message : "Failed to auto-load URL";
+              setTempDisabled(false);
+            }
+          })();
         }
+      } catch {}
+
+      if (isTouchDevice()) {
+        status.textContent = "Tap Load File / Load URL (or drop a file)";
       }
     }
   };
