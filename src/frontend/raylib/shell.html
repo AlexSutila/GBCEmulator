@@ -353,6 +353,40 @@
     .rom-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .rom-size { color: var(--muted); font-size: .88rem; }
 
+    .recent-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .recent-chip {
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.06);
+      color: rgba(255,255,255,.88);
+      border-radius: 999px;
+      padding: 8px 10px;
+      font-size: .86rem;
+      cursor: pointer;
+      max-width: 100%;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .recent-chip:hover { border-color: rgba(255,255,255,.20); }
+
+    .recent-chip .txt {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 44ch;
+    }
+
+    .recent-chip .hint {
+      color: rgba(255,255,255,.55);
+      font-size: .82rem;
+    }
+
     @media (pointer: coarse), (max-width: 900px) {
       :root {
         --touchbar-h: 190px;
@@ -447,6 +481,14 @@
         <button id="loadUrlGo" class="btn primary" type="button">Load</button>
       </div>
       <div class="dlg-help">Remote hosting must allow CORS.</div>
+    </div>
+
+    <div class="dlg-section" id="recentWrap" style="display:none;">
+      <div class="dlg-label" style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+        <span>Recent</span>
+        <button id="recentClear" class="btn" type="button" style="padding:8px 10px; border-radius:10px; font-size:.86rem;">Clear</button>
+      </div>
+      <div class="recent-list" id="recentList" aria-label="Recent URLs"></div>
     </div>
 
     <menu class="dlg-actions">
@@ -712,6 +754,74 @@
     } catch {}
   }
 
+  const RECENT_KEY = "gbc_recent_rom_urls_v1";
+  const RECENT_MAX = 8;
+
+  function loadRecentUrls() {
+    try {
+      const arr = JSON.parse(localStorage.getItem(RECENT_KEY) || "[]");
+      return Array.isArray(arr) ? arr.filter((s) => typeof s === "string") : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function saveRecentUrls(urls) {
+    try {
+      localStorage.setItem(RECENT_KEY, JSON.stringify(urls.slice(0, RECENT_MAX)));
+    } catch {}
+  }
+
+  function addRecentUrl(url) {
+    const u = String(url || "").trim();
+    if (!u) return;
+    const urls = loadRecentUrls();
+    const next = [u, ...urls.filter((x) => x !== u)];
+    saveRecentUrls(next);
+  }
+
+  function renderRecentUrls({ onPick }) {
+    const wrap = document.getElementById("recentWrap");
+    const list = document.getElementById("recentList");
+    if (!wrap || !list) return;
+
+    const urls = loadRecentUrls();
+    if (!urls.length) {
+      wrap.style.display = "none";
+      list.innerHTML = "";
+      return;
+    }
+
+    wrap.style.display = "grid";
+    list.innerHTML = "";
+
+    for (const u of urls) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "recent-chip";
+
+      const txt = document.createElement("span");
+      txt.className = "txt";
+      txt.textContent = u;
+
+      btn.appendChild(txt);
+
+      btn.addEventListener("click", () => onPick?.(u));
+      btn.addEventListener("dblclick", () => onPick?.(u, { load: true }));
+
+      list.appendChild(btn);
+    }
+  }
+
+  function looksLikeHttpUrl(s) {
+    try {
+      const u = new URL(s);
+      return u.protocol === "http:" || u.protocol === "https:";
+    } catch {
+      return false;
+    }
+  }
+
   // ---- Emscripten module ----
 
   var Module = {
@@ -728,6 +838,7 @@
       const loadFileInput = document.getElementById("loadFileInput");
       const loadUrlInput = document.getElementById("loadUrlInput");
       const loadUrlGo = document.getElementById("loadUrlGo");
+      const recentClear = document.getElementById("recentClear");
       const status = document.getElementById("status");
 
       setupCanvasFocus(canvas);
@@ -805,11 +916,13 @@
         if (looksZip) {
           status.textContent = "Unzipping…";
           const picked = await unzipAndSelectRom(bytes);
+          addRecentUrl(url);
           await loadRomBytes(picked.bytes, picked.name);
           return;
         }
 
         if (ROM_RE.test(name)) {
+          addRecentUrl(url);
           await loadRomBytes(bytes, name);
           return;
         }
@@ -819,12 +932,24 @@
 
       loadButton.addEventListener("click", () => {
         if (loadButton.disabled) return;
-        // reset fields each open
         loadFileInput.value = "";
         loadUrlInput.value = "";
+
+        renderRecentUrls({
+          onPick: (u, opts) => {
+            loadUrlInput.value = u;
+            loadUrlInput.focus();
+            if (opts?.load) loadUrlGo.click();
+          }
+        });
+
         loadDlg.showModal?.();
-        // focus URL field for paste convenience
         setTimeout(() => loadUrlInput.focus(), 0);
+      });
+
+      recentClear?.addEventListener("click", () => {
+        saveRecentUrls([]);
+        renderRecentUrls({ onPick: (u) => { loadUrlInput.value = u; loadUrlInput.focus(); } });
       });
 
       // Load local file immediately when selected
