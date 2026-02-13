@@ -698,6 +698,20 @@
     return await pickRomFromMany(roms);
   }
 
+  function isEmscriptenUnwind(e) {
+    // Emscripten can throw either a string or an Error-ish object
+    if (e === "unwind") return true;
+    const msg = (e && (e.message || e.toString?.())) ? String(e.message || e.toString()) : String(e);
+    return msg.toLowerCase().includes("unwind");
+  }
+
+  function closeDialogSafe(id) {
+    const dlg = document.getElementById(id);
+    try {
+      if (dlg?.open) dlg.close();
+    } catch {}
+  }
+
   // ---- Emscripten module ----
 
   var Module = {
@@ -738,9 +752,22 @@
         touch.clearAll();
         setLoadedUI(nameForUi);
         FS.writeFile("/rom.bin", bytes);
-        Module._emscripten_start();
-      };
 
+        // Close any UI dialogs BEFORE entering wasm (prevents "unwind" from skipping close)
+        closeDialogSafe("romPicker");
+        closeDialogSafe("loadDialog");
+
+        // Start on next tick so the close renders first
+        setTimeout(() => {
+          try {
+            Module._emscripten_start();
+          } catch (e) {
+            // Ignore Emscripten's internal unwind signal
+            if (isEmscriptenUnwind(e)) return;
+            throw e;
+          }
+        }, 0);
+      };
       const handleBlobOrFile = async (blob, displayName) => {
         const name = displayName || blob?.name || "file";
         const bytes = new Uint8Array(await blob.arrayBuffer());
@@ -809,7 +836,6 @@
           setTempDisabled(true);
           status.textContent = "Loading…";
           await handleBlobOrFile(file, file.name);
-          loadDlg.close?.();
         } catch (err) {
           console.warn(err);
           status.textContent = (err && err.message) ? err.message : "Failed to load file";
@@ -825,7 +851,6 @@
         try {
           setTempDisabled(true);
           await fetchRemote(url);
-          loadDlg.close?.();
         } catch (err) {
           console.warn(err);
           status.textContent = (err && err.message) ? err.message : "Failed to load URL";
