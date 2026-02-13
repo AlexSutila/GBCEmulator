@@ -10,8 +10,11 @@
 
 namespace Debug {
 
-[[nodiscard]] std::string hex8(byte_t v);
+[[nodiscard]] std::string hex8(byte_t v, bool compact);
 [[nodiscard]] std::string hex16(addr_t v);
+
+/* A nice utility for displaying address bus contents in an easy manner */
+[[nodiscard]] std::string create_hex_view(const std::vector<byte_t> &vec);
 
 [[nodiscard]] std::string to_string(const LR35902::ProcessorState &s);
 [[nodiscard]] std::string to_string(const InterruptBits &i);

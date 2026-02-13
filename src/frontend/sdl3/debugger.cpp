@@ -11,6 +11,9 @@
 #include <mutex>
 #include <stdexcept>
 
+constexpr auto hex_vieiwer_bytes_shown = 0x10 * 0x10; // Don't mess with this
+static_assert(hex_vieiwer_bytes_shown % 0x10 == 0, "Should be a factor of 16");
+
 constexpr auto tile_data_height_tiles = 24;
 constexpr auto tile_data_width_tiles = 16;
 constexpr auto tile_data_height_px = tile_data_height_tiles * 8;
@@ -31,6 +34,9 @@ void DebuggerImGui::init(SDLHost &host) {
     buf.resize(tile_data_height_px * tile_data_width_px);
     std::fill(buf.begin(), buf.end(), black);
   }
+
+  // Allocate heap space for the hex view memory reader
+  ctx.bus_content.resize(hex_vieiwer_bytes_shown);
 }
 
 // This is a public entry point called from the main GUI render loop
@@ -72,6 +78,7 @@ void DebuggerImGui::update_state_from_core(
   // Address bus relevant information
   ctx.oam_dma_state = Debug::to_string(address_bus->get_oam_dma().get_state());
   ctx.vdma_state = Debug::to_string(address_bus->get_vdma().get_state());
+  read_bus_data(core, 0x0000); // TODO: configurable base address
 
   // Interrupt enable bits and flags
   const InterruptBits *const ie_reg = dynamic_cast<InterruptBits *>(
@@ -179,6 +186,7 @@ void DebuggerImGui::build_memory_viewer_window(UiState &state) {
   ImGui::Text("%s", ctx.vdma_state.c_str());
 
   ImGui::SeparatorText("Main Address Bus View");
+  ImGui::Text("%s", Debug::create_hex_view(ctx.bus_content).c_str());
   ImGui::End();
 }
 
@@ -321,5 +329,14 @@ void DebuggerImGui::read_vram_tile_data(
         buf[y * tile_data_width_px + x] = get_mono_color(color_idx);
       }
     }
+  }
+}
+
+void DebuggerImGui::read_bus_data(const std::unique_ptr<GameBoyColor> &core,
+                                  const addr_t start_addr) {
+  auto bus = core->get_bus(); // Be sure not to mess with memory mapped regs
+  for (std::size_t offset{0}; offset < hex_vieiwer_bytes_shown; ++offset) {
+    const addr_t cur_addr_full = (start_addr + offset) & 0xFFFF;
+    ctx.bus_content.at(offset) = bus->read_byte_safe(cur_addr_full);
   }
 }

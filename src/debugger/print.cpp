@@ -1,13 +1,16 @@
 #include "debugger/print.hpp"
 #include "cpu/interrupts.hpp"
 #include "cpu/lr35902.hpp"
+#include <cctype>
 #include <sstream>
 
 namespace Debug {
 
-[[nodiscard]] std::string hex8(const byte_t v) {
+[[nodiscard]] std::string hex8(const byte_t v, bool compact = false) {
   std::ostringstream o;
-  o << "0x" << std::hex << std::uppercase // ...
+  if (!compact) // I hate this, but what can you do lol
+    o << "0x";
+  o << std::hex << std::uppercase // ...
     << std::setw(2) << std::setfill('0') << +v;
   return o.str();
 }
@@ -17,6 +20,29 @@ namespace Debug {
   o << "0x" << std::hex << std::uppercase // ...
     << std::setw(4) << std::setfill('0') << +v;
   return o.str();
+}
+
+std::string create_hex_view(const std::vector<byte_t> &vec) {
+  constexpr std::size_t bytes_per_row = 0x10;
+  std::ostringstream out;
+
+  for (std::size_t i{0}; i < vec.size(); i += bytes_per_row) {
+    out << hex16(static_cast<addr_t>(i)) << ": ";
+    for (std::size_t j{0}; j < bytes_per_row; ++j) {
+      if (i + j < vec.size())
+        out << hex8(vec.at(i + j), true) << " ";
+      else // Need the spaces to pad out for the ASCII view
+        out << "     ";
+    }
+
+    out << "|";
+    for (std::size_t j{0}; j < bytes_per_row && i + j < vec.size(); ++j) {
+      const char c = static_cast<char>(vec.at(i + j));
+      out << (std::isprint(c) ? c : '.');
+    }
+    out << "|\n";
+  }
+  return out.str();
 }
 
 std::string to_string(const LR35902::ProcessorState &s) {
@@ -63,7 +89,7 @@ std::string to_string(const ObjAttrDMA::DMAState &s) {
   out << "OAM DMA: " << (s.active ? "(active)\n" : "(inactive)\n")
       << " source_address: " << hex16(s.src_base_address) << "\n"
       << " dest_address:   " << hex16(0xFE00) << "\n" // always fixed
-      << " data_offset:   " << hex16(s.data_offset) << "\n";
+      << " data_offset:    " << hex16(s.data_offset) << "\n";
   return out.str();
 }
 
