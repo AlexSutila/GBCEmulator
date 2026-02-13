@@ -299,29 +299,34 @@
       border-radius: 0;
       background: #000;
     }
-
     :fullscreen .app {
       grid-template-rows: 1fr;
     }
 
-    @media (pointer: coarse), (max-width: 900px) {
-      .topbar {
-        flex-direction: column;
-        align-items: stretch;
+    @media (max-width: 900px) {
+      .desktop-only {
+        display: none !important;
       }
-
+      .brand {
+        display: none !important;
+      }
       .actions {
-        width: 100%;
-        justify-content: space-between;
-        flex-wrap: wrap;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex: 1;
       }
 
-      #romUrl.urlbox {
-        width: 100%;
+      .rom-name,
+      #romName {
+        display: none !important;
       }
-
-      .hint.desktop-only {
-        display: none;
+      #romUrl {
+        flex: 1;
+        min-width: 0;
+      }
+      #fsButton {
+        display: none !important;
       }
     }
   </style>
