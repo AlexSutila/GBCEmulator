@@ -37,8 +37,10 @@ void DebuggerImGui::init(SDLHost &host) {
 // Replaces the build_ui functionality
 void DebuggerImGui::render(UiState &state,
                            const std::unique_ptr<GameBoyColor> &core) {
-  if (state.show_debug)
+  if (state.show_main_debug_viewer)
     build_debug_window(state);
+  if (state.show_memory_viewer)
+    build_memory_viewer_window(state);
   if (state.show_breakpoints)
     build_breakpoints_window(state, core);
   if (state.show_ppu_viewer)
@@ -65,11 +67,17 @@ void DebuggerImGui::update_state_from_core(
   ctx.cpu_state = Debug::to_string(core->get_cpu()->get_state());
   ctx.ppu_state = Debug::to_string(core->get_ppu()->get_state());
   ctx.disasm = core->get_cpu()->disasm();
+  auto address_bus = core->get_bus();
 
+  // Address bus relevant information
+  ctx.oam_dma_state = Debug::to_string(address_bus->get_oam_dma().get_state());
+  ctx.vdma_state = Debug::to_string(address_bus->get_vdma().get_state());
+
+  // Interrupt enable bits and flags
   const InterruptBits *const ie_reg = dynamic_cast<InterruptBits *>(
-      core->get_bus()->get_mmio(IORegisterMapping::MMIO_INT_ENABLE));
+      address_bus->get_mmio(IORegisterMapping::MMIO_INT_ENABLE));
   const InterruptBits *const if_reg = dynamic_cast<InterruptBits *>(
-      core->get_bus()->get_mmio(IORegisterMapping::MMIO_INT_FLAGS));
+      address_bus->get_mmio(IORegisterMapping::MMIO_INT_FLAGS));
   ctx.ie_state = Debug::to_string(*ie_reg);
   ctx.if_state = Debug::to_string(*if_reg);
 
@@ -95,7 +103,7 @@ void DebuggerImGui::request_stop() {
 
 /* ImGui constructions */
 void DebuggerImGui::build_debug_window(UiState &state) {
-  ImGui::Begin("Debug", &state.show_debug);
+  ImGui::Begin("Debug", &state.show_main_debug_viewer);
 
   ImGui::SeparatorText("System State");
   ImGui::Text("Disassembly: %s", ctx.disasm.c_str());
@@ -159,6 +167,18 @@ void DebuggerImGui::build_debug_window(UiState &state) {
     }
     dbg_cv.notify_one();
   }
+  ImGui::End();
+}
+
+void DebuggerImGui::build_memory_viewer_window(UiState &state) {
+  std::lock_guard lock(dbg_mutex);
+  ImGui::Begin("Memory Viewer", &state.show_memory_viewer);
+  ImGui::SeparatorText("Direct Memory Access");
+  ImGui::Text("%s", ctx.oam_dma_state.c_str());
+  ImGui::SameLine();
+  ImGui::Text("%s", ctx.vdma_state.c_str());
+
+  ImGui::SeparatorText("Main Address Bus View");
   ImGui::End();
 }
 

@@ -13,7 +13,8 @@
 struct DebugContext {
   Debug::BreakReason reason{Debug::BRK_CONTINUE};
   std::array<SDL_Texture *, 2> tile_data_texture{};
-
+  std::string oam_dma_state{};
+  std::string vdma_state{};
   std::string sys_state{};
   std::string cpu_state{};
   std::string ppu_state{};
@@ -43,6 +44,7 @@ public:
 
 private:
   void build_debug_window(UiState &state);
+  void build_memory_viewer_window(UiState &state);
   void build_breakpoints_window(UiState &state,
                                 const std::unique_ptr<GameBoyColor> &core);
   void

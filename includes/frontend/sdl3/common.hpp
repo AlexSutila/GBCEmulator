@@ -112,7 +112,8 @@ struct Notification {
 /* ---------- UI State ---------- */
 struct UiState {
   bool show_settings{false};
-  bool show_debug{false};
+  bool show_main_debug_viewer{false};
+  bool show_memory_viewer{false};
   bool show_breakpoints{false};
   bool show_ppu_viewer{false};
   bool show_keybinds{false};

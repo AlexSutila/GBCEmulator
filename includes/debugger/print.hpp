@@ -4,6 +4,7 @@
 #include "cpu/interrupts.hpp"
 #include "cpu/lr35902.hpp"
 #include "gbc.hpp"
+#include "memory/dma.hpp"
 #include "ppu/ppu.hpp"
 #include <string>
 
@@ -13,9 +14,12 @@ namespace Debug {
 [[nodiscard]] std::string hex16(addr_t v);
 
 [[nodiscard]] std::string to_string(const LR35902::ProcessorState &s);
-[[nodiscard]] std::string to_string(const PixelProcessingUnit::PPUState &s);
 [[nodiscard]] std::string to_string(const InterruptBits &i);
 [[nodiscard]] std::string to_string(const runtime_sys_info &r);
+
+[[nodiscard]] std::string to_string(const PixelProcessingUnit::PPUState &s);
+[[nodiscard]] std::string to_string(const ObjAttrDMA::DMAState &s);
+[[nodiscard]] std::string to_string(const VDMA::DMAState &s);
 
 [[nodiscard]] std::string destination_name(byte_t code);
 [[nodiscard]] std::string cartridge_type_name(byte_t code, SpecialMbc special);

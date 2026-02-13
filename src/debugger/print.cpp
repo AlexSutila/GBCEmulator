@@ -1,6 +1,7 @@
 #include "debugger/print.hpp"
 #include "cpu/interrupts.hpp"
 #include "cpu/lr35902.hpp"
+#include <sstream>
 
 namespace Debug {
 
@@ -57,6 +58,31 @@ std::string to_string(const PixelProcessingUnit::PPUState &s) {
   return out.str();
 }
 
+std::string to_string(const ObjAttrDMA::DMAState &s) {
+  std::ostringstream out;
+  out << "OAM DMA: " << (s.active ? "(active)\n" : "(inactive)\n")
+      << " source_address: " << hex16(s.src_base_address) << "\n"
+      << " dest_address:   " << hex16(0xFE00) << "\n" // always fixed
+      << " data_offset:   " << hex16(s.data_offset) << "\n";
+  return out.str();
+}
+
+std::string to_string(const VDMA::DMAState &s) {
+  std::ostringstream out;
+  if (s.gdma_active)
+    out << "VDMA: (GDMA active)\n";
+  else if (s.hdma_active)
+    out << "VDMA: (HDMA active)\n";
+  else if (s.hdma_waiting)
+    out << "VDMA: (HDMA waiting)\n";
+  else
+    out << "VDMA: (inactive)\n";
+  out << " dest_address:   " << hex16(s.dest_base_address) << "\n"
+      << " source_address: " << hex16(s.src_base_address) << "\n"
+      << " data_offset:    " << hex16(s.data_offset) << "\n";
+  return out.str();
+}
+
 std::string to_string(const InterruptBits &i) {
   std::ostringstream out;
 
@@ -97,9 +123,7 @@ static std::string bytes_hex(const std::span<const byte_t> s) {
 }
 
 static std::string two_char_code(const byte_t a, const byte_t b) {
-  auto printable = [](const byte_t x) {
-    return std::isprint(x) != 0;
-  };
+  auto printable = [](const byte_t x) { return std::isprint(x) != 0; };
   if (printable(a) && printable(b)) {
     std::string s;
     s.push_back(static_cast<char>(a));
