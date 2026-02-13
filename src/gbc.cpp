@@ -14,10 +14,10 @@
 #include <stdexcept>
 
 GameBoyColor::GameBoyColor(Frontend &frontend, const std::string &bios_path)
-    : Debug::Debuggable(debugger_), debugger_(std::nullopt), fe_(frontend) {
+    : Debuggable(debugger_), debugger_(std::nullopt), fe_(frontend) {
   system_init(); // Connects all system components
 
-  /* We set CGB mode mased on the size of the boot ROM. This is the best way
+  /* We set CGB mode based on the size of the boot ROM. This is the best way
    * to make sure we get the coloring right, but it will likely cause strange
    * behavior in-game. Behavior should be okay with any CGB bios though. */
   try {
@@ -28,7 +28,7 @@ GameBoyColor::GameBoyColor(Frontend &frontend, const std::string &bios_path)
 
   /* If this fails for whatever reason, simply continue as if we didn't have a
      BIOS configured. Emulator will start in CGB mode (obviously). */
-  catch (std::runtime_error &e) {
+  catch (std::runtime_error &) {
     bios_ = std::nullopt;
     skip_bios();
   }
@@ -36,7 +36,7 @@ GameBoyColor::GameBoyColor(Frontend &frontend, const std::string &bios_path)
 }
 
 GameBoyColor::GameBoyColor(Frontend &frontend, const BootROM &rom)
-    : Debug::Debuggable(debugger_), debugger_(std::nullopt), fe_(frontend) {
+    : Debuggable(debugger_), debugger_(std::nullopt), fe_(frontend) {
   system_init();
   bios_ = rom; // We assume rom is already valid
   sys_.cgb_mode = bios_->is_large_rom();
@@ -44,12 +44,12 @@ GameBoyColor::GameBoyColor(Frontend &frontend, const BootROM &rom)
 }
 
 GameBoyColor::GameBoyColor(Frontend &frontend)
-    : Debug::Debuggable(debugger_), debugger_(std::nullopt),
+    : Debuggable(debugger_), debugger_(std::nullopt),
       bios_(std::nullopt), fe_(frontend) {
   system_init(); // Connects all system components
   skip_bios();   // BIOS is left unconfigured
   /* We still kind of have to do this here in case we run DMG games. Will likely
-   * end up staring at a pure black screen in such cases if we dont. */
+   * end up staring at a pure black screen in such cases if we don't. */
   cram_init_mono();
 }
 
@@ -63,7 +63,7 @@ void GameBoyColor::system_init() {
       .double_speed = false,
   };
 
-  /* Component initializaiton */
+  /* Component initialization */
   bus = std::make_unique<AddressBus>(sys_, debugger_, bios_);
   cpu = std::make_unique<LR35902>(bus.get(), debugger_, sys_);
   apu = std::make_unique<APU>(*bus, fe_);
@@ -81,11 +81,11 @@ void GameBoyColor::system_init() {
 
   /* To avoid running into problems with other registers it depends on in time,
    * we have to invoke this method to configure the dependencies it needs after
-   * we can garuntee they have been instantiated. */
+   * we can guarantee they have been instantiated. */
   joypad_reg->set_interrupt_reg(if_reg);
 }
 
-void GameBoyColor::skip_bios() {
+void GameBoyColor::skip_bios() const {
   using mmio = IORegisterMapping;
 
   /* We cannot simply start executing without a BIOS for numerous reasons. So,
@@ -143,25 +143,25 @@ void GameBoyColor::skip_bios() {
   cram_init_mono(mmio::MMIO_LCD_OBPI, mmio::MMIO_LCD_OBPD);
 }
 
-void GameBoyColor::cram_init_mono() {
+void GameBoyColor::cram_init_mono() const {
   using mmio = IORegisterMapping;
   cram_init_mono(mmio::MMIO_LCD_BGPI, mmio::MMIO_LCD_BGPD);
   cram_init_mono(mmio::MMIO_LCD_OBPI, mmio::MMIO_LCD_OBPD);
 }
 
 void GameBoyColor::cram_init_mono(IORegisterMapping index,
-                                  IORegisterMapping data) {
+                                  IORegisterMapping data) const {
   constexpr auto nr_palettes = 8;
-  constexpr auto nr_colors = 4;
 
   /* Convert index and data enumerations into 16-bit addresses */
-  const addr_t cram_index = static_cast<addr_t>(index);
-  const addr_t cram_data = static_cast<addr_t>(data);
+  const auto cram_index = static_cast<addr_t>(index);
+  const auto cram_data = static_cast<addr_t>(data);
   bus->write_byte(cram_index, 0x80); // Write high bit for auto increment
 
   /* This is where CRAM is actually populated, by writing the actual values in
    * that would normally be written in over the address bus. */
   for (auto pal{0}; pal < nr_palettes; pal++) {
+    constexpr auto nr_colors = 4;
     for (byte_t color{0}; color < nr_colors; color++) {
       const std::uint32_t argb8888 = get_mono_color(color & 0x3);
       const std::uint16_t rgb555 = argb8888_to_rgb555(argb8888);
@@ -171,7 +171,7 @@ void GameBoyColor::cram_init_mono(IORegisterMapping index,
   }
 }
 
-void GameBoyColor::insert_cartridge(cart c) {
+void GameBoyColor::insert_cartridge(const cart& c) {
   const byte_t &cgb_flag = c.header.cgb_flag();
   if (!bus)
     throw std::logic_error("Bus not initialized");
@@ -179,7 +179,7 @@ void GameBoyColor::insert_cartridge(cart c) {
 
   /* IMPORTANT: on the real hardware, this flag is set via KEY0 during the BIOS
    * based on the cartridge header. If we are skipping the BIOS, this init step
-   * will never happen. Hence we must do it ourselves when we skip the BIOS.
+   * will never happen. Hence, we must do it ourselves when we skip the BIOS.
    * --------------------------------------------------------------------------
    * Another side note, KEY0 uses a reference to this boolean to formulate the
    * actual value of the register read over the address bus. Hence, by changing
@@ -188,7 +188,7 @@ void GameBoyColor::insert_cartridge(cart c) {
     sys_.cgb_mode = cgb_enabled(cgb_flag);
 }
 
-void GameBoyColor::init_test_bed() {
+void GameBoyColor::init_test_bed() const {
   if (!bus)
     throw std::logic_error("Bus not initialized");
 
@@ -196,7 +196,7 @@ void GameBoyColor::init_test_bed() {
   bus->init_test_bed();
 }
 
-void GameBoyColor::step_dma(bool fast_cycle) {
+void GameBoyColor::step_dma(const bool fast_cycle) const {
   bus->get_oam_dma().step(); // Runs 2X in double speed
 
   /* As described elsewhere, HDMA and GDMA have an initialization phase that
@@ -208,7 +208,7 @@ void GameBoyColor::step_dma(bool fast_cycle) {
 }
 bool GameBoyColor::vdma_enabled() const { return bus->get_vdma().enabled(); }
 
-void GameBoyColor::step_processor() {
+void GameBoyColor::step_processor() const {
   const auto &vdma = bus->get_vdma();
   if (!vdma.enabled()) // CPU is halted until VDMA is complete
     cpu->step();

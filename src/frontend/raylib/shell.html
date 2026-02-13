@@ -1,10 +1,22 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1, viewport-fit=cover" name="viewport"/>
   <title>GBC Emulator</title>
 
   <style>
+    :root {
+      --bg0: #070a0f;
+      --bg1: #0b1020;
+      --border: rgba(255, 255, 255, 0.10);
+      --text: rgba(255, 255, 255, 0.92);
+      --muted: rgba(255, 255, 255, 0.68);
+      --shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+      --radius: 18px;
+      --touchbar-h: 0px;
+    }
+
     * {
       box-sizing: border-box;
     }
@@ -14,125 +26,690 @@
       padding: 0;
       width: 100%;
       height: 100%;
-      background: #111;
-      font-family: sans-serif;
-      color: #eee;
+      background: radial-gradient(1200px 700px at 50% -20%, rgba(99, 102, 241, 0.24), transparent 60%),
+      radial-gradient(900px 600px at 10% 110%, rgba(34, 211, 238, 0.10), transparent 55%),
+      linear-gradient(180deg, var(--bg1), var(--bg0));
+      color: var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Apple Color Emoji", "Segoe UI Emoji";
       overflow: hidden;
     }
 
-    body {
+    .app {
+      height: 100dvh;
+      height: 100vh;
+      display: grid;
+      grid-template-rows: auto 1fr;
+    }
+
+    .topbar {
+      padding: 14px 14px 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .brand {
       display: flex;
       flex-direction: column;
-      align-items: center;
+      gap: 2px;
+      min-width: 0;
     }
 
-    #canvas-container {
-      flex: 1 1 auto;
-      width: 100%;
+    .brand .title {
+      font-size: 0.98rem;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .brand .subtitle {
+      font-size: 0.82rem;
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .actions {
       display: flex;
       align-items: center;
-      justify-content: center;
-      padding-bottom: 16px;
-      min-height: 0;
-    }
-
-    canvas {
-      image-rendering: pixelated;
-      background: #000;
-      border: 2px solid #555;
-      aspect-ratio: 10 / 9;
-      width: 100%;
-      max-width: 95vmin;
-      max-height: 95vmin;
-      height: auto;
-    }
-
-    #controls {
-      margin: 12px 0;
+      gap: 10px;
       flex-shrink: 0;
+    }
+
+    .btn {
+      appearance: none;
+      border: 1px solid var(--border);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.06));
+      color: var(--text);
+      padding: 10px 12px;
+      border-radius: 12px;
+      font-size: 0.92rem;
+      font-weight: 650;
+      letter-spacing: 0.15px;
+      cursor: pointer;
+      user-select: none;
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25);
+      transition: transform 0.05s ease, background 0.12s ease, border-color 0.12s ease, opacity 0.12s ease;
+    }
+
+    .btn:active {
+      transform: translateY(1px);
+    }
+
+    .btn:hover {
+      border-color: rgba(255, 255, 255, 0.18);
+    }
+
+    .btn.primary {
+      border-color: rgba(99, 102, 241, 0.55);
+      background: linear-gradient(180deg, rgba(99, 102, 241, 0.40), rgba(99, 102, 241, 0.18));
+    }
+
+    .btn.disabled {
+      opacity: 0.6;
+      cursor: default;
+      pointer-events: none;
     }
 
     #romInput {
       display: none;
     }
 
-    #romButton {
-      display: inline-block;
-      padding: 10px 18px;
-      background: linear-gradient(#3a3a3a, #2a2a2a);
-      border: 1px solid #555;
-      border-radius: 6px;
-      color: #fff;
-      font-size: 0.95rem;
-      font-weight: 600;
-      letter-spacing: 0.3px;
-      cursor: pointer;
-      user-select: none;
-      transition: background 0.15s ease, transform 0.05s ease, box-shadow 0.15s ease;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.6);
+    #romUrl.urlbox {
+      width: min(44vw, 420px);
+      height: 42px;
+      padding: 0 12px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: rgba(0, 0, 0, 0.22);
+      color: var(--text);
+      outline: none;
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.20);
     }
 
-    #romButton:hover {
-      background: linear-gradient(#444, #333);
+    #romUrl.urlbox::placeholder {
+      color: rgba(255, 255, 255, 0.45);
     }
 
-    #romButton:active {
-      transform: translateY(1px);
-      box-shadow: 0 1px 2px rgba(0,0,0,0.8);
+    #romUrl.urlbox:focus {
+      border-color: rgba(99, 102, 241, 0.55);
     }
 
-    #romButton.disabled {
-      background: #222;
-      border-color: #444;
-      color: #888;
-      cursor: default;
-      box-shadow: none;
+    .stage {
+      padding: 0 14px calc(14px + var(--touchbar-h));
+      min-height: 0;
+      display: grid;
+      place-items: center;
+    }
+
+    .canvas-card {
+      width: min(92vw, 860px);
+      height: min(calc(100dvh - 120px - var(--touchbar-h)), 92vw);
+      max-height: 900px;
+      aspect-ratio: 10 / 9;
+      border-radius: var(--radius);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.03));
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      padding: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      min-height: 0;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      border-radius: calc(var(--radius) - 10px);
+      image-rendering: pixelated;
+      background: #000;
+      outline: none;
+      border: 1px solid rgba(255, 255, 255, 0.10);
+    }
+
+    .hint {
+      margin-top: 10px;
+      font-size: 0.85rem;
+      color: var(--muted);
+      text-align: center;
+      max-width: min(92vw, 860px);
+      line-height: 1.35;
+    }
+
+    .hint code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 0.92em;
+      padding: 1px 6px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.10);
+      background: rgba(0, 0, 0, 0.22);
+    }
+
+    /* Modal */
+    .modal {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 18px;
+      background: rgba(0, 0, 0, 0.62);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      z-index: 1000;
+    }
+
+    .modal.hidden {
+      display: none;
+    }
+
+    .modal-card {
+      width: min(92vw, 560px);
+      border-radius: 18px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.06));
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+      overflow: hidden;
+    }
+
+    .modal-head {
+      padding: 14px 14px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+    }
+
+    .modal-title {
+      font-size: 0.98rem;
+      font-weight: 800;
+      letter-spacing: 0.2px;
+    }
+
+    .modal-sub {
+      font-size: 0.85rem;
+      color: var(--muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .rom-list {
+      max-height: min(52vh, 420px);
+      overflow: auto;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .rom-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px 10px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(0, 0, 0, 0.18);
+    }
+
+    .rom-left {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .rom-name {
+      font-size: 0.92rem;
+      font-weight: 750;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 44ch;
+    }
+
+    .rom-meta {
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+
+    .modal-actions {
+      padding: 12px 14px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      border-top: 1px solid rgba(255, 255, 255, 0.10);
+    }
+
+    @media (pointer: coarse), (max-width: 900px) {
+      .topbar {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .actions {
+        width: 100%;
+        justify-content: space-between;
+        flex-wrap: wrap;
+      }
+
+      #romUrl.urlbox {
+        width: 100%;
+      }
+
+      .hint.desktop-only {
+        display: none;
+      }
     }
   </style>
+
+  <!-- ZIP support (global `fflate`) -->
+  <script src="https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.js"></script>
 </head>
 
 <body>
-  <header>GBC Emulator</header>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <div class="title" id="title">GBC Emulator</div>
+      <div class="subtitle" id="status">Load a ROM or ZIP to begin</div>
+    </div>
 
-  <div id="controls">
-    <input type="file" id="romInput" accept=".gb,.gbc" />
-    <label id="romButton" for="romInput">Load ROM</label>
+    <div class="actions">
+      <input accept=".gb,.gbc,.zip" id="romInput" type="file"/>
+      <label class="btn primary" for="romInput" id="romButton">Load File</label>
+
+      <input autocomplete="off" class="urlbox" id="romUrl" inputmode="url"
+             placeholder="https://example.gg/game.gbc or .zip" spellcheck="false" type="url"/>
+      <button class="btn" id="romUrlButton" type="button">Load URL</button>
+
+      <button class="btn" id="fsButton" type="button">Fullscreen</button>
+    </div>
+  </header>
+
+  <main class="stage">
+    <div>
+      <div class="canvas-card" id="canvasCard">
+        <canvas id="canvas"></canvas>
+      </div>
+      <div class="hint desktop-only">
+        Keyboard: <code>Arrows</code>=D-pad <code>Z</code>=A <code>X</code>=B <code>Enter</code>=Start <code>Backspace</code>=Select
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ROM picker modal -->
+<div aria-labelledby="romPickerTitle" aria-modal="true" class="modal hidden" id="romPicker" role="dialog">
+  <div class="modal-card">
+    <div class="modal-head">
+      <div class="modal-title" id="romPickerTitle">Multiple ROMs found</div>
+      <div class="modal-sub" id="romPickerSub">Choose a ROM to load</div>
+    </div>
+    <div class="rom-list" id="romList"></div>
+    <div class="modal-actions">
+      <button class="btn" id="romCancel" type="button">Cancel</button>
+    </div>
   </div>
+</div>
 
-  <canvas id="canvas"></canvas>
+<script>
+  function setupCanvasFocus(canvas) {
+    canvas.tabIndex = 0;
+    canvas.focus();
+    const isTypingTarget = (t) => {
+      if (!t) return false;
+      const tag = (t.tagName || "").toLowerCase();
+      return tag === "input" || tag === "textarea" || t.isContentEditable === true;
+    };
 
-  <script>
-    var Module = {
-      canvas: document.getElementById("canvas"),
-
-      printErr(text) {
-        console.error(text);
+    window.addEventListener(
+      "keydown",
+      (e) => {
+        // If the user is typing in the URL box (or any input), do NOT block keys
+        if (isTypingTarget(e.target) || isTypingTarget(document.activeElement)) return;
+        const block = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space", "Enter", "Backspace", "J", "K"]);
+        if (block.has(e.code)) e.preventDefault();
       },
+      {passive: false}
+    );
 
-      onRuntimeInitialized() {
-        console.log("WASM runtime initialized");
+    window.addEventListener("pointerdown", () => canvas.focus());
+  }
 
-        const input = document.getElementById("romInput");
-        const button = document.getElementById("romButton");
+  function setupFullscreen(canvas) {
+    const btn = document.getElementById("fsButton");
+    const card = document.getElementById("canvasCard");
 
-        input.addEventListener("change", async (e) => {
-          const file = e.target.files[0];
-          if (!file) return;
-
-          // I hate this stupid button, it is the bane of my existence
-          button.classList.add("disabled");
-          button.textContent = "ROM Loaded";
-          input.disabled = true;
-
-          // Copy rom to Emscripten FS and start emulation loop
-          const bytes = new Uint8Array(await file.arrayBuffer());
-          FS.writeFile("/rom.bin", bytes);
-          Module._emscripten_start();
-        });
+    const request = async () => {
+      try {
+        if (!document.fullscreenElement) {
+          await (card.requestFullscreen?.() || canvas.requestFullscreen?.());
+        } else {
+          await document.exitFullscreen?.();
+        }
+      } catch (err) {
+        console.warn("Fullscreen failed:", err);
       }
     };
-  </script>
 
-  {{{ SCRIPT }}}
+    btn.addEventListener("click", request);
+    document.addEventListener("fullscreenchange", () => {
+      btn.textContent = document.fullscreenElement ? "Exit" : "Fullscreen";
+    });
+  }
+
+  function formatBytes(n) {
+    const units = ["B", "KB", "MB", "GB"];
+    let i = 0;
+    let x = n;
+    while (x >= 1024 && i < units.length - 1) {
+      x /= 1024;
+      i++;
+    }
+    const v = (i === 0) ? String(Math.round(x)) : x.toFixed(x >= 10 ? 1 : 2);
+    return `${v} ${units[i]}`;
+  }
+
+  function isZipBytes(bytes) {
+    // ZIP signatures:
+    // local file header: 50 4B 03 04
+    // empty archive:     50 4B 05 06
+    // spanned:           50 4B 07 08
+    return bytes && bytes.length >= 4 &&
+      bytes[0] === 0x50 && bytes[1] === 0x4B &&
+      (bytes[2] === 0x03 || bytes[2] === 0x05 || bytes[2] === 0x07) &&
+      (bytes[3] === 0x04 || bytes[3] === 0x06 || bytes[3] === 0x08);
+  }
+
+  async function unzipEntries(zipBytes) {
+    if (!window.fflate) throw new Error("Zip library failed to load.");
+    return await new Promise((resolve, reject) => {
+      // fflate expects Uint8Array
+      window.fflate.unzip(zipBytes, (err, data) => {
+        if (err) reject(err);
+        else resolve(data); // { filename: Uint8Array }
+      });
+    });
+  }
+
+  function findRomCandidates(entriesObj) {
+    const out = [];
+    for (const [name, data] of Object.entries(entriesObj)) {
+      const lower = name.toLowerCase();
+      const isDir = lower.endsWith("/");
+      if (isDir) continue;
+      if (lower.endsWith(".gb") || lower.endsWith(".gbc")) {
+        out.push({name, data});
+      }
+    }
+    // Stable-ish ordering: prefer .gbc, then larger files, then name
+    out.sort((a, b) => {
+      const agbc = a.name.toLowerCase().endsWith(".gbc") ? 1 : 0;
+      const bgbc = b.name.toLowerCase().endsWith(".gbc") ? 1 : 0;
+      if (agbc !== bgbc) return bgbc - agbc;
+      if (a.data.length !== b.data.length) return b.data.length - a.data.length;
+      return a.name.localeCompare(b.name);
+    });
+    return out;
+  }
+
+  function showRomPicker(candidates, subtext) {
+    const modal = document.getElementById("romPicker");
+    const list = document.getElementById("romList");
+    const sub = document.getElementById("romPickerSub");
+    const cancel = document.getElementById("romCancel");
+
+    sub.textContent = subtext || "Choose a ROM to load";
+    list.innerHTML = "";
+
+    let resolveFn, rejectFn;
+    const p = new Promise((resolve, reject) => {
+      resolveFn = resolve;
+      rejectFn = reject;
+    });
+
+    const close = () => {
+      modal.classList.add("hidden");
+      list.innerHTML = "";
+      window.removeEventListener("keydown", onKey);
+    };
+
+    const onKey = (e) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        close();
+        rejectFn(new Error("Canceled"));
+      }
+    };
+
+    window.addEventListener("keydown", onKey);
+
+    for (const c of candidates) {
+      const row = document.createElement("div");
+      row.className = "rom-item";
+
+      const left = document.createElement("div");
+      left.className = "rom-left";
+
+      const nm = document.createElement("div");
+      nm.className = "rom-name";
+      nm.textContent = c.name;
+
+      const meta = document.createElement("div");
+      meta.className = "rom-meta";
+      meta.textContent = `${formatBytes(c.data.length)}`;
+
+      left.appendChild(nm);
+      left.appendChild(meta);
+
+      const btn = document.createElement("button");
+      btn.className = "btn primary";
+      btn.type = "button";
+      btn.textContent = "Load";
+      btn.addEventListener("click", () => {
+        close();
+        resolveFn(c);
+      });
+
+      row.appendChild(left);
+      row.appendChild(btn);
+      list.appendChild(row);
+    }
+
+    cancel.onclick = () => {
+      close();
+      rejectFn(new Error("Canceled"));
+    };
+
+    modal.classList.remove("hidden");
+    return p;
+  }
+
+  var Module = {
+    canvas: document.getElementById("canvas"),
+
+    printErr(text) {
+      console.error(text);
+    },
+
+    onRuntimeInitialized() {
+      const canvas = Module.canvas;
+      const romInput = document.getElementById("romInput");
+      const romButton = document.getElementById("romButton");
+      const romUrl = document.getElementById("romUrl");
+      const romUrlButton = document.getElementById("romUrlButton");
+      const status = document.getElementById("status");
+
+      setupCanvasFocus(canvas);
+      setupFullscreen(canvas);
+
+      const setBusy = (busy, msg) => {
+        if (msg) status.textContent = msg;
+        romButton.classList.toggle("disabled", busy);
+        romUrlButton.classList.toggle("disabled", busy);
+        romInput.disabled = busy;
+        romUrl.disabled = busy;
+      };
+
+      const setLoadedUI = (label) => {
+        romButton.classList.add("disabled");
+        romButton.textContent = "ROM Loaded";
+        romUrlButton.classList.add("disabled");
+        romInput.disabled = true;
+        romUrl.disabled = true;
+        status.textContent = label ? label : "Running";
+      };
+
+      const normalizeUrl = (s) => {
+        const trimmed = (s || "").trim();
+        if (!trimmed) return null;
+        const u = new URL(trimmed, window.location.href);
+        if (u.protocol !== "http:" && u.protocol !== "https:") {
+          throw new Error("Only http/https URLs are supported.");
+        }
+        return u.toString();
+      };
+
+      const isEmscriptenUnwind = (e) => {
+        const msg = (typeof e === "string") ? e : (e && e.message) ? e.message : "";
+        return msg === "unwind" || msg.toLowerCase().includes("unwind");
+      };
+
+      const writeAndStart = (bytes, label) => {
+        FS.writeFile("/rom.bin", bytes);
+        setLoadedUI(label);
+        try {
+          Module._emscripten_start();
+        } catch (e) {
+          // Emscripten can throw "unwind" when it hands control to the main loop.
+          if (isEmscriptenUnwind(e)) return;
+          throw e;
+        }
+      };
+
+      const processRomOrZip = async (bytes, sourceLabel) => {
+        // Zip path
+        if (isZipBytes(bytes)) {
+          setBusy(true, "Unzipping…");
+          const entries = await unzipEntries(bytes);
+          const candidates = findRomCandidates(entries);
+
+          if (candidates.length === 0) {
+            setBusy(false, "ZIP contained no .gb/.gbc ROMs");
+            return;
+          }
+
+          if (candidates.length === 1) {
+            const c = candidates[0];
+            writeAndStart(c.data, `${sourceLabel} — ${c.name}`);
+            return;
+          }
+
+          // Multiple: show modal picker
+          setBusy(false, "Choose a ROM from the ZIP");
+          try {
+            const chosen = await showRomPicker(
+              candidates,
+              sourceLabel ? `From: ${sourceLabel}` : "Choose a ROM to load"
+            );
+            setBusy(true, "Loading ROM…");
+            writeAndStart(chosen.data, `${sourceLabel} — ${chosen.name}`);
+          } catch (e) {
+            // canceled
+            setBusy(false, "Canceled");
+          }
+          return;
+        }
+
+        // Plain ROM path
+        writeAndStart(bytes, sourceLabel);
+      };
+
+      const loadFromLocalFile = async (file) => {
+        if (!file) return;
+        setBusy(true, "Reading file…");
+        try {
+          const bytes = new Uint8Array(await file.arrayBuffer());
+          const label = file.name || "Local file";
+          await processRomOrZip(bytes, label);
+        } catch (err) {
+          console.error(err);
+          setBusy(false, `Failed to read file: ${String(err.message || err)}`);
+        }
+      };
+
+      const loadFromUrl = async (urlStr) => {
+        const url = normalizeUrl(urlStr);
+        if (!url) return;
+
+        setBusy(true, "Fetching…");
+        try {
+          const res = await fetch(url, {mode: "cors"});
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const buf = await res.arrayBuffer();
+          const bytes = new Uint8Array(buf);
+
+          // If it looks like a zip, unzip. Otherwise treat as ROM.
+          await processRomOrZip(bytes, url);
+        } catch (err) {
+          console.error(err);
+          setBusy(false, `Failed to load URL: ${String(err.message || err)}`);
+        }
+      };
+
+      // Local picker (.gb/.gbc/.zip)
+      romInput.addEventListener("change", async (e) => {
+        const file = e.target.files?.[0];
+        await loadFromLocalFile(file);
+      });
+
+      // URL textbox (.gb/.gbc/.zip)
+      romUrlButton.addEventListener("click", async () => {
+        await loadFromUrl(romUrl.value);
+      });
+
+      romUrl.addEventListener("keydown", async (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          await loadFromUrl(romUrl.value);
+        }
+      });
+
+      // Drag & drop
+      window.addEventListener("dragover", (e) => e.preventDefault());
+      window.addEventListener("drop", async (e) => {
+        e.preventDefault();
+        if (!e.dataTransfer?.files?.length || romInput.disabled) return;
+        const file = e.dataTransfer.files[0];
+        await loadFromLocalFile(file);
+      });
+
+      // URL parameter auto-load:
+      //   ?rom=https://example.com/game.gbc
+      //   ?rom=https://example.com/archive.zip
+      const params = new URLSearchParams(window.location.search);
+      const qp = params.get("rom") || params.get("romUrl");
+      if (qp) {
+        try {
+          const normalized = normalizeUrl(qp);
+          romUrl.value = normalized;
+          loadFromUrl(normalized);
+        } catch (err) {
+          status.textContent = `Bad rom URL: ${String(err.message || err)}`;
+        }
+      }
+    }
+  };
+</script>
+
+{{{ SCRIPT }}}
 </body>
 </html>

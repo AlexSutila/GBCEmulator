@@ -11,20 +11,55 @@
 // sucks that it leads to implementing two emulation loops but eh.
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
-static void frame_cb(void *user) {
-  auto *fe = static_cast<RaylibFrontend *>(user);
+
+static std::uint8_t g_web_input_state = 0;
+
+extern "C" {
+// 0=Right, 1=Left, 2=Up, 3=Down, 4=A, 5=B, 6=Select, 7=Start
+EMSCRIPTEN_KEEPALIVE void emscripten_set_button(const int btn, const int pressed) {
+  using JB = Joypad::JoypadButton;
+  std::uint8_t mask = 0;
+  switch (btn) {
+  case 0: mask = static_cast<std::uint8_t>(JB::RIGHT);
+    break;
+  case 1: mask = static_cast<std::uint8_t>(JB::LEFT);
+    break;
+  case 2: mask = static_cast<std::uint8_t>(JB::UP);
+    break;
+  case 3: mask = static_cast<std::uint8_t>(JB::DOWN);
+    break;
+  case 4: mask = static_cast<std::uint8_t>(JB::A);
+    break;
+  case 5: mask = static_cast<std::uint8_t>(JB::B);
+    break;
+  case 6: mask = static_cast<std::uint8_t>(JB::SELECT);
+    break;
+  case 7: mask = static_cast<std::uint8_t>(JB::START);
+    break;
+  default: return;
+  }
+  if (pressed) g_web_input_state |= mask;
+  else g_web_input_state &= static_cast<std::uint8_t>(~mask);
+}
+
+EMSCRIPTEN_KEEPALIVE void emscripten_clear_buttons() { g_web_input_state = 0; }
+} // extern "C"
+
+
+static void frame_cb(void* user) {
+  auto* fe = static_cast<RaylibFrontend*>(user);
   fe->read_inputs();
   fe->step_frame();
   fe->present();
 }
 #endif // __EMSCRIPTEN__
 
-static std::uint32_t format_color(std::uint32_t c) {
+static std::uint32_t format_color(const std::uint32_t c) {
   return ((c & 0x00FF0000) >> 16) | ((c & 0x0000FF00)) |
-         ((c & 0x000000FF) << 16) | 0xFF000000;
+    ((c & 0x000000FF) << 16) | 0xFF000000;
 }
 
-RaylibFrontend::RaylibFrontend(const cart &c) { gbc->insert_cartridge(c); }
+RaylibFrontend::RaylibFrontend(const cart& c) { gbc->insert_cartridge(c); }
 
 RaylibFrontend::~RaylibFrontend() {
   if (texture.id)
@@ -33,29 +68,31 @@ RaylibFrontend::~RaylibFrontend() {
 }
 
 std::array<std::uint32_t, 144 * 160> RaylibFrontend::get_frame() {
-  return frame_buf.at(front_idx);
+  return frame_buf.at(display_idx);
 }
 
-void RaylibFrontend::put_pixel(int x, int y, std::uint32_t c) {
+void RaylibFrontend::put_pixel(const int x, const int y, const std::uint32_t c) {
   if (x < 0 || x >= fb_width || y < 0 || y >= fb_height) [[unlikely]]
     return;
-  frame_buf.at(front_idx).at(y * fb_width + x) = format_color(c);
+  frame_buf.at(write_idx).at(y * fb_width + x) = format_color(c);
 
   // Swap as frame becomes ready to avoid screen tears
   if (x == fb_width - 1 && y == fb_height - 1) {
-    front_idx = (front_idx + 1) % nbuf;
+    display_idx = write_idx;
+    write_idx = (write_idx + 1) % nbuf;
     frame_ready = true;
   }
 }
 
 void RaylibFrontend::clear(std::uint32_t c) {
-  for (auto &buf : frame_buf)
+  for (auto& buf : frame_buf)
     buf.fill(format_color(c));
   frame_ready = false;
-  front_idx = 0;
+  write_idx = 0;
+  display_idx = 0;
 }
 
-void RaylibFrontend::read_inputs() {
+void RaylibFrontend::read_inputs() const {
   std::uint8_t input_state{};
 
   if (::IsKeyDown(KEY_UP))
@@ -75,15 +112,19 @@ void RaylibFrontend::read_inputs() {
   if (::IsKeyDown(KEY_ENTER))
     input_state |= static_cast<std::uint8_t>(Joypad::JoypadButton::START);
 
+  #ifdef __EMSCRIPTEN__
+  input_state |= g_web_input_state;
+  #endif
+
   // This will never fail... Can't wait to eat these words though
-  Joypad::JOYP *const joyp = static_cast<Joypad::JOYP *>(
-      gbc->get_bus()->get_mmio(IORegisterMapping::MMIO_JOYPAD));
+  auto* const joyp = dynamic_cast<Joypad::JOYP*>(
+    gbc->get_bus()->get_mmio(IORegisterMapping::MMIO_JOYPAD));
   if (!joyp) [[unlikely]]
     throw std::runtime_error("RaylibFrontend::read_inputs()");
   joyp->set_state(input_state);
 }
 
-void RaylibFrontend::step_frame() {
+void RaylibFrontend::step_frame() const {
   constexpr std::size_t cycles_per_frame = 70224;
   for (std::size_t i{0}; i < cycles_per_frame; i++)
     gbc->step();
@@ -92,18 +133,15 @@ void RaylibFrontend::step_frame() {
 void RaylibFrontend::present() {
   if (!frame_ready)
     return;
-
-  // Pull oppositing buffer than the buffer being rendered to
-  const auto back_idx = (front_idx + 1) % nbuf;
   frame_ready = false;
 
   // Rendering
-  ::UpdateTexture(texture, frame_buf.at(back_idx).data());
+  ::UpdateTexture(texture, frame_buf.at(display_idx).data());
   ::BeginDrawing();
   ::DrawTexturePro(
-      texture, Rectangle{0, 0, (float)fb_width, (float)fb_height},
-      Rectangle{0, 0, (float)::GetScreenWidth(), (float)::GetScreenHeight()},
-      Vector2{0, 0}, 0.0f, WHITE);
+    texture, Rectangle{0, 0, static_cast<float>(fb_width), static_cast<float>(fb_height)},
+    Rectangle{0, 0, static_cast<float>(::GetScreenWidth()), static_cast<float>(::GetScreenHeight())},
+    Vector2{0, 0}, 0.0f, WHITE);
   ::EndDrawing();
 }
 
@@ -113,7 +151,7 @@ void RaylibFrontend::start() {
   ::InitAudioDevice();
 
   Image img{};
-  img.data = frame_buf.data();
+  img.data = frame_buf.at(0).data();
   img.width = fb_width;
   img.height = fb_height;
   img.mipmaps = 1;
@@ -134,5 +172,5 @@ void RaylibFrontend::start() {
     step_frame();
     present();
   }
-#endif // __EMSCRIPTEN
+#endif // __EMSCRIPTEN__
 }
