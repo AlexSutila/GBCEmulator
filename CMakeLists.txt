@@ -166,6 +166,8 @@ endif()
 #  WASM (Raylib) build target
 # ===========================================================================
 if(EMSCRIPTEN)
+    set(SHELL_HTML "${CMAKE_SOURCE_DIR}/src/frontend/raylib/shell.html")
+
     # Raylib simplistic WASM frontend
     add_executable(gbc_wasm
         src/frontend/raylib/frontend.cpp
@@ -198,7 +200,7 @@ if(EMSCRIPTEN)
             -fno-rtti
             -flto
             -O3
-            --shell-file ${CMAKE_SOURCE_DIR}/src/frontend/raylib/shell.html
+            --shell-file=${SHELL_HTML}
     )
     target_compile_options(gbc_wasm
         PRIVATE
@@ -208,6 +210,8 @@ if(EMSCRIPTEN)
             -O3
     )
     set_target_properties(gbc_wasm PROPERTIES SUFFIX ".html")
+    ## Make sure html changes are registered by ninja and trigger a rebuild
+    set_property(TARGET gbc_wasm APPEND PROPERTY LINK_DEPENDS "${SHELL_HTML}")
 
 # ===========================================================================
 #  Non=WASM build target (including Raylib for desktop)
