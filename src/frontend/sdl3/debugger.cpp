@@ -46,7 +46,7 @@ void DebuggerImGui::render(UiState &state,
   if (state.show_main_debug_viewer)
     build_debug_window(state);
   if (state.show_memory_viewer)
-    build_memory_viewer_window(state);
+    build_memory_viewer_window(state, core);
   if (state.show_breakpoints)
     build_breakpoints_window(state, core);
   if (state.show_ppu_viewer)
@@ -78,7 +78,7 @@ void DebuggerImGui::update_state_from_core(
   // Address bus relevant information
   ctx.oam_dma_state = Debug::to_string(address_bus->get_oam_dma().get_state());
   ctx.vdma_state = Debug::to_string(address_bus->get_vdma().get_state());
-  read_bus_data(core, 0x0000); // TODO: configurable base address
+  read_bus_data(core, ctx.bus_content_base_addr);
 
   // Interrupt enable bits and flags
   const InterruptBits *const ie_reg = dynamic_cast<InterruptBits *>(
@@ -177,16 +177,45 @@ void DebuggerImGui::build_debug_window(UiState &state) {
   ImGui::End();
 }
 
-void DebuggerImGui::build_memory_viewer_window(UiState &state) {
+void DebuggerImGui::build_memory_viewer_window(
+    UiState &state, const std::unique_ptr<GameBoyColor> &core) {
+  constexpr auto mask = 0xFF00;
+  constexpr auto increment = 0x100;
   std::lock_guard lock(dbg_mutex);
+
   ImGui::Begin("Memory Viewer", &state.show_memory_viewer);
   ImGui::SeparatorText("Direct Memory Access");
   ImGui::Text("%s", ctx.oam_dma_state.c_str());
   ImGui::SameLine();
   ImGui::Text("%s", ctx.vdma_state.c_str());
 
+  // Yeah... you read that right >:)
   ImGui::SeparatorText("Main Address Bus View");
-  ImGui::Text("%s", Debug::create_hex_view(ctx.bus_content).c_str());
+  const std::string sexy_ahh_hex_view = Debug::create_hex_view(
+      state.hex_view_base_addr & 0xFF00, ctx.bus_content);
+  ImGui::Text("%s", sexy_ahh_hex_view.c_str());
+
+  ImGui::InputScalar("", ImGuiDataType_U16, &ctx.bus_content_base_addr, nullptr,
+                     nullptr, "%04X", ImGuiInputTextFlags_CharsHexadecimal);
+  ImGui::SameLine();
+  if (ImGui::Button("GoTo")) {
+    read_bus_data(core, ctx.bus_content_base_addr & mask);
+    state.hex_view_base_addr = ctx.bus_content_base_addr & mask;
+  }
+  ImGui::SameLine();
+
+  if (ImGui::Button("Next")) { // Overflow is allowed intentionally
+    state.hex_view_base_addr = (state.hex_view_base_addr & mask) + increment;
+    read_bus_data(core, state.hex_view_base_addr & mask);
+    ctx.bus_content_base_addr = state.hex_view_base_addr;
+  }
+  ImGui::SameLine();
+
+  if (ImGui::Button("Prev")) { // Underflow is also allowed intentionally
+    state.hex_view_base_addr = (state.hex_view_base_addr & mask) - increment;
+    read_bus_data(core, state.hex_view_base_addr & mask);
+    ctx.bus_content_base_addr = state.hex_view_base_addr;
+  }
   ImGui::End();
 }
 

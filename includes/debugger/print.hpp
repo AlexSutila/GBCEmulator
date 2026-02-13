@@ -14,7 +14,8 @@ namespace Debug {
 [[nodiscard]] std::string hex16(addr_t v);
 
 /* A nice utility for displaying address bus contents in an easy manner */
-[[nodiscard]] std::string create_hex_view(const std::vector<byte_t> &vec);
+[[nodiscard]] std::string create_hex_view(const addr_t base_addr,
+                                          const std::vector<byte_t> &vec);
 
 [[nodiscard]] std::string to_string(const LR35902::ProcessorState &s);
 [[nodiscard]] std::string to_string(const InterruptBits &i);

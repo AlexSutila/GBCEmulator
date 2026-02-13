@@ -22,12 +22,13 @@ namespace Debug {
   return o.str();
 }
 
-std::string create_hex_view(const std::vector<byte_t> &vec) {
+std::string create_hex_view(const addr_t base_addr,
+                            const std::vector<byte_t> &vec) {
   constexpr std::size_t bytes_per_row = 0x10;
   std::ostringstream out;
 
   for (std::size_t i{0}; i < vec.size(); i += bytes_per_row) {
-    out << hex16(static_cast<addr_t>(i)) << ": ";
+    out << hex16(static_cast<addr_t>(i + base_addr)) << ": ";
     for (std::size_t j{0}; j < bytes_per_row; ++j) {
       if (i + j < vec.size())
         out << hex8(vec.at(i + j), true) << " ";
