@@ -2,6 +2,7 @@
 #include "gbc.hpp"
 #include "memory/mmio/dmg.hpp"
 #include "memory/mmio/mmio.hpp"
+#include <cstring>
 #include <raylib.h>
 #include <stdexcept>
 
@@ -16,53 +17,66 @@ static std::uint8_t g_web_input_state = 0;
 
 extern "C" {
 // 0=Right, 1=Left, 2=Up, 3=Down, 4=A, 5=B, 6=Select, 7=Start
-EMSCRIPTEN_KEEPALIVE void emscripten_set_button(const int btn, const int pressed) {
+EMSCRIPTEN_KEEPALIVE void emscripten_set_button(const int btn,
+                                                const int pressed) {
   using JB = Joypad::JoypadButton;
   std::uint8_t mask = 0;
   switch (btn) {
-  case 0: mask = static_cast<std::uint8_t>(JB::RIGHT);
+  case 0:
+    mask = static_cast<std::uint8_t>(JB::RIGHT);
     break;
-  case 1: mask = static_cast<std::uint8_t>(JB::LEFT);
+  case 1:
+    mask = static_cast<std::uint8_t>(JB::LEFT);
     break;
-  case 2: mask = static_cast<std::uint8_t>(JB::UP);
+  case 2:
+    mask = static_cast<std::uint8_t>(JB::UP);
     break;
-  case 3: mask = static_cast<std::uint8_t>(JB::DOWN);
+  case 3:
+    mask = static_cast<std::uint8_t>(JB::DOWN);
     break;
-  case 4: mask = static_cast<std::uint8_t>(JB::A);
+  case 4:
+    mask = static_cast<std::uint8_t>(JB::A);
     break;
-  case 5: mask = static_cast<std::uint8_t>(JB::B);
+  case 5:
+    mask = static_cast<std::uint8_t>(JB::B);
     break;
-  case 6: mask = static_cast<std::uint8_t>(JB::SELECT);
+  case 6:
+    mask = static_cast<std::uint8_t>(JB::SELECT);
     break;
-  case 7: mask = static_cast<std::uint8_t>(JB::START);
+  case 7:
+    mask = static_cast<std::uint8_t>(JB::START);
     break;
-  default: return;
+  default:
+    return;
   }
-  if (pressed) g_web_input_state |= mask;
-  else g_web_input_state &= static_cast<std::uint8_t>(~mask);
+  if (pressed)
+    g_web_input_state |= mask;
+  else
+    g_web_input_state &= static_cast<std::uint8_t>(~mask);
 }
 
 EMSCRIPTEN_KEEPALIVE void emscripten_clear_buttons() { g_web_input_state = 0; }
 } // extern "C"
 
-
-static void frame_cb(void* user) {
-  auto* fe = static_cast<RaylibFrontend*>(user);
+static void frame_cb(void *user) {
+  auto *fe = static_cast<RaylibFrontend *>(user);
   fe->tick_web();
 }
 #endif // __EMSCRIPTEN__
 
 static std::uint32_t format_color(const std::uint32_t c) {
   return ((c & 0x00FF0000) >> 16) | ((c & 0x0000FF00)) |
-    ((c & 0x000000FF) << 16) | 0xFF000000;
+         ((c & 0x000000FF) << 16) | 0xFF000000;
 }
 
-RaylibFrontend::RaylibFrontend(const cart& c) { gbc->insert_cartridge(c); }
+RaylibFrontend::RaylibFrontend(const cart &c) { gbc->insert_cartridge(c); }
 
 RaylibFrontend::~RaylibFrontend() {
-  if (audio_ready) ::UnloadAudioStream(audio_stream);
+  if (audio_ready)
+    ::UnloadAudioStream(audio_stream);
   CloseAudioDevice();
-  if (texture.id) ::UnloadTexture(texture);
+  if (texture.id)
+    ::UnloadTexture(texture);
   CloseWindow();
 }
 
@@ -70,7 +84,8 @@ std::array<std::uint32_t, 144 * 160> RaylibFrontend::get_frame() {
   return frame_buf.at(display_idx);
 }
 
-void RaylibFrontend::put_pixel(const int x, const int y, const std::uint32_t c) {
+void RaylibFrontend::put_pixel(const int x, const int y,
+                               const std::uint32_t c) {
   if (x < 0 || x >= fb_width || y < 0 || y >= fb_height) [[unlikely]]
     return;
   frame_buf.at(write_idx).at(y * fb_width + x) = format_color(c);
@@ -84,7 +99,7 @@ void RaylibFrontend::put_pixel(const int x, const int y, const std::uint32_t c) 
 }
 
 void RaylibFrontend::clear(std::uint32_t c) {
-  for (auto& buf : frame_buf)
+  for (auto &buf : frame_buf)
     buf.fill(format_color(c));
   frame_ready = false;
   write_idx = 0;
@@ -116,8 +131,8 @@ void RaylibFrontend::read_inputs() const {
 #endif
 
   // This will never fail... Can't wait to eat these words though
-  auto* const joyp = dynamic_cast<Joypad::JOYP*>(
-    gbc->get_bus()->get_mmio(IORegisterMapping::MMIO_JOYPAD));
+  auto *const joyp = dynamic_cast<Joypad::JOYP *>(
+      gbc->get_bus()->get_mmio(IORegisterMapping::MMIO_JOYPAD));
   if (!joyp) [[unlikely]]
     throw std::runtime_error("RaylibFrontend::read_inputs()");
   joyp->set_state(input_state);
@@ -137,16 +152,20 @@ void RaylibFrontend::present() {
   // Rendering
   UpdateTexture(texture, frame_buf.at(display_idx).data());
   BeginDrawing();
-  DrawTexturePro(
-    texture, Rectangle{0, 0, static_cast<float>(fb_width), static_cast<float>(fb_height)},
-    Rectangle{0, 0, static_cast<float>(GetScreenWidth()), static_cast<float>(GetScreenHeight())},
-    Vector2{0, 0}, 0.0f, WHITE);
+  DrawTexturePro(texture,
+                 Rectangle{0, 0, static_cast<float>(fb_width),
+                           static_cast<float>(fb_height)},
+                 Rectangle{0, 0, static_cast<float>(GetScreenWidth()),
+                           static_cast<float>(GetScreenHeight())},
+                 Vector2{0, 0}, 0.0f, WHITE);
   EndDrawing();
 }
 
 // ---- Audio ring buffer helpers (rb_size counts floats) ----
-void RaylibFrontend::queue_audio_samples(const float* samples, std::size_t sample_count) {
-  if (!samples || sample_count == 0) return;
+void RaylibFrontend::queue_audio_samples(const float *samples,
+                                         std::size_t sample_count) {
+  if (!samples || sample_count == 0)
+    return;
 
   // Drop the oldest samples if we would overflow (keeps latency bounded)
   constexpr std::size_t cap = ring_samples;
@@ -174,7 +193,8 @@ void RaylibFrontend::queue_audio_samples(const float* samples, std::size_t sampl
 }
 
 void RaylibFrontend::pump_audio() {
-  if (!audio_ready) return;
+  if (!audio_ready)
+    return;
 
   // Feed the stream whenever raylib tells us a sub-buffer is ready
   while (audio_prime > 0 || IsAudioStreamProcessed(audio_stream)) {
@@ -198,7 +218,8 @@ void RaylibFrontend::pump_audio() {
 
     // UpdateAudioStream() takes "frames", not float count
     UpdateAudioStream(audio_stream, audio_tmp.data(), (int)audio_chunk_frames);
-    if (audio_prime > 0) --audio_prime;
+    if (audio_prime > 0)
+      --audio_prime;
   }
 }
 
@@ -207,10 +228,12 @@ void RaylibFrontend::tick_web() {
   // Drive emulation by wall-time instead of assuming one frame per rAF tick
   // This keeps audio from underrunning when the browser drops frames
   constexpr double cpu_hz = 4194304.0; // Game Boy CPU clock (T-cycles/sec)
-  constexpr std::size_t cycles_per_frame = 70224; // T-cycles per frame (~59.73 Hz)
+  constexpr std::size_t cycles_per_frame =
+      70224; // T-cycles per frame (~59.73 Hz)
 
   const double now_ms = emscripten_get_now();
-  if (web_last_ms <= 0.0) web_last_ms = now_ms;
+  if (web_last_ms <= 0.0)
+    web_last_ms = now_ms;
 
   double dt_ms = now_ms - web_last_ms;
   web_last_ms = now_ms;
@@ -220,7 +243,8 @@ void RaylibFrontend::tick_web() {
 
   web_cycle_accum += dt_ms * (cpu_hz / 1000.0);
 
-  constexpr std::size_t max_cycles_per_tick = cycles_per_frame * 4; // cap catch-up
+  constexpr std::size_t max_cycles_per_tick =
+      cycles_per_frame * 4; // cap catch-up
   auto cycles_to_run = static_cast<std::size_t>(web_cycle_accum);
   cycles_to_run = std::min(cycles_to_run, max_cycles_per_tick);
   web_cycle_accum -= static_cast<double>(cycles_to_run);
@@ -229,8 +253,10 @@ void RaylibFrontend::tick_web() {
 
   // Chunk execution and keep feeding the audio stream between chunks
   while (cycles_to_run) {
-    const std::size_t block = std::min<std::size_t>(cycles_to_run, cycles_per_frame);
-    for (std::size_t i = 0; i < block; i++) gbc->step();
+    const std::size_t block =
+        std::min<std::size_t>(cycles_to_run, cycles_per_frame);
+    for (std::size_t i = 0; i < block; i++)
+      gbc->step();
     cycles_to_run -= block;
     pump_audio();
   }
@@ -239,7 +265,6 @@ void RaylibFrontend::tick_web() {
   present();
 }
 #endif
-
 
 void RaylibFrontend::start() {
   InitWindow(fb_width * 4, fb_height * 4, "GBC");
