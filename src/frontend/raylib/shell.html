@@ -64,7 +64,7 @@
 </div>
 
 <dialog class="dlg" id="loadDialog">
-  <form class="dlg-form" id="loadDialogForm" method="dialog">
+  <div class="dlg-form" id="loadDialogForm">
     <div class="dlg-title">Load ROM</div>
 
     <div class="dlg-section">
@@ -98,11 +98,11 @@
     <menu class="dlg-actions">
       <button class="btn" value="cancel">Close</button>
     </menu>
-  </form>
+  </div>
 </dialog>
 
 <dialog class="dlg" id="romPicker">
-  <form class="dlg-form" id="romPickerForm" method="dialog">
+  <div class="dlg-form" id="romPickerForm">
     <div class="dlg-title">Choose a ROM</div>
     <div class="dlg-sub" id="romPickerCount"></div>
 
@@ -114,7 +114,7 @@
       <button class="btn" value="cancel">Cancel</button>
       <button class="btn primary" id="romPickerOk" value="ok">Load</button>
     </menu>
-  </form>
+  </div>
 </dialog>
 
 <script src="app.js"></script>

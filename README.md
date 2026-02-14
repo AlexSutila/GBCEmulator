@@ -1,7 +1,7 @@
 # Overview
 Lolyep. This repo presents yet another GameBoy Color emulator written entirely from scratch. It serves as a spiritual successor to an earlier (and very poorly written) [DMG GameBoy Emulator](https://github.com/AlexSutila/GBEmulator), aiming to be a cleaner, more accurate, and more modular foundation for both DMG and CGB emulation.
 
-- Try it out without compiling: [here](https://alexsutila.github.io/GBCEmulator/gbc_wasm.html)
+- Try it out without compiling: [here](https://alexsutila.github.io/GBCEmulator/index.html)
 
 ## Compatability
 This emulator is designed to be compatible with **GameBoy Color (CGB)** games (obviously), and also implements the backwards compatability features CGB models provide. As such, this emulator can be used to emulate **original DMG GameBoy** games as well. The games shown in the screenshot below do not define the compatability limitations of this emulator, but they are known to play reasonably well.
