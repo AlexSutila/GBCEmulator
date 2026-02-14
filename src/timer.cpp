@@ -3,21 +3,20 @@
 #include "memory/bus.hpp"
 #include "memory/mmio/dmg.hpp"
 
-template <typename T> T *init_mmio(AddressBus *bus, IORegisterMapping reg_id) {
-  auto *reg = bus->get_mmio(reg_id);
-  if (auto *casted = dynamic_cast<T *>(reg))
+template <typename T>
+T* init_mmio(AddressBus* bus, const IORegisterMapping reg_id) {
+  auto* reg = bus->get_mmio(reg_id);
+  if (auto* casted = dynamic_cast<T*>(reg))
     return casted;
   throw std::logic_error(std::string("Failed to configure MMIO (Timer)"));
 }
 
-TimerUnit::TimerUnit(AddressBus *const bus, runtime_sys_info &sys,
-                     bool cgb_model)
-    : cgb_model_(cgb_model), // Since we emulate a GameBoyColor, always true
-      tima_reg(*this),       // Timer counter register
-      tma_reg(*this),        // Timer modulo register
-      tac_reg(*this),        // Timer control register
-      div_reg(*this),        // Divider register
-      sys_(sys)              // General operating mode info
+TimerUnit::TimerUnit(AddressBus* const bus, runtime_sys_info& sys)
+  : tima_reg(*this), // Timer counter register
+    tma_reg(*this), // Timer modulo register
+    tac_reg(*this), // Timer control register
+    div_reg(*this), // Divider register
+    sys_(sys) // General operating mode info
 {
   using mmio = IORegisterMapping;
   using namespace PPU;
@@ -54,12 +53,10 @@ void TimerUnit::write_div() noexcept {
   // tick
   const bool prev_in = edge_input(sys_counter_, tac_);
   sys_counter_ = 0;
-  const bool next_in = edge_input(sys_counter_, tac_);
 
-  // falling edge -> tick (with CGB gating difference)
-  if (prev_in && !next_in) {
-    if (tick_allowed_on_fall())
-      timer_tick_pulse();
+  // falling edge -> tick
+  if (const bool next_in = edge_input(sys_counter_, tac_); prev_in && !next_in) {
+    timer_tick_pulse();
   }
 }
 
@@ -96,16 +93,15 @@ void TimerUnit::write_tac(byte_t v) noexcept {
   // "writing to TAC may increase TIMA once"
   const bool prev_in = edge_input(sys_counter_, tac_);
   tac_ = v;
-  const bool next_in = edge_input(sys_counter_, tac_);
-  if (prev_in && !next_in) {
-    if (tick_allowed_on_fall())
-      timer_tick_pulse();
+  if (const bool next_in = edge_input(sys_counter_, tac_); prev_in && !next_in) {
+    timer_tick_pulse();
   }
 }
 
 byte_t TimerUnit::tac_sel(const byte_t tac) noexcept {
   return static_cast<byte_t>(tac & 0x03);
 }
+
 bool TimerUnit::tac_en(const byte_t tac) noexcept { return (tac & 0x04) != 0; }
 
 bool TimerUnit::selected_bit(const std::uint16_t sys,
@@ -118,18 +114,9 @@ bool TimerUnit::selected_bit(const std::uint16_t sys,
 }
 
 bool TimerUnit::edge_input(std::uint16_t sys, byte_t tac) const noexcept {
-  const bool src = selected_bit(sys, tac_sel(tac));
-  if (cgb_model_) {
-    // CGB: edge detector before enable gating (enable applied after)
-    return src;
-  }
-  // DMG: edge detector sees (src AND enable)
-  return src && tac_en(tac);
-}
-
-bool TimerUnit::tick_allowed_on_fall() const noexcept {
-  // CGB: enable is after edge detector -> only tick if enabled now
-  return !cgb_model_ || tac_en(tac_);
+  // On all models, TIMA increments on the falling edge of:
+  //   (TAC.enable AND selected DIV bit)
+  return tac_en(tac) && selected_bit(sys, tac_sel(tac));
 }
 
 void TimerUnit::request_timer_irq() const noexcept {
@@ -156,7 +143,8 @@ void TimerUnit::service_overflow_pipeline() noexcept {
       tima_ = tma_;
       request_timer_irq();
     }
-  } else if (reload_latch_) {
+  }
+  else if (reload_latch_) {
     if (reload_delay_ > 0 && --reload_delay_ == 0) {
       reload_latch_ = false;
     }
@@ -164,15 +152,14 @@ void TimerUnit::service_overflow_pipeline() noexcept {
 }
 
 void TimerUnit::timer_tick_pulse() noexcept {
-  if (!tac_en(tac_))
-    return;
   if (overflow_pending_ || reload_latch_)
     return;
 
   if (tima_ == 0xFF) {
     tima_ = 0x00;
     start_overflow_pipeline();
-  } else {
+  }
+  else {
     ++tima_;
   }
 }
@@ -182,10 +169,8 @@ void TimerUnit::step() noexcept {
 
   const bool prev = edge_input(sys_counter_, tac_);
   ++sys_counter_;
-  const bool next = edge_input(sys_counter_, tac_);
 
-  if (prev && !next) {
-    if (tick_allowed_on_fall())
-      timer_tick_pulse();
+  if (const bool next = edge_input(sys_counter_, tac_); prev && !next) {
+    timer_tick_pulse();
   }
 }
