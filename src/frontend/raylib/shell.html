@@ -1,138 +1,123 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1, viewport-fit=cover" name="viewport"/>
   <title>GBC Emulator</title>
-
-  <style>
-    * {
-      box-sizing: border-box;
-    }
-
-    html, body {
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      height: 100%;
-      background: #111;
-      font-family: sans-serif;
-      color: #eee;
-      overflow: hidden;
-    }
-
-    body {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-
-    #canvas-container {
-      flex: 1 1 auto;
-      width: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding-bottom: 16px;
-      min-height: 0;
-    }
-
-    canvas {
-      image-rendering: pixelated;
-      background: #000;
-      border: 2px solid #555;
-      aspect-ratio: 10 / 9;
-      width: 100%;
-      max-width: 95vmin;
-      max-height: 95vmin;
-      height: auto;
-    }
-
-    #controls {
-      margin: 12px 0;
-      flex-shrink: 0;
-    }
-
-    #romInput {
-      display: none;
-    }
-
-    #romButton {
-      display: inline-block;
-      padding: 10px 18px;
-      background: linear-gradient(#3a3a3a, #2a2a2a);
-      border: 1px solid #555;
-      border-radius: 6px;
-      color: #fff;
-      font-size: 0.95rem;
-      font-weight: 600;
-      letter-spacing: 0.3px;
-      cursor: pointer;
-      user-select: none;
-      transition: background 0.15s ease, transform 0.05s ease, box-shadow 0.15s ease;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.6);
-    }
-
-    #romButton:hover {
-      background: linear-gradient(#444, #333);
-    }
-
-    #romButton:active {
-      transform: translateY(1px);
-      box-shadow: 0 1px 2px rgba(0,0,0,0.8);
-    }
-
-    #romButton.disabled {
-      background: #222;
-      border-color: #444;
-      color: #888;
-      cursor: default;
-      box-shadow: none;
-    }
-  </style>
+  <link rel="stylesheet" href="app.css" />
 </head>
 
 <body>
-  <header>GBC Emulator</header>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <div class="title" id="title">GBC Emulator</div>
+      <div class="subtitle" id="status">Load a ROM to begin</div>
+    </div>
 
-  <div id="controls">
-    <input type="file" id="romInput" accept=".gb,.gbc" />
-    <label id="romButton" for="romInput">Load ROM</label>
+    <div class="actions">
+      <button class="btn primary" id="loadButton" type="button">Load ROM</button>
+      <button class="btn" id="fsButton" type="button">Fullscreen</button>
+    </div>
+  </header>
+
+  <main class="stage">
+    <div>
+      <div class="canvas-card" id="canvasCard">
+        <canvas id="canvas"></canvas>
+      </div>
+      <div class="hint desktop-only" id="hint">
+        Keyboard: <code>Arrows</code> <code>Z</code>=A <code>X</code>=B <code>Enter</code>=Start <code>Backspace</code>=Select
+      </div>
+    </div>
+  </main>
+
+  <div aria-label="On-screen controller" id="touch-controls">
+    <div class="cluster">
+      <div aria-label="D-pad" class="dpad">
+        <div class="spacer"></div>
+        <button aria-label="Up" class="touch-btn square" data-btn="2">▲</button>
+        <div class="spacer"></div>
+
+        <button aria-label="Left" class="touch-btn square" data-btn="1">◀</button>
+        <div class="spacer"></div>
+        <button aria-label="Right" class="touch-btn square" data-btn="0">▶</button>
+
+        <div class="spacer"></div>
+        <button aria-label="Down" class="touch-btn square" data-btn="3">▼</button>
+        <div class="spacer"></div>
+      </div>
+    </div>
+
+    <div class="cluster cluster-right" aria-label="Buttons">
+      <div aria-label="Start/Select" class="meta">
+        <button aria-label="Select" class="touch-btn pill" data-btn="6">Select</button>
+        <button aria-label="Start" class="touch-btn pill" data-btn="7">Start</button>
+      </div>
+
+      <div aria-label="A/B" class="ab">
+        <button aria-label="B" class="touch-btn round b" data-btn="5">B</button>
+        <button aria-label="A" class="touch-btn round" data-btn="4">A</button>
+      </div>
+    </div>
   </div>
+</div>
 
-  <canvas id="canvas"></canvas>
+<dialog class="dlg" id="loadDialog">
+  <form class="dlg-form" id="loadDialogForm" method="dialog">
+    <div class="dlg-title">Load ROM</div>
 
-  <script>
-    var Module = {
-      canvas: document.getElementById("canvas"),
+    <div class="dlg-section">
+      <div class="dlg-label">Local file</div>
+      <input class="dlg-file" id="loadFileInput" type="file"/>
+      <div class="dlg-help">Accepts <code>.gb</code>, <code>.gbc</code>, or <code>.zip</code></div>
+    </div>
 
-      printErr(text) {
-        console.error(text);
-      },
+    <div class="dlg-divider">or</div>
 
-      onRuntimeInitialized() {
-        console.log("WASM runtime initialized");
+    <div class="dlg-section">
+      <div class="dlg-label">URL</div>
+      <div class="dlg-urlrow">
+        <input autocomplete="off" class="dlg-url" id="loadUrlInput" inputmode="url"
+               placeholder="https://example.gg/game.zip" spellcheck="false" type="url"/>
+        <button class="btn primary" id="loadUrlGo" type="button">Load</button>
+      </div>
+      <div class="dlg-help">Remote host must allow CORS.</div>
+    </div>
 
-        const input = document.getElementById("romInput");
-        const button = document.getElementById("romButton");
+    <div class="dlg-section" id="recentWrap" style="display:none;">
+      <div class="dlg-label" style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+        <span>Recent</span>
+        <button class="btn" id="recentClear" style="padding:8px 10px; border-radius:10px; font-size:.86rem;"
+                type="button">Clear
+        </button>
+      </div>
+      <div aria-label="Recent URLs" class="recent-list" id="recentList"></div>
+    </div>
 
-        input.addEventListener("change", async (e) => {
-          const file = e.target.files[0];
-          if (!file) return;
+    <menu class="dlg-actions">
+      <button class="btn" value="cancel">Close</button>
+    </menu>
+  </form>
+</dialog>
 
-          // I hate this stupid button, it is the bane of my existence
-          button.classList.add("disabled");
-          button.textContent = "ROM Loaded";
-          input.disabled = true;
+<dialog class="dlg" id="romPicker">
+  <form class="dlg-form" id="romPickerForm" method="dialog">
+    <div class="dlg-title">Choose a ROM</div>
+    <div class="dlg-sub" id="romPickerCount"></div>
 
-          // Copy rom to Emscripten FS and start emulation loop
-          const bytes = new Uint8Array(await file.arrayBuffer());
-          FS.writeFile("/rom.bin", bytes);
-          Module._emscripten_start();
-        });
-      }
-    };
-  </script>
+    <fieldset aria-label="ROM list" class="rom-list" id="romList">
+      <!-- radios injected here -->
+    </fieldset>
 
-  {{{ SCRIPT }}}
+    <menu class="dlg-actions">
+      <button class="btn" value="cancel">Cancel</button>
+      <button class="btn primary" id="romPickerOk" value="ok">Load</button>
+    </menu>
+  </form>
+</dialog>
+
+<script src="app.js"></script>
+{{{ SCRIPT }}}
 </body>
 </html>

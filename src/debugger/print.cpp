@@ -1,12 +1,16 @@
 #include "debugger/print.hpp"
 #include "cpu/interrupts.hpp"
 #include "cpu/lr35902.hpp"
+#include <cctype>
+#include <sstream>
 
 namespace Debug {
 
-[[nodiscard]] std::string hex8(const byte_t v) {
+[[nodiscard]] std::string hex8(const byte_t v, bool compact = false) {
   std::ostringstream o;
-  o << "0x" << std::hex << std::uppercase // ...
+  if (!compact) // I hate this, but what can you do lol
+    o << "0x";
+  o << std::hex << std::uppercase // ...
     << std::setw(2) << std::setfill('0') << +v;
   return o.str();
 }
@@ -16,6 +20,30 @@ namespace Debug {
   o << "0x" << std::hex << std::uppercase // ...
     << std::setw(4) << std::setfill('0') << +v;
   return o.str();
+}
+
+std::string create_hex_view(const addr_t base_addr,
+                            const std::vector<byte_t> &vec) {
+  constexpr std::size_t bytes_per_row = 0x10;
+  std::ostringstream out;
+
+  for (std::size_t i{0}; i < vec.size(); i += bytes_per_row) {
+    out << hex16(static_cast<addr_t>(i + base_addr)) << ": ";
+    for (std::size_t j{0}; j < bytes_per_row; ++j) {
+      if (i + j < vec.size())
+        out << hex8(vec.at(i + j), true) << " ";
+      else // Need the spaces to pad out for the ASCII view
+        out << "     ";
+    }
+
+    out << "|";
+    for (std::size_t j{0}; j < bytes_per_row && i + j < vec.size(); ++j) {
+      const char c = static_cast<char>(vec.at(i + j));
+      out << (std::isprint(c) ? c : '.');
+    }
+    out << "|\n";
+  }
+  return out.str();
 }
 
 std::string to_string(const LR35902::ProcessorState &s) {
@@ -54,6 +82,31 @@ std::string to_string(const PixelProcessingUnit::PPUState &s) {
       << "WX:    " << hex8(s.wx) << "  WY:   " << hex8(s.wy) << "\n"
       << "LY:    " << static_cast<int>(s.ly)
       << "  LYC:  " << static_cast<int>(s.lyc);
+  return out.str();
+}
+
+std::string to_string(const ObjAttrDMA::DMAState &s) {
+  std::ostringstream out;
+  out << "OAM DMA: " << (s.active ? "(active)\n" : "(inactive)\n")
+      << " source_address: " << hex16(s.src_base_address) << "\n"
+      << " dest_address:   " << hex16(0xFE00) << "\n" // always fixed
+      << " data_offset:    " << hex16(s.data_offset) << "\n";
+  return out.str();
+}
+
+std::string to_string(const VDMA::DMAState &s) {
+  std::ostringstream out;
+  if (s.gdma_active)
+    out << "VDMA: (GDMA active)\n";
+  else if (s.hdma_active)
+    out << "VDMA: (HDMA active)\n";
+  else if (s.hdma_waiting)
+    out << "VDMA: (HDMA waiting)\n";
+  else
+    out << "VDMA: (inactive)\n";
+  out << " dest_address:   " << hex16(s.dest_base_address) << "\n"
+      << " source_address: " << hex16(s.src_base_address) << "\n"
+      << " data_offset:    " << hex16(s.data_offset) << "\n";
   return out.str();
 }
 
@@ -97,9 +150,7 @@ static std::string bytes_hex(const std::span<const byte_t> s) {
 }
 
 static std::string two_char_code(const byte_t a, const byte_t b) {
-  auto printable = [](const byte_t x) {
-    return std::isprint(x) != 0;
-  };
+  auto printable = [](const byte_t x) { return std::isprint(x) != 0; };
   if (printable(a) && printable(b)) {
     std::string s;
     s.push_back(static_cast<char>(a));
