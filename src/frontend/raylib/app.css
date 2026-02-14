@@ -583,6 +583,68 @@ canvas {
   display: none;
 }
 
+/* ---- Settings dialog ---- */
+.settings-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.slider { width: 100%; }
+
+.slider-val {
+  min-width: 3.5ch;
+  text-align: right;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.keybind-list {
+  border: 1px solid rgba(255, 255, 255, .12);
+  background: rgba(255, 255, 255, .04);
+  border-radius: 14px;
+  padding: 6px;
+  display: grid;
+  gap: 6px;
+}
+
+.keybind-item {
+  display: grid;
+  grid-template-columns: 90px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, .10);
+  background: rgba(0, 0, 0, .12);
+}
+
+.keybind-item .act {
+  color: rgba(255, 255, 255, .88);
+  font-weight: 750;
+  font-size: .92rem;
+}
+
+.keybind-item .key {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--muted);
+  font-size: .92rem;
+}
+
+.keybind-item .bind {
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-size: .86rem;
+}
+
+.keybind-item.capturing {
+  border-color: rgba(99, 102, 241, 0.55);
+  box-shadow: 0 10px 26px rgba(0,0,0,.35);
+}
+
 /* Phone-ish tweaks (only when touch UI is actually enabled) */
 @media (max-width: 900px) {
   :root.touch-ui {
@@ -592,6 +654,7 @@ canvas {
   }
 
   .touch-ui #fsButton { display: none; }
+  .touch-ui #settingsButton { display: none; }
   .touch-ui .canvas-card { padding: 0; border: none; box-shadow: none; background: #000; }
   .touch-ui canvas { border: none; }
 

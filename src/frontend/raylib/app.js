@@ -57,6 +57,147 @@ function setupCanvasFocus(canvas) {
   window.addEventListener("pointerdown", () => canvas.focus());
 }
 
+const ACTIONS = [
+  {id: 0, name: "Right", def: "ArrowRight"},
+  {id: 1, name: "Left", def: "ArrowLeft"},
+  {id: 2, name: "Up", def: "ArrowUp"},
+  {id: 3, name: "Down", def: "ArrowDown"},
+  {id: 4, name: "A", def: "KeyZ"},
+  {id: 5, name: "B", def: "KeyX"},
+  {id: 6, name: "Select", def: "Backspace"},
+  {id: 7, name: "Start", def: "Enter"},
+];
+
+const KEYMAP_KEY = "gbc_keymap_v1";
+const VOLUME_KEY = "gbc_volume_v1";
+
+function defaultKeymap() {
+  const m = {};
+  for (const a of ACTIONS) m[a.id] = a.def;
+  return m;
+}
+
+function loadKeymap() {
+  try {
+    const obj = JSON.parse(localStorage.getItem(KEYMAP_KEY) || "{}");
+    const d = defaultKeymap();
+    for (const a of ACTIONS) {
+      const v = obj?.[String(a.id)] || obj?.[a.id];
+      d[a.id] = (typeof v === "string" && v) ? v : d[a.id];
+    }
+    return d;
+  } catch {
+    return defaultKeymap();
+  }
+}
+
+function saveKeymap(map) {
+  try { localStorage.setItem(KEYMAP_KEY, JSON.stringify(map)); } catch {}
+}
+
+function loadVolume() {
+  try {
+    const v = Number(localStorage.getItem(VOLUME_KEY));
+    if (Number.isFinite(v)) return Math.min(1, Math.max(0, v));
+    return 1.0;
+  } catch {
+    return 1.0;
+  }
+}
+
+function saveVolume(v) {
+  try { localStorage.setItem(VOLUME_KEY, String(v)); } catch {}
+}
+
+function prettyKey(code) {
+  const s = String(code || "");
+  if (!s) return "(none)";
+  if (s.startsWith("Key")) return s.slice(3);
+  if (s.startsWith("Digit")) return s.slice(5);
+  if (s === "ArrowUp") return "↑";
+  if (s === "ArrowDown") return "↓";
+  if (s === "ArrowLeft") return "←";
+  if (s === "ArrowRight") return "→";
+  if (s === "Space") return "Space";
+  if (s === "Backspace") return "Backspace";
+  if (s === "Enter") return "Enter";
+  if (s === "Escape") return "Escape";
+  if (s.startsWith("Numpad")) return s.replace("Numpad", "Num ");
+  return s;
+}
+
+function isTextyTarget(t) {
+  const el = t && (t.nodeType === 1 ? t : null);
+  if (!el) return false;
+  const tag = el.tagName?.toLowerCase?.() || "";
+  if (tag === "input" || tag === "textarea" || tag === "select") return true;
+  return !!el.isContentEditable;
+}
+
+function updateHintFromKeymap(keymap) {
+  const hint = document.getElementById("hint");
+  if (!hint) return;
+  const get = (id) => `<code>${prettyKey(keymap[id])}</code>`;
+  hint.innerHTML =
+    `Keyboard: ${get(2)} ${get(3)} ${get(1)} ${get(0)} ` +
+    `${get(4)}=A ${get(5)}=B ${get(7)}=Start ${get(6)}=Select`;
+}
+
+function bindKeyboard(Module, getKeymap, opts) {
+  const callSetBtn = (btn, pressed) => {
+    if (typeof Module._emscripten_set_button === "function") {
+      Module._emscripten_set_button(btn, pressed ? 1 : 0);
+    }
+  };
+  const clearAll = () => {
+    if (typeof Module._emscripten_clear_buttons === "function") {
+      Module._emscripten_clear_buttons();
+    }
+  };
+
+  const down = new Set();
+  const codeToAction = () => {
+    const map = getKeymap();
+    const rev = new Map();
+    for (const a of ACTIONS) rev.set(map[a.id], a.id);
+    return rev;
+  };
+
+  window.addEventListener("keydown", (e) => {
+    if (opts?.isCapturing?.()) return;
+    if (isTextyTarget(e.target)) return;
+    if (e.repeat) return;
+
+    const rev = codeToAction();
+    const btn = rev.get(e.code);
+    if (btn == null) return;
+
+    e.preventDefault();
+    if (down.has(e.code)) return;
+    down.add(e.code);
+    callSetBtn(btn, true);
+  }, {passive: false});
+
+  window.addEventListener("keyup", (e) => {
+    if (opts?.isCapturing?.()) return;
+
+    const rev = codeToAction();
+    const btn = rev.get(e.code);
+    if (btn == null) return;
+
+    e.preventDefault();
+    down.delete(e.code);
+    callSetBtn(btn, false);
+  }, {passive: false});
+
+  window.addEventListener("blur", () => { down.clear(); clearAll(); });
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) { down.clear(); clearAll(); }
+  });
+
+  return {clearAll};
+}
+
 function bindTouchButtons(Module) {
   const callSetBtn = (btn, pressed) => {
     if (typeof Module._emscripten_set_button === "function") {
@@ -359,9 +500,115 @@ var Module = {
     const recentClear = document.getElementById("recentClear");
     const status = document.getElementById("status");
 
+    const settingsButton = document.getElementById("settingsButton");
+    const settingsDlg = document.getElementById("settingsDialog");
+    const volumeSlider = document.getElementById("volumeSlider");
+    const volumeValue = document.getElementById("volumeValue");
+    const keybindList = document.getElementById("keybindList");
+    const keybindReset = document.getElementById("keybindReset");
+
     setupCanvasFocus(canvas);
     setupFullscreen(canvas);
     const touch = bindTouchButtons(Module);
+
+    let keymap = loadKeymap();
+    let capturing = null;
+    const isCapturing = () => capturing != null;
+
+    const kb = bindKeyboard(Module, () => keymap, { isCapturing });
+    updateHintFromKeymap(keymap);
+
+    const applyVolume = (v01) => {
+      const v = Math.min(1, Math.max(0, Number(v01)));
+      if (typeof Module._emscripten_set_master_volume === "function") {
+        Module._emscripten_set_master_volume(v);
+      }
+      saveVolume(v);
+      if (volumeSlider) volumeSlider.value = String(Math.round(v * 100));
+      if (volumeValue) volumeValue.textContent = `${Math.round(v * 100)}%`;
+    };
+    applyVolume(loadVolume());
+
+    function renderKeybinds() {
+      if (!keybindList) return;
+      keybindList.innerHTML = "";
+      for (const a of ACTIONS) {
+        const row = document.createElement("div");
+        row.className = "keybind-item" + (capturing === a.id ? " capturing" : "");
+
+        const act = document.createElement("div");
+        act.className = "act";
+        act.textContent = a.name;
+
+        const key = document.createElement("div");
+        key.className = "key";
+        key.textContent = prettyKey(keymap[a.id]);
+
+        const bind = document.createElement("button");
+        bind.type = "button";
+        bind.className = "btn bind";
+        bind.textContent = capturing === a.id ? "Press a key…" : "Rebind";
+        bind.addEventListener("click", () => {
+          capturing = a.id;
+          renderKeybinds();
+        });
+
+        row.appendChild(act);
+        row.appendChild(key);
+        row.appendChild(bind);
+        keybindList.appendChild(row);
+      }
+    }
+    renderKeybinds();
+
+    window.addEventListener("keydown", (e) => {
+      if (!isCapturing()) return;
+      if (!settingsDlg?.open) return;
+
+      if (e.code === "Escape") {
+        e.preventDefault();
+        capturing = null;
+        renderKeybinds();
+        return;
+      }
+
+      if (!e.code) return;
+
+      e.preventDefault();
+      const newCode = e.code;
+      const action = capturing;
+
+      const other = ACTIONS.find((x) => x.id !== action && keymap[x.id] === newCode)?.id;
+      const prev = keymap[action];
+      keymap[action] = newCode;
+      if (other != null) keymap[other] = prev;
+
+      saveKeymap(keymap);
+      updateHintFromKeymap(keymap);
+      capturing = null;
+      renderKeybinds();
+    }, {passive: false});
+
+    keybindReset?.addEventListener("click", () => {
+      keymap = defaultKeymap();
+      saveKeymap(keymap);
+      updateHintFromKeymap(keymap);
+      capturing = null;
+      renderKeybinds();
+    });
+
+    volumeSlider?.addEventListener("input", () => {
+      const v = Math.min(100, Math.max(0, Number(volumeSlider.value))) / 100;
+      applyVolume(v);
+    });
+
+    settingsButton?.addEventListener("click", () => {
+      touch.clearAll();
+      kb.clearAll();
+      capturing = null;
+      renderKeybinds();
+      settingsDlg?.showModal?.();
+    });
 
     const root = document.documentElement;
     root.classList.toggle("touch-ui", hasTouchUI());

@@ -17,6 +17,7 @@
 
     <div class="actions">
       <button class="btn primary" id="loadButton" type="button">Load ROM</button>
+      <button class="btn" id="settingsButton" type="button">Settings</button>
       <button class="btn" id="fsButton" type="button">Fullscreen</button>
     </div>
   </header>
@@ -115,6 +116,36 @@
       <button class="btn primary" id="romPickerOk" value="ok">Load</button>
     </menu>
   </div>
+</dialog>
+
+<dialog class="dlg" id="settingsDialog">
+  <form class="dlg-form" id="settingsDialogForm" method="dialog">
+    <div class="dlg-title">Settings</div>
+
+    <div class="dlg-section">
+      <div class="dlg-label">Volume</div>
+      <div class="settings-row">
+        <input aria-label="Volume" class="slider" id="volumeSlider" max="100" min="0" step="1" type="range"/>
+        <div aria-label="Volume percent" class="slider-val" id="volumeValue">100%</div>
+      </div>
+    </div>
+
+    <div class="dlg-section">
+      <div class="dlg-label" style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+        <span>Keybinds</span>
+        <button class="btn" id="keybindReset"
+                style="padding:8px 10px; border-radius:10px; font-size:.86rem;"
+                type="button">Reset</button>
+      </div>
+
+      <div aria-label="Keybind list" class="keybind-list" id="keybindList"></div>
+      <div class="dlg-help">Click a binding, then press a key. Press <code>Escape</code> to cancel.</div>
+    </div>
+
+    <menu class="dlg-actions">
+      <button class="btn" value="cancel">Close</button>
+    </menu>
+  </form>
 </dialog>
 
 <script src="app.js"></script>
