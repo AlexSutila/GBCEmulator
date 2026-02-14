@@ -46,7 +46,8 @@ html, body {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap; /* keep actions from dropping due to long subtitle */
+  min-width: 0;
 }
 
 .brand {
@@ -54,6 +55,7 @@ html, body {
   flex-direction: column;
   gap: 2px;
   min-width: 0;
+  flex: 1 1 auto; /* allow brand to shrink; subtitle/title will ellipsis */
 }
 
 .brand .title {
@@ -78,7 +80,7 @@ html, body {
   align-items: center;
   gap: 10px;
   flex-shrink: 0;
-  flex-wrap: wrap;
+  flex-wrap: nowrap; /* keep buttons together */
   justify-content: flex-end;
 }
 
@@ -533,58 +535,41 @@ canvas {
   font-size: .82rem;
 }
 
-@media (pointer: coarse), (max-width: 900px) {
-  :root {
-    /* JS will overwrite this with the measured height of the touch controls;
-       keep a fallback value for very early layout. */
-    --touchbar-h: 170px;
+/* Touch UI: enabled by JS adding class "touch-ui" on <html> */
+:root.touch-ui {
+  /* JS will overwrite --touchbar-h with measured height; keep a fallback */
+  --touchbar-h: 170px;
+  --touch-unit: 56px;
+  --ab-a: 72px;
+  --ab-b: 64px;
+}
+
+.touch-ui #touch-controls {
+  display: grid;
+  grid-template-columns: auto auto;
+  justify-content: space-between;
+  align-items: end;
+}
+
+.touch-ui .hint.desktop-only {
+  display: none;
+}
+
+/* Phone-ish tweaks (only when touch UI is actually enabled) */
+@media (max-width: 900px) {
+  :root.touch-ui {
     --touch-unit: clamp(38px, 12vw, 52px);
     --ab-a: clamp(50px, 16vw, 64px);
     --ab-b: clamp(46px, 14vw, 58px);
   }
 
-  /* Hide fullscreen on phones */
-  #fsButton {
-    display: none;
-  }
+  .touch-ui #fsButton { display: none; }
+  .touch-ui .canvas-card { padding: 0; border: none; box-shadow: none; background: #000; }
+  .touch-ui canvas { border: none; }
 
-  /* Give the game screen more space on phones */
-  .canvas-card {
-    padding: 0;
-    border: none;
-    box-shadow: none;
-    background: #000;
-  }
-
-  canvas {
-    border: none;
-  }
-
-  #touch-controls {
-    display: grid;
-    grid-template-columns: auto auto;
-    justify-content: space-between;
-    align-items: end;
-  }
-
-  #touch-controls .cluster {
-    padding: 8px;
-    border-radius: 18px;
-  }
-
-  .touch-btn.pill {
-    height: 38px;
-    padding: 0 12px;
-    font-size: 0.88rem;
-  }
-
-  .touch-btn.square {
-    border-radius: 14px;
-  }
-
-  .hint.desktop-only {
-    display: none;
-  }
+  .touch-ui #touch-controls .cluster { padding: 8px; border-radius: 18px; }
+  .touch-ui .touch-btn.pill { height: 38px; padding: 0 12px; font-size: 0.88rem; }
+  .touch-ui .touch-btn.square { border-radius: 14px; }
 }
 
 /* Prevent mobile browsers from zooming in on the URL input */

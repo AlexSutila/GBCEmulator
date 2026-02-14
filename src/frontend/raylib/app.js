@@ -1,5 +1,9 @@
-function isTouchDevice() {
-  return window.matchMedia("(pointer: coarse)").matches || window.matchMedia("(max-width: 900px)").matches;
+function hasTouchUI() {
+  return (
+    (navigator.maxTouchPoints && navigator.maxTouchPoints > 0) ||
+    window.matchMedia("(pointer: coarse)").matches ||
+    "ontouchstart" in window
+  );
 }
 
 // Keep CSS layout variables in sync with the *actual* rendered chrome sizes
@@ -337,15 +341,6 @@ function renderRecentUrls({onPick}) {
   }
 }
 
-function looksLikeHttpUrl(s) {
-  try {
-    const u = new URL(s);
-    return u.protocol === "http:" || u.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
-
 // ---- Emscripten module ----
 var Module = {
   canvas: document.getElementById("canvas"),
@@ -367,6 +362,9 @@ var Module = {
     setupCanvasFocus(canvas);
     setupFullscreen(canvas);
     const touch = bindTouchButtons(Module);
+
+    const root = document.documentElement;
+    root.classList.toggle("touch-ui", hasTouchUI());
 
     const setTempDisabled = (disabled) => {
       loadButton.disabled = disabled;
