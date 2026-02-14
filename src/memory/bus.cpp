@@ -216,8 +216,10 @@ void AddressBus::write_byte(const addr_t addr, const byte_t value) {
   }
 
   /* Write to Object Attribute Memory */
-  else if (is_oam_range(addr))
-    oam[addr - 0xFE00] = value;
+  else if (is_oam_range(addr)) {
+    if (!is_acquired(BusConflictTypes::BUS_CONFLICT_OAM_DMA)) [[likely]]
+      oam[addr - 0xFE00] = value;
+  }
 
   /* Write to memory mapped IO register */
   else if (io_registers.contains(addr)) {
