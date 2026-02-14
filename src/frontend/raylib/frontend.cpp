@@ -204,8 +204,8 @@ void RaylibFrontend::pump_audio() {
 
 #ifdef __EMSCRIPTEN__
 void RaylibFrontend::tick_web() {
-  // Drive emulation by wall-time instead of assuming one frame per rAF tick.
-  // This keeps audio from underrunning when the browser drops frames.
+  // Drive emulation by wall-time instead of assuming one frame per rAF tick
+  // This keeps audio from underrunning when the browser drops frames
   constexpr double cpu_hz = 4194304.0; // Game Boy CPU clock (T-cycles/sec)
   constexpr std::size_t cycles_per_frame = 70224; // T-cycles per frame (~59.73 Hz)
 
@@ -215,19 +215,19 @@ void RaylibFrontend::tick_web() {
   double dt_ms = now_ms - web_last_ms;
   web_last_ms = now_ms;
 
-  // Clamp to avoid huge catch-up bursts (e.g., background tab).
+  // Clamp to avoid huge catch-up bursts (e.g., background tab)
   dt_ms = std::clamp(dt_ms, 0.0, 100.0);
 
   web_cycle_accum += dt_ms * (cpu_hz / 1000.0);
 
   constexpr std::size_t max_cycles_per_tick = cycles_per_frame * 4; // cap catch-up
-  std::size_t cycles_to_run = static_cast<std::size_t>(web_cycle_accum);
+  auto cycles_to_run = static_cast<std::size_t>(web_cycle_accum);
   cycles_to_run = std::min(cycles_to_run, max_cycles_per_tick);
   web_cycle_accum -= static_cast<double>(cycles_to_run);
 
   read_inputs();
 
-  // Chunk execution and keep feeding the audio stream between chunks.
+  // Chunk execution and keep feeding the audio stream between chunks
   while (cycles_to_run) {
     const std::size_t block = std::min<std::size_t>(cycles_to_run, cycles_per_frame);
     for (std::size_t i = 0; i < block; i++) gbc->step();

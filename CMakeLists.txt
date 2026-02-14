@@ -210,9 +210,20 @@ if(EMSCRIPTEN)
             -flto
             -O3
     )
-    set_target_properties(gbc_wasm PROPERTIES SUFFIX ".html")
+    set_target_properties(gbc_wasm PROPERTIES
+            OUTPUT_NAME "index"
+            SUFFIX ".html")
     ## Make sure html changes are registered by ninja and trigger a rebuild
     set_property(TARGET gbc_wasm APPEND PROPERTY LINK_DEPENDS "${SHELL_HTML}")
+
+    add_custom_command(TARGET gbc_wasm POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+              "${CMAKE_SOURCE_DIR}/src/frontend/raylib/app.css"
+              "$<TARGET_FILE_DIR:gbc_wasm>/app.css"
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+              "${CMAKE_SOURCE_DIR}/src/frontend/raylib/app.js"
+              "$<TARGET_FILE_DIR:gbc_wasm>/app.js"
+)
 
 # ===========================================================================
 #  Non=WASM build target (including Raylib for desktop)
