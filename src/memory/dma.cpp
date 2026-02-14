@@ -51,9 +51,12 @@ void ObjAttrDMA::start(const byte_t addr_high) {
 }
 
 void ObjAttrDMA::do_oam_dma_init() {
-  static constexpr auto total_clock_cycles = 4; // T-cycles
+  static constexpr auto total_clock_cycles = 4 * 2; // T-cycles
   if (!clocks_remaining.has_value())
     clocks_remaining = total_clock_cycles;
+
+  if (clocks_remaining.value() == 4)
+    bus_.acquire(BusConflictTypes::BUS_CONFLICT_OAM_DMA);
   --clocks_remaining.value();
 
   /* State transition logic */
@@ -68,10 +71,9 @@ void ObjAttrDMA::do_oam_dma_tran() {
 
   /* This is always fixed, although the time required for completion of the data
    * transfer does seem to be impacted by double speed mode. */
-  if (!clocks_remaining.has_value()) {
-    bus_.acquire(BusConflictTypes::BUS_CONFLICT_OAM_DMA);
+  if (!clocks_remaining.has_value())
+    // bus_.acquire(BusConflictTypes::BUS_CONFLICT_OAM_DMA);
     clocks_remaining = total_clock_cycles;
-  }
 
   /* Align data transfer perfectly with the M-cycle clock */
   if (clocks_remaining.value() % 4 == 0) {
