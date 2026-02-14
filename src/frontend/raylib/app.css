@@ -15,6 +15,13 @@
   --ab-b: 64px;
 }
 
+*,
+*::before,
+*::after {
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  -webkit-touch-callout: none !important;
+}
 * {
   box-sizing: border-box;
 }
@@ -31,6 +38,7 @@ html, body {
   font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Apple Color Emoji", "Segoe UI Emoji";
   overflow: hidden;
   overflow-x: hidden; /* guard against accidental horizontal overflow */
+  touch-action: manipulation;
 }
 
 .app {
@@ -224,8 +232,6 @@ canvas {
   justify-content: center;
   flex-wrap: wrap;
   pointer-events: none; /* enable only on children */
-  -webkit-user-select: none;
-  user-select: none;
 }
 
 #touch-controls .cluster {
@@ -237,8 +243,6 @@ canvas {
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.40);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  -webkit-user-select: none;
-  user-select: none;
 }
 
 /* Right-side touch cluster: Start/Select stacked above A/B */
@@ -248,8 +252,6 @@ canvas {
   border: none;
   align-items: center;
   justify-items: center;
-  -webkit-user-select: none;
-  user-select: none;
 }
 
 .dpad {
@@ -259,15 +261,11 @@ canvas {
   gap: clamp(4px, 1.6vw, 8px);
   align-items: center;
   justify-items: center;
-  -webkit-user-select: none;
-  user-select: none;
 }
 
 .dpad .spacer {
   width: var(--touch-unit);
   height: var(--touch-unit);
-  -webkit-user-select: none;
-  user-select: none;
 }
 
 .touch-btn {
@@ -279,14 +277,10 @@ canvas {
   color: var(--text);
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25);
   font-weight: 750;
-  -webkit-user-select: none;
-  user-select: none;
 }
 
 .touch-btn:active {
   transform: translateY(1px);
-  -webkit-user-select: none;
-  user-select: none;
 }
 
 .touch-btn.square {
@@ -294,8 +288,6 @@ canvas {
   height: var(--touch-unit);
   border-radius: 16px;
   font-size: 1.05rem;
-  -webkit-user-select: none;
-  user-select: none;
 }
 
 .touch-btn.pill {
@@ -304,8 +296,6 @@ canvas {
   border-radius: 999px;
   font-size: 0.92rem;
   letter-spacing: 0.2px;
-  -webkit-user-select: none;
-  user-select: none;
 }
 
 .touch-btn.round {
@@ -313,8 +303,6 @@ canvas {
   height: var(--ab-a);
   border-radius: 999px;
   font-size: 1.25rem;
-  -webkit-user-select: none;
-  user-select: none;
 }
 
 .touch-btn.round.b {
@@ -322,8 +310,6 @@ canvas {
   height: var(--ab-b);
   font-size: 1.1rem;
   opacity: 0.95;
-  -webkit-user-select: none;
-  user-select: none;
 }
 
 .meta {
@@ -339,8 +325,6 @@ canvas {
   border: 1px solid rgba(255, 255, 255, 0.10);
   /*box-shadow: 0 8px 18px rgba(0, 0, 0, 0.25);*/
   box-sizing: border-box;
-  -webkit-user-select: none;
-  user-select: none;
 }
 
 .ab {
@@ -356,8 +340,6 @@ canvas {
   border: 1px solid rgba(255, 255, 255, 0.10);
   /*box-shadow: 0 8px 18px rgba(0, 0, 0, 0.25);*/
   box-sizing: border-box;
-  -webkit-user-select: none;
-  user-select: none;
 }
 
 
@@ -575,8 +557,6 @@ canvas {
   grid-template-columns: auto auto;
   justify-content: space-between;
   align-items: end;
-  -webkit-user-select: none;
-  user-select: none;
 }
 
 .touch-ui .hint.desktop-only {

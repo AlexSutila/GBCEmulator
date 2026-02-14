@@ -30,6 +30,9 @@ function setupDynamicChromeVars() {
   window.addEventListener("resize", update, {passive: true});
   window.addEventListener("orientationchange", update, {passive: true});
   document.addEventListener("fullscreenchange", update);
+  document.addEventListener("gesturestart", e => e.preventDefault());
+  document.addEventListener("gesturechange", e => e.preventDefault());
+  document.addEventListener("gestureend", e => e.preventDefault());
 
   if (window.ResizeObserver) {
     const ro = new ResizeObserver(update);
