@@ -15,6 +15,7 @@
 | testing/test_mooneye.py | test_mooneye      | mts-20240926-1737-443f6e1/acceptance/bits/reg_f.gb                                                                                            |      1 |      0 |        1 |
 | testing/test_mooneye.py | test_mooneye      | mts-20240926-1737-443f6e1/acceptance/interrupts/ie_push.gb                                                                                    |      1 |      0 |        1 |
 | testing/test_mooneye.py | test_mooneye      | mts-20240926-1737-443f6e1/acceptance/timer/div_write.gb                                                                                       |      1 |      0 |        1 |
+| testing/test_mooneye.py | test_mooneye      | mts-20240926-1737-443f6e1/acceptance/timer/rapid_toggle.gb                                                                                    |      1 |      0 |        1 |
 | testing/test_mooneye.py | test_mooneye      | mts-20240926-1737-443f6e1/acceptance/timer/tim00_div_trigger.gb                                                                               |      1 |      0 |        1 |
 | testing/test_mooneye.py | test_mooneye      | mts-20240926-1737-443f6e1/acceptance/timer/tim00.gb                                                                                           |      1 |      0 |        1 |
 | testing/test_mooneye.py | test_mooneye      | mts-20240926-1737-443f6e1/acceptance/timer/tim01_div_trigger.gb                                                                               |      1 |      0 |        1 |
@@ -80,8 +81,7 @@
 | testing/test_mooneye.py | test_mooneye      | mts-20240926-1737-443f6e1/acceptance/reti_timing.gb                                                                                           |      0 |      1 |        1 |
 | testing/test_mooneye.py | test_mooneye      | mts-20240926-1737-443f6e1/acceptance/ret_timing.gb                                                                                            |      0 |      1 |        1 |
 | testing/test_mooneye.py | test_mooneye      | mts-20240926-1737-443f6e1/acceptance/rst_timing.gb                                                                                            |      0 |      1 |        1 |
-| testing/test_mooneye.py | test_mooneye      | mts-20240926-1737-443f6e1/acceptance/timer/rapid_toggle.gb                                                                                    |      0 |      1 |        1 |
 | testing/test_mooneye.py | test_mooneye      | mts-20240926-1737-443f6e1/acceptance/ppu/intr_2_mode0_timing_sprites.gb                                                                       |      0 |      1 |        1 |
 | testing/test_mooneye.py | test_mooneye      | mts-20240926-1737-443f6e1/acceptance/ppu/intr_2_oam_ok_timing.gb                                                                              |      0 |      1 |        1 |
 | testing/test_visual.py  | test_blargg_suite | oam_bug-https://github.com/retrio/gb-test-roms/raw/refs/heads/master/oam_bug/oam_bug.gb-00000000000000000000000000000000                      |      0 |      1 |        1 |
-| TOTAL                   |                   |                                                                                                                                               |     66 |     18 |       84 |
+| TOTAL                   |                   |                                                                                                                                               |     67 |     17 |       84 |
