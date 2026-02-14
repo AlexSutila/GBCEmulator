@@ -81,7 +81,20 @@ FetchContent_Declare(
     GIT_TAG        5.0
 )
 FetchContent_MakeAvailable(raylib)
+if(EMSCRIPTEN)
+  # Enable miniaudio AudioWorklet backend inside raylib
+  target_compile_definitions(raylib PRIVATE MA_ENABLE_AUDIO_WORKLETS)
 
+  # ALL objects must be built with atomics + bulk-memory (raylib includes raudio.c)
+  set(EM_SHARED_MEM_FLAGS -pthread -matomics -mbulk-memory)
+
+  target_compile_options(raylib PRIVATE ${EM_SHARED_MEM_FLAGS})
+  target_link_options(raylib PRIVATE ${EM_SHARED_MEM_FLAGS})
+
+  # since gbc_wasm uses -flto
+  target_compile_options(raylib PRIVATE -flto)
+  target_link_options(raylib PRIVATE -flto)
+endif()
 
 # ===========================================================================
 #  Emulator core source files - Common and needed across ALL build targets
@@ -192,21 +205,26 @@ if(EMSCRIPTEN)
             -sBINARYEN_ASYNC_COMPILATION=0
             -sMIN_WEBGL_VERSION=2
             -sMAX_WEBGL_VERSION=2
-            -sUSE_PTHREADS=0
             -sEXPORTED_FUNCTIONS=_emscripten_start,_malloc,_free
             -sEXPORTED_RUNTIME_METHODS=HEAPF32
             -sSTACK_OVERFLOW_CHECK=0
             -sFORCE_FILESYSTEM=1
             -sSAFE_HEAP=0
+            -sAUDIO_WORKLET=1
+            -sWASM_WORKERS=1
+            -sASYNCIFY
             -fno-rtti
             -flto
+            -pthread
             -O3
             --shell-file=${SHELL_HTML}
     )
     target_compile_options(gbc_wasm
         PRIVATE
             ${GBC_COMPILE_OPTIONS}
+            -pthread
             -sUSE_WEBGL2=1
+            -sWASM_WORKERS=1
             -flto
             -O3
     )
