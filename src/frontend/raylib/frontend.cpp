@@ -48,9 +48,7 @@ EMSCRIPTEN_KEEPALIVE void emscripten_clear_buttons() { g_web_input_state = 0; }
 
 static void frame_cb(void* user) {
   auto* fe = static_cast<RaylibFrontend*>(user);
-  fe->read_inputs();
-  fe->step_frame();
-  fe->present();
+  fe->tick_web();
 }
 #endif // __EMSCRIPTEN__
 
@@ -62,9 +60,10 @@ static std::uint32_t format_color(const std::uint32_t c) {
 RaylibFrontend::RaylibFrontend(const cart& c) { gbc->insert_cartridge(c); }
 
 RaylibFrontend::~RaylibFrontend() {
-  if (texture.id)
-    ::UnloadTexture(texture);
-  ::CloseWindow();
+  if (audio_ready) ::UnloadAudioStream(audio_stream);
+  CloseAudioDevice();
+  if (texture.id) ::UnloadTexture(texture);
+  CloseWindow();
 }
 
 std::array<std::uint32_t, 144 * 160> RaylibFrontend::get_frame() {
@@ -95,26 +94,26 @@ void RaylibFrontend::clear(std::uint32_t c) {
 void RaylibFrontend::read_inputs() const {
   std::uint8_t input_state{};
 
-  if (::IsKeyDown(KEY_UP))
+  if (IsKeyDown(KEY_UP))
     input_state |= static_cast<std::uint8_t>(Joypad::JoypadButton::UP);
-  if (::IsKeyDown(KEY_DOWN))
+  if (IsKeyDown(KEY_DOWN))
     input_state |= static_cast<std::uint8_t>(Joypad::JoypadButton::DOWN);
-  if (::IsKeyDown(KEY_LEFT))
+  if (IsKeyDown(KEY_LEFT))
     input_state |= static_cast<std::uint8_t>(Joypad::JoypadButton::LEFT);
-  if (::IsKeyDown(KEY_RIGHT))
+  if (IsKeyDown(KEY_RIGHT))
     input_state |= static_cast<std::uint8_t>(Joypad::JoypadButton::RIGHT);
-  if (::IsKeyDown(KEY_Z))
+  if (IsKeyDown(KEY_Z))
     input_state |= static_cast<std::uint8_t>(Joypad::JoypadButton::A);
-  if (::IsKeyDown(KEY_X))
+  if (IsKeyDown(KEY_X))
     input_state |= static_cast<std::uint8_t>(Joypad::JoypadButton::B);
-  if (::IsKeyDown(KEY_BACKSPACE))
+  if (IsKeyDown(KEY_BACKSPACE))
     input_state |= static_cast<std::uint8_t>(Joypad::JoypadButton::SELECT);
-  if (::IsKeyDown(KEY_ENTER))
+  if (IsKeyDown(KEY_ENTER))
     input_state |= static_cast<std::uint8_t>(Joypad::JoypadButton::START);
 
-  #ifdef __EMSCRIPTEN__
+#ifdef __EMSCRIPTEN__
   input_state |= g_web_input_state;
-  #endif
+#endif
 
   // This will never fail... Can't wait to eat these words though
   auto* const joyp = dynamic_cast<Joypad::JOYP*>(
@@ -136,40 +135,150 @@ void RaylibFrontend::present() {
   frame_ready = false;
 
   // Rendering
-  ::UpdateTexture(texture, frame_buf.at(display_idx).data());
-  ::BeginDrawing();
-  ::DrawTexturePro(
+  UpdateTexture(texture, frame_buf.at(display_idx).data());
+  BeginDrawing();
+  DrawTexturePro(
     texture, Rectangle{0, 0, static_cast<float>(fb_width), static_cast<float>(fb_height)},
-    Rectangle{0, 0, static_cast<float>(::GetScreenWidth()), static_cast<float>(::GetScreenHeight())},
+    Rectangle{0, 0, static_cast<float>(GetScreenWidth()), static_cast<float>(GetScreenHeight())},
     Vector2{0, 0}, 0.0f, WHITE);
-  ::EndDrawing();
+  EndDrawing();
 }
 
+// ---- Audio ring buffer helpers (rb_size counts floats) ----
+void RaylibFrontend::queue_audio_samples(const float* samples, std::size_t sample_count) {
+  if (!samples || sample_count == 0) return;
+
+  // Drop the oldest samples if we would overflow (keeps latency bounded)
+  constexpr std::size_t cap = ring_samples;
+  if (sample_count >= cap) {
+    // Keep only the last cap samples.
+    samples += (sample_count - cap);
+    sample_count = cap;
+  }
+  if (const std::size_t free = cap - rb_size; sample_count > free) {
+    const std::size_t drop = sample_count - free;
+    rb_tail = (rb_tail + drop) % cap;
+    rb_size -= drop;
+  }
+
+  // Copy in (handle wrap)
+  std::size_t to_write = sample_count;
+  while (to_write) {
+    const std::size_t chunk = std::min(to_write, cap - rb_head);
+    std::memcpy(&audio_rb[rb_head], samples, chunk * sizeof(float));
+    rb_head = (rb_head + chunk) % cap;
+    rb_size += chunk;
+    samples += chunk;
+    to_write -= chunk;
+  }
+}
+
+void RaylibFrontend::pump_audio() {
+  if (!audio_ready) return;
+
+  // Feed the stream whenever raylib tells us a sub-buffer is ready
+  while (audio_prime > 0 || IsAudioStreamProcessed(audio_stream)) {
+    constexpr std::size_t need = audio_chunk_frames * audio_channels; // floats
+
+    // Pop up to 'need' floats; pad with 0 if we don't have enough
+    std::size_t got = 0;
+    constexpr std::size_t cap = ring_samples;
+    while (got < need && rb_size > 0) {
+      const std::size_t want = std::min(need - got, cap - rb_tail);
+      const std::size_t take = std::min(want, rb_size);
+      std::memcpy(&audio_tmp[got], &audio_rb[rb_tail], take * sizeof(float));
+      rb_tail = (rb_tail + take) % cap;
+      rb_size -= take;
+      got += take;
+    }
+
+    if (got < need) {
+      std::fill(audio_tmp.begin() + got, audio_tmp.begin() + need, 0.0f);
+    }
+
+    // UpdateAudioStream() takes "frames", not float count
+    UpdateAudioStream(audio_stream, audio_tmp.data(), (int)audio_chunk_frames);
+    if (audio_prime > 0) --audio_prime;
+  }
+}
+
+#ifdef __EMSCRIPTEN__
+void RaylibFrontend::tick_web() {
+  // Drive emulation by wall-time instead of assuming one frame per rAF tick.
+  // This keeps audio from underrunning when the browser drops frames.
+  constexpr double cpu_hz = 4194304.0; // Game Boy CPU clock (T-cycles/sec)
+  constexpr std::size_t cycles_per_frame = 70224; // T-cycles per frame (~59.73 Hz)
+
+  const double now_ms = emscripten_get_now();
+  if (web_last_ms <= 0.0) web_last_ms = now_ms;
+
+  double dt_ms = now_ms - web_last_ms;
+  web_last_ms = now_ms;
+
+  // Clamp to avoid huge catch-up bursts (e.g., background tab).
+  dt_ms = std::clamp(dt_ms, 0.0, 100.0);
+
+  web_cycle_accum += dt_ms * (cpu_hz / 1000.0);
+
+  constexpr std::size_t max_cycles_per_tick = cycles_per_frame * 4; // cap catch-up
+  std::size_t cycles_to_run = static_cast<std::size_t>(web_cycle_accum);
+  cycles_to_run = std::min(cycles_to_run, max_cycles_per_tick);
+  web_cycle_accum -= static_cast<double>(cycles_to_run);
+
+  read_inputs();
+
+  // Chunk execution and keep feeding the audio stream between chunks.
+  while (cycles_to_run) {
+    const std::size_t block = std::min<std::size_t>(cycles_to_run, cycles_per_frame);
+    for (std::size_t i = 0; i < block; i++) gbc->step();
+    cycles_to_run -= block;
+    pump_audio();
+  }
+
+  pump_audio();
+  present();
+}
+#endif
+
+
 void RaylibFrontend::start() {
-  ::InitWindow(fb_width * 4, fb_height * 4, "GBC");
-  ::SetAudioStreamBufferSizeDefault(2048);
-  ::InitAudioDevice();
+  InitWindow(fb_width * 4, fb_height * 4, "GBC");
+  SetAudioStreamBufferSizeDefault(audio_chunk_frames);
+  InitAudioDevice();
+
+  audio_stream = LoadAudioStream(audio_sample_rate, 32, audio_channels);
+  audio_ready = IsAudioStreamReady(audio_stream);
+  if (audio_ready) {
+#ifdef __EMSCRIPTEN__
+    audio_prime = 4;
+#else
+    audio_prime = 2;
+#endif
+    PlayAudioStream(audio_stream);
+    SetAudioStreamVolume(audio_stream, 1.0f);
+  }
 
   Image img{};
   img.data = frame_buf.at(0).data();
   img.width = fb_width;
   img.height = fb_height;
   img.mipmaps = 1;
-  img.format = ::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
-  texture = ::LoadTextureFromImage(img);
+  img.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8;
+  texture = LoadTextureFromImage(img);
 
   // Controls timing for both desktop and WASM builds
   constexpr auto target_fps = 60;
-  ::SetTargetFPS(target_fps);
+  SetTargetFPS(target_fps);
 
 #ifdef __EMSCRIPTEN__
   emscripten_set_main_loop_arg(frame_cb, this, 0, true);
 #else
 
   // Desktop build is paced by using SetTargetFPS, nice and simple
-  while (!::WindowShouldClose()) {
+  while (!WindowShouldClose()) {
     read_inputs();
     step_frame();
+    pump_audio();
     present();
   }
 #endif // __EMSCRIPTEN__

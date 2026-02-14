@@ -22,9 +22,14 @@ public:
   void present();
   void pump_audio();
 
-  // TODO: WASM doesn't like heap allocated floats?????
+  #ifdef __EMSCRIPTEN__
+  void tick_web();
+  #endif
+
+  // samples: interleaved float PCM in [-1, 1]
+  // sample_count: number of floats (NOT frames)
   void queue_audio_samples(const float *samples,
-                           std::size_t sample_count) override {}
+                           std::size_t sample_count) override;
 
 private:
   static constexpr auto fb_height = 144;
@@ -38,7 +43,35 @@ private:
 
   // Double buffer, swap only when needed, prevents screen tears
   std::array<std::array<std::uint32_t, 144 * 160>, nbuf> frame_buf{};
-  ::Texture2D texture{};
+  Texture2D texture{};
+
+  // ---- Audio ----
+  static constexpr unsigned audio_sample_rate = 48000; // sync with APU output rate
+  static constexpr unsigned audio_channels    = 2;     // assume interleaved stereo
+  #ifdef __EMSCRIPTEN__
+    static constexpr unsigned audio_chunk_frames = 4096; // frames per UpdateAudioStream()
+  #else
+     static constexpr unsigned audio_chunk_frames = 1024; // frames per UpdateAudioStream()
+  #endif
+
+  AudioStream audio_stream{};
+  bool audio_ready{false};
+  int  audio_prime{0}; // prime stream with N buffers at startup
+
+  #ifdef __EMSCRIPTEN__
+  static constexpr std::size_t ring_frames  = audio_sample_rate * 2; // 2 seconds buffer (extra jitter tolerance)
+  #else
+  static constexpr std::size_t ring_frames  = audio_sample_rate; // 1 second buffer
+  #endif
+  static constexpr std::size_t ring_samples = ring_frames * audio_channels;
+  std::array<float, ring_samples> audio_rb{};
+  std::size_t rb_head{0}, rb_tail{0}, rb_size{0}; // rb_size in floats
+
+  std::array<float, audio_chunk_frames * audio_channels> audio_tmp{};
+  #ifdef __EMSCRIPTEN__
+  double web_last_ms{0.0};
+    double web_cycle_accum{0.0};
+  #endif
 };
 
 #endif // RAYLIB_FRONTEND_H

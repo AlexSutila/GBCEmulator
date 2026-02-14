@@ -194,6 +194,7 @@ if(EMSCRIPTEN)
             -sMAX_WEBGL_VERSION=2
             -sUSE_PTHREADS=0
             -sEXPORTED_FUNCTIONS=_emscripten_start,_malloc,_free
+            -sEXPORTED_RUNTIME_METHODS=HEAPF32
             -sSTACK_OVERFLOW_CHECK=0
             -sFORCE_FILESYSTEM=1
             -sSAFE_HEAP=0
