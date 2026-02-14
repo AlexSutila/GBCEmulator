@@ -239,6 +239,9 @@ if(EMSCRIPTEN)
               "${CMAKE_SOURCE_DIR}/src/frontend/raylib/app.css"
               "$<TARGET_FILE_DIR:gbc_wasm>/app.css"
       COMMAND ${CMAKE_COMMAND} -E copy_if_different
+              "${CMAKE_SOURCE_DIR}/src/frontend/raylib/coi-serviceworker.js"
+              "$<TARGET_FILE_DIR:gbc_wasm>/coi-serviceworker.js"
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
               "${CMAKE_SOURCE_DIR}/src/frontend/raylib/app.js"
               "$<TARGET_FILE_DIR:gbc_wasm>/app.js"
 )
