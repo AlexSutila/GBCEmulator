@@ -1,7 +1,6 @@
-#ifndef __TIMER_H
-#define __TIMER_H
+#ifndef GBC_TIMER_H
+#define GBC_TIMER_H
 
-#include "cpu/interrupts.hpp"
 #include "emu_types.hpp"
 #include "memory/bus.hpp"
 #include "memory/mmio/dmg.hpp"
@@ -10,8 +9,7 @@ struct runtime_sys_info;
 
 class TimerUnit {
 public:
-  explicit TimerUnit(AddressBus *const bus, runtime_sys_info &sys,
-                     bool cgb_model = true);
+  explicit TimerUnit(AddressBus *bus, runtime_sys_info &sys);
   void reset() noexcept;
   void step() noexcept;
 
@@ -31,11 +29,8 @@ public:
 private:
   [[nodiscard]] static byte_t tac_sel(byte_t tac) noexcept;
   [[nodiscard]] static bool tac_en(byte_t tac) noexcept;
-  [[nodiscard]] static bool selected_bit(std::uint16_t sys,
-                                         byte_t sel) noexcept;
-
+  [[nodiscard]] static bool selected_bit(std::uint16_t sys, byte_t sel) noexcept;
   [[nodiscard]] bool edge_input(std::uint16_t sys, byte_t tac) const noexcept;
-  [[nodiscard]] bool tick_allowed_on_fall() const noexcept;
 
   void start_overflow_pipeline() noexcept;
   void service_overflow_pipeline() noexcept;
@@ -43,7 +38,6 @@ private:
   void timer_tick_pulse() noexcept;
 
   InterruptBits *if_reg{};
-  bool cgb_model_{true};
 
   Timer::TIMA tima_reg;
   Timer::TMA tma_reg;
@@ -65,4 +59,4 @@ private:
   runtime_sys_info &sys_;
 };
 
-#endif // __TIMER_H
+#endif // GBC_TIMER_H
