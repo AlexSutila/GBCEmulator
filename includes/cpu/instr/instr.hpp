@@ -11,6 +11,18 @@
 enum class InstrStates {
   INSTR_STATE_READ,
   INSTR_STATE_WRITE,
+
+  /**
+   * For instructions which deal with 16-bit values being read and/or written to
+   * memory across the span of multiple clock cycles, examples:
+   *  - push
+   *  - pop
+   *  - call both conditional and unconditional
+   *  - ret or reti
+   * etc
+   */
+  INSTR_STATE_READ2,
+  INSTR_STATE_WRITE2,
 };
 
 class Instruction {

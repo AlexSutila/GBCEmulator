@@ -427,18 +427,34 @@ public:
   PUSH_XX(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
-    addr_t sp = reg_file->reg_sp.read();
-    const addr_t addr = read_reg<src>();
-    bus->write_byte(--sp, addr >> 8);
-    bus->write_byte(--sp, addr & 0xFF);
-
-    // Write back
-    reg_file->reg_sp.write(sp);
+    switch (state) {
+    case InstrStates::INSTR_STATE_WRITE:
+      bus->write_byte(--sp, read_reg<src>() >> 8);
+      state = InstrStates::INSTR_STATE_WRITE2;
+      break;
+    case InstrStates::INSTR_STATE_WRITE2:
+      bus->write_byte(--sp, read_reg<src>() & 0xFF);
+      reg_file->reg_sp.write(sp);
+      break;
+    default:
+      break;
+    }
     return 16;
   }
   std::string describe() override {
     return std::format("PUSH {}", to_string<src>());
   }
+  void parse() {
+    state = InstrStates::INSTR_STATE_WRITE;
+    sp = reg_file->reg_sp.read();
+  }
+  std::size_t mem_access_t_cycle() override {
+    return state == InstrStates::INSTR_STATE_WRITE ? 8 : 12;
+  }
+
+private:
+  InstrStates state{};
+  addr_t sp{};
 };
 
 /*
@@ -449,18 +465,34 @@ public:
   POP_XX(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
-    addr_t sp = reg_file->reg_sp.read();
-    addr_t addr = bus->read_byte(sp++);
-    addr |= (addr_t)bus->read_byte(sp++) << 8;
-
-    // Write back
-    reg_file->reg_sp.write(sp);
-    write_reg<dst>(addr);
+    switch (state) {
+    case InstrStates::INSTR_STATE_READ:
+      state = InstrStates::INSTR_STATE_READ2;
+      addr = bus->read_byte(sp++);
+      break;
+    case InstrStates::INSTR_STATE_READ2:
+      addr |= (addr_t)bus->read_byte(sp++) << 8;
+      reg_file->reg_sp.write(sp);
+      write_reg<dst>(addr);
+    default:
+      break;
+    }
     return 12;
   }
   std::string describe() override {
     return std::format("POP {}", to_string<dst>());
   }
+  void parse() {
+    state = InstrStates::INSTR_STATE_READ;
+    sp = reg_file->reg_sp.read();
+  }
+  std::size_t mem_access_t_cycle() override {
+    return state == InstrStates::INSTR_STATE_READ ? 4 : 8;
+  }
+
+private:
+  InstrStates state{};
+  addr_t sp{}, addr{};
 };
 
 #endif // __MOVES_H

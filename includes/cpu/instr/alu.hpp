@@ -770,6 +770,8 @@ public:
     case InstrStates::INSTR_STATE_WRITE:
       bus->write_byte(read_reg<Register16Bit::REG_HL>(), result);
       break;
+    default:
+      break;
     }
     return 12;
   }
@@ -832,6 +834,8 @@ public:
       break;
     case InstrStates::INSTR_STATE_WRITE:
       bus->write_byte(read_reg<Register16Bit::REG_HL>(), result);
+      break;
+    default:
       break;
     }
     return 12;

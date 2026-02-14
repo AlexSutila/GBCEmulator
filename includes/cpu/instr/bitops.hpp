@@ -192,6 +192,8 @@ public:
     case InstrStates::INSTR_STATE_WRITE:
       bus->write_byte(addr, result);
       break;
+    default:
+      break;
     }
     return 16;
   }
@@ -255,6 +257,8 @@ public:
     case InstrStates::INSTR_STATE_WRITE:
       bus->write_byte(hl, result);
       break;
+    default:
+      break;
     }
     return 16;
   }
@@ -316,6 +320,8 @@ public:
       break;
     case InstrStates::INSTR_STATE_WRITE:
       bus->write_byte(addr, result);
+      break;
+    default:
       break;
     }
     return 16;
@@ -380,6 +386,8 @@ public:
     case InstrStates::INSTR_STATE_WRITE:
       bus->write_byte(addr, result);
       break;
+    default:
+      break;
     }
     return 16;
   }
@@ -441,6 +449,8 @@ public:
     case InstrStates::INSTR_STATE_WRITE:
       bus->write_byte(addr, result);
       break;
+    default:
+      break;
     }
     return 16;
   }
@@ -501,6 +511,8 @@ public:
     case InstrStates::INSTR_STATE_WRITE:
       bus->write_byte(addr, result);
       break;
+    default:
+      break;
     }
     return 16;
   }
@@ -559,6 +571,8 @@ public:
       break;
     case InstrStates::INSTR_STATE_WRITE:
       bus->write_byte(addr, result);
+      break;
+    default:
       break;
     }
     return 16;
@@ -619,6 +633,8 @@ public:
       break;
     case InstrStates::INSTR_STATE_WRITE:
       bus->write_byte(addr, result);
+      break;
+    default:
       break;
     }
     return 16;
@@ -704,6 +720,8 @@ public:
     case InstrStates::INSTR_STATE_WRITE:
       bus->write_byte(hl, n);
       break;
+    default:
+      break;
     }
     return 16;
   }
@@ -748,6 +766,8 @@ public:
       break;
     case InstrStates::INSTR_STATE_WRITE:
       bus->write_byte(hl, n);
+      break;
+    default:
       break;
     }
     return 16;
