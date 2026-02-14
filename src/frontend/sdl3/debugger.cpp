@@ -11,9 +11,6 @@
 #include <mutex>
 #include <stdexcept>
 
-constexpr auto hex_vieiwer_bytes_shown = 0x10 * 0x10; // Don't mess with this
-static_assert(hex_vieiwer_bytes_shown % 0x10 == 0, "Should be a factor of 16");
-
 constexpr auto tile_data_height_tiles = 24;
 constexpr auto tile_data_width_tiles = 16;
 constexpr auto tile_data_height_px = tile_data_height_tiles * 8;
@@ -34,19 +31,14 @@ void DebuggerImGui::init(SDLHost &host) {
     buf.resize(tile_data_height_px * tile_data_width_px);
     std::fill(buf.begin(), buf.end(), black);
   }
-
-  // Allocate heap space for the hex view memory reader
-  ctx.bus_content.resize(hex_vieiwer_bytes_shown);
 }
 
 // This is a public entry point called from the main GUI render loop
 // Replaces the build_ui functionality
 void DebuggerImGui::render(UiState &state,
                            const std::unique_ptr<GameBoyColor> &core) {
-  if (state.show_main_debug_viewer)
+  if (state.show_debug)
     build_debug_window(state);
-  if (state.show_memory_viewer)
-    build_memory_viewer_window(state, core);
   if (state.show_breakpoints)
     build_breakpoints_window(state, core);
   if (state.show_ppu_viewer)
@@ -73,18 +65,11 @@ void DebuggerImGui::update_state_from_core(
   ctx.cpu_state = Debug::to_string(core->get_cpu()->get_state());
   ctx.ppu_state = Debug::to_string(core->get_ppu()->get_state());
   ctx.disasm = core->get_cpu()->disasm();
-  auto address_bus = core->get_bus();
 
-  // Address bus relevant information
-  ctx.oam_dma_state = Debug::to_string(address_bus->get_oam_dma().get_state());
-  ctx.vdma_state = Debug::to_string(address_bus->get_vdma().get_state());
-  read_bus_data(core, ctx.bus_content_base_addr);
-
-  // Interrupt enable bits and flags
   const InterruptBits *const ie_reg = dynamic_cast<InterruptBits *>(
-      address_bus->get_mmio(IORegisterMapping::MMIO_INT_ENABLE));
+      core->get_bus()->get_mmio(IORegisterMapping::MMIO_INT_ENABLE));
   const InterruptBits *const if_reg = dynamic_cast<InterruptBits *>(
-      address_bus->get_mmio(IORegisterMapping::MMIO_INT_FLAGS));
+      core->get_bus()->get_mmio(IORegisterMapping::MMIO_INT_FLAGS));
   ctx.ie_state = Debug::to_string(*ie_reg);
   ctx.if_state = Debug::to_string(*if_reg);
 
@@ -110,7 +95,7 @@ void DebuggerImGui::request_stop() {
 
 /* ImGui constructions */
 void DebuggerImGui::build_debug_window(UiState &state) {
-  ImGui::Begin("Debug", &state.show_main_debug_viewer);
+  ImGui::Begin("Debug", &state.show_debug);
 
   ImGui::SeparatorText("System State");
   ImGui::Text("Disassembly: %s", ctx.disasm.c_str());
@@ -173,48 +158,6 @@ void DebuggerImGui::build_debug_window(UiState &state) {
       ctx.stopped = false;
     }
     dbg_cv.notify_one();
-  }
-  ImGui::End();
-}
-
-void DebuggerImGui::build_memory_viewer_window(
-    UiState &state, const std::unique_ptr<GameBoyColor> &core) {
-  constexpr auto mask = 0xFF00;
-  constexpr auto increment = 0x100;
-  std::lock_guard lock(dbg_mutex);
-
-  ImGui::Begin("Memory Viewer", &state.show_memory_viewer);
-  ImGui::SeparatorText("Direct Memory Access");
-  ImGui::Text("%s", ctx.oam_dma_state.c_str());
-  ImGui::SameLine();
-  ImGui::Text("%s", ctx.vdma_state.c_str());
-
-  // Yeah... you read that right >:)
-  ImGui::SeparatorText("Main Address Bus View");
-  const std::string sexy_ahh_hex_view = Debug::create_hex_view(
-      state.hex_view_base_addr & 0xFF00, ctx.bus_content);
-  ImGui::Text("%s", sexy_ahh_hex_view.c_str());
-
-  ImGui::InputScalar("", ImGuiDataType_U16, &ctx.bus_content_base_addr, nullptr,
-                     nullptr, "%04X", ImGuiInputTextFlags_CharsHexadecimal);
-  ImGui::SameLine();
-  if (ImGui::Button("GoTo")) {
-    read_bus_data(core, ctx.bus_content_base_addr & mask);
-    state.hex_view_base_addr = ctx.bus_content_base_addr & mask;
-  }
-  ImGui::SameLine();
-
-  if (ImGui::Button("Next")) { // Overflow is allowed intentionally
-    state.hex_view_base_addr = (state.hex_view_base_addr & mask) + increment;
-    read_bus_data(core, state.hex_view_base_addr & mask);
-    ctx.bus_content_base_addr = state.hex_view_base_addr;
-  }
-  ImGui::SameLine();
-
-  if (ImGui::Button("Prev")) { // Underflow is also allowed intentionally
-    state.hex_view_base_addr = (state.hex_view_base_addr & mask) - increment;
-    read_bus_data(core, state.hex_view_base_addr & mask);
-    ctx.bus_content_base_addr = state.hex_view_base_addr;
   }
   ImGui::End();
 }
@@ -358,14 +301,5 @@ void DebuggerImGui::read_vram_tile_data(
         buf[y * tile_data_width_px + x] = get_mono_color(color_idx);
       }
     }
-  }
-}
-
-void DebuggerImGui::read_bus_data(const std::unique_ptr<GameBoyColor> &core,
-                                  const addr_t start_addr) {
-  auto bus = core->get_bus(); // Be sure not to mess with memory mapped regs
-  for (std::size_t offset{0}; offset < hex_vieiwer_bytes_shown; ++offset) {
-    const addr_t cur_addr_full = (start_addr + offset) & 0xFFFF;
-    ctx.bus_content.at(offset) = bus->read_byte_safe(cur_addr_full);
   }
 }

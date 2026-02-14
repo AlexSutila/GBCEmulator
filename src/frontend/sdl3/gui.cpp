@@ -201,11 +201,9 @@ void GbcImGui::build_main_menu_bar(UiState &state) const {
 
     if (ImGui::BeginMenu("Debug")) {
       if (ImGui::MenuItem("Open Debugger"))
-        state.show_main_debug_viewer = true;
+        state.show_debug = true;
       if (ImGui::MenuItem("Edit Breakpoints"))
         state.show_breakpoints = true;
-      if (ImGui::MenuItem("Show Memory Viewer"))
-        state.show_memory_viewer = true;
       if (ImGui::MenuItem("Show PPU Viewer"))
         state.show_ppu_viewer = true;
       ImGui::EndMenu();

@@ -26,19 +26,6 @@ ObjAttrDMA::ObjAttrDMA(AddressBus &bus) : dma_(*this), bus_(bus) {
   state = STATE_DISABLED;
 }
 
-ObjAttrDMA::DMAState ObjAttrDMA::get_state() const {
-  ObjAttrDMA::DMAState s{};
-  if (state == STATE_OAMDMA_TRAN) {
-    s.src_base_address = src_base_addr;
-    s.data_offset = data_offset;
-    s.active = true;
-  } else {
-    s.src_base_address = s.data_offset = 0;
-    s.active = false;
-  }
-  return s;
-}
-
 DMA::DMA *const ObjAttrDMA::get_dma_reg() { return &dma_; }
 
 void ObjAttrDMA::start(const byte_t addr_high) {
@@ -115,22 +102,6 @@ VDMA::VDMA(AddressBus &bus, runtime_sys_info &sys)
       bus_(bus) {
   src_base_addr = dest_base_addr = data_offset = transfer_size = 0;
   state = STATE_DISABLED;
-}
-
-VDMA::DMAState VDMA::get_state() const {
-  VDMA::DMAState s{};
-  if (state == STATE_GDMA_TRAN || state == STATE_HDMA_TRAN) {
-    s.gdma_active = (state == STATE_GDMA_TRAN);
-    s.hdma_active = (state == STATE_HDMA_TRAN);
-    s.dest_base_address = dest_base_addr;
-    s.src_base_address = src_base_addr;
-    s.data_offset = data_offset;
-  } else {
-    s.data_offset = s.src_base_address = s.dest_base_address = 0;
-    if (state == STATE_HDMA_WAIT)
-      s.hdma_waiting = true;
-  }
-  return s;
 }
 
 const addr_t VDMA::get_addr(MMIORegister &lo, MMIORegister &hi) {

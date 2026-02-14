@@ -114,15 +114,6 @@ void AddressBus::init_test_bed() {
 }
 void AddressBus::eject_cartridge() { cart_.reset(); }
 
-const byte_t AddressBus::read_byte_safe(const addr_t addr) {
-  if (io_registers.contains(addr)) {
-    assert((addr >= 0xFF00 && addr <= 0xFF7F) || addr == 0xFFFF);
-    const auto &mmio = io_registers.at(addr);
-    return mmio->peek(); // Const
-  } else
-    return read_byte(addr);
-}
-
 const byte_t AddressBus::read_byte(const addr_t addr) {
   try_brk(addr, Debug::BRK_ADDRESS_READ);
 

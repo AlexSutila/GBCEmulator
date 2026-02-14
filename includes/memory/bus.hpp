@@ -62,10 +62,6 @@ public:
   ObjAttrDMA &get_oam_dma() { return oam_dma; };
   VDMA &get_vdma() { return vdma; }
 
-  /* To be used by debuggers, more or less reads memory exactly the same as the
-   * regular `read_byte()`, but calls `peak()` for memory mapped registers. */
-  const byte_t read_byte_safe(const addr_t addr);
-
   /* Second constructor is called when skipping BIOS, first constructor may also
    * ignore the BIOS if the initialization fails for some reason. */
   AddressBus(runtime_sys_info &sys, std::optional<Debug::Debugger> &debugger,

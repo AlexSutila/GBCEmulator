@@ -166,8 +166,6 @@ endif()
 #  WASM (Raylib) build target
 # ===========================================================================
 if(EMSCRIPTEN)
-    set(SHELL_HTML "${CMAKE_SOURCE_DIR}/src/frontend/raylib/shell.html")
-
     # Raylib simplistic WASM frontend
     add_executable(gbc_wasm
         src/frontend/raylib/frontend.cpp
@@ -194,14 +192,13 @@ if(EMSCRIPTEN)
             -sMAX_WEBGL_VERSION=2
             -sUSE_PTHREADS=0
             -sEXPORTED_FUNCTIONS=_emscripten_start,_malloc,_free
-            -sEXPORTED_RUNTIME_METHODS=HEAPF32
             -sSTACK_OVERFLOW_CHECK=0
             -sFORCE_FILESYSTEM=1
             -sSAFE_HEAP=0
             -fno-rtti
             -flto
             -O3
-            --shell-file=${SHELL_HTML}
+            --shell-file ${CMAKE_SOURCE_DIR}/src/frontend/raylib/shell.html
     )
     target_compile_options(gbc_wasm
         PRIVATE
@@ -210,20 +207,7 @@ if(EMSCRIPTEN)
             -flto
             -O3
     )
-    set_target_properties(gbc_wasm PROPERTIES
-            OUTPUT_NAME "index"
-            SUFFIX ".html")
-    ## Make sure html changes are registered by ninja and trigger a rebuild
-    set_property(TARGET gbc_wasm APPEND PROPERTY LINK_DEPENDS "${SHELL_HTML}")
-
-    add_custom_command(TARGET gbc_wasm POST_BUILD
-      COMMAND ${CMAKE_COMMAND} -E copy_if_different
-              "${CMAKE_SOURCE_DIR}/src/frontend/raylib/app.css"
-              "$<TARGET_FILE_DIR:gbc_wasm>/app.css"
-      COMMAND ${CMAKE_COMMAND} -E copy_if_different
-              "${CMAKE_SOURCE_DIR}/src/frontend/raylib/app.js"
-              "$<TARGET_FILE_DIR:gbc_wasm>/app.js"
-)
+    set_target_properties(gbc_wasm PROPERTIES SUFFIX ".html")
 
 # ===========================================================================
 #  Non=WASM build target (including Raylib for desktop)
@@ -287,6 +271,7 @@ else()
         -lpthread
     )
 
+    # TODO: Why do we need this? Is it also an mingw large objfile size cope?
     include(CheckIPOSupported)
     check_ipo_supported(RESULT ipo_ok OUTPUT ipo_err LANGUAGES CXX)
     if(ipo_ok AND NOT MINGW)

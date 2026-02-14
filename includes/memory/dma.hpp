@@ -22,13 +22,6 @@ public:
   DMA::DMA *const get_dma_reg();
   explicit ObjAttrDMA(AddressBus &bus);
 
-  struct DMAState {
-    addr_t src_base_address;
-    addr_t data_offset;
-    bool active;
-  };
-  DMAState get_state() const;
-
   void start(const byte_t addr_high); // Begins the actual data transfer
   void step();
 
@@ -62,16 +55,6 @@ public:
   MMIORegister *const get_vdma3() { return &vdma3_; }
   MMIORegister *const get_vdma4() { return &vdma4_; }
   MMIORegister *const get_vdma5() { return &vdma5_; }
-
-  struct DMAState {
-    addr_t dest_base_address;
-    addr_t src_base_address;
-    addr_t data_offset;
-    bool hdma_waiting;
-    bool hdma_active;
-    bool gdma_active;
-  };
-  DMAState get_state() const;
 
   /* The initialization phase of DMA is impacted by double speed mode, but the
    * acutal transfer itself is not. Hence, `step_fast_cycle()` exists to run the

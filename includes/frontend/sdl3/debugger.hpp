@@ -13,10 +13,7 @@
 struct DebugContext {
   Debug::BreakReason reason{Debug::BRK_CONTINUE};
   std::array<SDL_Texture *, 2> tile_data_texture{};
-  std::vector<byte_t> bus_content{}; // use read_byte_safe()
-  addr_t bus_content_base_addr{};
-  std::string oam_dma_state{};
-  std::string vdma_state{};
+
   std::string sys_state{};
   std::string cpu_state{};
   std::string ppu_state{};
@@ -46,8 +43,6 @@ public:
 
 private:
   void build_debug_window(UiState &state);
-  void build_memory_viewer_window(UiState &state,
-                                  const std::unique_ptr<GameBoyColor> &core);
   void build_breakpoints_window(UiState &state,
                                 const std::unique_ptr<GameBoyColor> &core);
   void
@@ -59,8 +54,6 @@ private:
                              const std::size_t vram_bank_idx);
   void read_vram_tile_data(const std::unique_ptr<GameBoyColor> &core,
                            const std::size_t vram_bank_idx);
-  void read_bus_data(const std::unique_ptr<GameBoyColor> &core,
-                     const addr_t start_addr);
   std::array<std::vector<std::uint32_t>, 2> tile_data_buf{};
   DebugContext ctx; // Debugger context
 
