@@ -101,7 +101,7 @@ void RaylibFrontend::put_pixel(const int x, const int y,
   }
 }
 
-void RaylibFrontend::clear(std::uint32_t c) {
+void RaylibFrontend::clear(const std::uint32_t c) {
   for (auto &buf : frame_buf)
     buf.fill(format_color(c));
   frame_ready = false;
@@ -156,15 +156,13 @@ void RaylibFrontend::present() {
 }
 
 // ---- Audio ring buffer helpers (rb_size counts floats) ----
-void RaylibFrontend::queue_audio_samples(const float *samples,
-                                         std::size_t sample_count) {
-  if (!samples || sample_count == 0)
-    return;
+void RaylibFrontend::queue_audio_samples(const float *samples, std::size_t sample_count) {
+  if (!samples || sample_count == 0) return;
 
-  // Drop the oldest samples if we would overflow (keeps latency bounded)
   constexpr std::size_t cap = ring_samples;
+
+  // Hard cap: never overflow the ring
   if (sample_count >= cap) {
-    // Keep only the last cap samples.
     samples += (sample_count - cap);
     sample_count = cap;
   }
@@ -184,19 +182,32 @@ void RaylibFrontend::queue_audio_samples(const float *samples,
     samples += chunk;
     to_write -= chunk;
   }
+
+  // Soft cap: keep queued audio small to avoid audible delay
+  if (rb_size > rb_soft_cap_samples) {
+    const std::size_t drop = rb_size - rb_soft_cap_samples;
+    rb_tail = (rb_tail + drop) % cap;
+    rb_size -= drop;
+  }
 }
 
 void RaylibFrontend::pump_audio() {
-  if (!audio_ready)
-    return;
+  if (!audio_ready) return;
 
-  // Feed the stream whenever raylib tells us a sub-buffer is ready
-  while (audio_prime > 0 || IsAudioStreamProcessed(audio_stream)) {
+#ifdef __EMSCRIPTEN__
+  constexpr int max_refills_per_pump = 2;
+#else
+  constexpr int max_refills_per_pump = 3;
+#endif
+
+  int refills = 0;
+  while (audio_prime > 0 ||
+         (refills < max_refills_per_pump && IsAudioStreamProcessed(audio_stream))) {
+
     constexpr std::size_t need = audio_chunk_frames * audio_channels; // floats
-
-    // Pop up to 'need' floats; pad with 0 if we don't have enough
     std::size_t got = 0;
     constexpr std::size_t cap = ring_samples;
+
     while (got < need && rb_size > 0) {
       const std::size_t want = std::min(need - got, cap - rb_tail);
       const std::size_t take = std::min(want, rb_size);
@@ -206,57 +217,50 @@ void RaylibFrontend::pump_audio() {
       got += take;
     }
 
-    if (got < need) {
-      std::fill(audio_tmp.begin() + got, audio_tmp.begin() + need, 0.0f);
-    }
+    if (got < need) std::fill(audio_tmp.begin() + got, audio_tmp.begin() + need, 0.0f);
 
-    // UpdateAudioStream() takes "frames", not float count
-    UpdateAudioStream(audio_stream, audio_tmp.data(), (int)audio_chunk_frames);
-    if (audio_prime > 0)
-      --audio_prime;
-  }
+    UpdateAudioStream(audio_stream, audio_tmp.data(), audio_chunk_frames);
+    if (audio_prime > 0) --audio_prime;
+    ++refills;
+         }
 }
 
-#ifdef __EMSCRIPTEN__
-void RaylibFrontend::tick_web() {
-  // Drive emulation by wall-time instead of assuming one frame per rAF tick
-  // This keeps audio from underrunning when the browser drops frames
-  constexpr double cpu_hz = 4194304.0; // Game Boy CPU clock (T-cycles/sec)
-  constexpr std::size_t cycles_per_frame =
-      70224; // T-cycles per frame (~59.73 Hz)
+void RaylibFrontend::tick_common(double dt_ms) {
+  constexpr double cpu_hz = 4194304.0;
+  constexpr std::size_t cycles_per_frame = 70224;
+  constexpr std::size_t max_cycles_per_tick = cycles_per_frame * 4;
 
-  const double now_ms = emscripten_get_now();
-  if (web_last_ms <= 0.0)
-    web_last_ms = now_ms;
-
-  double dt_ms = now_ms - web_last_ms;
-  web_last_ms = now_ms;
-
-  // Clamp to avoid huge catch-up bursts (e.g., background tab)
   dt_ms = std::clamp(dt_ms, 0.0, 100.0);
 
-  web_cycle_accum += dt_ms * (cpu_hz / 1000.0);
-
-  constexpr std::size_t max_cycles_per_tick =
-      cycles_per_frame * 4; // cap catch-up
-  auto cycles_to_run = static_cast<std::size_t>(web_cycle_accum);
+  cycle_accum += dt_ms * (cpu_hz / 1000.0);
+  auto cycles_to_run = static_cast<std::size_t>(cycle_accum);
   cycles_to_run = std::min(cycles_to_run, max_cycles_per_tick);
-  web_cycle_accum -= static_cast<double>(cycles_to_run);
+  cycle_accum -= static_cast<double>(cycles_to_run);
 
   read_inputs();
 
-  // Chunk execution and keep feeding the audio stream between chunks
   while (cycles_to_run) {
-    const std::size_t block =
-        std::min<std::size_t>(cycles_to_run, cycles_per_frame);
-    for (std::size_t i = 0; i < block; i++)
-      gbc->step();
+    const std::size_t block = std::min<std::size_t>(cycles_to_run, cycles_per_frame);
+    for (std::size_t i = 0; i < block; i++) gbc->step();
     cycles_to_run -= block;
     pump_audio();
   }
 
   pump_audio();
   present();
+}
+
+#ifdef __EMSCRIPTEN__
+void RaylibFrontend::tick_web() {
+  const double now_ms = emscripten_get_now();
+  if (web_last_ms <= 0.0)
+    web_last_ms = now_ms;
+  double dt_ms = now_ms - web_last_ms;
+  web_last_ms = now_ms;
+  // Clamp to avoid huge catch-up bursts (e.g., background tab)
+  dt_ms = std::clamp(dt_ms, 0.0, 100.0);
+
+  tick_common(dt_ms);
 }
 #endif
 
@@ -269,12 +273,12 @@ void RaylibFrontend::start() {
   audio_ready = IsAudioStreamReady(audio_stream);
   if (audio_ready) {
 #ifdef __EMSCRIPTEN__
-    audio_prime = 4;
+    audio_prime = 0;
 #else
-    audio_prime = 2;
+    audio_prime = 0;
 #endif
     PlayAudioStream(audio_stream);
-    SetAudioStreamVolume(audio_stream, 1.0f);
+    SetAudioStreamVolume(audio_stream, 0.5f);
   }
 
   Image img{};

@@ -49,14 +49,31 @@ private:
   static constexpr unsigned audio_sample_rate = 48000; // sync with APU output rate
   static constexpr unsigned audio_channels    = 2;     // assume interleaved stereo
   #ifdef __EMSCRIPTEN__
-    static constexpr unsigned audio_chunk_frames = 4096; // frames per UpdateAudioStream()
+    static constexpr unsigned audio_chunk_frames = 2048; // frames per UpdateAudioStream() / 21ms
   #else
-     static constexpr unsigned audio_chunk_frames = 1024; // frames per UpdateAudioStream()
+     static constexpr unsigned audio_chunk_frames = 512; // frames per UpdateAudioStream()
   #endif
 
   AudioStream audio_stream{};
   bool audio_ready{false};
   int  audio_prime{0}; // prime stream with N buffers at startup
+
+  // Soft cap queued audio to avoid accumulating large latency
+  // (rb_size counts floats, not frames)
+  #ifdef __EMSCRIPTEN__
+    static constexpr std::size_t rb_soft_cap_frames  = (audio_sample_rate * 120) / 1000; // ~120ms
+  #else
+    static constexpr std::size_t rb_soft_cap_frames  = (audio_sample_rate * 60) / 1000;  // ~60ms
+  #endif
+    static constexpr std::size_t rb_soft_cap_samples = rb_soft_cap_frames * audio_channels;
+
+  // Time-based stepping accumulator (shared by native and web paths)
+  double cycle_accum{0.0};
+  void tick_common(double dt_ms);
+
+  #ifdef __EMSCRIPTEN__
+    double web_last_ms{0.0};
+  #endif
 
   #ifdef __EMSCRIPTEN__
   static constexpr std::size_t ring_frames  = audio_sample_rate * 2; // 2 seconds buffer (extra jitter tolerance)
@@ -68,10 +85,6 @@ private:
   std::size_t rb_head{0}, rb_tail{0}, rb_size{0}; // rb_size in floats
 
   std::array<float, audio_chunk_frames * audio_channels> audio_tmp{};
-  #ifdef __EMSCRIPTEN__
-  double web_last_ms{0.0};
-    double web_cycle_accum{0.0};
-  #endif
 };
 
 #endif // RAYLIB_FRONTEND_H
