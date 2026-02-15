@@ -76,6 +76,7 @@ private:
 
   // Input helpers
   InputState input_state{};
+  void handle_controller_press(SDL_GamepadButton key, bool pressed);
   void handle_keypress(SDL_Keycode key, bool pressed);
   static bool SDLCALL event_watcher(void *userdata, const SDL_Event *event);
 };

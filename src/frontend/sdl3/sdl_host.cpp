@@ -6,7 +6,7 @@
 #include <stdexcept>
 
 SDLHost::SDLHost(const int width, const int height, const int scale) {
-  if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO))
+  if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD))
     throw std::runtime_error(SDL_GetError());
 
   window =

@@ -1,5 +1,9 @@
 #include "frontend/sdl3/frontend.hpp"
+#include "SDL3/SDL_events.h"
+#include "SDL3/SDL_gamepad.h"
 #include "debugger/print.hpp"
+#include "memory/mmio/dmg.hpp"
+#include <atomic>
 
 SDL3Frontend::SDL3Frontend() : host(framebuf_width, framebuf_height, scale) {
   host.init_audio();
@@ -111,16 +115,20 @@ void SDL3Frontend::process_events() {
       running = false;
       continue;
     }
+
     // If process_event returns true, the GUI "ate" the input (e.g. rebinding)
-    if (gui.process_event(e, ui_state)) {
+    if (gui.process_event(e, ui_state))
       continue;
-    }
-    // If we got here, the GUI didn't want it
+
+    // If we got here, the GUI didn't want it - Update the atomic input state
+    // for the emulator thread and handle general frontend input (ctrl/keyb)
     if (e.type == SDL_EVENT_KEY_DOWN || e.type == SDL_EVENT_KEY_UP) {
-      // Update the atomic input state for the emulator thread and handle
-      // general frontend input
       const bool pressed = (e.type == SDL_EVENT_KEY_DOWN);
       handle_keypress(e.key.key, pressed);
+    } else if (e.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN ||
+               e.type == SDL_EVENT_GAMEPAD_BUTTON_UP) {
+      const bool pressed = (e.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN);
+      handle_controller_press((SDL_GamepadButton)e.gbutton.button, pressed);
     }
   }
 }
@@ -256,6 +264,52 @@ void SDL3Frontend::join_emu_thread_if_running() {
     debugger.request_stop();
     emulation_thread.join();
   }
+}
+
+void SDL3Frontend::handle_controller_press(SDL_GamepadButton btn,
+                                           bool pressed) {
+  byte_t mask{0};
+
+  // We do not enable UI control via controller, so only emulator input
+  switch (btn) {
+  case SDL_GAMEPAD_BUTTON_DPAD_UP:
+    mask |= (byte_t)Joypad::JoypadButton::UP;
+    break;
+  case SDL_GAMEPAD_BUTTON_DPAD_DOWN:
+    mask |= (byte_t)Joypad::JoypadButton::DOWN;
+    break;
+  case SDL_GAMEPAD_BUTTON_DPAD_LEFT:
+    mask |= (byte_t)Joypad::JoypadButton::LEFT;
+    break;
+  case SDL_GAMEPAD_BUTTON_DPAD_RIGHT:
+    mask |= (byte_t)Joypad::JoypadButton::RIGHT;
+    break;
+
+  case SDL_GAMEPAD_BUTTON_SOUTH:
+  case SDL_GAMEPAD_BUTTON_WEST:
+    mask |= (byte_t)Joypad::JoypadButton::A;
+    break;
+  case SDL_GAMEPAD_BUTTON_NORTH:
+  case SDL_GAMEPAD_BUTTON_EAST:
+    mask |= (byte_t)Joypad::JoypadButton::B;
+    break;
+
+  case SDL_GAMEPAD_BUTTON_START:
+    mask |= (byte_t)Joypad::JoypadButton::START;
+    break;
+  case SDL_GAMEPAD_BUTTON_BACK:
+    mask |= (byte_t)Joypad::JoypadButton::SELECT;
+    break;
+  default:
+    break;
+  }
+
+  byte_t current = input_state.buttons.load(std::memory_order_relaxed);
+  if (pressed)
+    current |= mask;
+  else
+    current &= static_cast<byte_t>(~mask);
+  input_state.buttons.store(current, std::memory_order_relaxed);
 }
 
 void SDL3Frontend::handle_keypress(const SDL_Keycode key, const bool pressed) {
