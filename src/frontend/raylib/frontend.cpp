@@ -123,10 +123,10 @@ void RaylibFrontend::read_controller_inputs(std::uint8_t &input_state) const {
   // virtual key. Better to have options.
   if (IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_FACE_DOWN) ||
       IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_FACE_LEFT))
-    input_state |= (std::uint8_t)Joypad::JoypadButton::A;
+    input_state |= (std::uint8_t)Joypad::JoypadButton::B;
   if (IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT) ||
       IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_FACE_UP))
-    input_state |= (std::uint8_t)Joypad::JoypadButton::B;
+    input_state |= (std::uint8_t)Joypad::JoypadButton::A;
 }
 
 void RaylibFrontend::read_keyboard_inputs(std::uint8_t &input_state) const {

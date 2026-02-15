@@ -285,13 +285,14 @@ void SDL3Frontend::handle_controller_press(SDL_GamepadButton btn,
     mask |= (byte_t)Joypad::JoypadButton::RIGHT;
     break;
 
+  // Like raylib frontend, give options for A and B buttons
   case SDL_GAMEPAD_BUTTON_SOUTH:
   case SDL_GAMEPAD_BUTTON_WEST:
-    mask |= (byte_t)Joypad::JoypadButton::A;
+    mask |= (byte_t)Joypad::JoypadButton::B;
     break;
   case SDL_GAMEPAD_BUTTON_NORTH:
   case SDL_GAMEPAD_BUTTON_EAST:
-    mask |= (byte_t)Joypad::JoypadButton::B;
+    mask |= (byte_t)Joypad::JoypadButton::A;
     break;
 
   case SDL_GAMEPAD_BUTTON_START:
