@@ -114,6 +114,7 @@ private:
    * of bus conflicts, one component will end up reading what we are basically
    * going to be treating as `open bus`. */
   constexpr byte_t open_bus() { return 0xFF; }
+  bool is_conflicting(const addr_t addr) const;
   BusConflictTypes bus_conflicts{};
 
   std::map<addr_t, MMIORegister *> io_registers{};

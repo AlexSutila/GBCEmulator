@@ -125,9 +125,11 @@ const byte_t AddressBus::read_byte_safe(const addr_t addr) {
 
 const byte_t AddressBus::read_byte(const addr_t addr) {
   try_brk(addr, Debug::BRK_ADDRESS_READ);
+  if (is_conflicting(addr)) [[unlikely]]
+    return open_bus();
 
   /* Read from boot ROM if it is mapped (boot ROM overrides reads only) */
-  if (is_boot_rom_range(addr))
+  else if (is_boot_rom_range(addr))
     return bios_->read_byte(addr);
 
   /* Cartridge memory */
@@ -161,11 +163,8 @@ const byte_t AddressBus::read_byte(const addr_t addr) {
   }
 
   /* Read from Object Attribute Memory */
-  else if (is_oam_range(addr)) {
-    if (is_acquired(BusConflictTypes::BUS_CONFLICT_OAM_DMA)) [[unlikely]]
-      return open_bus();
+  else if (is_oam_range(addr))
     return oam[addr - 0xFE00];
-  }
 
   /* Read from memory mapped IO register */
   else if (io_registers.contains(addr)) {
@@ -184,9 +183,11 @@ const byte_t AddressBus::read_byte(const addr_t addr) {
 }
 
 void AddressBus::write_byte(const addr_t addr, const byte_t value) {
+  if (is_conflicting(addr)) [[unlikely]]
+    return;
 
   /* Cartridge sees writes too (bank switching etc.) */
-  if (cart_ && is_cart_range(addr))
+  else if (cart_ && is_cart_range(addr))
     cart_->write(addr, value);
 
   /* Write to VRAM, only banked in CGB mode */
@@ -216,10 +217,8 @@ void AddressBus::write_byte(const addr_t addr, const byte_t value) {
   }
 
   /* Write to Object Attribute Memory */
-  else if (is_oam_range(addr)) {
-    if (!is_acquired(BusConflictTypes::BUS_CONFLICT_OAM_DMA)) [[likely]]
-      oam[addr - 0xFE00] = value;
-  }
+  else if (is_oam_range(addr))
+    oam[addr - 0xFE00] = value;
 
   /* Write to memory mapped IO register */
   else if (io_registers.contains(addr)) {
@@ -234,6 +233,8 @@ void AddressBus::write_byte(const addr_t addr, const byte_t value) {
   else if (is_hram_range(addr))
     hram[(addr - 0xFF80) & HRAM_MASK] = value;
 
+  /* We intentionally evaluate the breakpoint after the value has been written,
+   * as it is less confusing from a UI perspective, seeing the updated value. */
   try_brk(addr, Debug::BRK_ADDRESS_WRITTEN);
 }
 
@@ -242,6 +243,25 @@ MMIORegister *AddressBus::get_mmio(IORegisterMapping mapping) const {
   assert(io_registers.contains(addr));
   /* The address bus maintains ownership, so raw pointers are fine. */
   return io_registers.at(addr);
+}
+
+/**
+ * TODO (tentative):
+ * - We might want to consider VRAM locking during certain PPU modes, though
+ *   it probably isn't a good idea to mess with this until we are certain our
+ *   PPU timings are perfect.
+ * - Although I could imagine VDMA might cause problems, I don't think it is
+ *   worth simulating its impacts on the address bus since the processor has its
+ *   execution suspended while VDMA is active, so eh...
+ */
+bool AddressBus::is_conflicting(const addr_t addr) const {
+
+  /* OAM DMA transfer is active, hence OAM is locked down */
+  if ((bus_conflicts & BUS_CONFLICT_OAM_DMA) != 0)
+    return is_oam_range(addr); // TODO: Is this all?
+
+  /* Anything is fair game, read/write freely */
+  return false;
 }
 
 bool AddressBus::is_acquired(BusConflictTypes conflict_mask) const {
