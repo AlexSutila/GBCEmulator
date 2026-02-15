@@ -81,6 +81,7 @@ FetchContent_Declare(
     GIT_TAG        5.0
 )
 FetchContent_MakeAvailable(raylib)
+
 if(EMSCRIPTEN)
   # Enable miniaudio AudioWorklet backend inside raylib
   target_compile_definitions(raylib PRIVATE MA_ENABLE_AUDIO_WORKLETS)

@@ -225,9 +225,11 @@ void SDL3Frontend::emulation_thread_fn(const std::stop_token &st, const cart &c,
 
     // If we are ahead of the target (and not fast-forwarding), sleep briefly.
     // 1ms should be short enough to prevent underruns
-    const int bytes_per_frame = host.get_audio_spec().channels * static_cast<int>(sizeof(float));
-    const int bytes_per_sec   = host.get_audio_spec().freq * bytes_per_frame;
-    const int queued_ms       = bytes_per_sec > 0 ? queued_bytes * 1000 / bytes_per_sec : 0;
+    const int bytes_per_frame =
+        host.get_audio_spec().channels * static_cast<int>(sizeof(float));
+    const int bytes_per_sec = host.get_audio_spec().freq * bytes_per_frame;
+    const int queued_ms =
+        bytes_per_sec > 0 ? queued_bytes * 1000 / bytes_per_sec : 0;
     if (!ff && queued_ms > target_queue_ms) {
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
       continue;

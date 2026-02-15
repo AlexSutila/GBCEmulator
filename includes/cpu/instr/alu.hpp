@@ -1023,7 +1023,7 @@ public:
   }
 
 private:
-  std::int8_t imm; // Signed intentionally
+  std::int8_t imm{}; // Signed intentionally
 };
 
 #endif // __ALU_H
