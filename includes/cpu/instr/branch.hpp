@@ -205,16 +205,34 @@ public:
   RET(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
-    addr_t sp = reg_file->reg_sp.read();
-    const addr_t lo = bus->read_byte(sp++);
-    const addr_t hi = bus->read_byte(sp++);
-
-    // Write back for updated stack pointer
-    reg_file->reg_sp.write(sp);
-    reg_file->reg_pc = lo | (hi << 8);
+    switch (state) {
+    case InstrStates::INSTR_STATE_READ:
+      lo = bus->read_byte(sp++);
+      state = InstrStates::INSTR_STATE_READ2;
+      break;
+    case InstrStates::INSTR_STATE_READ2:
+      hi = bus->read_byte(sp++);
+      reg_file->reg_pc = lo | (hi << 8);
+      reg_file->reg_sp.write(sp);
+      break;
+    default:
+      break;
+    }
     return 16;
   }
+  std::size_t mem_access_t_cycle() override {
+    return state == InstrStates::INSTR_STATE_READ ? 4 : 8;
+  }
+  void parse() override {
+    state = InstrStates::INSTR_STATE_READ;
+    sp = reg_file->reg_sp.read();
+  }
   std::string describe() override { return std::format("RET"); }
+
+private:
+  InstrStates state{};
+  byte_t lo{}, hi{};
+  addr_t sp{};
 };
 
 /*
@@ -252,22 +270,37 @@ public:
        InterruptMasterEnable *ime_ptr)
       : Instruction(reg_file_ptr, bus_ptr), ime(ime_ptr) {}
   std::size_t exec() override {
-    addr_t sp = reg_file->reg_sp.read();
-    const addr_t lo = bus->read_byte(sp++);
-    const addr_t hi = bus->read_byte(sp++);
+    switch (state) {
+    case InstrStates::INSTR_STATE_READ:
+      lo = bus->read_byte(sp++);
+      state = InstrStates::INSTR_STATE_READ2;
+      break;
+    case InstrStates::INSTR_STATE_READ2:
+      hi = bus->read_byte(sp++);
+      reg_file->reg_pc = lo | (hi << 8);
+      reg_file->reg_sp.write(sp);
 
-    // Enable IME, but effects are instant bc of hardware quirk
-    ime->enable(false);
-
-    // Write back for updated stack pointer
-    reg_file->reg_sp.write(sp);
-    reg_file->reg_pc = lo | (hi << 8);
+      // Enable IME, but effects are instant bc of hardware quirk
+      ime->enable(false);
+    default:
+      break;
+    }
     return 16;
+  }
+  std::size_t mem_access_t_cycle() override {
+    return state == InstrStates::INSTR_STATE_READ ? 4 : 8;
+  }
+  void parse() override {
+    state = InstrStates::INSTR_STATE_READ;
+    sp = reg_file->reg_sp.read();
   }
   std::string describe() override { return std::format("RETI"); }
 
 private:
   InterruptMasterEnable *const ime;
+  InstrStates state{};
+  byte_t lo{}, hi{};
+  addr_t sp{};
 };
 
 /*
@@ -279,19 +312,35 @@ public:
       : Instruction(reg_file_ptr, bus_ptr) {}
 
   std::size_t exec() override {
-    const addr_t ret = reg_file->reg_pc;
-    addr_t sp = reg_file->reg_sp.read();
-    bus->write_byte(--sp, static_cast<uint8_t>(ret >> 8));
-    bus->write_byte(--sp, static_cast<uint8_t>(ret & 0xFF));
-
-    // Write back for updated stack pointer
-    reg_file->reg_sp.write(sp);
-    reg_file->reg_pc = vec;
+    switch (state) {
+    case InstrStates::INSTR_STATE_WRITE:
+      bus->write_byte(--sp, static_cast<uint8_t>(reg_file->reg_pc >> 8));
+      state = InstrStates::INSTR_STATE_WRITE2;
+      break;
+    case InstrStates::INSTR_STATE_WRITE2:
+      bus->write_byte(--sp, static_cast<uint8_t>(reg_file->reg_pc & 0xFF));
+      reg_file->reg_sp.write(sp);
+      reg_file->reg_pc = vec;
+      break;
+    default:
+      break;
+    }
     return 16;
+  }
+  std::size_t mem_access_t_cycle() override {
+    return state == InstrStates::INSTR_STATE_WRITE ? 8 : 12;
   }
   std::string describe() override {
     return std::format("RST {}", static_cast<int>(vec));
   }
+  void parse() override {
+    state = InstrStates::INSTR_STATE_WRITE;
+    sp = reg_file->reg_sp.read();
+  }
+
+private:
+  InstrStates state{};
+  addr_t sp{};
 };
 
 #endif // __BRANCH_H
