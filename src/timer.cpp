@@ -11,12 +11,11 @@ T* init_mmio(AddressBus* bus, const IORegisterMapping reg_id) {
   throw std::logic_error(std::string("Failed to configure MMIO (Timer)"));
 }
 
-TimerUnit::TimerUnit(AddressBus* const bus, runtime_sys_info& sys)
+TimerUnit::TimerUnit(AddressBus* const bus)
   : tima_reg(*this), // Timer counter register
     tma_reg(*this), // Timer modulo register
     tac_reg(*this), // Timer control register
-    div_reg(*this), // Divider register
-    sys_(sys) // General operating mode info
+    div_reg(*this) // Divider register
 {
   using mmio = IORegisterMapping;
   using namespace PPU;

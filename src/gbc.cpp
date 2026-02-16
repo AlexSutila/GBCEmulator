@@ -68,7 +68,7 @@ void GameBoyColor::system_init() {
   cpu = std::make_unique<LR35902>(bus.get(), debugger_, sys_);
   apu = std::make_unique<APU>(*bus, fe_);
   ppu = std::make_unique<PixelProcessingUnit>(bus.get(), fe_, debugger_, sys_);
-  timer = std::make_unique<TimerUnit>(bus.get(), sys_);
+  timer = std::make_unique<TimerUnit>(bus.get());
   serial = std::make_unique<SerialUnit>(bus.get());
 
   /* Joypad initialization */

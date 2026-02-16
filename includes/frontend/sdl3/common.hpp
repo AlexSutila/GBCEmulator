@@ -131,6 +131,22 @@ struct UiState {
   std::string load_bios_path;
   bool request_quit{false};
 
+  // ROM I/O status (downloads, unzip, etc.)
+  bool io_busy{false};
+  float io_progress{-1.0f}; // -1 = unknown/indeterminate
+  std::string io_status;
+
+  // Load-from-URL popup
+  bool show_load_url_popup{false};
+  char load_url_input[2048] = "";
+
+  // ZIP chooser popup (when multiple ROMs exist in an archive)
+  bool show_zip_picker_popup{false};
+  std::string zip_picker_title;
+  std::vector<std::string> zip_rom_entries;
+  int zip_rom_selected_idx{0};
+  int zip_picker_action{0}; // 0=none, 1=ok, 2=cancel
+
   // Audio Device Cache
   std::vector<std::string> audio_device_names;
   std::vector<SDL_AudioDeviceID> audio_device_ids;
