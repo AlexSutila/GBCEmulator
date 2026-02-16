@@ -86,6 +86,13 @@ namespace {
     }
     return path;
   }
+
+  std::string strip_colons(const std::string &path) {
+    if (const auto i = path.find(" ::"); i != std::string::npos) {
+      return path.substr(0, i);
+    }
+    return path;
+  }
 }
   void SDL3Frontend::sync_io_status_to_ui() {
   ui_state.io_busy = io_busy.load(std::memory_order_relaxed);
@@ -468,7 +475,7 @@ void SDL3Frontend::start() {
           ui_state.load_rom_path = display_label;
           ui_state.cart_info = Debug::describe_cart(cart_ctx);
         }
-        gui.update_rom_path(display_label);
+        gui.update_rom_path(strip_colons(display_label));
       } catch (std::exception &e) {
         Logger::push(LogLevel::Warning, "ROM", "Failed to load ROM", e.what());
       }
