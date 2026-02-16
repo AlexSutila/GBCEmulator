@@ -10,8 +10,8 @@ SDLHost::SDLHost(const int width, const int height, const int scale) {
     throw std::runtime_error(SDL_GetError());
 
   window =
-      SDL_CreateWindow("GBC", width * scale, height * scale + 19 * 2,
-                       SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
+    SDL_CreateWindow("GBC", width * scale, height * scale + 19 * 2,
+                     SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
   if (!window)
     throw std::runtime_error(SDL_GetError());
 
@@ -19,6 +19,7 @@ SDLHost::SDLHost(const int width, const int height, const int scale) {
   if (!renderer)
     throw std::runtime_error(SDL_GetError());
   SDL_SetRenderVSync(renderer, 1);
+  vsync_enabled = true;
 
   texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
                               SDL_TEXTUREACCESS_STREAMING, width, height);
@@ -41,18 +42,19 @@ SDLHost::~SDLHost() {
 }
 
 /* Rendering */
-void SDLHost::update_texture(const std::uint32_t *pixels, const int width,
-                             const int height, const std::atomic<bool> &is_cgb,
+void SDLHost::update_texture(const std::uint32_t* pixels, const int width,
+                             const int height, const std::atomic<bool>& is_cgb,
                              const bool force_mono) const {
-  uint32_t *texturePixels{};
+  uint32_t* texturePixels{};
   int pitch{};
-  SDL_LockTexture(texture, nullptr, reinterpret_cast<void **>(&texturePixels),
+  SDL_LockTexture(texture, nullptr, reinterpret_cast<void**>(&texturePixels),
                   &pitch);
   pitch /= sizeof(uint32_t);
+  const bool cgb = is_cgb.load(std::memory_order_relaxed);
   for (int y = 0; y < height; ++y)
     for (int x = 0; x < width; ++x) {
       const auto c =
-          format_pixel_data(pixels[y * width + x], is_cgb.load(), force_mono);
+        format_pixel_data(pixels[y * width + x], cgb, force_mono);
       texturePixels[y * pitch + x] = c;
     }
   SDL_UnlockTexture(texture);
@@ -64,7 +66,7 @@ void SDLHost::draw_texture(const float menu_bar_height,
   SDL_GetWindowSize(window, &window_w, &window_h);
   const auto avail_w = static_cast<float>(window_w);
   const auto avail_h =
-      static_cast<float>(window_h) - menu_bar_height - bottom_bar_height;
+    static_cast<float>(window_h) - menu_bar_height - bottom_bar_height;
 
   // Scale texture so it doesn't warp with window size
   float tex_w{}, tex_h{};
@@ -75,10 +77,12 @@ void SDLHost::draw_texture(const float menu_bar_height,
   const float dst_w = tex_w * scale;
   const float dst_h = tex_h * scale;
 
-  const SDL_FRect dst_rect{(avail_w - dst_w) * 0.5f, // center X
-                           menu_bar_height +
-                               (avail_h - dst_h) * 0.5f, // Center Y under menu
-                           dst_w, dst_h};
+  const SDL_FRect dst_rect{
+    (avail_w - dst_w) * 0.5f, // center X
+    menu_bar_height +
+    (avail_h - dst_h) * 0.5f, // Center Y under menu
+    dst_w, dst_h
+  };
   SDL_RenderTexture(renderer, texture, nullptr, &dst_rect);
 }
 
@@ -97,6 +101,13 @@ std::uint32_t SDLHost::format_pixel_data(const std::uint32_t px,
   return px | alpha_mask;
 }
 
+void SDLHost::set_vsync(const bool enabled) {
+  if (!renderer) return;
+  if (vsync_enabled == enabled) return;
+  SDL_SetRenderVSync(renderer, enabled ? 1 : 0);
+  vsync_enabled = enabled;
+}
+
 /* Audio related */
 void SDLHost::init_audio(const int freq, const int channels) {
   SDL_zero(audio_spec);
@@ -104,7 +115,7 @@ void SDLHost::init_audio(const int freq, const int channels) {
   audio_spec.format = SDL_AUDIO_F32;
   audio_spec.channels = channels;
   audio_device =
-      SDL_OpenAudioDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &audio_spec);
+    SDL_OpenAudioDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &audio_spec);
   if (!audio_device)
     throw std::runtime_error(SDL_GetError());
   audio_stream = SDL_CreateAudioStream(&audio_spec, &audio_spec);
@@ -114,7 +125,7 @@ void SDLHost::init_audio(const int freq, const int channels) {
     throw std::runtime_error(SDL_GetError());
 }
 
-void SDLHost::queue_audio(const float *samples, const std::size_t count) const {
+void SDLHost::queue_audio(const float* samples, const std::size_t count) const {
   if (!samples || count == 0)
     return;
 
@@ -123,9 +134,9 @@ void SDLHost::queue_audio(const float *samples, const std::size_t count) const {
     return;
 
   const std::size_t bytes_per_frame =
-      static_cast<std::size_t>(audio_spec.channels) * sizeof(float);
+    static_cast<std::size_t>(audio_spec.channels) * sizeof(float);
   const std::size_t max_queue_bytes =
-      static_cast<std::size_t>(audio_spec.freq) * bytes_per_frame; // ~1 second
+    static_cast<std::size_t>(audio_spec.freq) * bytes_per_frame; // ~1 second
   const int queued = SDL_GetAudioStreamQueued(audio_stream);
 
   if (queued < 0) {
@@ -136,13 +147,13 @@ void SDLHost::queue_audio(const float *samples, const std::size_t count) const {
     return;
 
   if (const int byte_count = static_cast<int>(count * sizeof(float));
-      !SDL_PutAudioStreamData(audio_stream, samples, byte_count)) {
+    !SDL_PutAudioStreamData(audio_stream, samples, byte_count)) {
     SDL_ClearAudioStream(audio_stream);
   }
 }
 
 bool SDLHost::set_audio_device(const int device_index,
-                               const std::vector<SDL_AudioDeviceID> &ids,
+                               const std::vector<SDL_AudioDeviceID>& ids,
                                const float vol) {
   if (device_index < 0 || device_index >= static_cast<int>(ids.size()))
     return false;
@@ -181,8 +192,8 @@ bool SDLHost::set_audio_device(const int device_index,
   return true;
 }
 
-void SDLHost::refresh_audio_devices(std::vector<std::string> &names,
-                                    std::vector<SDL_AudioDeviceID> &ids) {
+void SDLHost::refresh_audio_devices(std::vector<std::string>& names,
+                                    std::vector<SDL_AudioDeviceID>& ids) {
   names.clear();
   ids.clear();
 
@@ -191,7 +202,7 @@ void SDLHost::refresh_audio_devices(std::vector<std::string> &names,
   names.emplace_back("System default");
 
   int count = 0;
-  SDL_AudioDeviceID *devs = SDL_GetAudioPlaybackDevices(&count);
+  SDL_AudioDeviceID* devs = SDL_GetAudioPlaybackDevices(&count);
   if (!devs) {
     Logger::push(LogLevel::Error, "Audio", "Failed to get audio devices",
                  "Failed to get audio devices: " + std::string(SDL_GetError()));
@@ -201,7 +212,7 @@ void SDLHost::refresh_audio_devices(std::vector<std::string> &names,
   // SDL docs: returns a 0-terminated array; also provides count
   for (int i = 0; devs[i] != 0; ++i) {
     const SDL_AudioDeviceID id = devs[i];
-    const char *name = SDL_GetAudioDeviceName(id); // human-readable name
+    const char* name = SDL_GetAudioDeviceName(id); // human-readable name
     ids.push_back(id);
     names.emplace_back(name ? name : "(unknown device)");
   }
