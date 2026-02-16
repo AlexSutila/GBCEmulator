@@ -79,6 +79,13 @@ namespace {
                Clock::now().time_since_epoch())
         .count();
   }
+
+  std::string process_path(const std::string &path) {
+    if (path.find("file:/", 0) == 0) {
+      return path.substr(6);
+    }
+    return path;
+  }
 }
   void SDL3Frontend::sync_io_status_to_ui() {
   ui_state.io_busy = io_busy.load(std::memory_order_relaxed);
@@ -149,7 +156,7 @@ void SDL3Frontend::poll_zip_choice_response() {
 void SDL3Frontend::handle_drop(const SDL_Event &e) {
   if (!e.drop.data) return;
   std::lock_guard lock(ui_mutex);
-  ui_state.load_rom_path = e.drop.data;   // file path or URL text
+  ui_state.load_rom_path = process_path(e.drop.data);   // file path or URL text
   ui_state.request_load_rom = true;
 }
 
@@ -524,7 +531,7 @@ void SDL3Frontend::render_frame() {
   // 1. Get the latest frame buffer and current parameters
   const bool force_mono = gui.get_settings_c().force_mono_dmg;
   const bool cgb_mode   = is_cgb.load(std::memory_order_relaxed);
-  if (bool format_changed = force_mono != last_force_mono_dmg || cgb_mode != last_cgb_mode) {
+  if (force_mono != last_force_mono_dmg || cgb_mode != last_cgb_mode) {
     last_force_mono_dmg = force_mono;
     last_cgb_mode = cgb_mode;
     video_dirty.store(true, std::memory_order_relaxed);
