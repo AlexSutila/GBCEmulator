@@ -28,6 +28,7 @@ public:
   }
   void present() const { SDL_RenderPresent(renderer); }
   void clear_screen() const { SDL_RenderClear(renderer); }
+  void set_vsync(bool enabled);
 
   // Audio
   void init_audio(int freq = 48000, int channels = 2);
@@ -45,6 +46,7 @@ private:
   SDL_Window *window{nullptr};
   SDL_Renderer *renderer{nullptr};
   SDL_Texture *texture{nullptr};
+  bool vsync_enabled{true};
 
   SDL_AudioDeviceID audio_device{0};
   SDL_AudioStream *audio_stream{nullptr};

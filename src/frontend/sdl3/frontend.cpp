@@ -73,6 +73,12 @@ namespace {
     }
     return 0;
   }
+
+  std::int64_t steady_now_ns() {
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(
+               Clock::now().time_since_epoch())
+        .count();
+  }
 }
   void SDL3Frontend::sync_io_status_to_ui() {
   ui_state.io_busy = io_busy.load(std::memory_order_relaxed);
@@ -414,6 +420,7 @@ void SDL3Frontend::put_pixel(const int x, const int y, const std::uint32_t c) {
   if (x + 1 == framebuf_width && y + 1 == framebuf_height) {
     front_index.store(back_index, std::memory_order_release);
     emulated_frame_count.fetch_add(1, std::memory_order_relaxed);
+    video_dirty.store(true, std::memory_order_release);
   }
 }
 
@@ -421,6 +428,7 @@ void SDL3Frontend::clear(const std::uint32_t c) {
   for (int i = 0; i < framebuf_width * framebuf_height; ++i)
     for (auto &buffer : framebuffers)
       buffer[i] = c;
+  video_dirty.store(true, std::memory_order_relaxed);
 }
 
 void SDL3Frontend::queue_audio_samples(const float *samples,
@@ -462,7 +470,11 @@ void SDL3Frontend::start() {
     /* Handle BIOS selection, won't take effect until ROM re-inserted */
     consume_load_bios_request(bios_path);
     process_events();
-    render_frame();
+    // Don't force a redraw if the watcher just forced it
+    const auto now_ns = steady_now_ns();
+    if (const auto last_forced = last_forced_redraw_ns.load(std::memory_order_relaxed);
+      now_ns - last_forced > 2'000'000) // ~2ms
+         render_frame();
   }
 
   /* Kill emulation thread */
@@ -501,18 +513,34 @@ void SDL3Frontend::process_events() {
 
 void SDL3Frontend::render_frame() {
   // --- PHASE 1: PREPARE TEXTURE ---
-  // 1. Get the raw buffer from the emulator thread
-  const std::uint32_t *raw_pixels = get_front_buffer();
-  // 2. Send to GPU
-  host.update_texture(raw_pixels, 160, 144, is_cgb,
-                      gui.get_settings_c().force_mono_dmg);
+  // 0. Check if we need to update the texture (avoid redundant GPU uploads)
+  if (render_guard.test_and_set(std::memory_order_acquire)) return;
+  struct Guard { std::atomic_flag &f; ~Guard(){ f.clear(std::memory_order_release); } } g{render_guard};
+
+  const auto now_ns = steady_now_ns();
+  const auto until_ns = suppress_vsync_until_ns.load(std::memory_order_relaxed);
+  host.set_vsync(now_ns >= until_ns);
+
+  // 1. Get the latest frame buffer and current parameters
+  const bool force_mono = gui.get_settings_c().force_mono_dmg;
+  const bool cgb_mode   = is_cgb.load(std::memory_order_relaxed);
+  if (bool format_changed = force_mono != last_force_mono_dmg || cgb_mode != last_cgb_mode) {
+    last_force_mono_dmg = force_mono;
+    last_cgb_mode = cgb_mode;
+    video_dirty.store(true, std::memory_order_relaxed);
+  }
+
+  // 2. Update texture if needed
+  if (video_dirty.exchange(false, std::memory_order_acq_rel)) {
+    const std::uint32_t *raw_pixels = get_front_buffer();
+    host.update_texture(raw_pixels, 160, 144, is_cgb, force_mono);
+  }
 
   // 3. FPS Calculation
   const auto now = std::chrono::steady_clock::now();
   const auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                               now - last_fps_check)
                               .count();
-
   // Update FPS readout every 500ms
   if (elapsed_ms >= 500) {
     const uint64_t current_count =
@@ -713,14 +741,20 @@ bool SDLCALL SDL3Frontend::event_watcher(void *userdata,
       event->type == SDL_EVENT_WINDOW_EXPOSED) {
 
     static auto last_draw = std::chrono::steady_clock::now();
+    const int min_interval_ms = (event->type == SDL_EVENT_WINDOW_MOVED) ? 33 : 16;
 
     // Force a frame update immediately
     // When the main loop is blocked during windows resizing
     if (const auto now = std::chrono::steady_clock::now();
         std::chrono::duration_cast<std::chrono::milliseconds>(now - last_draw)
-            .count() >= 16) {
+            .count() >= min_interval_ms) {
       auto *self = static_cast<SDL3Frontend *>(userdata);
+
+      const auto now_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count();
+      // Disable vsync for a short grace window after move/resize events
+      self->suppress_vsync_until_ns.store(now_ns + 150'000'000, std::memory_order_relaxed);
       self->render_frame();
+      self->last_forced_redraw_ns.store(now_ns, std::memory_order_relaxed);
       last_draw = now;
     }
   }
