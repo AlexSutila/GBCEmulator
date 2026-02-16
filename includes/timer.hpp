@@ -9,7 +9,7 @@ struct runtime_sys_info;
 
 class TimerUnit {
 public:
-  explicit TimerUnit(AddressBus *bus, runtime_sys_info &sys);
+  explicit TimerUnit(AddressBus *bus);
   void reset() noexcept;
   void step() noexcept;
 
@@ -55,8 +55,6 @@ private:
 
   bool reload_latch_{};
   std::uint8_t reload_delay_{};
-
-  runtime_sys_info &sys_;
 };
 
 #endif // GBC_TIMER_H

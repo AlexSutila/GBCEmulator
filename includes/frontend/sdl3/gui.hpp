@@ -12,7 +12,7 @@
 
 class GbcImGui {
   static constexpr std::string_view rom_filters =
-    "ROM files (*.gb *.gbc){.gb,.gbc},All files (*.*){.*}";
+    "ROM files (*.gb *.gbc){.gb,.gbc},ZIP files (*.zip){.zip},All files (*.*){.*}";
   static constexpr std::string_view bios_filters =
       "BIOS files (*.bin){.bin},All files (*.*){.*}";
   static constexpr std::array<std::string_view, KCount> control_labels{
@@ -58,6 +58,7 @@ private:
   void build_keybinds_window(UiState& state);
   void build_about_window(UiState& state);
   void build_notification_window(UiState& state) const;
+  void build_rom_source_window(UiState& state) const;
 
   // Helpers
   IGFD::FileDialogConfig rom_sel_conf;

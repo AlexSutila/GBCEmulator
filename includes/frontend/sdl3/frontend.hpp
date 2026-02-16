@@ -66,6 +66,37 @@ private:
   bool consume_load_rom_request(std::string &rom_path);
   bool consume_load_bios_request(std::optional<std::string> &bios_path);
 
+  void start_rom_io_job(const std::string &source);
+  bool consume_rom_io_result(std::string &rom_path_on_disk, std::string &display_label);
+  void sync_io_status_to_ui();
+
+  int request_zip_choice_blocking(const std::string &zip_label,
+                                  const std::vector<std::string> &entries,
+                                  const std::stop_token &st);
+  void poll_zip_choice_response();
+
+  void handle_drop(const SDL_Event &e);
+
+  std::jthread rom_io_thread;
+  std::mutex rom_io_mutex;
+  std::optional<std::string> rom_ready_path;
+  std::string rom_ready_label;
+
+  std::atomic<bool> io_busy{false};
+  std::atomic<float> io_progress{-1.0f};
+  std::mutex io_status_mutex;
+  std::string io_status;
+
+  std::mutex zip_choice_mutex;
+  std::condition_variable zip_choice_cv;
+  bool zip_choice_pending{false};
+  int zip_choice_result{-1};
+  bool zip_choice_cancelled{false};
+
+  std::filesystem::path tmp_root;
+  std::optional<std::filesystem::path> last_tmp_rom;
+  std::optional<std::filesystem::path> last_tmp_zip;
+
   // Main loop helpers
   void process_events();
   void render_frame();
