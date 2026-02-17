@@ -444,7 +444,7 @@ public:
   std::string describe() override {
     return std::format("PUSH {}", to_string<src>());
   }
-  void parse() {
+  void parse() override {
     state = InstrStates::INSTR_STATE_WRITE;
     sp = reg_file->reg_sp.read();
   }
@@ -471,7 +471,7 @@ public:
       addr = bus->read_byte(sp++);
       break;
     case InstrStates::INSTR_STATE_READ2:
-      addr |= (addr_t)bus->read_byte(sp++) << 8;
+      addr |= static_cast<addr_t>(bus->read_byte(sp++)) << 8;
       reg_file->reg_sp.write(sp);
       write_reg<dst>(addr);
     default:
@@ -482,7 +482,7 @@ public:
   std::string describe() override {
     return std::format("POP {}", to_string<dst>());
   }
-  void parse() {
+  void parse() override {
     state = InstrStates::INSTR_STATE_READ;
     sp = reg_file->reg_sp.read();
   }

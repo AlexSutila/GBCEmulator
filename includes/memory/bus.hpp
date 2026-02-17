@@ -23,17 +23,17 @@ enum BusConflictTypes : std::uint32_t {
   BUS_CONFLICT_OAM_DMA = 1 << 1,
 };
 
-constexpr BusConflictTypes operator|(BusConflictTypes a, BusConflictTypes b) {
+constexpr BusConflictTypes operator|(const BusConflictTypes a, const BusConflictTypes b) {
   return static_cast<BusConflictTypes>(static_cast<std::uint32_t>(a) |
                                        static_cast<std::uint32_t>(b));
 }
 
-constexpr BusConflictTypes operator&(BusConflictTypes a, BusConflictTypes b) {
+constexpr BusConflictTypes operator&(const BusConflictTypes a, const BusConflictTypes b) {
   return static_cast<BusConflictTypes>(static_cast<std::uint32_t>(a) &
                                        static_cast<std::uint32_t>(b));
 }
 
-constexpr BusConflictTypes operator~(BusConflictTypes a) {
+constexpr BusConflictTypes operator~(const BusConflictTypes a) {
   return static_cast<BusConflictTypes>(~static_cast<std::uint32_t>(a));
 }
 
@@ -58,13 +58,13 @@ constexpr BusConflictTypes operator~(BusConflictTypes a) {
 class AddressBus final : Debug::Debuggable {
 public:
   void write_byte(addr_t addr, byte_t value);
-  byte_t read_byte(addr_t addr) const;
+  [[nodiscard]] byte_t read_byte(addr_t addr) const;
   ObjAttrDMA &get_oam_dma() { return oam_dma; };
   VDMA &get_vdma() { return vdma; }
 
   /* To be used by debuggers, more or less reads memory exactly the same as the
    * regular `read_byte()`, but calls `peak()` for memory mapped registers. */
-  byte_t read_byte_safe(addr_t addr) const;
+  [[nodiscard]] byte_t read_byte_safe(addr_t addr) const;
 
   /* Second constructor is called when skipping BIOS, first constructor may also
    * ignore the BIOS if the initialization fails for some reason. */
@@ -114,7 +114,7 @@ private:
    * of bus conflicts, one component will end up reading what we are basically
    * going to be treating as `open bus`. */
   static constexpr byte_t open_bus() { return 0xFF; }
-  bool is_conflicting(const addr_t addr) const;
+  [[nodiscard]] bool is_conflicting(addr_t addr) const;
   BusConflictTypes bus_conflicts{};
 
   std::map<addr_t, MMIORegister *> io_registers{};
