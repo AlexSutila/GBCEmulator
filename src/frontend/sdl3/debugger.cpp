@@ -11,8 +11,8 @@
 #include <mutex>
 #include <stdexcept>
 
-constexpr auto hex_vieiwer_bytes_shown = 0x10 * 0x10; // Don't mess with this
-static_assert(hex_vieiwer_bytes_shown % 0x10 == 0, "Should be a factor of 16");
+constexpr auto hex_viewer_bytes_shown = 0x10 * 0x10; // Don't mess with this
+static_assert(hex_viewer_bytes_shown % 0x10 == 0, "Should be a factor of 16");
 
 constexpr auto tile_data_height_tiles = 24;
 constexpr auto tile_data_width_tiles = 16;
@@ -20,7 +20,7 @@ constexpr auto tile_data_height_px = tile_data_height_tiles * 8;
 constexpr auto tile_data_width_px = tile_data_width_tiles * 8;
 constexpr auto black = 0xFF000000;
 
-void DebuggerImGui::init(SDLHost &host) {
+void DebuggerImGui::init(const SDLHost &host) {
   for (auto &texture : ctx.tile_data_texture) {
     texture = SDL_CreateTexture(host.get_renderer(), SDL_PIXELFORMAT_ARGB8888,
                                 SDL_TEXTUREACCESS_STREAMING, tile_data_width_px,
@@ -32,11 +32,11 @@ void DebuggerImGui::init(SDLHost &host) {
   // Clears buffers used to update textures
   for (auto &buf : tile_data_buf) {
     buf.resize(tile_data_height_px * tile_data_width_px);
-    std::fill(buf.begin(), buf.end(), black);
+    std::ranges::fill(buf, black);
   }
 
   // Allocate heap space for the hex view memory reader
-  ctx.bus_content.resize(hex_vieiwer_bytes_shown);
+  ctx.bus_content.resize(hex_viewer_bytes_shown);
 }
 
 // This is a public entry point called from the main GUI render loop
@@ -50,7 +50,7 @@ void DebuggerImGui::render(UiState &state,
   if (state.show_breakpoints)
     build_breakpoints_window(state, core);
   if (state.show_ppu_viewer)
-    build_ppu_viewer_window(state, core);
+    build_ppu_viewer_window(state);
 }
 
 // Called by the emulator thread when a breakpoint is hit
@@ -73,7 +73,7 @@ void DebuggerImGui::update_state_from_core(
   ctx.cpu_state = Debug::to_string(core->get_cpu()->get_state());
   ctx.ppu_state = Debug::to_string(core->get_ppu()->get_state());
   ctx.disasm = core->get_cpu()->disasm();
-  auto address_bus = core->get_bus();
+  const auto address_bus = core->get_bus();
 
   // Address bus relevant information
   ctx.oam_dma_state = Debug::to_string(address_bus->get_oam_dma().get_state());
@@ -261,7 +261,7 @@ void DebuggerImGui::build_breakpoints_window(
 }
 
 void DebuggerImGui::build_ppu_viewer_window(
-    UiState &state, const std::unique_ptr<GameBoyColor> &core) {
+  UiState& state) const {
   std::lock_guard lock(dbg_mutex);
 
   ImGui::Begin("Pixel Processor Viewer", &state.show_ppu_viewer);
@@ -270,9 +270,9 @@ void DebuggerImGui::build_ppu_viewer_window(
 
   // Render tile data to debug view for both banks
   ImGui::SeparatorText("Tile Data: (VRAM banks 0, 1)");
-  render_vram_tile_data(core, 0);
+  render_vram_tile_data(0);
   ImGui::SameLine();
-  render_vram_tile_data(core, 1);
+  render_vram_tile_data(1);
   ImGui::End();
 }
 
@@ -314,8 +314,7 @@ void DebuggerImGui::build_config_breakpoint_window(
 }
 
 void DebuggerImGui::render_vram_tile_data(
-    const std::unique_ptr<GameBoyColor> &core,
-    const std::size_t vram_bank_idx) {
+  const size_t vram_bank_idx) const {
   constexpr float scale = 1.5f; // Lol, hardcoded bc idc
   constexpr ImVec2 size(tile_data_width_px * scale,
                         tile_data_height_px * scale);
@@ -324,15 +323,12 @@ void DebuggerImGui::render_vram_tile_data(
   SDL_UpdateTexture(ctx.tile_data_texture.at(vram_bank_idx), nullptr,
                     tile_data_buf.at(vram_bank_idx).data(),
                     tile_data_width_px * sizeof(std::uint32_t));
-  ImGui::Image((ImTextureID)ctx.tile_data_texture.at(vram_bank_idx), size);
+  ImGui::Image(ctx.tile_data_texture.at(vram_bank_idx), size);
 }
 
 void DebuggerImGui::read_vram_tile_data(
     const std::unique_ptr<GameBoyColor> &core,
     const std::size_t vram_bank_idx) {
-  constexpr std::size_t tile_width = 8;
-  constexpr std::size_t tile_height = 8;
-  constexpr std::size_t bytes_per_tile = 16;
   constexpr std::size_t tiles_per_row = tile_data_width_tiles;
   constexpr std::size_t tile_count = 384;
   assert(vram_bank_idx >= 0 && vram_bank_idx <= 1);
@@ -343,8 +339,11 @@ void DebuggerImGui::read_vram_tile_data(
 
   // For get any PPU timing, just copy what is in VRAM as is
   for (std::size_t tile = 0; tile < tile_count; ++tile) {
-    const std::size_t tile_x = (tile % tiles_per_row) * tile_width;
-    const std::size_t tile_y = (tile / tiles_per_row) * tile_height;
+    constexpr std::size_t bytes_per_tile = 16;
+    constexpr std::size_t tile_height = 8;
+    constexpr std::size_t tile_width = 8;
+    const std::size_t tile_x = tile % tiles_per_row * tile_width;
+    const std::size_t tile_y = tile / tiles_per_row * tile_height;
     const std::size_t base = tile * bytes_per_tile;
     for (std::size_t row = 0; row < tile_height; ++row) {
       const byte_t lo = vram_bank[base + row * 2];
@@ -363,8 +362,8 @@ void DebuggerImGui::read_vram_tile_data(
 
 void DebuggerImGui::read_bus_data(const std::unique_ptr<GameBoyColor> &core,
                                   const addr_t start_addr) {
-  auto bus = core->get_bus(); // Be sure not to mess with memory mapped regs
-  for (std::size_t offset{0}; offset < hex_vieiwer_bytes_shown; ++offset) {
+  const auto bus = core->get_bus(); // Be sure not to mess with memory mapped regs
+  for (std::size_t offset{0}; offset < hex_viewer_bytes_shown; ++offset) {
     const addr_t cur_addr_full = (start_addr + offset) & 0xFFFF;
     ctx.bus_content.at(offset) = bus->read_byte_safe(cur_addr_full);
   }

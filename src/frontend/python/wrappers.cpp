@@ -6,11 +6,9 @@
 #include "memory/bus.hpp"
 #include "memory/mmio/dmg.hpp"
 #include "memory/mmio/mmio.hpp"
-#include "ppu/ppu.hpp"
-#include "timer.hpp"
 
-PyGameBoyColor::PyGameBoyColor(pybind11::function callback) : fe_() {
-  auto &gbc = fe_.get();
+PyGameBoyColor::PyGameBoyColor(const pybind11::function& callback) {
+  const auto &gbc = fe_.get();
 
   // Need to wrap callback and make it Python-call safe
   cb_ = [callback]() -> Debug::BreakReason {

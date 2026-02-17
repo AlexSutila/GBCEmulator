@@ -13,7 +13,7 @@
 #include <optional>
 #include <stdexcept>
 
-/* To make the contents of this file slightly less aggregious of a playground
+/* To make the contents of this file slightly less egregious of a playground
  * for performing heap corruption exploits lmao */
 constexpr addr_t VRAM_MASK = 0x1FFF;
 constexpr addr_t WRAM_MASK = 0x0FFF;
@@ -25,40 +25,40 @@ template <typename T> std::unique_ptr<T[]> make_zeroed(std::size_t size) {
   return p;
 }
 
-bool AddressBus::is_boot_rom_range(const addr_t a) {
+bool AddressBus::is_boot_rom_range(const addr_t a) const {
   if (!boot_rom_ctrl.boot_rom_enabled() || !bios_.has_value())
     return false;
   return bios_->in_range(a);
 }
 
 static constexpr bool is_cart_range(const addr_t a) noexcept {
-  return (a <= 0x7FFF) || (a >= 0xA000 && a <= 0xBFFF);
+  return a <= 0x7FFF || (a >= 0xA000 && a <= 0xBFFF);
 }
 
 static constexpr bool is_vram_range(const addr_t a) noexcept {
-  return (a >= 0x8000 && a <= 0x9FFF);
+  return a >= 0x8000 && a <= 0x9FFF;
 }
 
 static constexpr bool is_wram_range(const addr_t a) noexcept {
-  return (a >= 0xC000 && a <= 0xDFFF);
+  return a >= 0xC000 && a <= 0xDFFF;
 }
 
 static constexpr bool is_echo_range(const addr_t a) noexcept {
-  return (a >= 0xE000 && a <= 0xFDFF);
+  return a >= 0xE000 && a <= 0xFDFF;
 }
 
 static constexpr bool is_oam_range(const addr_t a) noexcept {
-  return (a >= 0xFE00 && a <= 0xFE9F);
+  return a >= 0xFE00 && a <= 0xFE9F;
 }
 
 static constexpr bool is_hram_range(const addr_t a) noexcept {
-  return (a >= 0xFF80 && a <= 0xFFFE);
+  return a >= 0xFF80 && a <= 0xFFFE;
 }
 
 AddressBus::AddressBus(runtime_sys_info &sys,
                        std::optional<Debug::Debugger> &debugger,
                        std::optional<BootROM> &bios)
-    : Debug::Debuggable(debugger), // Bus read/write breakpoings
+    : Debuggable(debugger), // Bus read/write breakpoints
       key0(sys),                   // Controls backwards compatability
       key1(sys),                   // Controls clock speed mode
       oam_dma(*this),              // Performs object attribute DMA (DMG/CGB)
@@ -73,10 +73,8 @@ AddressBus::AddressBus(runtime_sys_info &sys,
   using mmio = IORegisterMapping;
 
   /* Initialize banked and non-banked memory */
-  std::generate(vram.begin(), vram.end(),
-                [&] { return make_zeroed<byte_t>(vram_bank_size); });
-  std::generate(wram.begin(), wram.end(),
-                [&] { return make_zeroed<byte_t>(wram_bank_size); });
+  std::ranges::generate(vram,[&] { return make_zeroed<byte_t>(vram_bank_size); });
+  std::ranges::generate(wram,[&] { return make_zeroed<byte_t>(wram_bank_size); });
   hram = make_zeroed<byte_t>(hram_size);
   oam = make_zeroed<byte_t>(oam_size);
   bus_conflicts = BUS_CONFLICT_NONE;
@@ -114,16 +112,16 @@ void AddressBus::init_test_bed() {
 }
 void AddressBus::eject_cartridge() { cart_.reset(); }
 
-const byte_t AddressBus::read_byte_safe(const addr_t addr) {
+byte_t AddressBus::read_byte_safe(const addr_t addr) const {
   if (io_registers.contains(addr)) {
     assert((addr >= 0xFF00 && addr <= 0xFF7F) || addr == 0xFFFF);
     const auto &mmio = io_registers.at(addr);
     return mmio->peek(); // Const
-  } else
-    return read_byte(addr);
+  }
+  return read_byte(addr);
 }
 
-const byte_t AddressBus::read_byte(const addr_t addr) {
+byte_t AddressBus::read_byte(const addr_t addr) const {
   try_brk(addr, Debug::BRK_ADDRESS_READ);
 
   /* Read from boot ROM if it is mapped (boot ROM overrides reads only) */
@@ -131,44 +129,40 @@ const byte_t AddressBus::read_byte(const addr_t addr) {
     return bios_->read_byte(addr);
 
   /* Cartridge memory */
-  else if (cart_ && is_cart_range(addr))
+  if (cart_ && is_cart_range(addr))
     return cart_->read_byte(addr);
 
-  /* Read from VRAM, only banked in CGB mode */
-  else if (is_vram_range(addr)) {
+    /* Read from VRAM, only banked in CGB mode */
+  if (is_vram_range(addr)) {
     const auto bank = vram_bank_ctrl.get_bank();
     return vram.at(bank)[(addr - 0x8000) & VRAM_MASK];
   }
 
   /* Read from WRAM, low bank is always mapped to zero */
-  else if (is_wram_range(addr)) {
+  if (is_wram_range(addr)) {
     if (addr < 0xD000)
       return wram.at(0)[(addr - 0xC000) & WRAM_MASK];
-    else {
-      const auto bank = wram_bank_ctrl.get_bank();
-      return wram.at(bank)[(addr - 0xD000) & WRAM_MASK];
-    }
+    const auto bank = wram_bank_ctrl.get_bank();
+    return wram.at(bank)[(addr - 0xD000) & WRAM_MASK];
   }
 
   /* Echoes 0xC000-0xDDFF */
-  else if (is_echo_range(addr)) {
+  if (is_echo_range(addr)) {
     if (addr < 0xF000)
       return wram.at(0)[(addr - 0xE000) & WRAM_MASK];
-    else {
-      const auto bank = wram_bank_ctrl.get_bank();
-      return wram.at(bank)[(addr - 0xF000) & WRAM_MASK];
-    }
+    const auto bank = wram_bank_ctrl.get_bank();
+    return wram.at(bank)[(addr - 0xF000) & WRAM_MASK];
   }
 
   /* Read from Object Attribute Memory */
-  else if (is_oam_range(addr)) {
+  if (is_oam_range(addr)) {
     if (is_acquired(BusConflictTypes::BUS_CONFLICT_OAM_DMA)) [[unlikely]]
       return open_bus();
     return oam[addr - 0xFE00];
   }
 
   /* Read from memory mapped IO register */
-  else if (io_registers.contains(addr)) {
+  if (io_registers.contains(addr)) {
     assert((addr >= 0xFF00 && addr <= 0xFF7F) || addr == 0xFFFF);
     auto const &mmio = io_registers.at(addr);
 
@@ -177,7 +171,7 @@ const byte_t AddressBus::read_byte(const addr_t addr) {
   }
 
   /* Read from to High RAM */
-  else if (is_hram_range(addr))
+  if (is_hram_range(addr))
     return hram[(addr - 0xFF80) & HRAM_MASK];
 
   return open_bus();
@@ -236,20 +230,20 @@ void AddressBus::write_byte(const addr_t addr, const byte_t value) {
 }
 
 MMIORegister *AddressBus::get_mmio(IORegisterMapping mapping) const {
-  const addr_t addr = static_cast<addr_t>(mapping);
+  const auto addr = static_cast<addr_t>(mapping);
   assert(io_registers.contains(addr));
   /* The address bus maintains ownership, so raw pointers are fine. */
   return io_registers.at(addr);
 }
 
-bool AddressBus::is_acquired(BusConflictTypes conflict_mask) const {
+bool AddressBus::is_acquired(const BusConflictTypes conflict_mask) const {
   return (bus_conflicts & conflict_mask) != 0;
 }
 
-void AddressBus::acquire(BusConflictTypes conflict_mask) {
+void AddressBus::acquire(const BusConflictTypes conflict_mask) {
   bus_conflicts = bus_conflicts | conflict_mask;
 }
 
-void AddressBus::release(BusConflictTypes conflict_mask) {
+void AddressBus::release(const BusConflictTypes conflict_mask) {
   bus_conflicts = bus_conflicts & ~conflict_mask;
 }

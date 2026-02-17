@@ -1,5 +1,5 @@
-#ifndef GBC_COMMON_HPP
-#define GBC_COMMON_HPP
+#ifndef GBC_SDL3_COMMON_HPP
+#define GBC_SDL3_COMMON_HPP
 
 #pragma once
 #include <SDL3/SDL.h>
@@ -167,4 +167,4 @@ struct UiState {
   std::string cart_info{"No ROM loaded"};
 };
 
-#endif // GBC_COMMON_HPP
+#endif // GBC_SDL3_COMMON_HPP

@@ -1,5 +1,5 @@
-#ifndef RAYLIB_FRONTEND_H
-#define RAYLIB_FRONTEND_H
+#ifndef GBC_RAYLIB_FRONTEND_HPP
+#define GBC_RAYLIB_FRONTEND_HPP
 
 #include "frontend/frontend.hpp"
 #include <array>
@@ -87,4 +87,4 @@ private:
   std::array<float, audio_chunk_frames * audio_channels> audio_tmp{};
 };
 
-#endif // RAYLIB_FRONTEND_H
+#endif // GBC_RAYLIB_FRONTEND_HPP

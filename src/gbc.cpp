@@ -112,7 +112,7 @@ void GameBoyColor::skip_bios() const {
   bus->write_byte(static_cast<addr_t>(mmio::MMIO_TIMER_TMA), 0x00);
   bus->write_byte(static_cast<addr_t>(mmio::MMIO_TIMER_TAC), 0xF8);
   bus->write_byte(static_cast<addr_t>(mmio::MMIO_INT_FLAGS), 0xE1);
-  // TODO: Audio registers
+  // Audio registers handled in APU
   bus->write_byte(static_cast<addr_t>(mmio::MMIO_LCD_CTRL), 0x91);
   bus->write_byte(static_cast<addr_t>(mmio::MMIO_LCD_SCY), 0x00);
   bus->write_byte(static_cast<addr_t>(mmio::MMIO_LCD_SCX), 0x00);

@@ -1,5 +1,5 @@
-#ifndef __BUS_H
-#define __BUS_H
+#ifndef GBC_BUS_HPP
+#define GBC_BUS_HPP
 
 #include "cart/cart.hpp"
 #include "debugger/debugger.hpp"
@@ -55,16 +55,16 @@ constexpr BusConflictTypes operator~(BusConflictTypes a) {
  *  FF80    FFFE    High RAM (HRAM)
  *  FFFF    FFFF    Interrupt Enable Register (IE)
  */
-class AddressBus final : private Debug::Debuggable {
+class AddressBus final : Debug::Debuggable {
 public:
-  void write_byte(const addr_t addr, const byte_t value);
-  const byte_t read_byte(const addr_t addr);
+  void write_byte(addr_t addr, byte_t value);
+  byte_t read_byte(addr_t addr) const;
   ObjAttrDMA &get_oam_dma() { return oam_dma; };
   VDMA &get_vdma() { return vdma; }
 
   /* To be used by debuggers, more or less reads memory exactly the same as the
    * regular `read_byte()`, but calls `peak()` for memory mapped registers. */
-  const byte_t read_byte_safe(const addr_t addr);
+  byte_t read_byte_safe(addr_t addr) const;
 
   /* Second constructor is called when skipping BIOS, first constructor may also
    * ignore the BIOS if the initialization fails for some reason. */
@@ -72,11 +72,11 @@ public:
              std::optional<BootROM> &bios);
 
   /* For attaching MMIO component interface registers */
-  void connect_mmio(const addr_t addr, MMIORegister *const reg);
-  MMIORegister *get_mmio(IORegisterMapping mapping) const;
+  void connect_mmio(addr_t addr, MMIORegister *reg);
+  [[nodiscard]] MMIORegister *get_mmio(IORegisterMapping mapping) const;
 
   /* Bus conflict management */
-  bool is_acquired(BusConflictTypes conflict_mask) const;
+  [[nodiscard]] bool is_acquired(BusConflictTypes conflict_mask) const;
   void acquire(BusConflictTypes conflict_mask);
   void release(BusConflictTypes conflict_mask);
 
@@ -97,7 +97,7 @@ private:
   std::unique_ptr<Cartridge> cart_;
   Joypad::JOYP joypad_;
 
-  /* System control registers: (speed mode, backwards compatability, etc) */
+  /* System control registers: (speed mode, backwards compatability, etc.) */
   SYS::KEY0 key0; // Controls DMG backwards compatability
   SYS::KEY1 key1; // Controls clock speed mode
 
@@ -113,13 +113,13 @@ private:
   /* Denotes who is currently holding onto what address ranges. In the case
    * of bus conflicts, one component will end up reading what we are basically
    * going to be treating as `open bus`. */
-  constexpr byte_t open_bus() { return 0xFF; }
+  static constexpr byte_t open_bus() { return 0xFF; }
   BusConflictTypes bus_conflicts{};
 
   std::map<addr_t, MMIORegister *> io_registers{};
-  bool is_boot_rom_range(const addr_t a);
+  [[nodiscard]] bool is_boot_rom_range(addr_t a) const;
   std::optional<BootROM> &bios_;
-  runtime_sys_info &sys_;
+  [[maybe_unused]] runtime_sys_info &sys_;
 };
 
-#endif // __BUS_H
+#endif // GBC_BUS_HPP

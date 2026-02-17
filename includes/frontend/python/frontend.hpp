@@ -1,5 +1,5 @@
-#ifndef __PY_FRONTEND_H
-#define __PY_FRONTEND_H
+#ifndef GBC_PY_FRONTEND_HPP
+#define GBC_PY_FRONTEND_HPP
 
 #include "frontend/frontend.hpp"
 #include <array>
@@ -28,4 +28,4 @@ private:
   frame_buf_t frame_data{};
 };
 
-#endif // __PY_FRONTEND_H
+#endif // GBC_PY_FRONTEND_HPP

@@ -1,5 +1,5 @@
-#ifndef __BRANCH_H
-#define __BRANCH_H
+#ifndef GBC_BRANCH_HPP
+#define GBC_BRANCH_HPP
 
 #include "cpu/instr/instr.hpp"
 #include "cpu/interrupts.hpp"
@@ -31,7 +31,7 @@ public:
   }
 
 private:
-  addr_t imm;
+  addr_t imm{};
 };
 
 /*
@@ -57,8 +57,7 @@ public:
   JP_cond_imm16(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
-    const bool cond = reg_file->reg_af.get_flag(flag);
-    if (cond != expect)
+    if (const bool cond = reg_file->reg_af.get_flag(flag); cond != expect)
       return 12;
     reg_file->reg_pc = imm;
     return 16;
@@ -74,7 +73,7 @@ public:
   }
 
 private:
-  addr_t imm;
+  addr_t imm{};
 };
 
 /*
@@ -96,7 +95,7 @@ public:
   }
 
 private:
-  std::int8_t imm; // Signed intentionally
+  std::int8_t imm{}; // Signed intentionally
 };
 
 /*
@@ -123,7 +122,7 @@ public:
   }
 
 private:
-  std::int8_t imm; // Signed intentionally
+  std::int8_t imm{}; // Signed intentionally
 };
 
 /*
@@ -156,7 +155,7 @@ public:
   }
 
 private:
-  addr_t imm;
+  addr_t imm{};
 };
 
 /*
@@ -168,11 +167,10 @@ public:
   CALL_cond_imm16(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
-    const bool cond = reg_file->reg_af.get_flag(flag);
-    if (cond != expect)
+    if (const bool cond = reg_file->reg_af.get_flag(flag); cond != expect)
       return 12;
     addr_t sp = reg_file->reg_sp.read();
-    addr_t pc = reg_file->reg_pc;
+    const addr_t pc = reg_file->reg_pc;
 
     // Push current PC onto the stack (high byte first)
     bus->write_byte(--sp, static_cast<byte_t>(pc >> 8));
@@ -194,7 +192,7 @@ public:
   }
 
 private:
-  addr_t imm;
+  addr_t imm{};
 };
 
 /*
@@ -294,4 +292,4 @@ public:
   }
 };
 
-#endif // __BRANCH_H
+#endif // GBC_BRANCH_HPP

@@ -1,18 +1,17 @@
-#ifndef __PALETTE_H
-#define __PALETTE_H
+#ifndef GBC_PALETTE_HPP
+#define GBC_PALETTE_HPP
 
 #include "emu_types.hpp"
 #include "memory/mmio/cgb.hpp"
 
 #include <array>
-#include <cstdint>
 
 class ColorRam {
 public:
-  const std::uint32_t get_cgb_color(const byte_t color_idx,
-                                    const byte_t palette_idx) const;
-  PPU::PaletteData *const get_data_reg();
-  PPU::PaletteIdx *const get_idx_reg();
+  [[nodiscard]] std::uint32_t get_cgb_color(byte_t color_idx,
+                                            byte_t palette_idx) const;
+  PPU::PaletteData *get_data_reg();
+  PPU::PaletteIdx *get_idx_reg();
   ColorRam();
 
 private:
@@ -25,10 +24,10 @@ private:
 /* TODO: This is currently not in use, however I'm leaving the support for it
  * anyway. It would be cool to offer a togglable "additional" compatability
  * option that bypasses the coloring the CGB hardware does for DMG games. */
-[[nodiscard]] const std::uint32_t get_mono_color(const byte_t idx);
+[[nodiscard]] std::uint32_t get_mono_color(byte_t idx);
 
 /* Helpers for color format conversion */
-[[nodiscard]] const std::uint16_t argb8888_to_rgb555(std::uint32_t argb);
-[[nodiscard]] const std::uint32_t rgb555_to_argb8888(byte_t, byte_t);
+[[nodiscard]] std::uint16_t argb8888_to_rgb555(std::uint32_t argb);
+[[nodiscard]] std::uint32_t rgb555_to_argb8888(byte_t, byte_t);
 
-#endif // __PALETTE_H
+#endif // GBC_PALETTE_HPP

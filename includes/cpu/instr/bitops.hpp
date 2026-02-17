@@ -1,5 +1,5 @@
-#ifndef __BITOPS_H
-#define __BITOPS_H
+#ifndef GBC_BITOPS_HPP
+#define GBC_BITOPS_HPP
 
 #include "cpu/instr/instr.hpp"
 #include "cpu/registers/flags.hpp"
@@ -126,7 +126,7 @@ public:
 
 /*
  * The CB-prefix ISA extension. All instructions below this one lie under this
- * instruction set architecture extention.
+ * instruction set architecture extension.
  */
 class CB_PREFIX final : public Instruction {
 public:
@@ -141,7 +141,7 @@ private:
   byte_t op{};
 
   /* This is identical in behavior to the lookup table in lr35902.hpp */
-  void init_cb_prefix(lookup_table_t &lookup);
+  void init_cb_prefix(lookup_table_t &lookup_) const;
   lookup_table_t lookup{};
 };
 
@@ -153,7 +153,7 @@ public:
     const byte_t x = read_reg<dst>();
 
     const bool carry = (x & 0x80) != 0x00;
-    byte_t result = (x << 1) | (carry ? 0x01 : 0x00);
+    const byte_t result = (x << 1) | (carry ? 0x01 : 0x00);
 
     // Update flags
     reg_file->reg_af.put_flag(StatusFlagMask::FLAG_Z_MASK, result == 0);
@@ -765,4 +765,4 @@ private:
   byte_t n{};
 };
 
-#endif // __BITOPS_H
+#endif // GBC_BITOPS_HPP

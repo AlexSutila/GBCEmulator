@@ -1,8 +1,8 @@
 #include "frontend/sdl3/gui.hpp"
-
 #include "memory/boot.hpp"
 #include <ranges>
 #include <sys/stat.h>
+#include <imgui_internal.h>
 
 namespace fs = std::filesystem;
 

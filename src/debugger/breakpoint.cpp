@@ -5,7 +5,7 @@
 
 namespace Debug {
 
-Breakpoint::Breakpoint(BreakReason reason_flags, addr_t watch_addr)
+Breakpoint::Breakpoint(const BreakReason reason_flags, const addr_t watch_addr)
     : reasons(reason_flags), // Should be read/write/execute only
       addr(watch_addr)       // Address of breakpoint
 {
@@ -15,11 +15,11 @@ Breakpoint::Breakpoint(BreakReason reason_flags, addr_t watch_addr)
     throw std::runtime_error("Breakpoint::Breakpoint() bad flags");
 }
 
-bool Breakpoint::eval(BreakReason reason_flags) const {
+bool Breakpoint::eval(const BreakReason reason_flags) const {
   return (reason_flags & reasons) != 0;
 }
 
-bool Breakpoint::has_flag(BreakReason flag) const {
+bool Breakpoint::has_flag(const BreakReason flag) const {
   return (flag & reasons) != 0;
 }
 

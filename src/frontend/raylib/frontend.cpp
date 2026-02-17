@@ -116,14 +116,14 @@ void RaylibFrontend::read_inputs() const {
   // On web builds, keyboard input is handled in JS so it can be rebound.
   input_state = g_web_input_state;
 #else
-  if (IsKeyDown(KEY_UP))    input_state |= (std::uint8_t)Joypad::JoypadButton::UP;
-  if (IsKeyDown(KEY_DOWN))  input_state |= (std::uint8_t)Joypad::JoypadButton::DOWN;
-  if (IsKeyDown(KEY_LEFT))  input_state |= (std::uint8_t)Joypad::JoypadButton::LEFT;
-  if (IsKeyDown(KEY_RIGHT)) input_state |= (std::uint8_t)Joypad::JoypadButton::RIGHT;
-  if (IsKeyDown(KEY_Z))     input_state |= (std::uint8_t)Joypad::JoypadButton::A;
-  if (IsKeyDown(KEY_X))     input_state |= (std::uint8_t)Joypad::JoypadButton::B;
-  if (IsKeyDown(KEY_BACKSPACE)) input_state |= (std::uint8_t)Joypad::JoypadButton::SELECT;
-  if (IsKeyDown(KEY_ENTER))     input_state |= (std::uint8_t)Joypad::JoypadButton::START;
+  if (IsKeyDown(KEY_UP))    input_state |= static_cast<std::uint8_t>(Joypad::JoypadButton::UP);
+  if (IsKeyDown(KEY_DOWN))  input_state |= static_cast<std::uint8_t>(Joypad::JoypadButton::DOWN);
+  if (IsKeyDown(KEY_LEFT))  input_state |= static_cast<std::uint8_t>(Joypad::JoypadButton::LEFT);
+  if (IsKeyDown(KEY_RIGHT)) input_state |= static_cast<std::uint8_t>(Joypad::JoypadButton::RIGHT);
+  if (IsKeyDown(KEY_Z))     input_state |= static_cast<std::uint8_t>(Joypad::JoypadButton::A);
+  if (IsKeyDown(KEY_X))     input_state |= static_cast<std::uint8_t>(Joypad::JoypadButton::B);
+  if (IsKeyDown(KEY_BACKSPACE)) input_state |= static_cast<std::uint8_t>(Joypad::JoypadButton::SELECT);
+  if (IsKeyDown(KEY_ENTER))     input_state |= static_cast<std::uint8_t>(Joypad::JoypadButton::START);
 #endif
 
   auto *const joyp = dynamic_cast<Joypad::JOYP *>(

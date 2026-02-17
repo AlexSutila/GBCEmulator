@@ -1,5 +1,5 @@
-#ifndef __FIFO_H
-#define __FIFO_H
+#ifndef GBC_FIFO_HPP
+#define GBC_FIFO_HPP
 
 #include "ppu/pixel.hpp"
 #include <array>
@@ -14,10 +14,10 @@ template <typename T, std::size_t cap> class CircularFifo {
 public:
   static_assert(cap > 0);
 
-  constexpr std::size_t capacity() const noexcept { return cap; }
-  std::size_t size() const noexcept { return count; }
-  bool full() const noexcept { return count == cap; }
-  bool empty() const noexcept { return count == 0; }
+  [[nodiscard]] static constexpr std::size_t capacity() noexcept { return cap; }
+  [[nodiscard]] std::size_t size() const noexcept { return count; }
+  [[nodiscard]] bool full() const noexcept { return count == cap; }
+  [[nodiscard]] bool empty() const noexcept { return count == 0; }
 
   void push(const T &value) {
     buf[head] = value;
@@ -45,19 +45,19 @@ public:
     return buf[tail];
   }
 
-  const T &front() const {
+  [[nodiscard]] const T &front() const {
     if (empty())
       throw std::runtime_error("CircularFifo::front() called on empty");
     return buf[tail];
   }
 
-  T &at(std::size_t index) {
+  T &at(const std::size_t index) {
     if (index >= count)
       throw std::out_of_range("CircularFifo::at() index out of range");
     return buf[(tail + index) % cap];
   }
 
-  const T &at(std::size_t index) const {
+  [[nodiscard]] const T &at(const std::size_t index) const {
     if (index >= count)
       throw std::out_of_range("CircularFifo::at() index out of range");
     return buf[(tail + index) % cap];
@@ -87,8 +87,8 @@ public:
 
   /* Pixels can only be pushed eight at a time, and popped if there would be at
    * least eight pixels remaining, so the rules here are kinda iffy. */
-  bool can_push() const;
-  bool can_pop() const;
+  [[nodiscard]] bool can_push() const;
+  [[nodiscard]] bool can_pop() const;
 
   /* Should have error checking for over pushing/popping */
   void push(pixel px);
@@ -106,16 +106,16 @@ public:
   /* The object fifo isn't... really... a fifo lol, because pixel data overlays
    * over other pixel data when sprites overlap. We need to poke holes when we
    * run into such circumstances. */
-  const pixel &at(std::size_t index) const;
+  [[nodiscard]] const pixel &at(std::size_t index) const;
   pixel &at(std::size_t index);
   void fill_transparent();
 
   /* Should have error checking for over pushing/popping */
-  bool can_pop() const;
+  [[nodiscard]] bool can_pop() const;
   pixel pop();
 
 private:
   CircularFifo<pixel, 8> fifo; // Yeah, pandocs is wrong lol
 };
 
-#endif // __FIFO_H
+#endif // GBC_FIFO_HPP

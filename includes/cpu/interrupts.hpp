@@ -1,11 +1,10 @@
-#ifndef __INTERRUPTS_H
-#define __INTERRUPTS_H
+#ifndef GBC_INTERRUPTS_HPP
+#define GBC_INTERRUPTS_HPP
 
 #include "cpu/registers/regfile.hpp"
 #include "emu_types.hpp"
 #include "instr/instr.hpp"
 #include "memory/mmio/mmio.hpp"
-#include <cassert>
 #include <tuple>
 
 enum class InterruptFlagMask : byte_t {
@@ -35,22 +34,22 @@ enum class InterruptVector : addr_t {
  *
  * The interrupt flag register is set when some component actually signals that
  * the interrupt should go off. A bit being set does nothing more than request
- * the execution of an interrupt, but ultimately whether or not that actually
+ * the execution of an interrupt, but ultimately whether that actually
  * happens depends on the enable flags.
  */
 class InterruptBits final : public MMIORegister {
 public:
   void write(byte_t value) override;
-  byte_t peek() const override;
+  [[nodiscard]] byte_t peek() const override;
   byte_t read() override;
-  InterruptBits(const bool pull_unused_high);
+  explicit InterruptBits(bool pull_unused_high);
 
   void put_flag(InterruptFlagMask flag, bool value);
-  bool get_flag(InterruptFlagMask flag) const;
+  [[nodiscard]] bool get_flag(InterruptFlagMask flag) const;
 
 private:
   union {
-    byte_t raw;
+    byte_t raw{0x00};
     struct {
       byte_t vblank : 1; // Bit 0
       byte_t lcd : 1;    // Bit 1
@@ -81,7 +80,7 @@ public:
   InterruptMasterEnable();
   void enable(bool delayed);
   void disable();
-  bool is_enabled() const;
+  [[nodiscard]] bool is_enabled() const;
 
   /* Call once per instruction */
   void step();
@@ -95,13 +94,13 @@ private:
 };
 
 /*
- * Finally, this class implements the acutal operation that handles interrupts.
+ * Finally, this class implements the actual operation that handles interrupts.
  * By using the inheriting from `Instruction`, we are able to tie the handling
  * of interrupts with accurate timing into the LR35902's fetch/decode/execute
  * FSM seamlessly.
  *
  * The following interrupt service routine is executed when control is being
- * transfered to an interrupt handler:
+ * transferred to an interrupt handler:
  *
  * 1. Two wait steps are executed (8 clock cycles) pass, nothing happens
  * 2. The current value of the PC register is pushed onto the stack
@@ -121,13 +120,13 @@ public:
         ie_(ie_reg) {}
   std::string describe() override;
   std::size_t exec() override;
-  void incur_halt_delay(); // Invoked by CPU to incur the when halted
+  void incur_halt_delay(); // Invoked by CPU to incur when halted
 
   // Compute new PC location, considers stack overflow leading to EI overwrite
-  // and the bizzare behavior that can emerge with that as well.
+  // and the bizarre behavior that can emerge with that as well.
   using isr_metadata = std::tuple<InterruptFlagMask, InterruptVector>;
-  const isr_metadata calc_effective_call_addr() const;
-  void handle_ei_push_bug(); // Occurs when interrupted with (SP == 0)
+  [[nodiscard]] isr_metadata calc_effective_call_addr() const;
+  void handle_ei_push_bug() const; // Occurs when interrupted with (SP == 0)
 
 private:
   InterruptMasterEnable &ime_;
@@ -137,4 +136,4 @@ private:
   bool halt_delay{false};
 };
 
-#endif // __INTERRUPTS_H
+#endif // GBC_INTERRUPTS_HPP

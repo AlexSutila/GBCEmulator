@@ -10,7 +10,7 @@ import zipfile
 import pytest
 import io
 
-# See github repository to update
+# See GitHub repository to update
 RELEASE = 'mts-20240926-1737-443f6e1'
 
 

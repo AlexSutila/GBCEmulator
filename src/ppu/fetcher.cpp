@@ -36,7 +36,7 @@ Fetcher::Fetcher(std::array<std::unique_ptr<byte_t[]>, 2> &vram,
   reset();
 }
 
-void Fetcher::reset(bool window_started) {
+void Fetcher::reset(const bool window_started) {
   coarse_scroll_x = scx_.peek();
   fine_scroll_x = coarse_scroll_x & 0x7;
   state = STATE_READ_TILE;
@@ -62,7 +62,7 @@ void Fetcher::reset(bool window_started) {
 
 // Always enters background rendering mode, unless window is rendered instantly
 void Fetcher::reset() {
-  bool win_visible = is_window_visible(0);
+  const bool win_visible = is_window_visible(0);
   reset(win_visible);
 }
 
@@ -81,7 +81,7 @@ void Fetcher::sample_window_enable() {
 
 void Fetcher::render_window() {
   // Window is already being rendered. Also, if a sprite fetch is in progress,
-  // do not interrupt it. This will take effect afterwards.
+  // do not interrupt it. This will take effect afterward.
   if (win_started || state == STATE_SPRITE_FETCH)
     return;
 
@@ -93,29 +93,29 @@ void Fetcher::render_window() {
 
 // The fetcher may need to read from banks which are not currently active to
 // fetch specific tile metadata (CGB mode BG map attributes, for example).
-byte_t Fetcher::read_vram_byte(addr_t addr, byte_t bank) const {
+byte_t Fetcher::read_vram_byte(const addr_t addr, const byte_t bank) const {
   assert((addr >= 0x8000 && addr <= 0x9FFF) && (bank < 2));
   return vram_.at(bank)[addr - vram_base_addr];
 }
 
-const byte_t Fetcher::calc_bgwin_pixel_y() const {
+byte_t Fetcher::calc_bgwin_pixel_y() const {
   if (win_started)
     return win_internal_ly & 0xFF;
   return (ly_.peek() + fine_scroll_y) & 0xFF;
 }
 
-const byte_t Fetcher::calc_bgwin_tile_x() const {
+byte_t Fetcher::calc_bgwin_tile_x() const {
   if (win_started)
     return data.x_coor & 0x1F;
   // Since returning unit tiles, can only be 32 max
   return (data.x_coor + (coarse_scroll_x / pixels_per_row)) & 0x1F;
 }
 
-const byte_t Fetcher::calc_obj_pixel_y(const Sprite &sprite) const {
+byte_t Fetcher::calc_obj_pixel_y(const Sprite& sprite) const {
   return (ly_.peek() - (sprite.y_pos - 16)) & 0xFF;
 }
 
-const addr_t Fetcher::calc_tilemap_base() const {
+addr_t Fetcher::calc_tilemap_base() const {
   const auto base_addr =
       win_started ? lcdc_.win_tilemap_base() : lcdc_.bg_tilemap_base();
   return static_cast<addr_t>(base_addr);
@@ -125,7 +125,7 @@ const addr_t Fetcher::calc_tilemap_base() const {
  * the tile attributes actually lie at the same address. The difference between
  * the physical locations of both bytes is which bank they lie in. Hence, we can
  * leverage the same address calculation for tile indices and attributes. */
-const addr_t Fetcher::calc_tile_metadata_addr() const {
+addr_t Fetcher::calc_tile_metadata_addr() const {
   constexpr auto tile_shift = 5;
   const byte_t y_px = calc_bgwin_pixel_y();
 
@@ -142,16 +142,15 @@ const addr_t Fetcher::calc_tile_metadata_addr() const {
 /* In DMG mode, the priority is always resolved by simply prioritizing the one
  * sprite which appears earliest in the scanline based on x-pos. In other words
  * we only write over 'transparent' pixels in the FIFO. In CGB mode, this can be
- * done as well but you can also choose based on OAM index optionally. */
-const bool Fetcher::has_priority(const pixel &old_px, const byte_t new_oam_idx,
-                                 const byte_t new_color_idx) const {
+ * done as well, but you can also choose based on OAM index optionally. */
+bool Fetcher::has_priority(const pixel& old_px, const byte_t new_oam_idx,
+                           const byte_t new_color_idx) const {
   using prioMode = PPU::ObjectPriorityMode;
   const prioMode prio = opri_.get_prio_mode();
   const bool old_transparent = is_transparent(old_px);
-  const bool new_transparent = is_transparent(new_color_idx);
 
   // Rule 1: new pixel transparent -> never wins
-  if (new_transparent)
+  if (is_transparent(new_color_idx))
     return false;
 
   // Rule 2: old pixel transparent -> always wins
@@ -166,10 +165,9 @@ const bool Fetcher::has_priority(const pixel &old_px, const byte_t new_oam_idx,
   return new_oam_idx < old_px.oam_index;
 }
 
-const byte_t Fetcher::calc_sprite_tile_idx(const Sprite &sprite,
-                                           bool flip) const {
-  const bool tall = lcdc_.obj_size() == PPU::SpriteHeight::TALL_SPRITES;
-  if (!tall) // Regular 8x8 sprites do not have their LSB set by hardware
+byte_t Fetcher::calc_sprite_tile_idx(const Sprite& sprite) const {
+  if (const bool tall = lcdc_.obj_size() == PPU::SpriteHeight::TALL_SPRITES; !tall)
+    // Regular 8x8 sprites do not have their LSB set by hardware
     return sprite.tile_idx;
 
   // But tall sprites do to make up for the fact that the total number of
@@ -185,7 +183,7 @@ bool Fetcher::should_discard() const {
 }
 
 /* Calculate the base address of the tilemap for bg/win */
-const byte_t Fetcher::fetch_bgwin_tile_data(bool high) const {
+byte_t Fetcher::fetch_bgwin_tile_data(const bool high) const {
   constexpr auto tile_size_bytes = 16;
   constexpr auto tile_row_bytes = 2;
   const byte_t y_px_idx = calc_bgwin_pixel_y();
@@ -223,8 +221,8 @@ const byte_t Fetcher::fetch_bgwin_tile_data(bool high) const {
   }
 }
 
-const byte_t Fetcher::fetch_obj_tile_data(const Sprite &sprite,
-                                          bool high) const {
+byte_t Fetcher::fetch_obj_tile_data(const Sprite& sprite,
+                                    const bool high) const {
   constexpr auto tile_size_bytes = 16;
   constexpr auto tile_row_bytes = 2;
   const byte_t y_px_idx = calc_obj_pixel_y(sprite);
@@ -234,7 +232,7 @@ const byte_t Fetcher::fetch_obj_tile_data(const Sprite &sprite,
   // Get the current Y coordinate at a pixel granularity
   const byte_t y_px_idx_flipped = do_y_px_flip(y_px_idx, flip, tall);
   const addr_t y_offset = y_px_idx_flipped * tile_row_bytes;
-  const byte_t tile_idx = calc_sprite_tile_idx(sprite, flip);
+  const byte_t tile_idx = calc_sprite_tile_idx(sprite);
 
   // Need to consider y-offset based on LY register
   addr_t data_offset = (tile_idx * tile_size_bytes) + y_offset;
@@ -248,10 +246,9 @@ const byte_t Fetcher::fetch_obj_tile_data(const Sprite &sprite,
 }
 
 void Fetcher::do_read_tile() {
-  constexpr std::size_t max_state_clks = 2;
-
   // State entry logic
   if (!total_clks.has_value()) {
+    constexpr std::size_t max_state_clks = 2;
     const addr_t metadata_addr = calc_tile_metadata_addr();
     data.tile_idx = read_vram_byte(metadata_addr, 0);
     // Tile attributes are only fetched in CGB mode, I do not think this
@@ -271,10 +268,9 @@ void Fetcher::do_read_tile() {
 }
 
 void Fetcher::do_read_data_lo() {
-  constexpr std::size_t max_state_clks = 2;
-
   // State entry logic, false indicates low byte
   if (!total_clks.has_value()) {
+    constexpr std::size_t max_state_clks = 2;
     data.data_lo = fetch_bgwin_tile_data(false);
     total_clks = max_state_clks;
   }
@@ -289,10 +285,9 @@ void Fetcher::do_read_data_lo() {
 }
 
 void Fetcher::do_read_data_hi() {
-  constexpr std::size_t max_state_clks = 2;
-
   // State entry logic, false indicates high byte
   if (!total_clks.has_value()) {
+    constexpr std::size_t max_state_clks = 2;
     data.data_hi = fetch_bgwin_tile_data(true);
     total_clks = max_state_clks;
   }
@@ -307,8 +302,8 @@ void Fetcher::do_read_data_hi() {
 }
 
 void Fetcher::do_push_data() {
-  constexpr std::size_t min_state_clks = 2;
   if (!total_clks.has_value()) {
+    constexpr std::size_t min_state_clks = 2;
     const bool take_priority = get_bg_attrib_priority(data.tile_attr);
     const byte_t palette_idx = get_bg_attrib_palette(data.tile_attr);
     const bool flip = get_bg_attrib_x_flip(data.tile_attr);
@@ -334,7 +329,7 @@ void Fetcher::do_push_data() {
       }
       data.x_coor = (data.x_coor + 1) & 0x1F;
     }
-    // Setup timing after pushing the pixels, gets us to 174 clocks minumum
+    // Setup timing after pushing the pixels, gets us to 174 clocks minimum
     total_clks = min_state_clks;
   }
   ++cur_clks;
@@ -408,7 +403,7 @@ bool Fetcher::do_sprite_fetch(const Sprite &sprite) {
 
 /* This is only to be called when one of the two conditions hold ---------- *
  *  1. We are waiting for a sprite fetch to start, no pixels should be popped
- *  2. A sprite fetch has started and we are waiting for it to complete */
+ *  2. A sprite fetch has started, and we are waiting for it to complete */
 bool Fetcher::step_and_try_sprite_fetch(const Sprite &sprite) {
   /* Preempt the next background or window tile fetch, if possible. This will
    * only preempt if the ongoing background or window tile fetch is done. */

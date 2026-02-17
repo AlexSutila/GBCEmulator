@@ -1,5 +1,5 @@
-#ifndef GBC_TIMER_H
-#define GBC_TIMER_H
+#ifndef GBC_TIMER_HPP
+#define GBC_TIMER_HPP
 
 #include "emu_types.hpp"
 #include "memory/bus.hpp"
@@ -30,7 +30,7 @@ private:
   [[nodiscard]] static byte_t tac_sel(byte_t tac) noexcept;
   [[nodiscard]] static bool tac_en(byte_t tac) noexcept;
   [[nodiscard]] static bool selected_bit(std::uint16_t sys, byte_t sel) noexcept;
-  [[nodiscard]] bool edge_input(std::uint16_t sys, byte_t tac) const noexcept;
+  [[nodiscard]] static bool edge_input(std::uint16_t sys, byte_t tac) noexcept;
 
   void start_overflow_pipeline() noexcept;
   void service_overflow_pipeline() noexcept;
@@ -57,4 +57,4 @@ private:
   std::uint8_t reload_delay_{};
 };
 
-#endif // GBC_TIMER_H
+#endif // GBC_TIMER_HPP
