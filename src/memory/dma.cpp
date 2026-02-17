@@ -6,12 +6,12 @@
 #include <cassert>
 #include <optional>
 
-inline byte_t vdma_bytes_to_blks(std::size_t bytes) {
+inline byte_t vdma_bytes_to_blks(const std::size_t bytes) {
   constexpr auto blk_size_bytes = 0x10;
   return (bytes - blk_size_bytes) / blk_size_bytes;
 }
 
-inline std::size_t vdma_blks_to_bytes(byte_t blks) {
+inline std::size_t vdma_blks_to_bytes(const byte_t blks) {
   constexpr auto blk_size_bytes = 0x10;
   return (blks * blk_size_bytes) + blk_size_bytes;
 }
@@ -27,7 +27,7 @@ ObjAttrDMA::ObjAttrDMA(AddressBus &bus) : dma_(*this), bus_(bus) {
 }
 
 ObjAttrDMA::DMAState ObjAttrDMA::get_state() const {
-  ObjAttrDMA::DMAState s{};
+  DMAState s{};
   if (state == STATE_OAMDMA_TRAN) {
     s.src_base_address = src_base_addr;
     s.data_offset = data_offset;
@@ -39,11 +39,11 @@ ObjAttrDMA::DMAState ObjAttrDMA::get_state() const {
   return s;
 }
 
-DMA::DMA *const ObjAttrDMA::get_dma_reg() { return &dma_; }
+DMA::DMA *ObjAttrDMA::get_dma_reg() { return &dma_; }
 
 void ObjAttrDMA::start(const byte_t addr_high) {
-  /* The value passed is what is recieved over the address bus, hence it is only
-   * a single byte. This byte determines the upper byte of the source addres. */
+  /* The value passed is what is received over the address bus, hence it is only
+   * a single byte. This byte determines the upper byte of the source adders. */
   src_base_addr = static_cast<addr_t>(addr_high) * 0x100;
   state = STATE_OAMDMA_INIT;
   clocks_remaining.reset();
@@ -135,7 +135,7 @@ VDMA::DMAState VDMA::get_state() const {
   return s;
 }
 
-const addr_t VDMA::get_addr(MMIORegister &lo, MMIORegister &hi) {
+addr_t VDMA::get_addr(const MMIORegister& lo, const MMIORegister& hi) {
   const byte_t hi_byte = hi.peek(), lo_byte = lo.peek();
   return (static_cast<addr_t>(hi_byte) << 8) | static_cast<addr_t>(lo_byte);
 }
@@ -145,14 +145,14 @@ void VDMA::set_addr(MMIORegister &lo, MMIORegister &hi, const addr_t addr) {
   lo.write(static_cast<byte_t>(addr & 0xFF));
 }
 
-const addr_t VDMA::get_dest_addr() {
+addr_t VDMA::get_dest_addr() const {
   constexpr addr_t vram_base = 0x8000;
   const addr_t addr_true = get_addr(vdma4_, vdma3_);
   return vram_base | (addr_true & 0x1FF0);
 }
 void VDMA::set_dest_addr(const addr_t addr) { set_addr(vdma4_, vdma3_, addr); }
 
-const addr_t VDMA::get_src_addr() {
+addr_t VDMA::get_src_addr() const {
   const addr_t addr_true = get_addr(vdma2_, vdma1_);
   return addr_true & 0xFFF0;
 }
@@ -168,7 +168,7 @@ void VDMA::enable(DMA::VDMATransferMode mode, const byte_t blks) {
   data_offset = 0;
 
   /* If the mode bit was written zero, it should start GDMA. However, if we are
-   * already performing an ongoing HDMA transfer, then it will be cancelled and
+   * already performing an ongoing HDMA transfer, then it will be canceled and
    * no DMA happens. */
   if (mode == modes::GENERAL_PURPOSE_DMA)
     state = (state == STATE_HDMA_WAIT) ? STATE_DISABLED : STATE_GDMA_INIT;
@@ -186,12 +186,12 @@ byte_t VDMA::get_blks_remaining() const {
   return vdma_bytes_to_blks(bytes_remaining);
 }
 
-void VDMA::transfer_byte(const addr_t offset) {
+void VDMA::transfer_byte(const addr_t offset) const {
   const byte_t data = bus_.read_byte(src_base_addr + offset);
   bus_.write_byte(dest_base_addr + offset, data);
 }
 
-void VDMA::do_init(State next_state) {
+void VDMA::do_init(const State next_state) {
   constexpr auto total_init_clks = 4 * 4; // 4 M-cycles, 8 T-cycles
 
   // State entry logic
@@ -221,12 +221,12 @@ void VDMA::signal_complete() {
 }
 
 void VDMA::do_gdma_init() {
-  const auto next_state = STATE_GDMA_TRAN;
+  constexpr auto next_state = STATE_GDMA_TRAN;
   do_init(next_state);
 }
 
 void VDMA::do_hdma_init() {
-  const auto next_state = STATE_HDMA_TRAN;
+  constexpr auto next_state = STATE_HDMA_TRAN;
   if (!sys_.halted) // HDMA is paused when halted
     do_init(next_state);
 }

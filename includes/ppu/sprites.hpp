@@ -1,5 +1,5 @@
-#ifndef __SPRITE_H
-#define __SPRITE_H
+#ifndef GBC_SPRITE_HPP
+#define GBC_SPRITE_HPP
 
 #include "emu_types.hpp"
 #include <cstddef>
@@ -32,12 +32,12 @@ struct Sprite {
  * ultimately decide if a row of pixels from a said sprite will be rendered or
  * not. */
 [[nodiscard]] bool // Helper for exact pixel position during rendering phase
-sprite_visible(const byte_t x_pos,      // From object attribute memory
-               const byte_t cur_pixel); // Where we're at in the scanline
+sprite_visible(byte_t x_pos,      // From object attribute memory
+               byte_t cur_pixel); // Where we're at in the scanline
 [[nodiscard]] bool // Helper for whole scanline checks during OAM memory scan
-sprite_visible(const byte_t x_pos,         // From object attribute memory
-               const byte_t y_pos,         // From object attribute memory
-               const byte_t cur_scanline,  // Basically contents of LY register
-               const bool tall_sprites);   // Is 8x16 sprite mode enabled
+sprite_visible(byte_t x_pos,         // From object attribute memory
+               byte_t y_pos,         // From object attribute memory
+               byte_t cur_scanline,  // Basically contents of LY register
+               bool tall_sprites);   // Is 8x16 sprite mode enabled
 
-#endif // __SPRITE_H
+#endif // GBC_SPRITE_HPP

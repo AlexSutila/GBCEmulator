@@ -1,5 +1,5 @@
-#ifndef __MMIO_CGB_H
-#define __MMIO_CGB_H
+#ifndef GBC_MMIO_CGB_HPP
+#define GBC_MMIO_CGB_HPP
 
 #include "emu_types.hpp"
 #include "memory/mmio/mmio.hpp"
@@ -19,10 +19,10 @@ namespace SYS {
  */
 class KEY0 final : public MMIORegister {
 public:
-  void write(const byte_t value) override;
-  byte_t peek() const override;
+  void write(byte_t value) override;
+  [[nodiscard]] byte_t peek() const override;
   byte_t read() override;
-  KEY0(runtime_sys_info &sys) : MMIORegister(0), sys_(sys) {}
+  explicit KEY0(runtime_sys_info &sys) : MMIORegister(0), sys_(sys) {}
 
 private:
   static constexpr byte_t dmg_mode_mask = 0x04;
@@ -45,8 +45,8 @@ private:
  */
 class KEY1 final : public MMIORegister {
 public:
-  void write(const byte_t value) override;
-  byte_t peek() const override;
+  void write(byte_t value) override;
+  [[nodiscard]] byte_t peek() const override;
   byte_t read() override;
   KEY1(runtime_sys_info &sys) : MMIORegister(0), sys_(sys) {}
 
@@ -67,11 +67,11 @@ namespace PPU {
  */
 class VramBank final : public MMIORegister {
 public:
-  void write(const byte_t value) override;
-  byte_t peek() const override;
+  void write(byte_t value) override;
+  [[nodiscard]] byte_t peek() const override;
   byte_t read() override;
   VramBank() : MMIORegister(0) {}
-  const byte_t get_bank() const;
+  [[nodiscard]] byte_t get_bank() const;
 };
 
 /**
@@ -96,23 +96,23 @@ public:
 
 class PaletteIdx final : public MMIORegister {
 public:
-  void write(const byte_t value) override;
-  byte_t peek() const override;
+  void write(byte_t value) override;
+  [[nodiscard]] byte_t peek() const override;
   byte_t read() override;
   PaletteIdx() : MMIORegister(0) {}
 
   // Writes to color RAM can increase register value
-  bool auto_inc_enabled() const;
+  [[nodiscard]] bool auto_inc_enabled() const;
   void inc();
 
   // Index color RAM contents
-  addr_t get_address() const;
+  [[nodiscard]] addr_t get_address() const;
 };
 
 class PaletteData final : public MMIORegister {
 public:
-  void write(const byte_t value) override;
-  byte_t peek() const override;
+  void write(byte_t value) override;
+  [[nodiscard]] byte_t peek() const override;
   byte_t read() override;
   PaletteData(std::array<byte_t, 64> &mem, PaletteIdx &idx);
 
@@ -139,13 +139,13 @@ enum class ObjectPriorityMode {
 
 class OPRI final : public MMIORegister {
 public:
-  void write(const byte_t value) override;
-  byte_t peek() const override;
+  void write(byte_t value) override;
+  [[nodiscard]] byte_t peek() const override;
   byte_t read() override;
   OPRI() : MMIORegister(0) {}
 
   /* Resolves sprite ordering in OAM search */
-  const ObjectPriorityMode get_prio_mode() const;
+  [[nodiscard]] ObjectPriorityMode get_prio_mode() const;
   static constexpr byte_t unused_mask = 0xFE;
 };
 
@@ -197,12 +197,12 @@ enum class VDMATransferMode {
 // AKA: VDMA5
 class VDMA_MODE_LEN final : public MMIORegister {
 public:
-  void write(const byte_t value) override;
-  byte_t peek() const override;
+  void write(byte_t value) override;
+  [[nodiscard]] byte_t peek() const override;
   byte_t read() override;
 
-  VDMA_MODE_LEN(VDMA &dma) : MMIORegister(0), dma_(dma) {}
-  void update_size(const byte_t bytes_transfered);
+  explicit VDMA_MODE_LEN(VDMA &dma) : MMIORegister(0), dma_(dma) {}
+  static void update_size(byte_t bytes_transferred);
 
 private:
   VDMA &dma_;
@@ -218,12 +218,12 @@ private:
  */
 class WramBank final : public MMIORegister {
 public:
-  void write(const byte_t value) override;
-  byte_t peek() const override;
+  void write(byte_t value) override;
+  [[nodiscard]] byte_t peek() const override;
   byte_t read() override;
 
   WramBank() : MMIORegister(1) {}
-  const byte_t get_bank() const;
+  [[nodiscard]] byte_t get_bank() const;
 };
 
-#endif // __MMIO_CGB_H
+#endif // GBC_MMIO_CGB_HPP

@@ -1,7 +1,6 @@
-#ifndef GBC_SDL_HOST_HPP
-#define GBC_SDL_HOST_HPP
+#ifndef GBC_SDL3_HOST_HPP
+#define GBC_SDL3_HOST_HPP
 
-#pragma once
 #include <SDL3/SDL.h>
 #include <atomic>
 #include <imgui_impl_sdlrenderer3.h>
@@ -54,4 +53,4 @@ private:
   mutable std::mutex audio_mutex;
 };
 
-#endif // GBC_SDL_HOST_HPP
+#endif // GBC_SDL3_HOST_HPP

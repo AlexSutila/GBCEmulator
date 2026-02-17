@@ -1,5 +1,5 @@
-#ifndef __PPU_H
-#define __PPU_H
+#ifndef GBC_PPU_HPP
+#define GBC_PPU_HPP
 
 #include "cpu/interrupts.hpp"
 #include "debugger/debugger.hpp"
@@ -22,7 +22,7 @@
 struct runtime_sys_info;
 class Frontend;
 
-class PixelProcessingUnit : private Debug::Debuggable {
+class PixelProcessingUnit : Debug::Debuggable {
 public:
   PixelProcessingUnit(AddressBus *bus, Frontend &fe,
                       std::optional<Debug::Debugger> &debugger,
@@ -42,7 +42,7 @@ public:
     byte_t ly;
     std::size_t dots;
   };
-  PPUState get_state() const;
+  [[nodiscard]] PPUState get_state() const;
 
 private:
   InterruptBits *if_reg{};
@@ -72,10 +72,10 @@ private:
   /* For tracking where we currently are in the rendering process */
   std::size_t row_pixels_rendered{}, sprites_fetched{};
   std::optional<std::uint32_t> get_next_pixel(std::size_t px_idx);
-  const bool next_sprite_visible(std::size_t px_idx) const;
+  [[nodiscard]] bool next_sprite_visible(std::size_t px_idx) const;
 
   /* For popping and combining pixel data from both fifos */
-  std::uint32_t resolve_px_priority(const pixel &bg_px,
+  [[nodiscard]] std::uint32_t resolve_px_priority(const pixel &bg_px,
                                     const pixel &obj_px) const;
   std::optional<std::uint32_t> try_fifo_pop();
 
@@ -93,8 +93,8 @@ private:
   bool ppu_enable_oam_bug{};
 
   /* Coloring and palette configuration */
-  std::uint32_t get_bgwin_rgb(const pixel &px) const;
-  std::uint32_t get_obj_rgb(const pixel &px) const;
+  [[nodiscard]] std::uint32_t get_bgwin_rgb(const pixel &px) const;
+  [[nodiscard]] std::uint32_t get_obj_rgb(const pixel &px) const;
   PPU::DMGPalette bgp_{}, obp0_{}, obp1_{};
 
   /* CGB mode object priority resolution */
@@ -111,13 +111,13 @@ private:
   /* Blanking periods */
   void do_hblank();
   void do_vblank();
-  bool blank(); // Returns true when blakning period is complete
+  bool blank(); // Returns true when blanking period is complete
 
   /* Interrupt helpers */
-  void request_vblank_irq() {
+  void request_vblank_irq() const {
     if_reg->put_flag(InterruptFlagMask::INT_FLAG_VBLANK, true);
   }
-  void request_lcd_irq() {
+  void request_lcd_irq() const {
     if_reg->put_flag(InterruptFlagMask::INT_FLAG_LCD, true);
   }
   void update_stat(PPU::StatModes new_mode);
@@ -140,4 +140,4 @@ private:
   std::unique_ptr<ColorRam> bg_cram;
 };
 
-#endif // __PPU_H
+#endif // GBC_PPU_HPP

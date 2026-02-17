@@ -20,9 +20,9 @@
 #include <stdexcept>
 
 // Store DMG color index in alpha bits bc we're just based like that lmao
-#define DMG_COLOR_PRESERVE_HACK(rgb, idx) (rgb & 0x00FFFFFF) | (idx << 24)
+#define DMG_COLOR_PRESERVE_HACK(rgb, idx) ((rgb & 0x00FFFFFF) | (idx << 24))
 
-template <typename T> T *init_mmio(AddressBus *bus, IORegisterMapping reg_id) {
+template <typename T> T *init_mmio(AddressBus *bus, const IORegisterMapping reg_id) {
   auto *reg = bus->get_mmio(reg_id);
   if (auto *casted = dynamic_cast<T *>(reg))
     return casted;
@@ -32,26 +32,12 @@ template <typename T> T *init_mmio(AddressBus *bus, IORegisterMapping reg_id) {
 PixelProcessingUnit::PixelProcessingUnit(
     AddressBus *bus, Frontend &fe, std::optional<Debug::Debugger> &debugger,
     runtime_sys_info &sys)
-    : Debug::Debuggable(debugger), // Scanline/frame breakpoints
+    : Debuggable(debugger), // Scanline/frame breakpoints
       sys_(sys),                   // General operating mode info
       fe_(fe),                     // To access frame buffer(s)
       vram(bus->get_vram()),       // Tile data/map/attribute content
       oam(bus->get_oam()),         // Object (sprite) attribute memory
-      lcdc_(),                     // LCD control
-      stat_(),                     // PPU status
-      lyc_(),                      // Current scanline compare
-      scy_(),                      // BG scroll Y
-      scx_(),                      // BG scroll X
-      wy_(),                       // Window scroll Y
-      wx_(),                       // Window scroll X
-      ly_(),                       // Current scanline
-      bgp_(),                      // DMG background and window palette
-      obp0_(),                     // The first DMG sprite/object palette
-      obp1_(),                     // The second DMG sprite/object palette
-      opri_(),                     // CGB object priority resolution
       vdma_(bus->get_vdma()),      // Performs GDMA and HDMA in CGB mode
-      obj_fifo(),                  // Pushes object (or sprite) pixels
-      bg_fifo(),                   // Pushes background/window pixels
       obj_cram(std::make_unique<ColorRam>()), // CGB sprite color RAM
       bg_cram(std::make_unique<ColorRam>())   // CGB background color RAM
 {
@@ -112,27 +98,26 @@ PixelProcessingUnit::PixelProcessingUnit(
 }
 
 PixelProcessingUnit::PPUState PixelProcessingUnit::get_state() const {
-  PPUState state{};
-  state.lcdc = lcdc_.peek();
-  state.stat = stat_.peek();
-  state.scx = scx_.peek();
-  state.scy = scy_.peek();
-  state.wy = wy_.peek();
-  state.wx = wx_.peek();
-  state.lyc = lyc_.peek();
-  state.ly = ly_.peek();
-  state.dots = cur_scanline_clks;
-  return state;
+  PPUState state_{};
+  state_.lcdc = lcdc_.peek();
+  state_.stat = stat_.peek();
+  state_.scx = scx_.peek();
+  state_.scy = scy_.peek();
+  state_.wy = wy_.peek();
+  state_.wx = wx_.peek();
+  state_.lyc = lyc_.peek();
+  state_.ly = ly_.peek();
+  state_.dots = cur_scanline_clks;
+  return state_;
 }
 
 bool PixelProcessingUnit::should_advance_ly() {
   constexpr std::size_t total_scanline_cycles = 456; // Fixed
-  const byte_t cur_ly = ly_.peek();
 
   /* First, perform a check to make sure we do not accidentally re-increment the
    * LY before moving onto the next frame from scanline 153, `scanline_153_bug`
    * is set to false when entering OAM scan. */
-  if (cur_ly == 0 && scanline_153_bug)
+  if (const byte_t cur_ly = ly_.peek(); cur_ly == 0 && scanline_153_bug)
     return false;
 
   /* Next, if we are on any scanline (including zero) without the bug enabled,
@@ -165,8 +150,8 @@ std::uint32_t PixelProcessingUnit::get_bgwin_rgb(const pixel &px) const {
       return DMG_COLOR_PRESERVE_HACK(0x00FFFFFFFF, 0);
     /* Otherwise if we are running in backwards compatability mode, we have to
      * consult the BGP register to translate the monochrome color index. */
-    byte_t true_color_idx = bgp_.get_color_idx(px.color_idx);
-    std::uint32_t rgb = bg_cram->get_cgb_color(true_color_idx, 0);
+    const byte_t true_color_idx = bgp_.get_color_idx(px.color_idx);
+    const std::uint32_t rgb = bg_cram->get_cgb_color(true_color_idx, 0);
     return DMG_COLOR_PRESERVE_HACK(rgb, true_color_idx);
   }
   // CGB palette is denoted directly by the attributes themselves
@@ -177,10 +162,10 @@ std::uint32_t PixelProcessingUnit::get_obj_rgb(const pixel &px) const {
     /* If we are running in backwards compatability mode, we have to consult one
      * of the OBP0/OBP1 registers to translate the monochrome color index. */
     const byte_t palette_idx = px.palette_idx & 0x1;
-    byte_t true_color_idx = (palette_idx == 0)
+    const byte_t true_color_idx = (palette_idx == 0)
                                 ? obp0_.get_color_idx(px.color_idx)
                                 : obp1_.get_color_idx(px.color_idx);
-    std::uint32_t rgb = obj_cram->get_cgb_color(true_color_idx, palette_idx);
+    const std::uint32_t rgb = obj_cram->get_cgb_color(true_color_idx, palette_idx);
     return DMG_COLOR_PRESERVE_HACK(rgb, true_color_idx);
   }
   // CGB palette is denoted directly by the attributes themselves
@@ -189,7 +174,7 @@ std::uint32_t PixelProcessingUnit::get_obj_rgb(const pixel &px) const {
 
 /* Determines if a sprite is visible on the current pixel being processed. This
  * method will ultimately end up determining when sprites need to be fetched. */
-const bool PixelProcessingUnit::next_sprite_visible(std::size_t px_idx) const {
+bool PixelProcessingUnit::next_sprite_visible(std::size_t px_idx) const {
   constexpr auto max_sprites = 10; // Per-scanline hardware limitation
   if (sprites_fetched >= oam_data.size() || sprites_fetched >= max_sprites)
     return false;
@@ -202,7 +187,7 @@ const bool PixelProcessingUnit::next_sprite_visible(std::size_t px_idx) const {
 /* Performs the fetcher stepping, FIFO popping, and all the logic behind what
  * happens when regarding the pixel FIFO madness that confuses everyone. */
 std::optional<std::uint32_t>
-PixelProcessingUnit::get_next_pixel(std::size_t px_idx) {
+PixelProcessingUnit::get_next_pixel(const std::size_t px_idx) {
 
   // If the window becomes visible, we have to reset the fetcher so it starts
   // fetching window data instead of BG data.
@@ -238,7 +223,7 @@ std::uint32_t
 PixelProcessingUnit::resolve_px_priority(const pixel &bg_px,
                                          const pixel &obj_px) const {
   const bool lcdc = lcdc_.bg_win_en_priority();
-  const bool oam = obj_px.take_priority;
+  const bool oam_ = obj_px.take_priority;
   const bool bg = bg_px.take_priority;
 
   // If background color index is zero, sprites always have priority
@@ -246,8 +231,8 @@ PixelProcessingUnit::resolve_px_priority(const pixel &bg_px,
     return get_obj_rgb(obj_px);
 
   // This is the 'fighting over priority' that is mentioned numerous places
-  // throughout this codebase. It isn't acutally that bad, I was just lazy.
-  if (lcdc && (oam || bg))
+  // throughout this codebase. It isn't actually that bad, I was just lazy.
+  if (lcdc && (oam_ || bg))
     return get_bgwin_rgb(bg_px);
   return get_obj_rgb(obj_px);
 }
@@ -257,7 +242,7 @@ std::optional<std::uint32_t> PixelProcessingUnit::try_fifo_pop() {
     return std::nullopt;
 
   // Pop the background pixel, try to pop the sprite FIFO. If the sprite FIFO
-  // is empty, just proceed. The sprtie FIFO will be populated on demand.
+  // is empty, just proceed. The sprite FIFO will be populated on demand.
   const pixel bg_px = bg_fifo.pop();
   if (!obj_fifo.can_pop())
     return get_bgwin_rgb(bg_px);
@@ -273,7 +258,7 @@ std::optional<std::uint32_t> PixelProcessingUnit::try_fifo_pop() {
   if (is_transparent(obj_px)) // If object is transparent use BG
     return get_bgwin_rgb(bg_px);
 
-  // Otherwise, render what ever, let the two pixels fight over priority.
+  // Otherwise, render whatever, let the two pixels fight over priority.
   return resolve_px_priority(bg_px, obj_px);
 }
 
@@ -296,7 +281,6 @@ void PixelProcessingUnit::do_disabled() {
 }
 
 void PixelProcessingUnit::do_oam_scan() {
-  constexpr std::size_t oam_t_cycles = 80; // Fixed
   constexpr auto max_sprites = 10;         // Per-scanline hardware limitation
   using modes = PPU::StatModes;
 
@@ -306,6 +290,7 @@ void PixelProcessingUnit::do_oam_scan() {
 
   // State entry
   if (!total_mode_clks.has_value()) {
+    constexpr std::size_t oam_t_cycles = 80;
     cur_scanline_clks = cur_mode_clks = 0;
     total_mode_clks = oam_t_cycles;
     scanline_153_bug = false;
@@ -317,7 +302,7 @@ void PixelProcessingUnit::do_oam_scan() {
 
     /* State entry always indicates the start of a new scanline, but if the LY
      * register currently reads zero, we have also begun a new frame too. */
-    Debug::BreakReason reason =
+    const Debug::BreakReason reason =
         (ly_.peek() == 0) ? Debug::BRK_STEP_SCANLINE | Debug::BRK_STEP_FRAME
                           : Debug::BRK_STEP_SCANLINE;
     try_brk(reason);
@@ -377,9 +362,9 @@ void PixelProcessingUnit::do_oam_scan() {
                ? a.obj_no < b.obj_no // OAM index is used to break any ties
                : a.x_pos < b.x_pos;  // Otherwise sort based on X-position
   };
-  std::sort(oam_data.begin(), oam_data.end(), selection_priority);
+  std::ranges::sort(oam_data, selection_priority);
 
-  /* Signal that HDMA can start running if it is has been requested or started
+  /* Signal that HDMA can start running if it has been requested or started
    * previously. If HBLANK is partially complete, it can also be triggered. */
   vdma_.set_ppu_hblank_signal(true);
 
@@ -392,8 +377,6 @@ void PixelProcessingUnit::do_oam_scan() {
 }
 
 void PixelProcessingUnit::do_draw() {
-  constexpr std::size_t min_drawing_cycles = 172; // Variable
-  constexpr std::size_t pixels_per_row = 160;     // H-Resolution
   using modes = PPU::StatModes;
 
   // Rendering always happens on visible scanlines
@@ -404,6 +387,7 @@ void PixelProcessingUnit::do_draw() {
    * features cause the rendering process to stall. This additional stalling
    * time lengthens the duration of this operation mode. */
   if (!total_mode_clks.has_value()) {
+    constexpr std::size_t min_drawing_cycles = 172;
     fetcher->reset();
     obj_fifo.flush();
     bg_fifo.flush();
@@ -421,18 +405,18 @@ void PixelProcessingUnit::do_draw() {
   ++cur_mode_clks;
 
   // Rendering step, try to pop pixels when ready from the fifo
-  if (auto px = get_next_pixel(row_pixels_rendered); px.has_value()) {
+  if (const auto px = get_next_pixel(row_pixels_rendered); px.has_value()) {
     const auto x = row_pixels_rendered++;
     const auto y = ly_.peek();
     const auto c = px.value();
-    fe_.put_pixel(x, y, c);
+    fe_.put_pixel(static_cast<int>(x), y, c);
   }
 
   // Rendering incomplete
-  if (row_pixels_rendered < pixels_per_row)
+  if (constexpr std::size_t pixels_per_row = 160; row_pixels_rendered < pixels_per_row)
     return;
 
-  // The window uses an internal scanline counter to track it's verticle
+  // The window uses an internal scanline counter to track it's vertical
   // rendering progress. Determine if that counter is increased (or reset)
   // here, depending on where we are in the frame.
   if (ly_.peek() >= 143)
@@ -453,11 +437,10 @@ void PixelProcessingUnit::do_hblank() {
   // HBlank will only ever occur during visible scanlines
   assert(state == PPU::StatModes::MODE_HBLANK);
   assert(ly_.is_visible());
-  const bool complete = blank();
 
   /* Signal that HDMA is no longer allowed to kick in. Note, that it can still
    * start running last minute and bleed into OAM scan. This is intentional. */
-  if (complete)
+  if (blank())
     vdma_.set_ppu_hblank_signal(false);
 }
 
@@ -501,7 +484,7 @@ bool PixelProcessingUnit::blank() {
   return true;
 }
 
-void PixelProcessingUnit::update_stat(PPU::StatModes new_mode) {
+void PixelProcessingUnit::update_stat(const PPU::StatModes new_mode) {
   const bool old = stat_irq_signal_edge;
   const auto &cur_mode = state;
 
@@ -514,20 +497,20 @@ void PixelProcessingUnit::update_stat(PPU::StatModes new_mode) {
     stat_.set_mode(new_mode);
 
   /* Condition 1: The LY register is equal to the LYC register */
-  const bool cond_a = (ly_.peek() == lyc_.peek()) &&
+  const bool cond_a = ly_.peek() == lyc_.peek() &&
                       stat_.int_enabled(PPU::StatIntFlags::LYC_SEL);
 
   /* Condition 2: We are in HBLANK and the STAT source bit is set */
-  const bool cond_b = (cur_mode == PPU::StatModes::MODE_HBLANK) &&
+  const bool cond_b = cur_mode == PPU::StatModes::MODE_HBLANK &&
                       stat_.int_enabled(PPU::StatIntFlags::MODE_0_SEL);
 
   /* Condition 3: We are in OAM and the STAT source bit is set */
-  const bool cond_c = (cur_mode == PPU::StatModes::MODE_OAM_SCAN) &&
+  const bool cond_c = cur_mode == PPU::StatModes::MODE_OAM_SCAN &&
                       stat_.int_enabled(PPU::StatIntFlags::MODE_2_SEL);
 
   /* Condition 4: We are in VBLANK and the STAT source bit is set. For some
    * reason, this condition is also met in OAM scan as per TCAGBD. */
-  const bool cond_d = (cur_mode == PPU::StatModes::MODE_VBLANK) &&
+  const bool cond_d = cur_mode == PPU::StatModes::MODE_VBLANK &&
                       (stat_.int_enabled(PPU::StatIntFlags::MODE_2_SEL) ||
                        stat_.int_enabled(PPU::StatIntFlags::MODE_1_SEL));
 

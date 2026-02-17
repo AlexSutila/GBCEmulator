@@ -1,12 +1,11 @@
 #include "debugger/print.hpp"
 #include "cpu/interrupts.hpp"
 #include "cpu/lr35902.hpp"
-#include <cctype>
 #include <sstream>
 
 namespace Debug {
 
-[[nodiscard]] std::string hex8(const byte_t v, bool compact = false) {
+[[nodiscard]] std::string hex8(const byte_t v, const bool compact = false) {
   std::ostringstream o;
   if (!compact) // I hate this, but what can you do lol
     o << "0x";

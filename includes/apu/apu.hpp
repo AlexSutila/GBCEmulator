@@ -1,11 +1,10 @@
-#ifndef APU_H
-#define APU_H
+#ifndef GBC_APU_HPP
+#define GBC_APU_HPP
 
 #include "emu_types.hpp"
 #include "memory/mmio/dmg.hpp"
 #include <array>
 #include <cstddef>
-#include <cstdint>
 #include <vector>
 
 class AddressBus;
@@ -190,4 +189,4 @@ private:
   float dc_x1_r{}, dc_y1_r{};
 };
 
-#endif // APU_H
+#endif // GBC_APU_HPP

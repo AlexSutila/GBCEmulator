@@ -12,7 +12,7 @@ JOYP::JOYP() : MMIORegister(0), select_bits(select_mask), last_low(0x0F) {}
 void JOYP::set_interrupt_reg(InterruptBits *reg) { if_reg = reg; }
 
 void JOYP::set_button(JoypadButton button, const bool pressed) {
-  const byte_t mask = static_cast<byte_t>(button);
+  const auto mask = static_cast<byte_t>(button);
   if (pressed)
     state |= mask;
   else
@@ -20,12 +20,12 @@ void JOYP::set_button(JoypadButton button, const bool pressed) {
   update_output(compute_low_bits());
 }
 
-void JOYP::set_state(byte_t mask) {
+void JOYP::set_state(const byte_t mask) {
   state = mask;
   update_output(compute_low_bits());
 }
 
-void JOYP::write(byte_t value) {
+void JOYP::write(const byte_t value) {
   select_bits = value & select_mask;
   update_output(compute_low_bits());
 }
@@ -71,8 +71,7 @@ byte_t JOYP::compute_low_bits() const {
 
 void JOYP::update_output(const byte_t next_low) {
   if (if_reg) {
-    const byte_t pressed = static_cast<byte_t>(last_low & ~next_low);
-    if (pressed != 0)
+    if (const auto pressed = static_cast<byte_t>(last_low & ~next_low); pressed != 0)
       if_reg->put_flag(InterruptFlagMask::INT_FLAG_JOYPAD, true);
   }
   last_low = next_low;

@@ -1,5 +1,5 @@
-#ifndef FRONTEND_H
-#define FRONTEND_H
+#ifndef GBC_FRONTEND_HPP
+#define GBC_FRONTEND_HPP
 
 #include "gbc.hpp"
 #include <memory>
@@ -23,4 +23,4 @@ protected:
   std::unique_ptr<GameBoyColor> gbc;
 };
 
-#endif // FRONTEND_H
+#endif // GBC_FRONTEND_HPP

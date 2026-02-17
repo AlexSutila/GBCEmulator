@@ -1,5 +1,5 @@
-#ifndef __PIXEL_H
-#define __PIXEL_H
+#ifndef GBC_PIXEL_HPP
+#define GBC_PIXEL_HPP
 
 #include "emu_types.hpp"
 
@@ -9,7 +9,7 @@ struct pixel {
 
   /* This is required for sprite pixels. The DMG model always renders sprites
    * which appear earlier on the X-axis on top. This behavior can optionally
-   * swapped out in CGB mode to prioritize based on OAM index instead. */
+   * be swapped out in CGB mode to prioritize based on OAM index instead. */
   byte_t oam_index;
 
   /* Is used by both sprite and background pixels to resolve priority conflicts.
@@ -26,4 +26,4 @@ struct pixel {
   return px.color_idx == 0;
 }
 
-#endif // __PIXEL_H
+#endif // GBC_PIXEL_HPP

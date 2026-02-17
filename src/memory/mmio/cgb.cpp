@@ -2,7 +2,6 @@
 #include "emu_types.hpp"
 #include "gbc.hpp"
 #include "memory/dma.hpp"
-#include <cassert>
 
 namespace SYS {
 
@@ -46,7 +45,7 @@ byte_t VramBank::read() { return peek(); }
 
 /* Only bit 0 matters, all other bits are ignored. Pandoc claims that unused
  * MMIO bits (mostly) read 1 unless specified otherwise. */
-const byte_t VramBank::get_bank() const { return state & 0x01; }
+byte_t VramBank::get_bank() const { return state & 0x01; }
 
 void PaletteIdx::write(const byte_t value) {
   // Fourth bit is unused
@@ -90,7 +89,7 @@ void OPRI::write(const byte_t value) { state = value | unused_mask; }
 byte_t OPRI::peek() const { return state | unused_mask; }
 byte_t OPRI::read() { return peek(); }
 
-const ObjectPriorityMode OPRI::get_prio_mode() const {
+ObjectPriorityMode OPRI::get_prio_mode() const {
   byte_t prio_mode = state & ~unused_mask;
   return static_cast<ObjectPriorityMode>(prio_mode);
 }
@@ -106,8 +105,8 @@ void VDMA_MODE_LEN::write(const byte_t value) {
   constexpr byte_t size_mask = 0x7F;
   const byte_t blks = value & size_mask;
 
-  // All logic revolving around HDMA cancel and bizzare behavior is implemented
-  // within the VDMA unit itself, so calling this was is completely intentional.
+  // All logic revolving around HDMA cancel and bizarre behavior is implemented
+  // within the VDMA unit itself, so calling this is completely intentional.
   dma_.enable(mode, blks);
 }
 
@@ -123,6 +122,8 @@ byte_t VDMA_MODE_LEN::peek() const {
 }
 byte_t VDMA_MODE_LEN::read() { return peek(); }
 
+void VDMA_MODE_LEN::update_size(const byte_t bytes_transferred) {
+}
 } // namespace DMA
 
 void WramBank::write(const byte_t value) { state = value | 0xF8; }
@@ -132,7 +133,7 @@ byte_t WramBank::read() { return peek(); }
 /* Only bits 0-2 matter, and only values 1-7 actually map to their respective
  * banks. If zero is written, it will map to bank 1, as bank 0 can always be
  * used from the 0xC000-0xCFFF address range. */
-const byte_t WramBank::get_bank() const {
+byte_t WramBank::get_bank() const {
   byte_t ret = state & 0x07; // Only read bits 0-2
   if (ret == 0)
     ++ret;

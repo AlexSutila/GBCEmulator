@@ -10,7 +10,7 @@ using isr_metadata = std::tuple<InterruptFlagMask, InterruptVector>;
  * and what to set the PC to upon handling an interrupt. Do not mess with the
  * order, it is specific to the bit order in the IE/IF registers.
  */
-static constexpr std::array<InterruptVector, 5> int_vector_lookup = {
+static constexpr std::array int_vector_lookup = {
     InterruptVector::INT_VECTOR_VBLANK, InterruptVector::INT_VECTOR_LCD,
     InterruptVector::INT_VECTOR_TIMER,  InterruptVector::INT_VECTOR_SERIAL,
     InterruptVector::INT_VECTOR_JOYPAD,
@@ -22,9 +22,9 @@ static constexpr std::array<InterruptVector, 5> int_vector_lookup = {
  * bits high to be conditional.
  */
 InterruptBits::InterruptBits(const bool pull_unused_high)
-    : raw(0x00), pull_high(pull_unused_high) {}
+    : pull_high(pull_unused_high) {}
 
-void InterruptBits::write(byte_t value) {
+void InterruptBits::write(const byte_t value) {
   raw = value;
   if (pull_high)
     raw |= 0xE0;
@@ -33,15 +33,15 @@ void InterruptBits::write(byte_t value) {
 byte_t InterruptBits::peek() const { return pull_high ? raw | 0xE0 : raw; }
 byte_t InterruptBits::read() { return peek(); }
 
-void InterruptBits::put_flag(InterruptFlagMask flag, bool value) {
-  const byte_t mask = static_cast<byte_t>(flag);
+void InterruptBits::put_flag(InterruptFlagMask flag, const bool value) {
+  const auto mask = static_cast<byte_t>(flag);
   raw = raw & ~mask;
   if (value)
     raw = raw | mask;
 }
 
 bool InterruptBits::get_flag(InterruptFlagMask flag) const {
-  const byte_t mask = static_cast<byte_t>(flag);
+  const auto mask = static_cast<byte_t>(flag);
   return (raw & mask) != 0;
 }
 
@@ -82,7 +82,7 @@ std::size_t ISR::exec() {
   const addr_t sp = read_reg<Register16Bit::REG_SP>();
 
   // Consider additional four clock cycle delay when leaving halt mode
-  bool was_halted = halt_delay;
+  const bool was_halted = halt_delay;
   halt_delay = false;
   ime_.disable(); // Always disabled to avoid crazy recursion
 
@@ -105,7 +105,7 @@ std::size_t ISR::exec() {
   return was_halted ? 24 : 20;
 }
 
-void ISR::handle_ei_push_bug() {
+void ISR::handle_ei_push_bug() const {
   constexpr auto mask = 0x1F;
   constexpr addr_t pc_bugged = 0;
 
@@ -124,7 +124,7 @@ void ISR::handle_ei_push_bug() {
   }
 }
 
-const isr_metadata ISR::calc_effective_call_addr() const {
+isr_metadata ISR::calc_effective_call_addr() const {
   constexpr auto num_interrupts = 5;
 
   // Lower bits have higher priority, so check them first

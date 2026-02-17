@@ -112,7 +112,7 @@ bool TimerUnit::selected_bit(const std::uint16_t sys,
   return ((sys >> bit) & 1) != 0;
 }
 
-bool TimerUnit::edge_input(std::uint16_t sys, byte_t tac) const noexcept {
+bool TimerUnit::edge_input(const std::uint16_t sys, const byte_t tac) noexcept {
   // On all models, TIMA increments on the falling edge of:
   //   (TAC.enable AND selected DIV bit)
   return tac_en(tac) && selected_bit(sys, tac_sel(tac));

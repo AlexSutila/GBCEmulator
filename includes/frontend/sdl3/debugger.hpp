@@ -1,5 +1,5 @@
-#ifndef GBC_DEBUGGER_HPP
-#define GBC_DEBUGGER_HPP
+#ifndef GBC_SDL3_DEBUGGER_HPP
+#define GBC_SDL3_DEBUGGER_HPP
 
 #pragma once
 #include "SDL3/SDL_render.h"
@@ -36,7 +36,7 @@ struct BreakpointPrompt {
 
 class DebuggerImGui {
 public:
-  void init(SDLHost &host);
+  void init(const SDLHost &host);
   void render(UiState &state, const std::unique_ptr<GameBoyColor> &core);
   Debug::BreakReason on_breakpoint(const std::stop_token &st,
                                    const std::unique_ptr<GameBoyColor> &core);
@@ -46,21 +46,14 @@ public:
 
 private:
   void build_debug_window(UiState &state);
-  void build_memory_viewer_window(UiState &state,
-                                  const std::unique_ptr<GameBoyColor> &core);
-  void build_breakpoints_window(UiState &state,
-                                const std::unique_ptr<GameBoyColor> &core);
-  void
-  build_config_breakpoint_window(const std::unique_ptr<GameBoyColor> &core);
-  void build_ppu_viewer_window(UiState &state,
-                               const std::unique_ptr<GameBoyColor> &core);
+  void build_memory_viewer_window(UiState &state, const std::unique_ptr<GameBoyColor> &core);
+  void build_breakpoints_window(UiState &state, const std::unique_ptr<GameBoyColor> &core);
+  void build_config_breakpoint_window(const std::unique_ptr<GameBoyColor> &core);
+  void build_ppu_viewer_window(UiState& state) const;
 
-  void render_vram_tile_data(const std::unique_ptr<GameBoyColor> &core,
-                             const std::size_t vram_bank_idx);
-  void read_vram_tile_data(const std::unique_ptr<GameBoyColor> &core,
-                           const std::size_t vram_bank_idx);
-  void read_bus_data(const std::unique_ptr<GameBoyColor> &core,
-                     const addr_t start_addr);
+  void render_vram_tile_data(size_t vram_bank_idx) const;
+  void read_vram_tile_data(const std::unique_ptr<GameBoyColor> &core, std::size_t vram_bank_idx);
+  void read_bus_data(const std::unique_ptr<GameBoyColor> &core, addr_t start_addr);
   std::array<std::vector<std::uint32_t>, 2> tile_data_buf{};
   DebugContext ctx; // Debugger context
 
@@ -69,4 +62,4 @@ private:
   BreakpointPrompt bp_prompt{};
 };
 
-#endif // GBC_DEBUGGER_HPP
+#endif // GBC_SDL3_DEBUGGER_HPP

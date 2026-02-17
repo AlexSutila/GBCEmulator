@@ -9,10 +9,10 @@
  * TODO: We do not actually implement serial data transfers. The idea of doing
  * serial data transfers over network has crossed our minds, but we are unsure
  * of how bad the latency would be as compared to a literal wire connecting two
- * systems... hence, the serial unit doesn't acutally do anything as of now.
+ * systems... hence, the serial unit doesn't actually do anything as of now.
  */
 SerialUnit::SerialUnit(AddressBus *const bus)
-    : serial_data(0), // Should be initialized first becaue of SC dependency
+    : serial_data(0), // Should be initialized first because of SC dependency
       serial_ctrl(serial_data) // Fires the interrupt immediately for now
 {
   using mmio = IORegisterMapping;

@@ -1,5 +1,5 @@
-#ifndef __LR35902_H
-#define __LR35902_H
+#ifndef GBC_LR35902_HPP
+#define GBC_LR35902_HPP
 
 #include "cpu/instr/instr.hpp"
 #include "cpu/interrupts.hpp"
@@ -19,11 +19,11 @@ struct runtime_sys_info;
  * 8-bit 8080-like Sharp CPU (speculated to be a SM83 core), running
  * between 4.194304 MHz and 8.388608 MHz based on mode of operation
  */
-class LR35902 final : private Debug::Debuggable {
+class LR35902 final : Debug::Debuggable {
 public:
   LR35902(AddressBus *bus_ptr, std::optional<Debug::Debugger> &debugger,
           runtime_sys_info &sys);
-  std::string disasm() const { return ins_->describe(); };
+  [[nodiscard]] std::string disasm() const { return ins_->describe(); };
   void step();
 
   struct ProcessorState {
@@ -39,8 +39,8 @@ public:
     byte_t l;
     bool ime_enabled;
   };
-  void load_state(ProcessorState state);
-  ProcessorState get_state() const;
+  void load_state(ProcessorState state_);
+  [[nodiscard]] ProcessorState get_state() const;
 
 private:
   static constexpr Debug::BreakReason brk_reason_flags =
@@ -50,7 +50,7 @@ private:
   runtime_sys_info &sys_;
 
   /* Interrupt handling */
-  const bool should_interrupt() const;
+  [[nodiscard]] bool should_interrupt() const;
   InterruptMasterEnable ime;
   InterruptBits ie_reg;
   InterruptBits if_reg;
@@ -58,11 +58,11 @@ private:
 
   /* Opcode decoding configuration */
   using lookup_table_t = std::array<std::unique_ptr<Instruction>, 256>;
-  void init_alu(lookup_table_t &lookup);
-  void init_bitops(lookup_table_t &lookup);
-  void init_branch(lookup_table_t &lookup);
-  void init_control(lookup_table_t &lookup, runtime_sys_info &sys);
-  void init_moves(lookup_table_t &lookup);
+  void init_alu(lookup_table_t &lookup_);
+  void init_bitops(lookup_table_t &lookup_);
+  void init_branch(lookup_table_t &lookup_);
+  void init_control(lookup_table_t &lookup_, runtime_sys_info &sys);
+  void init_moves(lookup_table_t &lookup_);
   lookup_table_t lookup{};
 
   enum CpuStates {
@@ -83,4 +83,4 @@ private:
   std::size_t cur_ins_clks{};
 };
 
-#endif // __LR35902_H
+#endif // GBC_LR35902_HPP

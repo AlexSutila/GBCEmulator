@@ -1,5 +1,5 @@
-#ifndef GBC_H
-#define GBC_H
+#ifndef GBC_HPP
+#define GBC_HPP
 
 #include "apu/apu.hpp"
 #include "cart/cart.hpp"
@@ -79,4 +79,4 @@ private:
   Frontend &fe_;
 };
 
-#endif // GBC_H
+#endif // GBC_HPP

@@ -1,7 +1,6 @@
-#ifndef GBC_FRONTEND_HPP
-#define GBC_FRONTEND_HPP
+#ifndef GBC_SDL3_FRONTEND_HPP
+#define GBC_SDL3_FRONTEND_HPP
 
-#pragma once
 #include "common.hpp"
 #include "debugger.hpp"
 #include "frontend/frontend.hpp"
@@ -125,4 +124,4 @@ private:
   static bool SDLCALL event_watcher(void* userdata, const SDL_Event* event);
 };
 
-#endif // GBC_FRONTEND_HPP
+#endif // GBC_SDL3_FRONTEND_HPP

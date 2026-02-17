@@ -1,17 +1,17 @@
-#ifndef __ATTRIBUTES_H
-#define __ATTRIBUTES_H
+#ifndef GBC_ATTRIBUTES_HPP
+#define GBC_ATTRIBUTES_HPP
 
 #include "emu_types.hpp"
 #include <cstddef>
 
-[[nodiscard]] byte_t do_y_px_flip(const byte_t y_px,  // Offset within tile
+[[nodiscard]] byte_t do_y_px_flip(byte_t y_px,        // Offset within tile
                                   bool flip,          // Decides flip
                                   bool tall_sprites); // Using 8x16 sprites
 
 /* Extracts the color index from the data bytes based on the index itself
- * and whether or not the tile is flipped */
-[[nodiscard]] byte_t calc_color_idx(const byte_t lo_byte,  // Low data byte
-                                    const byte_t hi_byte,  // High data byte
+ * and whether the tile is flipped */
+[[nodiscard]] byte_t calc_color_idx(byte_t lo_byte,        // Low data byte
+                                    byte_t hi_byte,        // High data byte
                                     std::size_t pixel_idx, // Which pixel?
                                     bool flip);            // Decides flip
 
@@ -101,4 +101,4 @@
 [[nodiscard]] bool get_obj_attrib_y_flip(byte_t attrib);
 [[nodiscard]] bool get_obj_attrib_priority(byte_t attrib);
 
-#endif // __ATTRIBUTES_H
+#endif // GBC_ATTRIBUTES_HPP
