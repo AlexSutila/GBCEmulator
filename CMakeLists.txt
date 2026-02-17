@@ -223,7 +223,7 @@ set(GBC_COMPILE_OPTIONS
         $<$<CONFIG:Release>:${GBC_RELEASE_OPTIONS}>
 )
 
-# Mingw cope with large object sizes
+# MinGW+GCC cope with large object sizes
 if (MINGW AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     list(APPEND GBC_COMPILE_OPTIONS -Wa,-mbig-obj)
 endif ()
@@ -364,9 +364,17 @@ else ()
             -lpthread
     )
 
+    ## Enable IPO/LTO if the compiler and the platform supports it
+    ## Note: only platform combo where it fails is MinGW + GCC, they got autistic bugs with LTO when certain flags are set
     include(CheckIPOSupported)
     check_ipo_supported(RESULT ipo_ok OUTPUT ipo_err LANGUAGES CXX)
-    if (ipo_ok AND NOT MINGW)
+    message("LTO: compiler: ${CMAKE_CXX_COMPILER_ID}, IPO/LTO support: ${ipo_ok}, mingw: ${MINGW}")
+    set(mingw_gcc OFF)
+    if(MINGW AND "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+      set(mingw_gcc ON)
+      set(ipo_err "MinGW + GCC combo is known to have issues with LTO")
+    endif()
+    if(ipo_ok AND NOT mingw_gcc)
         set_property(TARGET imgui PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
         set_property(TARGET gbc_full PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
         set_property(TARGET gbc_simple PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
