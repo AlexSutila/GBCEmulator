@@ -338,7 +338,7 @@ void GbcImGui::build_file_dialogs(UiState &state) const {
           "RomFileDialog", ImGuiWindowFlags_NoCollapse, min_size, max_size)) {
     if (ImGuiFileDialog::Instance()->IsOk()) {
       state.load_rom_path = ImGuiFileDialog::Instance()->GetFilePathName();
-      state.load_rom_path = "";
+      state.load_rom_name = "";
       state.request_load_rom = true;
     }
     ImGuiFileDialog::Instance()->Close();
