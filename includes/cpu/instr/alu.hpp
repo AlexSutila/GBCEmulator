@@ -965,7 +965,7 @@ public:
   ADD_SP_imm8(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
-    const addr_t nn = static_cast<unsigned char>(imm);
+    const addr_t nn = static_cast<addr_t>(imm);
     const addr_t sp = reg_file->reg_sp.read();
 
     // Update flags
@@ -1000,7 +1000,7 @@ public:
   LD_HL_SP_E8(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
-    const addr_t nn = static_cast<unsigned char>(imm);
+    const addr_t nn = static_cast<addr_t>(imm);
     const addr_t sp = reg_file->reg_sp.read();
 
     // Update flags
