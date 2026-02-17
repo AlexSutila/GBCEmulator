@@ -506,6 +506,7 @@ const std::uint32_t *SDL3Frontend::get_front_buffer() const {
 }
 
 /* Main loop helpers */
+
 void SDL3Frontend::process_events() {
   SDL_Event e;
   while (SDL_PollEvent(&e)) {
@@ -533,6 +534,9 @@ void SDL3Frontend::process_events() {
                e.type == SDL_EVENT_GAMEPAD_BUTTON_UP) {
       const bool pressed = (e.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN);
       handle_controller_press((SDL_GamepadButton)e.gbutton.button, pressed);
+    }
+    if (e.type == SDL_EVENT_DROP_FILE || e.type == SDL_EVENT_DROP_TEXT) {
+      handle_drop(e);
     }
     if (e.type == SDL_EVENT_DROP_FILE || e.type == SDL_EVENT_DROP_TEXT) {
       handle_drop(e);
