@@ -106,6 +106,7 @@ private:
 
   // Avoid redundant texture uploads
   std::atomic<bool> video_dirty{true};
+  std::atomic<bool> force_redraw{false};
   bool last_force_mono_dmg{false};
   bool last_cgb_mode{false};
 
