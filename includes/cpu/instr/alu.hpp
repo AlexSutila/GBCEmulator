@@ -1,5 +1,5 @@
-#ifndef __ALU_H
-#define __ALU_H
+#ifndef GBC_ALU_HPP
+#define GBC_ALU_HPP
 
 #include "cpu/instr/instr.hpp"
 #include "cpu/registers/flags.hpp"
@@ -68,7 +68,7 @@ public:
   void parse() override { imm = bus->read_byte(reg_file->reg_pc++); }
 
 private:
-  byte_t imm;
+  byte_t imm{};
 };
 
 /*
@@ -115,7 +115,7 @@ public:
     // Compute sum including carry flag
     const addr_t sum = static_cast<addr_t>(a) + static_cast<addr_t>(x) +
                        static_cast<addr_t>(carry);
-    const byte_t result = static_cast<byte_t>(sum);
+    const auto result = static_cast<byte_t>(sum);
 
     // Update flags
     const bool half_carry = ((a & 0x0F) + (x & 0x0F) + carry) > 0x0F;
@@ -148,7 +148,7 @@ public:
     // Compute sum including carry flag
     const addr_t sum = static_cast<addr_t>(a) + static_cast<addr_t>(imm) +
                        static_cast<addr_t>(carry);
-    const byte_t result = static_cast<byte_t>(sum);
+    const auto result = static_cast<byte_t>(sum);
 
     // Update flags
     const bool half_carry = ((a & 0x0F) + (imm & 0x0F) + carry) > 0x0F;
@@ -167,7 +167,7 @@ public:
   void parse() override { imm = bus->read_byte(reg_file->reg_pc++); }
 
 private:
-  byte_t imm;
+  byte_t imm{};
 };
 
 /*
@@ -186,7 +186,7 @@ public:
     // Compute sum including carry flag
     const addr_t sum = static_cast<addr_t>(a) + static_cast<addr_t>(n) +
                        static_cast<addr_t>(carry);
-    const byte_t result = static_cast<byte_t>(sum);
+    const auto result = static_cast<byte_t>(sum);
 
     // Update flags
     const bool half_carry = ((a & 0x0F) + (n & 0x0F) + carry) > 0x0F;
@@ -259,7 +259,7 @@ public:
   void parse() override { imm = bus->read_byte(reg_file->reg_pc++); }
 
 private:
-  byte_t imm;
+  byte_t imm{};
 };
 
 /*
@@ -305,7 +305,7 @@ public:
     // Compute difference including carry flag
     const addr_t diff = static_cast<addr_t>(a) - static_cast<addr_t>(x) -
                         static_cast<addr_t>(carry);
-    const byte_t result = static_cast<byte_t>(diff);
+    const auto result = static_cast<byte_t>(diff);
 
     // Update flags
     const bool c = static_cast<addr_t>(a) < static_cast<addr_t>(x + carry);
@@ -339,7 +339,7 @@ public:
     // Compute difference including carry flag
     const addr_t diff = static_cast<addr_t>(a) - static_cast<addr_t>(imm) -
                         static_cast<addr_t>(carry);
-    const byte_t result = static_cast<byte_t>(diff);
+    const auto result = static_cast<byte_t>(diff);
 
     // Update flags
     const bool c = static_cast<addr_t>(a) < static_cast<addr_t>(imm + carry);
@@ -359,7 +359,7 @@ public:
   void parse() override { imm = bus->read_byte(reg_file->reg_pc++); }
 
 private:
-  byte_t imm;
+  byte_t imm{};
 };
 
 /*
@@ -378,7 +378,7 @@ public:
     // Compute difference including carry flag
     const addr_t diff = static_cast<addr_t>(a) - static_cast<addr_t>(n) -
                         static_cast<addr_t>(carry);
-    const byte_t result = static_cast<byte_t>(diff);
+    const auto result = static_cast<byte_t>(diff);
 
     // Update flags
     const bool c = static_cast<addr_t>(a) < static_cast<addr_t>(n + carry);
@@ -450,7 +450,7 @@ public:
   void parse() override { imm = bus->read_byte(reg_file->reg_pc++); }
 
 private:
-  byte_t imm;
+  byte_t imm{};
 };
 
 /*
@@ -533,7 +533,7 @@ public:
   void parse() override { imm = bus->read_byte(reg_file->reg_pc++); }
 
 private:
-  byte_t imm;
+  byte_t imm{};
 };
 
 /*
@@ -616,7 +616,7 @@ public:
   void parse() override { imm = bus->read_byte(reg_file->reg_pc++); }
 
 private:
-  byte_t imm;
+  byte_t imm{};
 };
 
 /*
@@ -695,7 +695,7 @@ public:
   void parse() override { imm = bus->read_byte(reg_file->reg_pc++); }
 
 private:
-  byte_t imm;
+  byte_t imm{};
 };
 
 /*
@@ -965,7 +965,7 @@ public:
   ADD_SP_imm8(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
-    const addr_t nn = static_cast<addr_t>(imm);
+    const addr_t nn = static_cast<std::int16_t>(static_cast<std::int8_t>(imm));
     const addr_t sp = reg_file->reg_sp.read();
 
     // Update flags
@@ -988,7 +988,7 @@ public:
   }
 
 private:
-  std::int8_t imm; // Signed intentionally
+  std::int8_t imm{}; // Signed intentionally
 };
 
 /*
@@ -1000,7 +1000,7 @@ public:
   LD_HL_SP_E8(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
-    const addr_t nn = static_cast<addr_t>(imm);
+    const addr_t nn = static_cast<std::int16_t>(static_cast<std::int8_t>(imm));
     const addr_t sp = reg_file->reg_sp.read();
 
     // Update flags
@@ -1026,4 +1026,4 @@ private:
   std::int8_t imm{}; // Signed intentionally
 };
 
-#endif // __ALU_H
+#endif // GBC_ALU_HPP

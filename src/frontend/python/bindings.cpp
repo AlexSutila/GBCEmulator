@@ -47,8 +47,8 @@ static void bind_cart(py::module_ &m) {
   // For content loading
   m.def(
       "load_cart_raw",
-      [](py::bytes data) {
-        std::string_view view = data;
+      [](const py::bytes& data) {
+        const std::string_view view = data;
         std::vector<byte_t> rom(view.begin(), view.end());
         return load_cart_raw(std::move(rom));
       },
@@ -59,7 +59,7 @@ static void bind_cart(py::module_ &m) {
       py::arg("rom_path"), "Load a Game Boy cartridge from filesystem");
 }
 
-static void bind_address_bus(py::module_ &m) {
+static void bind_address_bus(const py::module_ &m) {
   py::class_<AddressBus>(m, "AddressBus")
       .def("init_test_bed", &AddressBus::init_test_bed)
       .def("write_byte", &AddressBus::write_byte, py::arg("addr"),
@@ -67,7 +67,7 @@ static void bind_address_bus(py::module_ &m) {
       .def("read_byte", &AddressBus::read_byte, py::arg("addr"));
 }
 
-static void bind_processor(py::module_ &m) {
+static void bind_processor(const py::module_ &m) {
   py::class_<LR35902>(m, "LR35902")
       .def("step", &LR35902::step)
       .def("get_state", &LR35902::get_state)
@@ -90,11 +90,11 @@ static void bind_processor(py::module_ &m) {
       .def_readwrite("ime_enabled", &LR35902::ProcessorState::ime_enabled);
 }
 
-static void bind_timer(py::module_ &m) {
+static void bind_timer(const py::module_ &m) {
   py::class_<TimerUnit>(m, "TimerUnit").def("step", &TimerUnit::step);
 }
 
-static void bind_ppu(py::module_ &m) {
+static void bind_ppu(const py::module_ &m) {
   py::class_<PixelProcessingUnit>(m, "PixelProcessor")
       .def("step", &PixelProcessingUnit::step)
       .def("get_state", &PixelProcessingUnit::get_state);
@@ -118,7 +118,7 @@ static void bind_ppu(py::module_ &m) {
       .def_readonly("ly", &PixelProcessingUnit::PPUState::ly);
 }
 
-static void bind_debugger(py::module_ &m) {
+static void bind_debugger(const py::module_ &m) {
   py::enum_<Debug::BreakReason>(m, "BreakReason")
       .value("BRK_CONTINUE", Debug::BreakReason::BRK_CONTINUE)
       .value("BRK_ADDRESS_EXECUTED", Debug::BreakReason::BRK_ADDRESS_EXECUTED)
@@ -130,7 +130,7 @@ static void bind_debugger(py::module_ &m) {
       .value("BRK_STEP_FRAME", Debug::BreakReason::BRK_STEP_FRAME);
 }
 
-static void bind_gbc(py::module_ &m) {
+static void bind_gbc(const py::module_ &m) {
   py::class_<PyGameBoyColor>(m, "GameBoyColor")
       .def(py::init<pybind11::function>())
       .def(py::init<>())

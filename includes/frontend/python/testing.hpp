@@ -1,5 +1,5 @@
-#ifndef __PY_FRONTEND_TESTING_H
-#define __PY_FRONTEND_TESTING_H
+#ifndef GBC_PY_FRONTEND_TESTING_HPP
+#define GBC_PY_FRONTEND_TESTING_HPP
 
 #include "frontend/python/wrappers.hpp"
 #include <cstdint>
@@ -20,7 +20,8 @@
  *  ; assert state.l == 34
  */
 [[nodiscard]] inline bool poll_mooneye_test(PyGameBoyColor &gbc) {
-  std::uint32_t max_cycles = 10000000, cycles = 0;
+  constexpr std::uint32_t max_cycles = 10000000;
+  std::uint32_t cycles = 0;
   byte_t op = 0;
   while (op != 0x40 && cycles < max_cycles) {
     const auto &bus = gbc.get_bus();
@@ -38,4 +39,4 @@
   return op == 0x40;
 }
 
-#endif // __PY_FRONTEND_TESTING_H
+#endif // GBC_PY_FRONTEND_TESTING_HPP

@@ -1,5 +1,5 @@
-#ifndef __BOOT_H
-#define __BOOT_H
+#ifndef GBC_BOOT_HPP
+#define GBC_BOOT_HPP
 
 #include "emu_types.hpp"
 #include <cstddef>
@@ -32,16 +32,16 @@ constexpr std::size_t CGB = 0x900;
 class BootROM {
 public:
   explicit BootROM(const std::string &path);
-  byte_t read_byte(const addr_t addr) const;
-  bool in_range(const addr_t addr) const;
+  [[nodiscard]] byte_t read_byte(addr_t addr) const;
+  [[nodiscard]] bool in_range(addr_t addr) const;
 
   /* In the scenario where a custom BIOS is provided, we use the rom size to
    * infer if we should start executing in CGB mode or not. Sooo cursed... */
-  bool is_large_rom() const;
+  [[nodiscard]] bool is_large_rom() const;
 
 private:
   std::vector<byte_t> rom_data{};
   std::size_t rom_size{};
 };
 
-#endif // __BOOT_H
+#endif // GBC_BOOT_HPP

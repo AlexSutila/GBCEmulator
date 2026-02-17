@@ -1,5 +1,5 @@
-#ifndef __MMIO_DMG_H
-#define __MMIO_DMG_H
+#ifndef GBC_MMIO_DMG_HPP
+#define GBC_MMIO_DMG_HPP
 
 #include "emu_types.hpp"
 #include "memory/mmio/mmio.hpp"
@@ -27,7 +27,7 @@ class JOYP final : public MMIORegister {
 public:
   JOYP();
   void write(byte_t value) override;
-  byte_t peek() const override;
+  [[nodiscard]] byte_t peek() const override;
   byte_t read() override;
 
   void set_button(JoypadButton button, bool pressed);
@@ -35,7 +35,7 @@ public:
   void set_interrupt_reg(InterruptBits *reg);
 
 private:
-  byte_t compute_low_bits() const;
+  [[nodiscard]] byte_t compute_low_bits() const;
   void update_output(byte_t next_low);
 
   byte_t select_bits{};
@@ -49,8 +49,8 @@ namespace Serial {
 
 class SerialCtrl final : public MMIORegister {
 public:
-  void write(const byte_t value) override;
-  byte_t peek() const override;
+  void write(byte_t value) override;
+  [[nodiscard]] byte_t peek() const override;
   byte_t read() override;
   SerialCtrl(MMIORegister &serial_data);
   void set_interrupt_reg(InterruptBits *reg);
@@ -145,14 +145,14 @@ public:
   LCDCtrl() : MMIORegister(0) {}
 
   /* Helpers */
-  const bool lcd_enabled() const;
-  const TileMapArea win_tilemap_base() const;
-  const TileMapArea bg_tilemap_base() const;
-  const TileDataArea bg_win_data_area() const;
-  const SpriteHeight obj_size() const;
-  const bool obj_enable() const;
-  const bool win_enabled() const;
-  const bool bg_win_en_priority() const;
+  [[nodiscard]] bool lcd_enabled() const;
+  [[nodiscard]] TileMapArea win_tilemap_base() const;
+  [[nodiscard]] TileMapArea bg_tilemap_base() const;
+  [[nodiscard]] TileDataArea bg_win_data_area() const;
+  [[nodiscard]] SpriteHeight obj_size() const;
+  [[nodiscard]] bool obj_enable() const;
+  [[nodiscard]] bool win_enabled() const;
+  [[nodiscard]] bool bg_win_en_priority() const;
 };
 
 /*
@@ -202,18 +202,18 @@ enum class StatModes : byte_t {
 class STAT final : public MMIORegister {
 public:
   void write(byte_t value) override;
-  byte_t peek() const override;
+  [[nodiscard]] byte_t peek() const override;
   byte_t read() override;
   STAT() : MMIORegister(0) {}
 
   /* PPU needs to check these flags to generate interrupts, but does not set
    * them itself afaik. Hence, we don't need a setter. */
-  const bool int_enabled(StatIntFlags flag) const {
+  [[nodiscard]] bool int_enabled(StatIntFlags flag) const {
     return (state & static_cast<byte_t>(flag)) != 0;
   }
-  const bool get_ly_eq_lyc() const;
+  [[nodiscard]] bool get_ly_eq_lyc() const;
   void set_ly_eq_lyc(bool value);
-  const StatModes get_mode() const;
+  [[nodiscard]] StatModes get_mode() const;
   void set_mode(StatModes mode);
 };
 
@@ -232,18 +232,18 @@ public:
 class LY final : public MMIORegister {
 public:
   void write(byte_t) override;
-  byte_t peek() const override;
+  [[nodiscard]] byte_t peek() const override;
   byte_t read() override;
   LY() : MMIORegister(0) {}
 
-  const bool is_visible() const { return state <= 143; }
-  const bool is_vblank() const { return state >= 144; }
+  [[nodiscard]] bool is_visible() const { return state <= 143; }
+  [[nodiscard]] bool is_vblank() const { return state >= 144; }
 
   void reset() { state = 0; };
   bool inc(); // Returns true during LY wrap around
 
 private:
-  constexpr byte_t max_ly() const { return 153; }
+  static constexpr byte_t max_ly() { return 153; }
 };
 
 /*
@@ -302,7 +302,7 @@ public:
   DMGPalette() : MMIORegister(0) {}
 
   /* Indexes the internal register state to obtain true color index */
-  byte_t get_color_idx(byte_t idx) const;
+  [[nodiscard]] byte_t get_color_idx(byte_t idx) const;
 };
 
 } // namespace PPU
@@ -331,8 +331,8 @@ namespace DMA {
  */
 class DMA final : public MMIORegister {
 public:
-  void write(const byte_t value) override;
-  DMA(ObjAttrDMA &dma) : MMIORegister(0), dma_(dma) {}
+  void write(byte_t value) override;
+  explicit DMA(ObjAttrDMA &dma) : MMIORegister(0), dma_(dma) {}
 
 private:
   ObjAttrDMA &dma_;
@@ -345,10 +345,10 @@ private:
  */
 class BootROMCtrl final : public MMIORegister {
 public:
-  void write(const byte_t value) override;
+  void write(byte_t value) override;
 
   /* Determine if the boot ROM is currently mapped */
-  bool boot_rom_enabled() const;
+  [[nodiscard]] bool boot_rom_enabled() const;
   BootROMCtrl();
 
 private:
@@ -362,7 +362,7 @@ class DIV final : public MMIORegister {
 public:
   explicit DIV(TimerUnit &t);
   void write(byte_t v) override;
-  byte_t peek() const override;
+  [[nodiscard]] byte_t peek() const override;
   byte_t read() override;
 
 private:
@@ -373,7 +373,7 @@ class TIMA final : public MMIORegister {
 public:
   explicit TIMA(TimerUnit &t);
   void write(byte_t v) override;
-  byte_t peek() const override;
+  [[nodiscard]] byte_t peek() const override;
   byte_t read() override;
 
 private:
@@ -384,7 +384,7 @@ class TMA final : public MMIORegister {
 public:
   explicit TMA(TimerUnit &t);
   void write(byte_t v) override;
-  byte_t peek() const override;
+  [[nodiscard]] byte_t peek() const override;
   byte_t read() override;
 
 private:
@@ -395,7 +395,7 @@ class TAC final : public MMIORegister {
 public:
   explicit TAC(TimerUnit &t);
   void write(byte_t v) override;
-  byte_t peek() const override;
+  [[nodiscard]] byte_t peek() const override;
   byte_t read() override;
 
 private:
@@ -404,4 +404,4 @@ private:
 
 } // namespace Timer
 
-#endif // __MMIO_DMG_H
+#endif // GBC_MMIO_DMG_HPP

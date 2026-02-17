@@ -1,5 +1,5 @@
-#ifndef DEBUG_PRINT_H
-#define DEBUG_PRINT_H
+#ifndef DEBUG_PRINT_HPP
+#define DEBUG_PRINT_HPP
 
 #include "cpu/interrupts.hpp"
 #include "cpu/lr35902.hpp"
@@ -14,7 +14,7 @@ namespace Debug {
 [[nodiscard]] std::string hex16(addr_t v);
 
 /* A nice utility for displaying address bus contents in an easy manner */
-[[nodiscard]] std::string create_hex_view(const addr_t base_addr,
+[[nodiscard]] std::string create_hex_view(addr_t base_addr,
                                           const std::vector<byte_t> &vec);
 
 [[nodiscard]] std::string to_string(const LR35902::ProcessorState &s);
@@ -38,4 +38,4 @@ namespace Debug {
 
 } // namespace Debug
 
-#endif // DEBUG_PRINT_H
+#endif // DEBUG_PRINT_HPP

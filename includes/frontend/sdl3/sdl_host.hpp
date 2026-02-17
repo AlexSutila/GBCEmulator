@@ -1,7 +1,6 @@
-#ifndef GBC_SDL_HOST_HPP
-#define GBC_SDL_HOST_HPP
+#ifndef GBC_SDL3_HOST_HPP
+#define GBC_SDL3_HOST_HPP
 
-#pragma once
 #include <SDL3/SDL.h>
 #include <atomic>
 #include <imgui_impl_sdlrenderer3.h>
@@ -28,6 +27,7 @@ public:
   }
   void present() const { SDL_RenderPresent(renderer); }
   void clear_screen() const { SDL_RenderClear(renderer); }
+  void set_vsync(bool enabled);
 
   // Audio
   void init_audio(int freq = 48000, int channels = 2);
@@ -45,6 +45,7 @@ private:
   SDL_Window *window{nullptr};
   SDL_Renderer *renderer{nullptr};
   SDL_Texture *texture{nullptr};
+  bool vsync_enabled{true};
 
   SDL_AudioDeviceID audio_device{0};
   SDL_AudioStream *audio_stream{nullptr};
@@ -52,4 +53,4 @@ private:
   mutable std::mutex audio_mutex;
 };
 
-#endif // GBC_SDL_HOST_HPP
+#endif // GBC_SDL3_HOST_HPP

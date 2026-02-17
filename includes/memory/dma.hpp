@@ -1,5 +1,5 @@
-#ifndef __DMA_H
-#define __DMA_H
+#ifndef GBC_DMA_HPP
+#define GBC_DMA_HPP
 
 #include "emu_types.hpp"
 #include "memory/mmio/mmio.hpp"
@@ -19,7 +19,7 @@ class AddressBus;
  */
 class ObjAttrDMA {
 public:
-  DMA::DMA *const get_dma_reg();
+  DMA::DMA * get_dma_reg();
   explicit ObjAttrDMA(AddressBus &bus);
 
   struct DMAState {
@@ -27,9 +27,9 @@ public:
     addr_t data_offset;
     bool active;
   };
-  DMAState get_state() const;
+  [[nodiscard]] DMAState get_state() const;
 
-  void start(const byte_t addr_high); // Begins the actual data transfer
+  void start(byte_t addr_high); // Begins the actual data transfer
   void step();
 
 private:
@@ -57,11 +57,11 @@ private:
 class VDMA {
 public:
   explicit VDMA(AddressBus &bus, runtime_sys_info &sys);
-  MMIORegister *const get_vdma1() { return &vdma1_; }
-  MMIORegister *const get_vdma2() { return &vdma2_; }
-  MMIORegister *const get_vdma3() { return &vdma3_; }
-  MMIORegister *const get_vdma4() { return &vdma4_; }
-  MMIORegister *const get_vdma5() { return &vdma5_; }
+  MMIORegister *get_vdma1() { return &vdma1_; }
+  MMIORegister* get_vdma2() { return &vdma2_; }
+  MMIORegister* get_vdma3() { return &vdma3_; }
+  MMIORegister* get_vdma4() { return &vdma4_; }
+  MMIORegister* get_vdma5() { return &vdma5_; }
 
   struct DMAState {
     addr_t dest_base_address;
@@ -71,22 +71,22 @@ public:
     bool hdma_active;
     bool gdma_active;
   };
-  DMAState get_state() const;
+  [[nodiscard]] DMAState get_state() const;
 
   /* The initialization phase of DMA is impacted by double speed mode, but the
-   * acutal transfer itself is not. Hence, `step_fast_cycle()` exists to run the
+   * actual transfer itself is not. Hence, `step_fast_cycle()` exists to run the
    * initial phase to completion twice as fast in double speed mode. */
   void step_fast_cycle();
   void step();
 
   /* For enabling and observing the state of both HDMA and GDMA procedures. */
-  bool enabled() const { return gdma_enabled() || hdma_enabled(); }
-  void enable(DMA::VDMATransferMode mode, const byte_t blks);
+  [[nodiscard]] bool enabled() const { return gdma_enabled() || hdma_enabled(); }
+  void enable(DMA::VDMATransferMode mode, byte_t blks);
 
   /* To be used by the VDMA5 register to interrogate the progress of HDMA */
-  bool waiting_on_hblank() const { return state == STATE_HDMA_WAIT; }
-  bool complete() const { return state == STATE_DISABLED; }
-  byte_t get_blks_remaining() const;
+  [[nodiscard]] bool waiting_on_hblank() const { return state == STATE_HDMA_WAIT; }
+  [[nodiscard]] bool complete() const { return state == STATE_DISABLED; }
+  [[nodiscard]] byte_t get_blks_remaining() const;
 
   /* For the pixel processor to signal that it is in HBLANK, allowing queued up
    * HDMA transfers to execute. */
@@ -94,10 +94,10 @@ public:
 
   /* Getters and setters for both source and destination addresses involve
    * consulting a pair of two 8-bit MMIORegisters to form a 16-bit address. */
-  void set_dest_addr(const addr_t addr);
-  void set_src_addr(const addr_t addr);
-  const addr_t get_dest_addr();
-  const addr_t get_src_addr();
+  void set_dest_addr(addr_t addr);
+  void set_src_addr(addr_t addr);
+  addr_t get_dest_addr() const;
+  addr_t get_src_addr() const;
 
 private:
   addr_t src_base_addr{}, dest_base_addr{}, data_offset{}, transfer_size{};
@@ -117,9 +117,9 @@ private:
   } state;
 
   /* Generic helper methods */
-  bool gdma_enabled() const { return state == STATE_GDMA_TRAN; }
-  bool hdma_enabled() const { return state == STATE_HDMA_TRAN; }
-  void transfer_byte(const addr_t offset);
+  [[nodiscard]] bool gdma_enabled() const { return state == STATE_GDMA_TRAN; }
+  [[nodiscard]] bool hdma_enabled() const { return state == STATE_HDMA_TRAN; }
+  void transfer_byte(addr_t offset) const;
   void do_init(State next_state);
 
   /* See details about these registers under their definitions in `cgb.hpp` */
@@ -136,8 +136,8 @@ private:
   void do_hdma_wait();
 
   /* Helpers for working with source and destination address registers. */
-  void set_addr(MMIORegister &lo, MMIORegister &hi, const addr_t addr);
-  const addr_t get_addr(MMIORegister &lo, MMIORegister &hi);
+  static void set_addr(MMIORegister &lo, MMIORegister &hi, addr_t addr);
+  static addr_t get_addr(const MMIORegister& lo, const MMIORegister& hi);
 
   /* Timing metadata */
   std::optional<std::size_t> clocks_remaining;
@@ -145,4 +145,4 @@ private:
   AddressBus &bus_;
 };
 
-#endif //__DMA_H
+#endif //GBC_DMA_HPP

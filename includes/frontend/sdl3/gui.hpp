@@ -1,18 +1,17 @@
-#ifndef GBC_GUI_HPP
-#define GBC_GUI_HPP
+#ifndef GBC_SDL3_GUI_HPP
+#define GBC_SDL3_GUI_HPP
+#define IMGUI_DEFINE_MATH_OPERATORS
 
-#pragma once
 #include "common.hpp"
 #include "sdl_host.hpp"
 #include <imgui.h>
-#include <imgui_internal.h>
 #include <ImGuiFileDialog.h>
 #include <backends/imgui_impl_sdlrenderer3.h>
 #include <backends/imgui_impl_sdl3.h>
 
 class GbcImGui {
   static constexpr std::string_view rom_filters =
-    "ROM files (*.gb *.gbc){.gb,.gbc},All files (*.*){.*}";
+    "ROM files (*.gb *.gbc){.gb,.gbc},ZIP files (*.zip){.zip},All files (*.*){.*}";
   static constexpr std::string_view bios_filters =
       "BIOS files (*.bin){.bin},All files (*.*){.*}";
   static constexpr std::array<std::string_view, KCount> control_labels{
@@ -56,8 +55,9 @@ private:
   void build_file_dialogs(UiState& state) const;
   void build_settings_window(UiState& state, SDLHost& host);
   void build_keybinds_window(UiState& state);
-  void build_about_window(UiState& state);
+  static void build_about_window(UiState& state);
   void build_notification_window(UiState& state) const;
+  void build_rom_source_window(UiState& state) const;
 
   // Helpers
   IGFD::FileDialogConfig rom_sel_conf;
@@ -69,4 +69,4 @@ private:
   static ImVec4 get_level_color(LogLevel level) ;
 };
 
-#endif //GBC_GUI_HPP
+#endif //GBC_SDL3_GUI_HPP

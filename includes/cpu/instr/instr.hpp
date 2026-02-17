@@ -1,5 +1,5 @@
-#ifndef __INSTR_H
-#define __INSTR_H
+#ifndef GBC_INSTR_HPP
+#define GBC_INSTR_HPP
 
 #include "cpu/registers/flags.hpp"
 #include "cpu/registers/regfile.hpp"
@@ -27,6 +27,8 @@ enum class InstrStates {
 
 class Instruction {
 public:
+  virtual ~Instruction() = default;
+
   Instruction(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : reg_file(reg_file_ptr), bus(bus_ptr) {}
 
@@ -47,7 +49,7 @@ public:
   virtual std::size_t mem_access_t_cycle() { return 0; };
 
   /**
-   * Parses the instruction in it's entirety, reading intermediate fields
+   * Parses the instruction in its entirety, reading intermediate fields
    */
   virtual void parse() {}
 
@@ -58,12 +60,12 @@ public:
 
 protected:
   /**
-   * All just compile time stuff to reduce having to go through unnecessry
+   * All just compile time stuff to reduce having to go through unnecessary
    * decode logic during runtime. A lot of it can be done during compile time
    * unless an instruction deals with immediate values.
    */
 
-  template <Register16Bit reg> inline const char *to_string() const {
+  template <Register16Bit reg> [[nodiscard]] static const char *to_string() {
     if constexpr (reg == Register16Bit::REG_AF)
       return "AF";
     else if constexpr (reg == Register16Bit::REG_BC)
@@ -76,9 +78,10 @@ protected:
       return "SP";
     else
       static_assert("Invalid 16-bit register");
+    return "??";
   }
 
-  template <Register8Bit reg> inline const char *to_string() const {
+  template <Register8Bit reg> [[nodiscard]] static const char *to_string() {
     if constexpr (reg == Register8Bit::REG_A)
       return "A";
     else if constexpr (reg == Register8Bit::REG_F)
@@ -97,10 +100,11 @@ protected:
       return "L";
     else
       static_assert("Invalid 8-bit register");
+    return "?";
   }
 
   template <StatusFlagMask flag, bool expect>
-  inline const char *to_string() const {
+  [[nodiscard]] static const char *to_string() {
     if constexpr (flag == StatusFlagMask::FLAG_C_MASK)
       return expect ? "C" : "!C";
     if constexpr (flag == StatusFlagMask::FLAG_N_MASK)
@@ -109,9 +113,11 @@ protected:
       return expect ? "Z" : "!Z";
     if constexpr (flag == StatusFlagMask::FLAG_H_MASK)
       return expect ? "H" : "!H";
+    return "?";
   }
 
-  template <Register16Bit reg> inline void write_reg(addr_t addr) const {
+  template <Register16Bit reg>
+  void write_reg(const addr_t addr) const {
     if constexpr (reg == Register16Bit::REG_AF)
       reg_file->reg_af.write(addr);
     else if constexpr (reg == Register16Bit::REG_BC)
@@ -126,7 +132,7 @@ protected:
       static_assert("Invalid 16-bit register");
   }
 
-  template <Register16Bit reg> addr_t inline read_reg() const {
+  template <Register16Bit reg> [[nodiscard]] addr_t read_reg() const {
     if constexpr (reg == Register16Bit::REG_AF)
       return reg_file->reg_af.read();
     else if constexpr (reg == Register16Bit::REG_BC)
@@ -139,9 +145,11 @@ protected:
       return reg_file->reg_sp.read();
     else
       static_assert("Invalid 16-bit register");
+    return 0xFF;
   }
 
-  template <Register8Bit reg> inline void write_reg(byte_t byte) const {
+  template <Register8Bit reg>
+  void write_reg(const byte_t byte) const {
     if constexpr (reg == Register8Bit::REG_A)
       reg_file->reg_af.write_hi(byte);
     else if constexpr (reg == Register8Bit::REG_F)
@@ -162,7 +170,7 @@ protected:
       static_assert("Invalid 8-bit register");
   }
 
-  template <Register8Bit reg> byte_t inline read_reg() const {
+  template <Register8Bit reg> [[nodiscard]] byte_t read_reg() const {
     if constexpr (reg == Register8Bit::REG_A)
       return reg_file->reg_af.read_hi();
     else if constexpr (reg == Register8Bit::REG_F)
@@ -181,10 +189,11 @@ protected:
       return reg_file->reg_hl.read_lo();
     else
       static_assert("Invalid 8-bit register");
+    return 0xFF;
   }
 
   RegisterFile *const reg_file;
   AddressBus *const bus;
 };
 
-#endif // __INSTR_H
+#endif // GBC_INSTR_HPP

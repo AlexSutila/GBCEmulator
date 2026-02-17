@@ -1,5 +1,5 @@
-#ifndef __MMIO_H
-#define __MMIO_H
+#ifndef GBC_MMIO_HPP
+#define GBC_MMIO_HPP
 
 #include "emu_types.hpp"
 
@@ -73,25 +73,26 @@ enum class IORegisterMapping : addr_t {
  */
 class MMIORegister {
 public:
+  virtual ~MMIORegister() = default;
   /* Note that read() is meant for address bus which may alter internal state
    * peak() can be used by other components to read state. */
-  virtual void write(const byte_t value);
-  virtual byte_t peek() const; // Non-state altering read
+  virtual void write(byte_t value);
+  [[nodiscard]] virtual byte_t peek() const; // Non-state altering read
   virtual byte_t read();       // Not const, reads could alter internal state
-  MMIORegister(const byte_t init_state) : state(init_state) {}
+  explicit MMIORegister(const byte_t init_state) : state(init_state) {}
   MMIORegister() : state(0) {}
 
   /* Overriding this is entirely optional. The intention is, return true if this
    * should behave as an unused 'open bus - return 0xFF' in CGB mode type
    * register. Such support may be useful for extending this code backwards to
-   * re-implement a true DMG gameboy emulator.
+   * re-implement a true DMG GameBoy emulator.
    *
    * Although it may be useless for this emulator, which strictly emulates a
-   * gameboy color, we leave the option here regardless. */
+   * GameBoy color, we leave the option here regardless. */
   virtual constexpr bool cgb() { return false; }
 
 protected:
   byte_t state{}; // Internal state
 };
 
-#endif // __MMIO_H
+#endif // GBC_MMIO_HPP

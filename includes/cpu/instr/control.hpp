@@ -1,5 +1,5 @@
-#ifndef __CONTROL_H
-#define __CONTROL_H
+#ifndef GBC_CONTROL_HPP
+#define GBC_CONTROL_HPP
 
 #include "cpu/instr/instr.hpp"
 #include "cpu/interrupts.hpp"
@@ -146,10 +146,10 @@ private:
 };
 
 /*
- * This instruction is... bizzare. The most important thing is that it is used
+ * This instruction is... bizarre. The most important thing is that it is used
  * to switch into double speed mode.
  *
- * TODO: Implement bizzare behavior from that flow chart... it sucks lol
+ * TODO: Implement bizarre behavior from that flow chart... it sucks lol
  */
 class STOP final : public Instruction {
 public:
@@ -171,4 +171,4 @@ private:
   runtime_sys_info &sys_;
 };
 
-#endif // __CONTROL_H
+#endif // GBC_CONTROL_HPP

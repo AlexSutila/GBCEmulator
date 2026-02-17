@@ -11,12 +11,11 @@ T* init_mmio(AddressBus* bus, const IORegisterMapping reg_id) {
   throw std::logic_error(std::string("Failed to configure MMIO (Timer)"));
 }
 
-TimerUnit::TimerUnit(AddressBus* const bus, runtime_sys_info& sys)
+TimerUnit::TimerUnit(AddressBus* const bus)
   : tima_reg(*this), // Timer counter register
     tma_reg(*this), // Timer modulo register
     tac_reg(*this), // Timer control register
-    div_reg(*this), // Divider register
-    sys_(sys) // General operating mode info
+    div_reg(*this) // Divider register
 {
   using mmio = IORegisterMapping;
   using namespace PPU;
@@ -113,7 +112,7 @@ bool TimerUnit::selected_bit(const std::uint16_t sys,
   return ((sys >> bit) & 1) != 0;
 }
 
-bool TimerUnit::edge_input(std::uint16_t sys, byte_t tac) const noexcept {
+bool TimerUnit::edge_input(const std::uint16_t sys, const byte_t tac) noexcept {
   // On all models, TIMA increments on the falling edge of:
   //   (TAC.enable AND selected DIV bit)
   return tac_en(tac) && selected_bit(sys, tac_sel(tac));

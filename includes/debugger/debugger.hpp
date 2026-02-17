@@ -1,5 +1,5 @@
-#ifndef DEBUGGER_H
-#define DEBUGGER_H
+#ifndef GBC_DEBUGGER_HPP
+#define GBC_DEBUGGER_HPP
 
 #include "breakpoint.hpp"
 #include "emu_types.hpp"
@@ -13,23 +13,23 @@ namespace Debug {
  * The top level debugger class, responsible for breakpoint maintenance and
  * evaluation. Configuration at the top level is entirely optional. Breakpoints
  * will invoke a callback on hit, and actually pausing the emulator is the sole
- * responsability of the callback, not the Debugger.
+ * responsibility of the callback, not the Debugger.
  */
 class Debugger {
 public:
   explicit Debugger(std::function<BreakReason()> callback);
 
   // Invoked by components, determines if callback is to be invoked or not
-  void eval(const addr_t addr, Debug::BreakReason reason);
-  void eval(Debug::BreakReason reason); // For hardware specific breakpoints
+  void eval(addr_t addr, BreakReason reason);
+  void eval(BreakReason reason); // For hardware specific breakpoints
 
   // Invoked by UI to stop execution
-  void request_stop(Debug::BreakReason reason);
+  void request_stop(BreakReason reason);
 
   // Breakpoint maintenance
-  const std::unordered_map<addr_t, Breakpoint> &get_breakpoints() const;
-  void breakpoint_add(const addr_t addr, Debug::BreakReason reason);
-  void breakpoint_del(const addr_t addr);
+  [[nodiscard]] const std::unordered_map<addr_t, Breakpoint> &get_breakpoints() const;
+  void breakpoint_add(addr_t addr, BreakReason reason);
+  void breakpoint_del(addr_t addr);
 
 private:
   std::function<BreakReason()> on_brk_callback{};
@@ -47,8 +47,8 @@ class Debuggable {
 public:
   explicit Debuggable(std::optional<Debugger> &debugger)
       : debugger_(debugger) {}
-  void try_brk(const addr_t addr, Debug::BreakReason reason);
-  void try_brk(Debug::BreakReason reason);
+  void try_brk(addr_t addr, BreakReason reason) const;
+  void try_brk(BreakReason reason) const;
 
 private:
   std::optional<Debugger> &debugger_;
@@ -56,4 +56,4 @@ private:
 
 } // namespace Debug
 
-#endif // DEBUGGER_H
+#endif // GBC_DEBUGGER_HPP

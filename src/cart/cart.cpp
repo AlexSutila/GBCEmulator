@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <fstream>
 #include <bitset>
-#include <csignal>
 #include <cstring>
 
 static std::optional<std::vector<byte_t>> read_all_bytes(const fs::path& p) {

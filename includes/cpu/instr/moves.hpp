@@ -1,5 +1,5 @@
-#ifndef __MOVES_H
-#define __MOVES_H
+#ifndef GBC_MOVES_HPP
+#define GBC_MOVES_HPP
 
 #include "cpu/instr/instr.hpp"
 #include "cpu/registers/regfile.hpp"
@@ -44,7 +44,7 @@ public:
   }
 
 private:
-  byte_t imm;
+  byte_t imm{};
 };
 
 /*
@@ -86,7 +86,7 @@ public:
 };
 
 /*
- * Copies 8-bit immedaite value into address HL
+ * Copies 8-bit immediate value into address HL
  */
 class LD_HL_imm8 final : public Instruction {
 public:
@@ -107,7 +107,7 @@ public:
   std::size_t mem_access_t_cycle() override { return 8; }
 
 private:
-  byte_t imm;
+  byte_t imm{};
 };
 
 /*
@@ -152,7 +152,7 @@ public:
   std::size_t mem_access_t_cycle() override { return 12; }
 
 private:
-  addr_t addr;
+  addr_t addr{};
 };
 
 /*
@@ -197,7 +197,7 @@ public:
   std::size_t mem_access_t_cycle() override { return 12; }
 
 private:
-  addr_t addr;
+  addr_t addr{};
 };
 
 /*
@@ -219,7 +219,7 @@ public:
   std::size_t mem_access_t_cycle() override { return 8; }
 
 private:
-  addr_t addr;
+  addr_t addr{};
 };
 
 /*
@@ -241,7 +241,7 @@ public:
   std::size_t mem_access_t_cycle() override { return 8; }
 
 private:
-  addr_t addr;
+  addr_t addr{};
 };
 
 /*
@@ -373,11 +373,11 @@ public:
   }
   void parse() override {
     addr = bus->read_byte(reg_file->reg_pc++);
-    addr |= (addr_t)bus->read_byte(reg_file->reg_pc++) << 8;
+    addr |= static_cast<addr_t>(bus->read_byte(reg_file->reg_pc++)) << 8;
   }
 
 private:
-  addr_t addr;
+  addr_t addr{};
 };
 
 /*
@@ -397,11 +397,11 @@ public:
   }
   void parse() override {
     addr = bus->read_byte(reg_file->reg_pc++);
-    addr |= (addr_t)bus->read_byte(reg_file->reg_pc++) << 8;
+    addr |= static_cast<addr_t>(bus->read_byte(reg_file->reg_pc++)) << 8;
   }
 
 private:
-  addr_t addr;
+  addr_t addr{};
 };
 
 /*
@@ -444,7 +444,7 @@ public:
   std::string describe() override {
     return std::format("PUSH {}", to_string<src>());
   }
-  void parse() {
+  void parse() override {
     state = InstrStates::INSTR_STATE_WRITE;
     sp = reg_file->reg_sp.read();
   }
@@ -458,7 +458,7 @@ private:
 };
 
 /*
- * Pop 16-bit registe value
+ * Pop 16-bit register value
  */
 template <Register16Bit dst> class POP_XX final : public Instruction {
 public:
@@ -471,7 +471,7 @@ public:
       addr = bus->read_byte(sp++);
       break;
     case InstrStates::INSTR_STATE_READ2:
-      addr |= (addr_t)bus->read_byte(sp++) << 8;
+      addr |= static_cast<addr_t>(bus->read_byte(sp++)) << 8;
       reg_file->reg_sp.write(sp);
       write_reg<dst>(addr);
     default:
@@ -482,7 +482,7 @@ public:
   std::string describe() override {
     return std::format("POP {}", to_string<dst>());
   }
-  void parse() {
+  void parse() override {
     state = InstrStates::INSTR_STATE_READ;
     sp = reg_file->reg_sp.read();
   }
@@ -495,4 +495,4 @@ private:
   addr_t sp{}, addr{};
 };
 
-#endif // __MOVES_H
+#endif // GBC_MOVES_HPP

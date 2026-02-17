@@ -1,8 +1,8 @@
 #include "frontend/sdl3/gui.hpp"
-
 #include "memory/boot.hpp"
 #include <ranges>
 #include <sys/stat.h>
+#include <imgui_internal.h>
 
 namespace fs = std::filesystem;
 
@@ -58,6 +58,7 @@ void GbcImGui::render(UiState &state, SDLHost &host) {
   build_main_menu_bar(state);
   build_status_bar(state);
   build_file_dialogs(state);
+  build_rom_source_window(state);
   if (state.show_settings)
     build_settings_window(state, host);
   if (state.show_keybinds)
@@ -137,9 +138,20 @@ void GbcImGui::push_notification(UiState &state, const LogLevel level,
 }
 
 void GbcImGui::update_rom_path(const std::string &rom_path) {
-  const auto new_rom_path = fs::path(rom_path).parent_path().string();
-  rom_sel_conf.path = new_rom_path;
-  settings.rom_dir = new_rom_path;
+  const auto looks_like_url = [](const std::string &s) {
+    return s.rfind("http://", 0) == 0 || s.rfind("https://", 0) == 0;
+  };
+
+  if (!looks_like_url(rom_path)) {
+    std::error_code ec;
+    const fs::path p{rom_path};
+    if (!p.empty() && fs::exists(p, ec)) {
+      const auto new_rom_path = p.parent_path().string();
+      rom_sel_conf.path = new_rom_path;
+      settings.rom_dir = new_rom_path;
+    }
+  }
+
   settings.add_recent_rom(rom_path);
   settings.save();
 }
@@ -160,7 +172,9 @@ void GbcImGui::build_main_menu_bar(UiState &state) const {
         ImGuiFileDialog::Instance()->OpenDialog(
             "RomFileDialog", "Choose a ROM file", rom_filters.data(),
             rom_sel_conf);
-
+      if (ImGui::MenuItem("Load from URL...")) {
+        state.show_load_url_popup = true;
+      }
       if (ImGui::BeginMenu("Open Recent")) {
         if (settings.recent_roms.empty()) {
           ImGui::MenuItem("(No recent files)", nullptr, false, false);
@@ -172,6 +186,7 @@ void GbcImGui::build_main_menu_bar(UiState &state) const {
             if (ImGui::MenuItem(
                     std::filesystem::path(path).filename().string().c_str())) {
               state.load_rom_path = path;
+              state.load_rom_name = "";
               state.request_load_rom = true;
             }
             // In case differentiation is needed, we add a tooltip
@@ -245,12 +260,17 @@ void GbcImGui::build_status_bar(UiState &state) const {
       ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNav;
 
   if (ImGui::Begin("StatusBar", nullptr, flags)) {
-    // --- Left Aligned Content ---
-    if (!state.load_rom_path.empty()) {
-      ImGui::Text("Loaded: %s", std::filesystem::path(state.load_rom_path)
-                                    .filename()
-                                    .string()
-                                    .c_str());
+    if (state.io_busy) {
+      if (state.io_progress >= 0.0f) {
+        ImGui::Text("%s (%.0f%%)", state.io_status.c_str(), state.io_progress * 100.0f);
+      } else {
+        ImGui::Text("%s", state.io_status.c_str());
+      }
+    } else if (!state.load_rom_path.empty()) {
+      ImGui::Text("Loaded: %s", state.load_rom_name.c_str());
+      if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("%s", state.load_rom_path.c_str());
+      }
     } else {
       ImGui::TextDisabled("Ready");
     }
@@ -318,6 +338,7 @@ void GbcImGui::build_file_dialogs(UiState &state) const {
           "RomFileDialog", ImGuiWindowFlags_NoCollapse, min_size, max_size)) {
     if (ImGuiFileDialog::Instance()->IsOk()) {
       state.load_rom_path = ImGuiFileDialog::Instance()->GetFilePathName();
+      state.load_rom_name = "";
       state.request_load_rom = true;
     }
     ImGuiFileDialog::Instance()->Close();
@@ -337,6 +358,92 @@ void GbcImGui::build_file_dialogs(UiState &state) const {
       }
     }
     ImGuiFileDialog::Instance()->Close();
+  }
+}
+
+void GbcImGui::build_rom_source_window(UiState &state) const {
+  // --- Load from URL popup ---
+  if (state.show_load_url_popup) {
+    ImGui::OpenPopup("Load ROM/ZIP from URL");
+    state.show_load_url_popup = false;
+  }
+
+  if (ImGui::BeginPopupModal("Load ROM/ZIP from URL", nullptr,
+                             ImGuiWindowFlags_AlwaysAutoResize)) {
+    ImGui::TextUnformatted(
+        "Enter a link to a .gb/.gbc ROM or a .zip archive");
+    ImGui::Spacing();
+
+    ImGui::SetNextItemWidth(520.0f * dpi_scale);
+    ImGui::InputTextWithHint("##rom_url", "https://example.com/game.zip",
+                             state.load_url_input, IM_ARRAYSIZE(state.load_url_input));
+
+    const bool can_load = state.load_url_input[0] != '\0';
+    if (!can_load) ImGui::BeginDisabled();
+
+    if (ImGui::Button("Load")) {
+      state.load_rom_path = state.load_url_input;
+      state.load_rom_name = "";
+      state.request_load_rom = true;
+      ImGui::CloseCurrentPopup();
+    }
+
+    if (!can_load) ImGui::EndDisabled();
+
+    ImGui::SameLine();
+    if (ImGui::Button("Cancel")) {
+      ImGui::CloseCurrentPopup();
+    }
+    ImGui::EndPopup();
+  }
+
+  // --- ZIP ROM chooser popup ---
+  if (state.show_zip_picker_popup) {
+    ImGui::OpenPopup("Choose ROM from ZIP");
+  }
+
+  if (ImGui::BeginPopupModal("Choose ROM from ZIP", nullptr,
+                             ImGuiWindowFlags_AlwaysAutoResize)) {
+    if (!state.zip_picker_title.empty()) {
+      ImGui::TextUnformatted(state.zip_picker_title.c_str());
+      ImGui::Spacing();
+    } else {
+      ImGui::TextUnformatted("Multiple ROM files were found in this ZIP");
+      ImGui::Spacing();
+    }
+
+    const float lb_w = 520.0f * dpi_scale;
+    const float lb_h = 220.0f * dpi_scale;
+    if (ImGui::BeginListBox("##zip_rom_list", ImVec2(lb_w, lb_h))) {
+      for (int i = 0; i < static_cast<int>(state.zip_rom_entries.size()); ++i) {
+        const bool selected = (i == state.zip_rom_selected_idx);
+        if (ImGui::Selectable(state.zip_rom_entries[i].c_str(), selected)) {
+          state.zip_rom_selected_idx = i;
+        }
+        if (selected) ImGui::SetItemDefaultFocus();
+      }
+      ImGui::EndListBox();
+    }
+
+    const bool has_entries = !state.zip_rom_entries.empty();
+    if (!has_entries) ImGui::BeginDisabled();
+
+    if (ImGui::Button("OK")) {
+      state.zip_picker_action = 1;
+      state.show_zip_picker_popup = false;
+      ImGui::CloseCurrentPopup();
+    }
+
+    if (!has_entries) ImGui::EndDisabled();
+
+    ImGui::SameLine();
+    if (ImGui::Button("Cancel")) {
+      state.zip_picker_action = 2;
+      state.show_zip_picker_popup = false;
+      ImGui::CloseCurrentPopup();
+    }
+
+    ImGui::EndPopup();
   }
 }
 
