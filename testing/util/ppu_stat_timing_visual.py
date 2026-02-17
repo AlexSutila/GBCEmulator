@@ -35,6 +35,10 @@ if __name__ == "__main__":
         "orange",  # Mode 3: Transfer
     ])
 
+    # STAT value is actually delayed, hence step a few cycles before read
+    for _ in range(3):  # TODO: This should technically be four???
+        gbc.step()
+
     for scanline in range(nr_scanlines):
         run_scanline(scanline, update=False)  # run for one dummy frame
     for scanline in range(nr_scanlines):
