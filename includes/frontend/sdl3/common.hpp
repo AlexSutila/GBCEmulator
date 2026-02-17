@@ -126,6 +126,7 @@ struct UiState {
 
   // File requests
   bool request_load_rom{false};
+  std::string load_rom_name;
   std::string load_rom_path;
   bool request_load_bios{false};
   std::string load_bios_path;

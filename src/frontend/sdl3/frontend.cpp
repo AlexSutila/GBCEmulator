@@ -164,6 +164,7 @@ void SDL3Frontend::handle_drop(const SDL_Event &e) {
   if (!e.drop.data) return;
   std::lock_guard lock(ui_mutex);
   ui_state.load_rom_path = process_path(e.drop.data);   // file path or URL text
+  ui_state.load_rom_name = "";
   ui_state.request_load_rom = true;
 }
 
@@ -473,6 +474,7 @@ void SDL3Frontend::start() {
         {
           std::lock_guard lock(ui_mutex);
           ui_state.load_rom_path = display_label;
+          ui_state.load_rom_name = cart_ctx.header.title();
           ui_state.cart_info = Debug::describe_cart(cart_ctx);
         }
         gui.update_rom_path(strip_colons(display_label));

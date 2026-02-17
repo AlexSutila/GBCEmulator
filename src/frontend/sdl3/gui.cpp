@@ -186,6 +186,7 @@ void GbcImGui::build_main_menu_bar(UiState &state) const {
             if (ImGui::MenuItem(
                     std::filesystem::path(path).filename().string().c_str())) {
               state.load_rom_path = path;
+              state.load_rom_name = "";
               state.request_load_rom = true;
             }
             // In case differentiation is needed, we add a tooltip
@@ -266,8 +267,10 @@ void GbcImGui::build_status_bar(UiState &state) const {
         ImGui::Text("%s", state.io_status.c_str());
       }
     } else if (!state.load_rom_path.empty()) {
-      ImGui::Text("Loaded: %s",
-                  std::filesystem::path(state.load_rom_path).filename().string().c_str());
+      ImGui::Text("Loaded: %s", state.load_rom_name.c_str());
+      if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("%s", state.load_rom_path.c_str());
+      }
     } else {
       ImGui::TextDisabled("Ready");
     }
@@ -335,6 +338,7 @@ void GbcImGui::build_file_dialogs(UiState &state) const {
           "RomFileDialog", ImGuiWindowFlags_NoCollapse, min_size, max_size)) {
     if (ImGuiFileDialog::Instance()->IsOk()) {
       state.load_rom_path = ImGuiFileDialog::Instance()->GetFilePathName();
+      state.load_rom_path = "";
       state.request_load_rom = true;
     }
     ImGuiFileDialog::Instance()->Close();
@@ -379,6 +383,7 @@ void GbcImGui::build_rom_source_window(UiState &state) const {
 
     if (ImGui::Button("Load")) {
       state.load_rom_path = state.load_url_input;
+      state.load_rom_name = "";
       state.request_load_rom = true;
       ImGui::CloseCurrentPopup();
     }
