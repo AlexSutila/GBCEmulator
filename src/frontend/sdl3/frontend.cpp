@@ -512,11 +512,19 @@ void SDL3Frontend::process_events() {
       running = false;
       continue;
     }
-    {
+
+    bool consumed = false;
+    // DPI scale change triggers SDL_SetWindowSize() inside gui.process_event(),
+    // which can synchronously generate window events that hit our event watcher
+    // Do NOT hold ui_mutex here or we can deadlock
+    if (e.type == SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED) {
+      consumed = gui.process_event(e, ui_state);
+    } else {
       std::lock_guard lock(ui_mutex);
-      if (gui.process_event(e, ui_state))
-        continue;
+      consumed = gui.process_event(e, ui_state);
     }
+    if (consumed) continue;
+
     if (e.type == SDL_EVENT_KEY_DOWN || e.type == SDL_EVENT_KEY_UP) {
       const bool pressed = (e.type == SDL_EVENT_KEY_DOWN);
       handle_keypress(e.key.key, pressed);
@@ -768,7 +776,14 @@ bool SDLCALL SDL3Frontend::event_watcher(void *userdata,
 
       const auto now_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count();
       // Disable vsync for a short grace window after move/resize events
-      self->suppress_vsync_until_ns.store(now_ns + 150'000'000, std::memory_order_relaxed);
+      // Never block in the watcher (avoids deadlocks on DPI-crossing cascades)
+      // If UI is currently being updated, skip this forced draw
+      if (!self->ui_mutex.try_lock()) {
+        last_draw = now; // still rate-limit; don't spin
+        return true;
+      }
+      self->ui_mutex.unlock();
+
       self->render_frame();
       self->last_forced_redraw_ns.store(now_ns, std::memory_order_relaxed);
       last_draw = now;
