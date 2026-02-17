@@ -71,7 +71,8 @@ static void bind_processor(py::module_ &m) {
   py::class_<LR35902>(m, "LR35902")
       .def("step", &LR35902::step)
       .def("get_state", &LR35902::get_state)
-      .def("load_state", &LR35902::load_state, py::arg("state"));
+      .def("load_state", &LR35902::load_state, py::arg("state"))
+      .def("disasm", &LR35902::disasm);
 
   // For processor state interrogation
   py::class_<LR35902::ProcessorState>(m, "ProcessorState")
