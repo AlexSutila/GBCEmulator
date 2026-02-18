@@ -15,7 +15,7 @@
 
 GameBoyColor::GameBoyColor(Frontend &frontend, const std::string &bios_path)
     : Debuggable(debugger_), debugger_(std::nullopt), fe_(frontend) {
-  system_init(); // Connects all system components
+  system_init(); // Connects all system components to each other
 
   /* We set CGB mode based on the size of the boot ROM. This is the best way
    * to make sure we get the coloring right, but it will likely cause strange
