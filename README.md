@@ -1,7 +1,7 @@
 # Overview
-Lolyep. This repo presents yet another GameBoy Color emulator written entirely from scratch. It serves as a spiritual successor to an earlier (and very poorly written) [DMG GameBoy Emulator](https://github.com/AlexSutila/GBEmulator), aiming to be a cleaner, more accurate, and more modular foundation for both DMG and CGB emulation.
+Lolyep. Presenting IroGB, a Game Boy Color emulator written entirely from scratch. It serves as a spiritual successor to an earlier (and very poorly written) [DMG GameBoy Emulator](https://github.com/AlexSutila/GBEmulator), aiming to be a cleaner, more accurate, and more modular foundation for both DMG and CGB emulation.
 
-This emulator is designed to be compatible with **GameBoy Color (CGB)** games (obviously), and also implements the backwards compatability features CGB models provide. As such, this emulator can be used to emulate **original DMG GameBoy** games as well. The games shown in the screenshot below do not define the compatability limitations of this emulator, but they are known to play reasonably well.
+This emulator is designed to be compatible with **Game Boy Color (CGB)** games, and also implements the backwards compatability features CGB models provide. As such, this emulator can be used to emulate **original DMG GameBoy** games as well. The games shown in the screenshot below do not define the compatability limitations of this emulator, but they are known to play reasonably well.
 
 ### CGB Model Compatability
 ![CGB Compatability](assets/cgb_demo.png)
@@ -31,7 +31,21 @@ The web version is built on [raylib](https://github.com/raysan5/raylib) and aims
 The web version does not require compilation or installation, try it out [here](https://alexsutila.github.io/GBCEmulator/index.html)!
 
 ### Memory Bank Circuitry Support
-TODO: We support a couple, just need to finalize before we can say we support the fully.
+IroGB supports most official and unofficial memory bank controllers (MBCs) that were used in Game Boy cartridges. This includes the following:
+- No MBC
+- MBC1/MBC1M
+- MBC2
+- MBC3/MBC30
+- MBC5
+- MBC6
+- MBC7
+- MMM01
+- M161
+- HuC1
+- HuC3
+- TAMA5
+- EMS
+- Wisdom Tree
 
 ## Accuracy
 To evaluate the accuracy of any emulator, the community has released a plethora of test ROMs that can be used to evaluate the accuracy of both basic hardware functionality and bizzare edge cases. Specifically, we leverage the following testing suites:
@@ -71,6 +85,6 @@ cmake .. -DCMAKE_BUILD_TYPE=Debug && make -j$(nproc)
 To compile the web version, reference the GitHub action. To self host it, you will need to deploy as an HTTP server.
 - The GitHub action which builds and deploys the web frontend can be found [here](https://github.com/AlexSutila/GBCEmulator/blob/release/.github/workflows/deploy-to-pages.yml)
 
-## Original Authors
+## Authors
 1. Alex Sutila (https://github.com/alexsutila)
 2. Xuanli Lin (https://github.com/kazum1kun)
