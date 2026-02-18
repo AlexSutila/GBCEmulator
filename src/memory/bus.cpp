@@ -59,22 +59,23 @@ AddressBus::AddressBus(runtime_sys_info &sys,
                        std::optional<Debug::Debugger> &debugger,
                        std::optional<BootROM> &bios)
     : Debuggable(debugger), // Bus read/write breakpoints
-      key0(sys),                   // Controls backwards compatability
-      key1(sys),                   // Controls clock speed mode
-      oam_dma(*this),              // Performs object attribute DMA (DMG/CGB)
-      vdma(*this, sys),            // Performs GDMA and HDMA (CGB only)
-      bios_(bios),                 // Optionally configured by frontend
-      sys_(sys)                    // Generic system information
+      key0(sys),            // Controls backwards compatability
+      key1(sys),            // Controls clock speed mode
+      oam_dma(*this),       // Performs object attribute DMA (DMG/CGB)
+      vdma(*this, sys),     // Performs GDMA and HDMA (CGB only)
+      bios_(bios),          // Optionally configured by frontend
+      sys_(sys)             // Generic system information
 {
   constexpr std::size_t vram_bank_size = 0x2000;
   constexpr std::size_t wram_bank_size = 0x1000;
   constexpr std::size_t hram_size = 0x7F;
   constexpr std::size_t oam_size = 0xA0;
   using mmio = IORegisterMapping;
+  using namespace std::ranges;
 
   /* Initialize banked and non-banked memory */
-  std::ranges::generate(vram,[&] { return make_zeroed<byte_t>(vram_bank_size); });
-  std::ranges::generate(wram,[&] { return make_zeroed<byte_t>(wram_bank_size); });
+  generate(vram, [&] { return make_zeroed<byte_t>(vram_bank_size); });
+  generate(wram, [&] { return make_zeroed<byte_t>(wram_bank_size); });
   hram = make_zeroed<byte_t>(hram_size);
   oam = make_zeroed<byte_t>(oam_size);
   bus_conflicts = BUS_CONFLICT_NONE;
@@ -112,6 +113,33 @@ void AddressBus::init_test_bed() {
 }
 void AddressBus::eject_cartridge() { cart_.reset(); }
 
+byte_t &AddressBus::vram_byte(const addr_t addr) const {
+  const auto bank = vram_bank_ctrl.get_bank();
+  return vram.at(bank)[(addr - 0x8000) & VRAM_MASK];
+}
+
+byte_t &AddressBus::wram_byte(const addr_t addr) const {
+  if (addr < 0xD000) // Only one half is banked
+    return wram.at(0)[(addr - 0xC000) & WRAM_MASK];
+  const auto bank = wram_bank_ctrl.get_bank();
+  return wram.at(bank)[(addr - 0xD000) & WRAM_MASK];
+}
+
+byte_t &AddressBus::echo_byte(const addr_t addr) const {
+  if (addr < 0xF000)
+    return wram.at(0)[(addr - 0xE000) & WRAM_MASK];
+  const auto bank = wram_bank_ctrl.get_bank();
+  return wram.at(bank)[(addr - 0xF000) & WRAM_MASK];
+}
+
+byte_t &AddressBus::oam_byte(const addr_t addr) const {
+  return oam[addr - 0xFE00];
+}
+
+byte_t &AddressBus::hram_byte(const addr_t addr) const {
+  return hram[(addr - 0xFF80) & HRAM_MASK];
+}
+
 byte_t AddressBus::read_byte_safe(const addr_t addr) const {
   if (io_registers.contains(addr)) {
     assert((addr >= 0xFF00 && addr <= 0xFF7F) || addr == 0xFFFF);
@@ -134,44 +162,32 @@ byte_t AddressBus::read_byte(const addr_t addr) const {
   if (cart_ && is_cart_range(addr))
     return cart_->read_byte(addr);
 
-    /* Read from VRAM, only banked in CGB mode */
-  if (is_vram_range(addr)) {
-    const auto bank = vram_bank_ctrl.get_bank();
-    return vram.at(bank)[(addr - 0x8000) & VRAM_MASK];
-  }
+  /* Read from VRAM, only banked in CGB mode */
+  if (is_vram_range(addr))
+    return vram_byte(addr);
 
   /* Read from WRAM, low bank is always mapped to zero */
-  if (is_wram_range(addr)) {
-    if (addr < 0xD000)
-      return wram.at(0)[(addr - 0xC000) & WRAM_MASK];
-    const auto bank = wram_bank_ctrl.get_bank();
-    return wram.at(bank)[(addr - 0xD000) & WRAM_MASK];
-  }
+  if (is_wram_range(addr))
+    return wram_byte(addr);
 
   /* Echoes 0xC000-0xDDFF */
-  if (is_echo_range(addr)) {
-    if (addr < 0xF000)
-      return wram.at(0)[(addr - 0xE000) & WRAM_MASK];
-    const auto bank = wram_bank_ctrl.get_bank();
-    return wram.at(bank)[(addr - 0xF000) & WRAM_MASK];
-  }
+  if (is_echo_range(addr))
+    return echo_byte(addr);
 
   /* Read from Object Attribute Memory */
   if (is_oam_range(addr))
-    return oam[addr - 0xFE00];
+    return oam_byte(addr);
 
   /* Read from memory mapped IO register */
   if (io_registers.contains(addr)) {
     assert((addr >= 0xFF00 && addr <= 0xFF7F) || addr == 0xFFFF);
     auto const &mmio = io_registers.at(addr);
-
-    // Only write CGB registers if in CGB mode, fallback to 0xFF otherwise
     return mmio->read();
   }
 
   /* Read from to High RAM */
   if (is_hram_range(addr))
-    return hram[(addr - 0xFF80) & HRAM_MASK];
+    return hram_byte(addr);
 
   return open_bus();
 }
@@ -185,47 +201,31 @@ void AddressBus::write_byte(const addr_t addr, const byte_t value) {
     cart_->write(addr, value);
 
   /* Write to VRAM, only banked in CGB mode */
-  else if (is_vram_range(addr)) {
-    const auto bank = vram_bank_ctrl.get_bank();
-    vram.at(bank)[(addr - 0x8000) & VRAM_MASK] = value;
-  }
+  else if (is_vram_range(addr))
+    vram_byte(addr) = value;
 
   /* Write to WRAM, low bank is always mapped to zero */
-  else if (is_wram_range(addr)) {
-    if (addr < 0xD000)
-      wram.at(0)[(addr - 0xC000) & WRAM_MASK] = value;
-    else {
-      const auto bank = wram_bank_ctrl.get_bank();
-      wram.at(bank)[(addr - 0xD000) & WRAM_MASK] = value;
-    }
-  }
+  else if (is_wram_range(addr))
+    wram_byte(addr) = value;
 
   /* Echoes 0xC000-0xDDFF */
-  else if (is_echo_range(addr)) {
-    if (addr < 0xF000)
-      wram.at(0)[(addr - 0xE000) & WRAM_MASK] = value;
-    else {
-      const auto bank = wram_bank_ctrl.get_bank();
-      wram.at(bank)[(addr - 0xF000) & WRAM_MASK] = value;
-    }
-  }
+  else if (is_echo_range(addr))
+    echo_byte(addr) = value;
 
   /* Write to Object Attribute Memory */
   else if (is_oam_range(addr))
-    oam[addr - 0xFE00] = value;
+    oam_byte(addr) = value;
 
   /* Write to memory mapped IO register */
   else if (io_registers.contains(addr)) {
     assert((addr >= 0xFF00 && addr <= 0xFF7F) || addr == 0xFFFF);
     auto const &mmio = io_registers.at(addr);
-
-    // Only write CGB registers if in CGB mode
     mmio->write(value);
   }
 
   /* Write to High RAM */
   else if (is_hram_range(addr))
-    hram[(addr - 0xFF80) & HRAM_MASK] = value;
+    hram_byte(addr) = value;
 
   /* We intentionally evaluate the breakpoint after the value has been written,
    * as it is less confusing from a UI perspective, seeing the updated value. */

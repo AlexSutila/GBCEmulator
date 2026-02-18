@@ -97,6 +97,13 @@ private:
   std::unique_ptr<Cartridge> cart_;
   Joypad::JOYP joypad_;
 
+  /* Facilitators for memory access and optimizing instruction fetches */
+  byte_t &vram_byte(const addr_t addr) const;
+  byte_t &wram_byte(const addr_t addr) const;
+  byte_t &echo_byte(const addr_t addr) const;
+  byte_t &oam_byte(const addr_t addr) const;
+  byte_t &hram_byte(const addr_t addr) const;
+
   /* System control registers: (speed mode, backwards compatability, etc.) */
   SYS::KEY0 key0; // Controls DMG backwards compatability
   SYS::KEY1 key1; // Controls clock speed mode
