@@ -146,10 +146,10 @@ byte_t AddressBus::read_byte_safe(const addr_t addr) const {
     const auto &mmio = io_registers.at(addr);
     return mmio->peek(); // Const
   }
-  return read_byte(addr);
+  return read_byte(addr, false);
 }
 
-byte_t AddressBus::read_byte(const addr_t addr) const {
+byte_t AddressBus::read_byte(const addr_t addr, bool debug) const {
   try_brk(addr, Debug::BRK_ADDRESS_READ);
   if (is_conflicting(addr)) [[unlikely]]
     return open_bus();

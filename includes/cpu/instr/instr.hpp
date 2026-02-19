@@ -8,6 +8,10 @@
 #include <cstddef>
 #include <string>
 
+static inline addr_t make_addr(byte_t lo, byte_t hi) {
+  return static_cast<addr_t>(lo) | (static_cast<addr_t>(hi) << 8);
+}
+
 enum class InstrStates {
   INSTR_STATE_READ,
   INSTR_STATE_WRITE,
@@ -116,8 +120,7 @@ protected:
     return "?";
   }
 
-  template <Register16Bit reg>
-  void write_reg(const addr_t addr) const {
+  template <Register16Bit reg> void write_reg(const addr_t addr) const {
     if constexpr (reg == Register16Bit::REG_AF)
       reg_file->reg_af.write(addr);
     else if constexpr (reg == Register16Bit::REG_BC)
@@ -148,8 +151,7 @@ protected:
     return 0xFF;
   }
 
-  template <Register8Bit reg>
-  void write_reg(const byte_t byte) const {
+  template <Register8Bit reg> void write_reg(const byte_t byte) const {
     if constexpr (reg == Register8Bit::REG_A)
       reg_file->reg_af.write_hi(byte);
     else if constexpr (reg == Register8Bit::REG_F)

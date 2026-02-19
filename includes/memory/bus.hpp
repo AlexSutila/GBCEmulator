@@ -23,12 +23,14 @@ enum BusConflictTypes : std::uint32_t {
   BUS_CONFLICT_OAM_DMA = 1 << 1,
 };
 
-constexpr BusConflictTypes operator|(const BusConflictTypes a, const BusConflictTypes b) {
+constexpr BusConflictTypes operator|(const BusConflictTypes a,
+                                     const BusConflictTypes b) {
   return static_cast<BusConflictTypes>(static_cast<std::uint32_t>(a) |
                                        static_cast<std::uint32_t>(b));
 }
 
-constexpr BusConflictTypes operator&(const BusConflictTypes a, const BusConflictTypes b) {
+constexpr BusConflictTypes operator&(const BusConflictTypes a,
+                                     const BusConflictTypes b) {
   return static_cast<BusConflictTypes>(static_cast<std::uint32_t>(a) &
                                        static_cast<std::uint32_t>(b));
 }
@@ -58,7 +60,7 @@ constexpr BusConflictTypes operator~(const BusConflictTypes a) {
 class AddressBus final : Debug::Debuggable {
 public:
   void write_byte(addr_t addr, byte_t value);
-  [[nodiscard]] byte_t read_byte(addr_t addr) const;
+  [[nodiscard]] byte_t read_byte(addr_t addr, bool debug = true) const;
   ObjAttrDMA &get_oam_dma() { return oam_dma; };
   VDMA &get_vdma() { return vdma; }
 

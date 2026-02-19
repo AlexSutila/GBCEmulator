@@ -47,7 +47,7 @@ static void bind_cart(py::module_ &m) {
   // For content loading
   m.def(
       "load_cart_raw",
-      [](const py::bytes& data) {
+      [](const py::bytes &data) {
         const std::string_view view = data;
         std::vector<byte_t> rom(view.begin(), view.end());
         return load_cart_raw(std::move(rom));
@@ -64,7 +64,8 @@ static void bind_address_bus(const py::module_ &m) {
       .def("init_test_bed", &AddressBus::init_test_bed)
       .def("write_byte", &AddressBus::write_byte, py::arg("addr"),
            py::arg("value"))
-      .def("read_byte", &AddressBus::read_byte, py::arg("addr"));
+      .def("read_byte", &AddressBus::read_byte, py::arg("addr"),
+           py::arg("debug") = true);
 }
 
 static void bind_processor(const py::module_ &m) {

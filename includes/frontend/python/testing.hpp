@@ -24,11 +24,8 @@
   std::uint32_t cycles = 0;
   byte_t op = 0;
   while (op != 0x40 && cycles < max_cycles) {
-    const auto &bus = gbc.get_bus();
     const auto &cpu = gbc.get_cpu();
-
-    const auto state = cpu->get_state();
-    op = bus->read_byte(state.pc);
+    op = cpu->cur_opcode();
 
     gbc.step(); // Run until 'LD B, B'
     gbc.step();

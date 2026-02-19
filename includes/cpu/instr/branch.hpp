@@ -18,20 +18,36 @@ public:
   JP_imm16(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
-    reg_file->reg_pc = imm;
+    switch (state) {
+    case InstrStates::INSTR_STATE_READ:
+      lo = bus->read_byte(reg_file->reg_pc++);
+      state = InstrStates::INSTR_STATE_READ2;
+      break;
+    case InstrStates::INSTR_STATE_READ2:
+      hi = bus->read_byte(reg_file->reg_pc++);
+      reg_file->reg_pc = make_addr(lo, hi);
+      break;
+    default:
+      break;
+    }
     return 16;
   }
   std::string describe() override {
+    const addr_t imm = make_addr(lo, hi);
     return std::format("JP {}", static_cast<int>(imm));
   }
   void parse() override {
-    const byte_t lo = bus->read_byte(reg_file->reg_pc++);
-    const byte_t hi = bus->read_byte(reg_file->reg_pc++);
-    imm = lo | (hi << 8);
+    lo = bus->read_byte(reg_file->reg_pc, false);
+    hi = bus->read_byte(reg_file->reg_pc + 1, false);
+    state = InstrStates::INSTR_STATE_READ;
+  }
+  std::size_t mem_access_t_cycle() override {
+    return (state == InstrStates::INSTR_STATE_READ) ? 4 : 8;
   }
 
 private:
-  addr_t imm{};
+  InstrStates state{};
+  byte_t lo{}, hi{};
 };
 
 /*
@@ -133,29 +149,56 @@ public:
   CALL_imm16(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
-    addr_t sp = reg_file->reg_sp.read();
-    addr_t pc = reg_file->reg_pc;
+    switch (state) {
+    case InstrStates::INSTR_STATE_READ:
+      lo = bus->read_byte(reg_file->reg_pc++);
+      state = InstrStates::INSTR_STATE_READ2;
+      break;
+    case InstrStates::INSTR_STATE_READ2:
+      hi = bus->read_byte(reg_file->reg_pc++);
+      state = InstrStates::INSTR_STATE_WRITE;
+      break;
 
-    // Push current PC onto the stack (high byte first)
-    bus->write_byte(--sp, static_cast<byte_t>(pc >> 8));
-    bus->write_byte(--sp, static_cast<byte_t>(pc & 0xFF));
-
-    // Write back for updated stack pointer
-    reg_file->reg_sp.write(sp);
-    reg_file->reg_pc = imm;
+    case InstrStates::INSTR_STATE_WRITE:
+      bus->write_byte(--sp, static_cast<byte_t>(reg_file->reg_pc >> 8));
+      state = InstrStates::INSTR_STATE_WRITE2;
+      break;
+    case InstrStates::INSTR_STATE_WRITE2:
+      bus->write_byte(--sp, static_cast<byte_t>(reg_file->reg_pc & 0xFF));
+      reg_file->reg_sp.write(sp);
+      reg_file->reg_pc = make_addr(lo, hi);
+      break;
+    }
     return 24;
   }
   std::string describe() override {
+    const addr_t imm = make_addr(lo, hi);
     return std::format("CALL {}", static_cast<int>(imm));
   }
   void parse() override {
-    const byte_t lo = bus->read_byte(reg_file->reg_pc++);
-    const byte_t hi = bus->read_byte(reg_file->reg_pc++);
-    imm = lo | (hi << 8);
+    state = InstrStates::INSTR_STATE_READ;
+    lo = bus->read_byte(reg_file->reg_pc, false);
+    hi = bus->read_byte(reg_file->reg_pc + 1, false);
+    sp = reg_file->reg_sp.read();
+  }
+  std::size_t mem_access_t_cycle() override {
+    switch (state) {
+    case InstrStates::INSTR_STATE_READ:
+      return 4;
+    case InstrStates::INSTR_STATE_READ2:
+      return 8;
+    case InstrStates::INSTR_STATE_WRITE:
+      return 16;
+    case InstrStates::INSTR_STATE_WRITE2:
+      return 20;
+    }
+    return 0; // Never reached
   }
 
 private:
-  addr_t imm{};
+  InstrStates state{};
+  byte_t lo{}, hi{};
+  addr_t sp{};
 };
 
 /*
