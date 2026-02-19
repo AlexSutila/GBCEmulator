@@ -1000,6 +1000,7 @@ public:
   LD_HL_SP_E8(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
+    imm = bus->read_byte(reg_file->reg_pc++); // Re-read bc frick bus conflicts
     const addr_t nn = static_cast<std::int16_t>(static_cast<std::int8_t>(imm));
     const addr_t sp = reg_file->reg_sp.read();
 
@@ -1019,8 +1020,9 @@ public:
     return std::format("LD HL, SP+{}", static_cast<int>(imm));
   }
   void parse() override {
-    imm = static_cast<int8_t>(bus->read_byte(reg_file->reg_pc++));
+    imm = static_cast<std::int8_t>(bus->read_byte(reg_file->reg_pc, false));
   }
+  std::size_t mem_access_t_cycle() override { return 4; }
 
 private:
   std::int8_t imm{}; // Signed intentionally
