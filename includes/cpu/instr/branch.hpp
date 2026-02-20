@@ -73,23 +73,39 @@ public:
   JP_cond_imm16(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
-    if (const bool cond = reg_file->reg_af.get_flag(flag); cond != expect)
-      return 12;
-    reg_file->reg_pc = imm;
-    return 16;
+    switch (state) {
+    case InstrStates::INSTR_STATE_READ:
+      lo = bus->read_byte(reg_file->reg_pc++);
+      state = InstrStates::INSTR_STATE_READ2;
+      break;
+    case InstrStates::INSTR_STATE_READ2:
+      hi = bus->read_byte(reg_file->reg_pc++);
+      if (cond)
+        reg_file->reg_pc = make_addr(lo, hi);
+      break;
+    default:
+      break;
+    }
+    return cond ? 16 : 12; // Four extra cycles when jump is taken
   }
   std::string describe() override {
     return std::format("JP {}, {}", to_string<flag, expect>(),
-                       static_cast<int>(imm));
+                       static_cast<int>(make_addr(lo, hi)));
   }
   void parse() override {
-    const byte_t lo = bus->read_byte(reg_file->reg_pc++);
-    const byte_t hi = bus->read_byte(reg_file->reg_pc++);
-    imm = lo | (hi << 8);
+    cond = reg_file->reg_af.get_flag(flag) == expect;
+    lo = bus->read_byte(reg_file->reg_pc, false);
+    hi = bus->read_byte(reg_file->reg_pc + 1, false);
+    state = InstrStates::INSTR_STATE_READ;
+  }
+  std::size_t mem_access_t_cycle() override {
+    return state == InstrStates::INSTR_STATE_READ ? 4 : 8;
   }
 
 private:
-  addr_t imm{};
+  InstrStates state{};
+  byte_t lo{}, hi{};
+  bool cond{};
 };
 
 /*
@@ -159,6 +175,7 @@ public:
       state = InstrStates::INSTR_STATE_WRITE;
       break;
 
+    // Write PC to stack and take jump
     case InstrStates::INSTR_STATE_WRITE:
       bus->write_byte(--sp, static_cast<byte_t>(reg_file->reg_pc >> 8));
       state = InstrStates::INSTR_STATE_WRITE2;
@@ -167,6 +184,9 @@ public:
       bus->write_byte(--sp, static_cast<byte_t>(reg_file->reg_pc & 0xFF));
       reg_file->reg_sp.write(sp);
       reg_file->reg_pc = make_addr(lo, hi);
+      break;
+
+    default:
       break;
     }
     return 24;
@@ -191,8 +211,9 @@ public:
       return 16;
     case InstrStates::INSTR_STATE_WRITE2:
       return 20;
+    default:
+      return 0; // Never reached
     }
-    return 0; // Never reached
   }
 
 private:
@@ -210,32 +231,66 @@ public:
   CALL_cond_imm16(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
-    if (const bool cond = reg_file->reg_af.get_flag(flag); cond != expect)
-      return 12;
-    addr_t sp = reg_file->reg_sp.read();
-    const addr_t pc = reg_file->reg_pc;
+    switch (state) {
+    case InstrStates::INSTR_STATE_READ:
+      lo = bus->read_byte(reg_file->reg_pc++);
+      state = InstrStates::INSTR_STATE_READ2;
+      break;
+    case InstrStates::INSTR_STATE_READ2:
+      hi = bus->read_byte(reg_file->reg_pc++);
+      if (cond)
+        state = InstrStates::INSTR_STATE_WRITE;
+      else // Call is ignored, goto dead state
+        state = InstrStates::INSTR_STATE_DEAD;
+      break;
 
-    // Push current PC onto the stack (high byte first)
-    bus->write_byte(--sp, static_cast<byte_t>(pc >> 8));
-    bus->write_byte(--sp, static_cast<byte_t>(pc & 0xFF));
+    // Call is taken, write PC to stack and take jump
+    case InstrStates::INSTR_STATE_WRITE:
+      bus->write_byte(--sp, static_cast<byte_t>(reg_file->reg_pc >> 8));
+      state = InstrStates::INSTR_STATE_WRITE2;
+      break;
+    case InstrStates::INSTR_STATE_WRITE2:
+      bus->write_byte(--sp, static_cast<byte_t>(reg_file->reg_pc & 0xFF));
+      reg_file->reg_pc = make_addr(lo, hi);
+      reg_file->reg_sp.write(sp);
+      break;
 
-    // Write back for updated stack pointer
-    reg_file->reg_sp.write(sp);
-    reg_file->reg_pc = imm;
-    return 24;
+    default:
+      break;
+    }
+    return cond ? 24 : 12;
   }
   std::string describe() override {
     return std::format("CALL {}, {}", to_string<flag, expect>(),
-                       static_cast<int>(imm));
+                       static_cast<int>(make_addr(lo, hi)));
   }
   void parse() override {
-    const byte_t lo = bus->read_byte(reg_file->reg_pc++);
-    const byte_t hi = bus->read_byte(reg_file->reg_pc++);
-    imm = lo | (hi << 8);
+    cond = reg_file->reg_af.get_flag(flag) == expect;
+    lo = bus->read_byte(reg_file->reg_pc, false);
+    hi = bus->read_byte(reg_file->reg_pc + 1, false);
+    state = InstrStates::INSTR_STATE_READ;
+    sp = reg_file->reg_sp.read();
+  }
+  std::size_t mem_access_t_cycle() override {
+    switch (state) {
+    case InstrStates::INSTR_STATE_READ:
+      return 4;
+    case InstrStates::INSTR_STATE_READ2:
+      return 8;
+    case InstrStates::INSTR_STATE_WRITE:
+      return 16;
+    case InstrStates::INSTR_STATE_WRITE2:
+      return 20;
+    default:
+      return 0; // Never reached
+    }
   }
 
 private:
-  addr_t imm{};
+  InstrStates state{};
+  byte_t lo{}, hi{};
+  addr_t sp{};
+  bool cond{};
 };
 
 /*
@@ -285,21 +340,43 @@ public:
   RET_cond(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
-    const bool cond = reg_file->reg_af.get_flag(flag);
-    if (cond != expect)
-      return 8;
-    addr_t sp = reg_file->reg_sp.read();
-    const addr_t lo = bus->read_byte(sp++);
-    const addr_t hi = bus->read_byte(sp++);
-
-    // Write back for updated stack pointer
-    reg_file->reg_sp.write(sp);
-    reg_file->reg_pc = lo | (hi << 8);
-    return 20;
+    switch (state) {
+    case InstrStates::INSTR_STATE_READ:
+      lo = bus->read_byte(sp++);
+      state = InstrStates::INSTR_STATE_READ2;
+      break;
+    case InstrStates::INSTR_STATE_READ2:
+      hi = bus->read_byte(sp++);
+      reg_file->reg_sp.write(sp);
+      reg_file->reg_pc = lo | (hi << 8);
+      break;
+    default:
+      break;
+    }
+    return state == InstrStates::INSTR_STATE_DEAD ? 8 : 20;
   }
   std::string describe() override {
     return std::format("RET {}", to_string<flag, expect>());
   }
+  void parse() override {
+    cond = reg_file->reg_af.get_flag(flag) == expect;
+    if (!cond)
+      state = InstrStates::INSTR_STATE_DEAD;
+    else
+      state = InstrStates::INSTR_STATE_READ;
+    sp = reg_file->reg_sp.read();
+  }
+  std::size_t mem_access_t_cycle() override {
+    if (!cond) // Return does not happen
+      return 0;
+    return state == InstrStates::INSTR_STATE_READ ? 8 : 12;
+  }
+
+private:
+  InstrStates state{};
+  byte_t lo{}, hi{};
+  addr_t sp{};
+  bool cond{};
 };
 
 /*
