@@ -73,23 +73,39 @@ public:
   JP_cond_imm16(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
-    if (const bool cond = reg_file->reg_af.get_flag(flag); cond != expect)
-      return 12;
-    reg_file->reg_pc = imm;
-    return 16;
+    switch (state) {
+    case InstrStates::INSTR_STATE_READ:
+      lo = bus->read_byte(reg_file->reg_pc++);
+      state = InstrStates::INSTR_STATE_READ2;
+      break;
+    case InstrStates::INSTR_STATE_READ2:
+      hi = bus->read_byte(reg_file->reg_pc++);
+      if (cond)
+        reg_file->reg_pc = make_addr(lo, hi);
+      break;
+    default:
+      break;
+    }
+    return cond ? 16 : 12; // Four extra cycles when jump is taken
   }
   std::string describe() override {
     return std::format("JP {}, {}", to_string<flag, expect>(),
-                       static_cast<int>(imm));
+                       static_cast<int>(make_addr(lo, hi)));
   }
   void parse() override {
-    const byte_t lo = bus->read_byte(reg_file->reg_pc++);
-    const byte_t hi = bus->read_byte(reg_file->reg_pc++);
-    imm = lo | (hi << 8);
+    cond = reg_file->reg_af.get_flag(flag) == expect;
+    lo = bus->read_byte(reg_file->reg_pc, false);
+    hi = bus->read_byte(reg_file->reg_pc + 1, false);
+    state = InstrStates::INSTR_STATE_READ;
+  }
+  std::size_t mem_access_t_cycle() override {
+    return state == InstrStates::INSTR_STATE_READ ? 4 : 8;
   }
 
 private:
-  addr_t imm{};
+  InstrStates state{};
+  byte_t lo{}, hi{};
+  bool cond{};
 };
 
 /*
