@@ -1,29 +1,34 @@
-name: Build & Deploy WASM to GitHub Pages
+name: Build & Deploy WASM
 
 on:
   push:
     branches:
       - release
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
 concurrency:
-  group: "pages"
+  group: pages
   cancel-in-progress: true
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
+  build-and-deploy:
+    runs-on: docker
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: https://data.forgejo.org/actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install build deps
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates git cmake make ninja-build python3 \
+            rsync openssh-client
+          update-ca-certificates
 
       - name: Set up Emscripten SDK
-        uses: mymindstorm/setup-emsdk@v14
+        uses: https://github.com/mymindstorm/setup-emsdk@v14
         with:
           version: latest
 
@@ -31,31 +36,36 @@ jobs:
         run: |
           mkdir -p build
           cd build
-          emcmake cmake .. \
-            -DCMAKE_BUILD_TYPE=Release
+          emcmake cmake .. -DCMAKE_BUILD_TYPE=Release
 
       - name: Build (emmake)
         run: |
           cd build
-          emmake make -j$(nproc)
+          emmake make -j"$(nproc)"
 
-      - name: Prepare Pages output
+      - name: Prepare dist
         run: |
+          rm -rf dist
           mkdir -p dist
-          cp -r build/* dist/
+          # Adjust to fit actual output:
+          cp -a build/*.html build/*.js build/*.wasm build/*.data build/*.css dist/ 2>/dev/null || true
+          # If there are asset folders:
+          cp -a build/assets dist/assets 2>/dev/null || true
 
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
-
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Deploy to server (rsync over SSH)
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf "%s" "$DEPLOY_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf "%s\n" "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          
+          rsync -az --delete \
+            -e "ssh -p $DEPLOY_PORT -i ~/.ssh/id_ed25519" \
+            dist/ "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/"
