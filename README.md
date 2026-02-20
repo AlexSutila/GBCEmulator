@@ -28,7 +28,7 @@ The web version is built on [raylib](https://github.com/raysan5/raylib) and aims
   <img src="assets/mobile_2.png" width="30%" />
 </p>
 
-The web version does not require compilation or installation, try it out [here](https://alexsutila.github.io/GBCEmulator/index.html)!
+The web version does not require compilation or installation, try it out [here](https://alexsutila.github.io/IroGB/)!
 
 ### Memory Bank Circuitry Support
 IroGB supports most official and unofficial memory bank controllers (MBCs) that were used in Game Boy cartridges. This includes the following:
