@@ -135,12 +135,12 @@ VDMA::DMAState VDMA::get_state() const {
   return s;
 }
 
-addr_t VDMA::get_addr(const MMIORegister& lo, const MMIORegister& hi) {
-  const byte_t hi_byte = hi.peek(), lo_byte = lo.peek();
+addr_t VDMA::get_addr(const DMA::VDMA_ADDR &lo, const DMA::VDMA_ADDR &hi) {
+  const byte_t hi_byte = hi.get_addr_bits(), lo_byte = lo.get_addr_bits();
   return (static_cast<addr_t>(hi_byte) << 8) | static_cast<addr_t>(lo_byte);
 }
 
-void VDMA::set_addr(MMIORegister &lo, MMIORegister &hi, const addr_t addr) {
+void VDMA::set_addr(DMA::VDMA_ADDR &lo, DMA::VDMA_ADDR &hi, const addr_t addr) {
   hi.write(static_cast<byte_t>((addr >> 8) & 0xFF));
   lo.write(static_cast<byte_t>(addr & 0xFF));
 }
@@ -187,8 +187,21 @@ byte_t VDMA::get_blks_remaining() const {
 }
 
 void VDMA::transfer_byte(const addr_t offset) const {
-  const byte_t data = bus_.read_byte(src_base_addr + offset);
-  bus_.write_byte(dest_base_addr + offset, data);
+  byte_t data{0xFF}; // Assume open bus unless address range is sane
+
+  // This is the ideal source address range, read byte as you would expect
+  if ((src_base_addr >= 0x0000 && src_base_addr <= 0x7FF0) ||
+      (src_base_addr >= 0xA000 && src_base_addr <= 0xDFF0)) [[likely]]
+    data = bus_.read_byte(src_base_addr + offset);
+
+  // If the source address lies within this address range, it actually ends up
+  // reading from 0xA000-0xBFF0, which is located somewhere in SRAM
+  else if (src_base_addr >= 0xE000 && src_base_addr <= 0xFFF0)
+    data = bus_.read_byte((src_base_addr - 0x4000) + offset);
+
+  // Only write data byte if the dest address is sane
+  if (dest_base_addr >= 0x8000 && dest_base_addr <= 0x9FF0) [[likely]]
+    bus_.write_byte(dest_base_addr + offset, data);
 }
 
 void VDMA::do_init(const State next_state) {

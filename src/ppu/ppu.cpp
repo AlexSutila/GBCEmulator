@@ -364,10 +364,6 @@ void PixelProcessingUnit::do_oam_scan() {
   };
   std::ranges::sort(oam_data, selection_priority);
 
-  /* Signal that HDMA can start running if it has been requested or started
-   * previously. If HBLANK is partially complete, it can also be triggered. */
-  vdma_.set_ppu_hblank_signal(true);
-
   // State transition logic
   state = modes::MODE_DRAWING;
   total_mode_clks.reset();
@@ -427,6 +423,10 @@ void PixelProcessingUnit::do_draw() {
   // TODO: I am not 100% sure about the sample timing of this, but I do know
   // with a high degree of certainty that it is only sampled once per scanline
   fetcher->sample_window_enable();
+
+  /* Signal that HDMA can start running if it has been requested or started
+   * previously. If HBLANK is partially complete, it can also be triggered. */
+  vdma_.set_ppu_hblank_signal(true);
 
   // State transition logic
   state = modes::MODE_HBLANK;

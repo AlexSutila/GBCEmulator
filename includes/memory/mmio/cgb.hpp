@@ -154,6 +154,17 @@ public:
 class VDMA;
 namespace DMA {
 
+class VDMA_ADDR final : public MMIORegister {
+public:
+  explicit VDMA_ADDR() : MMIORegister(0) {}
+  void write(byte_t value) override;
+  [[nodiscard]] byte_t peek() const override;
+  byte_t read() override;
+
+  // For internal DMA usage only
+  [[nodiscard]] byte_t get_addr_bits() const;
+};
+
 /*
  * FF51–FF55 — CGB VRAM DMA (HDMA)
  *
@@ -197,12 +208,10 @@ enum class VDMATransferMode {
 // AKA: VDMA5
 class VDMA_MODE_LEN final : public MMIORegister {
 public:
+  explicit VDMA_MODE_LEN(VDMA &dma) : MMIORegister(0), dma_(dma) {}
   void write(byte_t value) override;
   [[nodiscard]] byte_t peek() const override;
   byte_t read() override;
-
-  explicit VDMA_MODE_LEN(VDMA &dma) : MMIORegister(0), dma_(dma) {}
-  static void update_size(byte_t bytes_transferred);
 
 private:
   VDMA &dma_;
