@@ -654,47 +654,9 @@ void GbcImGui::build_about_window(UiState &state) {
     ImGui::TextLinkOpenURL("https://github.com/kazum1kun",
                            "https://github.com/kazum1kun");
 
-    ImGui::SeparatorText("Open Source Credits");
-    ImGui::BulletText("SDL3");
-    ImGui::SameLine();
-    ImGui::TextLinkOpenURL("https://github.com/libsdl-org/SDL",
-                           "https://github.com/libsdl-org/SDL");
-    ImGui::BulletText("Dear ImGui");
-    ImGui::SameLine();
-    ImGui::TextLinkOpenURL("https://github.com/ocornut/imgui",
-                           "https://github.com/ocornut/imgui");
-    ImGui::BulletText("ImGuiFileDialog");
-    ImGui::SameLine();
-    ImGui::TextLinkOpenURL("https://github.com/aiekick/ImGuiFileDialog",
-                           "https://github.com/aiekick/ImGuiFileDialog");
-    ImGui::BulletText("nlohmann/json");
-    ImGui::SameLine();
-    ImGui::TextLinkOpenURL("https://github.com/nlohmann/json",
-                           "https://github.com/nlohmann/json");
-    ImGui::BulletText("libcurl");
-    ImGui::SameLine();
-    ImGui::TextLinkOpenURL("https://github.com/curl/curl",
-                           "https://github.com/curl/curl");
-    ImGui::BulletText("miniz");
-    ImGui::SameLine();
-    ImGui::TextLinkOpenURL("https://github.com/richgel999/miniz",
-                           "https://github.com/richgel999/miniz");
-    ImGui::BulletText("PicoSHA2");
-    ImGui::SameLine();
-    ImGui::TextLinkOpenURL("https://github.com/okdshin/PicoSHA2",
-                           "https://github.com/okdshin/PicoSHA2");
-    ImGui::BulletText("pybind11");
-    ImGui::SameLine();
-    ImGui::TextLinkOpenURL("https://github.com/pybind/pybind11",
-                           "https://github.com/pybind/pybind11");
-    ImGui::BulletText("raylib");
-    ImGui::SameLine();
-    ImGui::TextLinkOpenURL("https://github.com/raysan5/raylib",
-                           "https://github.com/raysan5/raylib");
-    ImGui::BulletText("Emscripten");
-    ImGui::SameLine();
-    ImGui::TextLinkOpenURL("https://github.com/emscripten-core/emsdk",
-                           "https://github.com/emscripten-core/emsdk");
+    ImGui::SeparatorText("Credits");
+    ImGui::Text("We would like to thank the following open source projects for providing tools and resources that were instrumental in the development of IroGB:");
+    populate_credits();
   }
   ImGui::End();
 }
@@ -806,5 +768,15 @@ ImVec4 GbcImGui::get_level_color(const LogLevel level) {
     return {0.71f, 0.74f, 0.40f, 1.0f}; // Light green #b5bd68
   default:
     return {0.77f, 0.78f, 0.78f, 1.0f}; // Grey #c5c8c6
+  }
+}
+
+void GbcImGui::populate_credits() {
+  for (const auto& [name, url, license] : kThirdPartyProjects) {
+    ImGui::Bullet();
+    ImGui::SameLine();
+    ImGui::TextLinkOpenURL(name.data(), url.data());
+    ImGui::SameLine();
+    ImGui::Text("%s", license.data());
   }
 }

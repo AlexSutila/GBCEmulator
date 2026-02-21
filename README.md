@@ -88,3 +88,20 @@ To compile the web version, reference the GitHub action. To self host it, you wi
 ## Authors
 1. Alex Sutila (https://github.com/alexsutila)
 2. Xuanli Lin (https://github.com/kazum1kun)
+
+## Credits
+We would like to thank the following open source projects for providing tools and resources that were instrumental in the development of IroGB:
+- [curl](https://curl.se) - MIT-like license
+- [emscripten](https://emscripten.org) - MIT/Expat license
+- [Dear ImGUI](https://github.com/ocornut/imgui) - MIT license
+- [ImGUIFileDialog](https://github.com/aiekick/ImGuiFileDialog) - MIT license
+- [json](https://github.com/nlohmann/json) - MIT license
+- [mbedTLS](https://www.trustedfirmware.org/projects/mbed-tls) - Apache 2.0 OR GPL 2.0 or later license
+- [miniz](https://github.com/richgel999/miniz) - MIT license
+- [PicoSHA2](https://github.com/okdshin/PicoSHA2) - MIT license
+- [pybind11](https://github.com/pybind/pybind11) - BSD-like license
+- [raylib](https://www.raylib.com) - zlib license
+- [SDL3](https://www.libsdl.org) - zlib license
+
+## License
+IroGB is licensed under the GPLv3 License. See [LICENSE](LICENSE) for more information.

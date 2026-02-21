@@ -23,6 +23,25 @@ class GbcImGui {
   static constexpr float max_font_scale = 3.0f;
   static constexpr float base_font_size = 16.0f;
   const std::string font = "../fonts/TerminessNerdFontMono-Regular.ttf";
+  struct ThirdPartyProject {
+    std::string_view name;
+    std::string_view url;
+    std::string_view license;
+  };
+
+  static constexpr std::array<ThirdPartyProject, 11> kThirdPartyProjects{{
+    {"curl",            "https://curl.se",                                        "MIT-like license"},
+    {"emscripten",      "https://emscripten.org",                                 "MIT/Expat license"},
+    {"Dear ImGUI",      "https://github.com/ocornut/imgui",                       "MIT license"},
+    {"ImGUIFileDialog", "https://github.com/aiekick/ImGuiFileDialog",             "MIT license"},
+    {"json",            "https://github.com/nlohmann/json",                       "MIT license"},
+    {"mbedTLS",         "https://www.trustedfirmware.org/projects/mbed-tls",      "Apache 2.0 OR GPL 2.0 or later license"},
+    {"miniz",           "https://github.com/richgel999/miniz",                    "MIT license"},
+    {"PicoSHA2",        "https://github.com/okdshin/PicoSHA2",                    "MIT license"},
+    {"pybind11",        "https://github.com/pybind/pybind11",                     "BSD-like license"},
+    {"raylib",          "https://www.raylib.com",                                 "zlib license"},
+    {"SDL3",            "https://www.libsdl.org",                                 "zlib license"},
+  }};
 
 public:
   void init(const SDLHost& host);
@@ -70,6 +89,7 @@ private:
   static ImVec4 get_darkened_color(ImVec4 color, float factor);
   static void apply_keybind_preset(std::array<SDL_Keycode, 8>& array, int keybind_preset_index);
   static ImVec4 get_level_color(LogLevel level) ;
+  static void populate_credits();
 };
 
 #endif //GBC_SDL3_GUI_HPP
