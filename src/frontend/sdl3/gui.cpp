@@ -588,7 +588,8 @@ void GbcImGui::build_about_window(UiState &state) {
   ImGui::SetNextWindowSize(ImVec2(400, 300), ImGuiCond_FirstUseEver);
   if (ImGui::Begin("About", &state.show_about)) {
     ImGui::SeparatorText("Source");
-    ImGui::Text("%s", "github.com/AlexSutila/GBCEmulator");
+    ImGui::TextLinkOpenURL("https://kaze.moe/TismForge/IroGB",
+                           "https://kaze.moe/TismForge/IroGB");
     ImGui::SeparatorText("Cartridge Info");
     ImGui::Text("%s", state.cart_info.c_str());
   }
