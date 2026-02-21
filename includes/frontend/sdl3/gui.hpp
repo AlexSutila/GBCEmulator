@@ -14,6 +14,8 @@ class GbcImGui {
     "ROM files (*.gb *.gbc){.gb,.gbc},ZIP files (*.zip){.zip},All files (*.*){.*}";
   static constexpr std::string_view bios_filters =
       "BIOS files (*.bin){.bin},All files (*.*){.*}";
+  static constexpr std::string_view save_filters =
+      "Save files (*.sav){.sav},All files (*.*){.*}";
   static constexpr std::array<std::string_view, KCount> control_labels{
     "Right", "Left", "Up", "Down", "A", "B", "Select", "Start"};
   static constexpr std::array<std::string_view, 5> general_labels{

@@ -6,6 +6,7 @@
 #include "mbc_creator.hpp"
 
 #include <array>
+#include <atomic>
 #include <filesystem>
 #include <memory>
 #include <span>
@@ -84,7 +85,7 @@ public:
       : image_({}), mbc_(make_test_mbc()) {}
 
   [[nodiscard]] byte_t read_byte(const addr_t addr) const { return mbc_->read(addr); }
-  void write(const addr_t addr, const byte_t v) const { mbc_->write(addr, v); }
+  void write(addr_t addr, byte_t v);
 
   [[nodiscard]] const cart &image() const noexcept { return image_; }
 
@@ -95,10 +96,16 @@ public:
     return mbc_->ram();
   }
   [[nodiscard]] std::span<byte_t> ram() noexcept { return mbc_->ram(); }
+  bool load_save_file(const fs::path &save_path);
+  bool write_save_file(const fs::path &save_path) const;
+  bool consume_save_event() noexcept {
+    return save_dirty_.exchange(false, std::memory_order_acq_rel);
+  }
 
 private:
   cart image_;
   std::unique_ptr<Mbc> mbc_;
+  std::atomic<bool> save_dirty_{false};
 };
 
 [[nodiscard]] cart load_cart_raw(std::vector<byte_t> rom_bytes);

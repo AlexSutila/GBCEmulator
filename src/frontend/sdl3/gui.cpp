@@ -334,6 +334,17 @@ void GbcImGui::build_status_bar(UiState &state) const {
 
 void GbcImGui::build_file_dialogs(UiState &state) const {
   auto [max_size, min_size] = get_min_dialog_size();
+  if (state.request_open_save_dialog) {
+    IGFD::FileDialogConfig save_conf;
+    save_conf.path = state.save_dialog_start_dir.empty() ? rom_sel_conf.path
+                                                          : state.save_dialog_start_dir;
+    save_conf.fileName = state.save_dialog_default_name;
+    save_conf.flags = ImGuiFileDialogFlags_Modal;
+    ImGuiFileDialog::Instance()->OpenDialog(
+        "SaveFileDialog", "Save battery data", save_filters.data(), save_conf);
+    state.request_open_save_dialog = false;
+  }
+
   if (ImGuiFileDialog::Instance()->Display(
           "RomFileDialog", ImGuiWindowFlags_NoCollapse, min_size, max_size)) {
     if (ImGuiFileDialog::Instance()->IsOk()) {
@@ -356,6 +367,18 @@ void GbcImGui::build_file_dialogs(UiState &state) const {
         Logger::push(LogLevel::Warning, "BIOS", "Failed to load BIOS",
                      e.what());
       }
+    }
+    ImGuiFileDialog::Instance()->Close();
+  }
+
+  if (ImGuiFileDialog::Instance()->Display(
+          "SaveFileDialog", ImGuiWindowFlags_NoCollapse, min_size, max_size)) {
+    state.save_dialog_result_ready = true;
+    state.save_dialog_accepted = ImGuiFileDialog::Instance()->IsOk();
+    if (state.save_dialog_accepted) {
+      state.save_dialog_path = ImGuiFileDialog::Instance()->GetFilePathName();
+    } else {
+      state.save_dialog_path.clear();
     }
     ImGuiFileDialog::Instance()->Close();
   }

@@ -25,7 +25,7 @@ SDLHost::SDLHost(const int width, const int height, const int scale) {
                               SDL_TEXTUREACCESS_STREAMING, width, height);
   if (!texture)
     throw std::runtime_error(SDL_GetError());
-  SDL_SetTextureScaleMode(texture, SDL_ScaleMode::SDL_SCALEMODE_NEAREST);
+  SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_NEAREST);
 }
 
 SDLHost::~SDLHost() {

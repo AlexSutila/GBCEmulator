@@ -2,6 +2,8 @@
 #include "SDL3/SDL_events.h"
 #include "SDL3/SDL_gamepad.h"
 #include "debugger/print.hpp"
+#include <algorithm>
+#include <fstream>
 #include <random>
 #include <curl/curl.h>
 #include <miniz.h>
@@ -96,7 +98,7 @@ namespace {
     return path;
   }
 }
-  void SDL3Frontend::sync_io_status_to_ui() {
+void SDL3Frontend::sync_io_status_to_ui() {
   ui_state.io_busy = io_busy.load(std::memory_order_relaxed);
   ui_state.io_progress = io_progress.load(std::memory_order_relaxed);
   {
@@ -114,6 +116,159 @@ bool SDL3Frontend::consume_rom_io_result(std::string &rom_path_on_disk,
   rom_ready_path.reset();
   rom_ready_label.clear();
   return true;
+}
+
+bool SDL3Frontend::consume_save_dialog_result(std::string &save_path,
+                                              bool &accepted) {
+  std::lock_guard lock(ui_mutex);
+  if (!ui_state.save_dialog_result_ready)
+    return false;
+  accepted = ui_state.save_dialog_accepted;
+  save_path = ui_state.save_dialog_path;
+  ui_state.save_dialog_result_ready = false;
+  ui_state.save_dialog_accepted = false;
+  ui_state.save_dialog_path.clear();
+  return true;
+}
+
+std::filesystem::path SDL3Frontend::suggest_save_path(
+    const cart &c, const std::string &display_label) {
+  const auto name_from_label = [&]() -> std::string {
+    if (const auto p = display_label.find(" :: ");
+        p != std::string::npos && p + 4 < display_label.size()) {
+      return display_label.substr(p + 4);
+    }
+    if (!c.file_path.empty())
+      return c.file_path.filename().string();
+    return std::filesystem::path(strip_colons(display_label)).filename().string();
+  };
+
+  std::string stem = std::filesystem::path(name_from_label()).stem().string();
+  if (stem.empty())
+    stem = c.header.title().empty() ? "cartridge" : c.header.title();
+  if (stem.empty())
+    stem = "cartridge";
+
+  std::filesystem::path dir = c.file_path.parent_path();
+  if (dir.empty())
+    dir = std::filesystem::current_path();
+  return dir / (stem + ".sav");
+}
+
+void SDL3Frontend::setup_save_context(const cart &c,
+                                      const std::string &display_label) {
+  suggested_save_path_ = suggest_save_path(c, display_label);
+  active_save_path.reset();
+  if (!suggested_save_path_.empty()) {
+    std::error_code ec;
+    if (std::filesystem::exists(suggested_save_path_, ec))
+      active_save_path = suggested_save_path_;
+  }
+
+  {
+    std::lock_guard lk(save_mutex);
+    latest_save_snapshot.clear();
+    save_snapshot_ready = false;
+  }
+  deferred_save_data.clear();
+  deferred_save_pending = false;
+  save_dialog_inflight = false;
+
+  std::lock_guard lock(ui_mutex);
+  ui_state.request_open_save_dialog = false;
+  ui_state.save_dialog_result_ready = false;
+  ui_state.save_dialog_accepted = false;
+  ui_state.save_dialog_path.clear();
+  ui_state.save_dialog_default_name.clear();
+  ui_state.save_dialog_start_dir.clear();
+}
+
+void SDL3Frontend::enqueue_save_snapshot(std::vector<byte_t> snapshot) {
+  std::lock_guard lk(save_mutex);
+  latest_save_snapshot = std::move(snapshot);
+  save_snapshot_ready = true;
+}
+
+void SDL3Frontend::process_pending_save() {
+  std::vector<byte_t> snapshot;
+  {
+    std::lock_guard lk(save_mutex);
+    if (save_snapshot_ready) {
+      snapshot = std::move(latest_save_snapshot);
+      latest_save_snapshot.clear();
+      save_snapshot_ready = false;
+    }
+  }
+  if (!snapshot.empty()) {
+    deferred_save_data = std::move(snapshot);
+    deferred_save_pending = true;
+  }
+
+  std::string dialog_path;
+  bool accepted = false;
+  if (consume_save_dialog_result(dialog_path, accepted)) {
+    save_dialog_inflight = false;
+    if (accepted && !dialog_path.empty()) {
+      active_save_path = std::filesystem::path(dialog_path);
+      suggested_save_path_ = *active_save_path;
+    } else {
+      Logger::push(LogLevel::Info, "Save", "Save cancelled",
+                   "Battery save data changed but no save file was selected.");
+    }
+  }
+
+  if (!deferred_save_pending)
+    return;
+
+  const auto write_snapshot = [](const std::filesystem::path &path,
+                                 const std::vector<byte_t> &data) -> bool {
+    if (path.empty() || data.empty())
+      return false;
+    const auto parent = path.parent_path();
+    if (!parent.empty()) {
+      std::error_code ec;
+      std::filesystem::create_directories(parent, ec);
+    }
+    std::ofstream f(path, std::ios::binary | std::ios::trunc);
+    if (!f)
+      return false;
+    f.write(reinterpret_cast<const char *>(data.data()),
+            static_cast<std::streamsize>(data.size()));
+    return static_cast<bool>(f);
+  };
+
+  if (active_save_path.has_value()) {
+    if (write_snapshot(*active_save_path, deferred_save_data)) {
+      deferred_save_pending = false;
+      deferred_save_data.clear();
+    } else {
+      Logger::push(LogLevel::Warning, "Save", "Failed to write save file",
+                   "Could not write battery save data to: " +
+                       active_save_path->string());
+    }
+    return;
+  }
+
+  if (save_dialog_inflight)
+    return;
+
+  std::string start_dir = suggested_save_path_.parent_path().string();
+  if (start_dir.empty())
+    start_dir = gui.get_settings_c().rom_dir;
+  std::string default_name = suggested_save_path_.filename().string();
+  if (default_name.empty())
+    default_name = "cartridge.sav";
+
+  {
+    std::lock_guard lock(ui_mutex);
+    ui_state.save_dialog_start_dir = start_dir;
+    ui_state.save_dialog_default_name = default_name;
+    ui_state.save_dialog_path.clear();
+    ui_state.save_dialog_result_ready = false;
+    ui_state.save_dialog_accepted = false;
+    ui_state.request_open_save_dialog = true;
+  }
+  save_dialog_inflight = true;
 }
 
 int SDL3Frontend::request_zip_choice_blocking(const std::string &zip_label,
@@ -464,15 +619,21 @@ void SDL3Frontend::start() {
   while (running.load()) {
     if (consume_load_rom_request(rom_source)) {
       join_emu_thread_if_running();
+      process_pending_save();
       start_rom_io_job(rom_source);
     }
     std::string rom_on_disk;
     if (std::string display_label; consume_rom_io_result(rom_on_disk, display_label)) {
       try {
         cart cart_ctx = load_cart_fs(rom_on_disk.c_str());
+        setup_save_context(cart_ctx, display_label);
+        const std::optional<std::filesystem::path> initial_save_path =
+            suggested_save_path_.empty()
+                ? std::nullopt
+                : std::make_optional(suggested_save_path_);
         emulation_thread = std::jthread(
           std::bind_front(&SDL3Frontend::emulation_thread_fn, this),
-                                        cart_ctx, bios_path);
+                                        cart_ctx, bios_path, initial_save_path);
         {
           std::lock_guard lock(ui_mutex);
           ui_state.load_rom_path = display_label;
@@ -488,6 +649,7 @@ void SDL3Frontend::start() {
     /* Handle BIOS selection, won't take effect until ROM re-inserted */
     consume_load_bios_request(bios_path);
     process_events();
+    process_pending_save();
     // Don't force a redraw if the watcher just forced it
     const auto now_ns = steady_now_ns();
     if (const auto last_forced = last_forced_redraw_ns.load(std::memory_order_relaxed);
@@ -498,6 +660,7 @@ void SDL3Frontend::start() {
   /* Kill emulation thread */
   emulation_thread.request_stop();
   join_emu_thread_if_running();
+  process_pending_save();
 }
 
 /* Rendering */
@@ -623,8 +786,9 @@ void SDL3Frontend::render_frame() {
   host.present();
 }
 
-void SDL3Frontend::emulation_thread_fn(const std::stop_token &st, const cart &c,
-                                       const std::optional<std::string> &bios) {
+void SDL3Frontend::emulation_thread_fn(
+    const std::stop_token &st, const cart &c, const std::optional<std::string> &bios,
+    std::optional<std::filesystem::path> initial_save_path) {
   bool ff = false;
   clear(black);
 
@@ -646,6 +810,26 @@ void SDL3Frontend::emulation_thread_fn(const std::stop_token &st, const cart &c,
     gbc = std::make_unique<GameBoyColor>(*this);
   }
   gbc->insert_cartridge(c);
+  if (auto *bus = gbc->get_bus(); bus && initial_save_path.has_value()) {
+    if (auto *cart_ptr = bus->get_cartridge(); cart_ptr) {
+      std::error_code ec;
+      if (cart_ptr->has_battery() && std::filesystem::exists(*initial_save_path, ec) &&
+          !cart_ptr->load_save_file(*initial_save_path)) {
+        Logger::push(LogLevel::Warning, "Save", "Failed to load save file",
+                     "Could not load battery save data from: " +
+                         initial_save_path->string());
+      }
+    }
+  }
+  std::vector<byte_t> last_saved_snapshot;
+  if (auto *bus = gbc->get_bus(); bus) {
+    if (auto *cart_ptr = bus->get_cartridge();
+        cart_ptr && cart_ptr->has_battery()) {
+      const auto ram_view = cart_ptr->ram();
+      last_saved_snapshot.assign(ram_view.begin(), ram_view.end());
+    }
+  }
+
   auto callback = [this, st]() -> Debug::BreakReason {
     return debugger.on_breakpoint(st, gbc);
   };
@@ -656,6 +840,7 @@ void SDL3Frontend::emulation_thread_fn(const std::stop_token &st, const cart &c,
       gbc->get_bus()->get_mmio(IORegisterMapping::MMIO_JOYPAD));
   if (!joypad)
     throw std::logic_error("Failed to configure joypad input");
+  auto next_save_poll = Clock::now();
 
   /* Run emulation in real-time */
   while (!st.stop_requested()) [[likely]] {
@@ -685,6 +870,38 @@ void SDL3Frontend::emulation_thread_fn(const std::stop_token &st, const cart &c,
 
     /* Update the fuck ass debugger */
     debugger.forward_stop(gbc);
+
+    if (const auto now = Clock::now(); now >= next_save_poll) {
+      next_save_poll = now + std::chrono::milliseconds(250);
+      if (auto *bus = gbc->get_bus(); bus) {
+        if (auto *cart_ptr = bus->get_cartridge();
+            cart_ptr && cart_ptr->consume_save_event()) {
+          const auto ram_view = cart_ptr->ram();
+          if (!ram_view.empty() &&
+              (ram_view.size() != last_saved_snapshot.size() ||
+               !std::equal(ram_view.begin(), ram_view.end(),
+                           last_saved_snapshot.begin()))) {
+            last_saved_snapshot.assign(ram_view.begin(), ram_view.end());
+            enqueue_save_snapshot(
+                std::vector<byte_t>(ram_view.begin(), ram_view.end()));
+          }
+        }
+      }
+    }
+  }
+
+  if (auto *bus = gbc->get_bus(); bus) {
+    if (auto *cart_ptr = bus->get_cartridge();
+        cart_ptr && cart_ptr->consume_save_event()) {
+      const auto ram_view = cart_ptr->ram();
+      if (!ram_view.empty() &&
+          (ram_view.size() != last_saved_snapshot.size() ||
+           !std::equal(ram_view.begin(), ram_view.end(),
+                       last_saved_snapshot.begin()))) {
+        enqueue_save_snapshot(
+            std::vector<byte_t>(ram_view.begin(), ram_view.end()));
+      }
+    }
   }
 }
 

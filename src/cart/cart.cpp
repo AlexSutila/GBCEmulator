@@ -341,3 +341,61 @@ cart load_cart_raw(std::vector<byte_t> rom_bytes) {
   c.special_mbc = detect_special_mbc(c);
   return c;
 }
+
+void Cartridge::write(const addr_t addr, const byte_t v) {
+  (void)addr;
+  mbc_->write(addr, v);
+  if (has_battery() && !mbc_->ram().empty()) {
+    save_dirty_.store(true, std::memory_order_release);
+  }
+}
+
+bool Cartridge::load_save_file(const fs::path &save_path) {
+  if (!has_battery() || save_path.empty())
+    return false;
+
+  auto ram_view = ram();
+  if (ram_view.empty())
+    return false;
+
+  std::ifstream f(save_path, std::ios::binary | std::ios::ate);
+  if (!f)
+    return false;
+
+  const std::streamsize size = f.tellg();
+  if (size <= 0)
+    return false;
+
+  std::vector<byte_t> buf(static_cast<std::size_t>(size));
+  f.seekg(0, std::ios::beg);
+  if (!f.read(reinterpret_cast<char *>(buf.data()), size))
+    return false;
+
+  const std::size_t copy_bytes = std::min(ram_view.size(), buf.size());
+  std::copy_n(buf.data(), copy_bytes, ram_view.begin());
+  save_dirty_.store(false, std::memory_order_release);
+  return true;
+}
+
+bool Cartridge::write_save_file(const fs::path &save_path) const {
+  if (!has_battery() || save_path.empty())
+    return false;
+
+  const auto ram_view = ram();
+  if (ram_view.empty())
+    return false;
+
+  const auto parent = save_path.parent_path();
+  if (!parent.empty()) {
+    std::error_code ec;
+    fs::create_directories(parent, ec);
+  }
+
+  std::ofstream f(save_path, std::ios::binary | std::ios::trunc);
+  if (!f)
+    return false;
+
+  f.write(reinterpret_cast<const char *>(ram_view.data()),
+          static_cast<std::streamsize>(ram_view.size()));
+  return static_cast<bool>(f);
+}

@@ -66,10 +66,16 @@ private:
   // ROM loading
   bool consume_load_rom_request(std::string& rom_path);
   bool consume_load_bios_request(std::optional<std::string>& bios_path);
+  bool consume_save_dialog_result(std::string& save_path, bool& accepted);
 
   void start_rom_io_job(const std::string& source);
   bool consume_rom_io_result(std::string& rom_path_on_disk, std::string& display_label);
   void sync_io_status_to_ui();
+  void setup_save_context(const cart& c, const std::string& display_label);
+  void process_pending_save();
+  void enqueue_save_snapshot(std::vector<byte_t> snapshot);
+  static std::filesystem::path suggest_save_path(const cart& c,
+                                                 const std::string& display_label);
 
   int request_zip_choice_blocking(const std::string& zip_label,
                                   const std::vector<std::string>& entries,
@@ -98,6 +104,16 @@ private:
   std::optional<std::filesystem::path> last_tmp_rom;
   std::optional<std::filesystem::path> last_tmp_zip;
 
+  // Battery save handling
+  std::mutex save_mutex;
+  std::vector<byte_t> latest_save_snapshot;
+  bool save_snapshot_ready{false};
+  std::optional<std::filesystem::path> active_save_path;
+  std::filesystem::path suggested_save_path_;
+  std::vector<byte_t> deferred_save_data;
+  bool deferred_save_pending{false};
+  bool save_dialog_inflight{false};
+
   // Resize/move redraw tuning
   std::atomic<std::int64_t> suppress_vsync_until_ns{0};
   std::atomic<std::int64_t> last_forced_redraw_ns{0};
@@ -113,7 +129,8 @@ private:
   void process_events();
   void render_frame();
   void emulation_thread_fn(const std::stop_token& st, const cart& c,
-                           const std::optional<std::string>& bios);
+                           const std::optional<std::string>& bios,
+                           std::optional<std::filesystem::path> initial_save_path);
   void join_emu_thread_if_running();
   byte_t button_mask_for_key(SDL_Keycode key) const;
 
