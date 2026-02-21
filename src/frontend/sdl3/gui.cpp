@@ -67,6 +67,8 @@ void GbcImGui::render(UiState &state, SDLHost &host) {
     build_notification_window(state);
   if (state.show_about)
     build_about_window(state);
+  if (state.show_cart_info)
+    build_cart_info_window(state);
 }
 
 // Returns true if the event was handled by the GUI and should be ignored by the
@@ -229,6 +231,8 @@ void GbcImGui::build_main_menu_bar(UiState &state) const {
     if (ImGui::BeginMenu("About")) {
       if (ImGui::MenuItem("About"))
         state.show_about = true;
+      if (ImGui::MenuItem("Cartridge Info"))
+        state.show_cart_info = true;
       ImGui::EndMenu();
     }
 
@@ -633,13 +637,78 @@ void GbcImGui::update_dpi_scale(const float new_scale) {
 
 void GbcImGui::build_about_window(UiState &state) {
   // Set a default size and position (bottom right)
-  ImGui::SetNextWindowSize(ImVec2(400, 300), ImGuiCond_FirstUseEver);
+  ImGui::SetNextWindowSize(ImVec2(560, 420), ImGuiCond_FirstUseEver);
   if (ImGui::Begin("About", &state.show_about)) {
-    ImGui::SeparatorText("Source");
+    ImGui::SeparatorText("Project");
+    ImGui::TextUnformatted("IroGB");
     ImGui::TextLinkOpenURL("https://kaze.moe/TismForge/IroGB",
                            "https://kaze.moe/TismForge/IroGB");
-    ImGui::SeparatorText("Cartridge Info");
-    ImGui::Text("%s", state.cart_info.c_str());
+
+    ImGui::SeparatorText("Authors");
+    ImGui::BulletText("Alex Sutila");
+    ImGui::SameLine();
+    ImGui::TextLinkOpenURL("https://github.com/alexsutila",
+                           "https://github.com/alexsutila");
+    ImGui::BulletText("Xuanli Lin");
+    ImGui::SameLine();
+    ImGui::TextLinkOpenURL("https://github.com/kazum1kun",
+                           "https://github.com/kazum1kun");
+
+    ImGui::SeparatorText("Open Source Credits");
+    ImGui::BulletText("SDL3");
+    ImGui::SameLine();
+    ImGui::TextLinkOpenURL("https://github.com/libsdl-org/SDL",
+                           "https://github.com/libsdl-org/SDL");
+    ImGui::BulletText("Dear ImGui");
+    ImGui::SameLine();
+    ImGui::TextLinkOpenURL("https://github.com/ocornut/imgui",
+                           "https://github.com/ocornut/imgui");
+    ImGui::BulletText("ImGuiFileDialog");
+    ImGui::SameLine();
+    ImGui::TextLinkOpenURL("https://github.com/aiekick/ImGuiFileDialog",
+                           "https://github.com/aiekick/ImGuiFileDialog");
+    ImGui::BulletText("nlohmann/json");
+    ImGui::SameLine();
+    ImGui::TextLinkOpenURL("https://github.com/nlohmann/json",
+                           "https://github.com/nlohmann/json");
+    ImGui::BulletText("libcurl");
+    ImGui::SameLine();
+    ImGui::TextLinkOpenURL("https://github.com/curl/curl",
+                           "https://github.com/curl/curl");
+    ImGui::BulletText("miniz");
+    ImGui::SameLine();
+    ImGui::TextLinkOpenURL("https://github.com/richgel999/miniz",
+                           "https://github.com/richgel999/miniz");
+    ImGui::BulletText("PicoSHA2");
+    ImGui::SameLine();
+    ImGui::TextLinkOpenURL("https://github.com/okdshin/PicoSHA2",
+                           "https://github.com/okdshin/PicoSHA2");
+    ImGui::BulletText("pybind11");
+    ImGui::SameLine();
+    ImGui::TextLinkOpenURL("https://github.com/pybind/pybind11",
+                           "https://github.com/pybind/pybind11");
+    ImGui::BulletText("raylib");
+    ImGui::SameLine();
+    ImGui::TextLinkOpenURL("https://github.com/raysan5/raylib",
+                           "https://github.com/raysan5/raylib");
+    ImGui::BulletText("Emscripten");
+    ImGui::SameLine();
+    ImGui::TextLinkOpenURL("https://github.com/emscripten-core/emsdk",
+                           "https://github.com/emscripten-core/emsdk");
+  }
+  ImGui::End();
+}
+
+void GbcImGui::build_cart_info_window(UiState &state) {
+  ImGui::SetNextWindowSize(ImVec2(600, 440), ImGuiCond_FirstUseEver);
+  if (ImGui::Begin("Cartridge Info", &state.show_cart_info)) {
+    if (state.cart_info.empty()) {
+      ImGui::TextDisabled("No cartridge info available.");
+    } else {
+      ImGui::BeginChild("CartInfoScroll", ImVec2(0, 0), true);
+      ImGui::TextUnformatted(state.cart_info.c_str());
+      ImGui::EndChild();
+    }
   }
   ImGui::End();
 }

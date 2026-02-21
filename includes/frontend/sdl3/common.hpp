@@ -121,6 +121,7 @@ struct UiState {
   bool show_ppu_viewer{false};
   bool show_keybinds{false};
   bool show_about{false};
+  bool show_cart_info{false};
   bool fast_forward{false};
 
   // Hex memory reader specific

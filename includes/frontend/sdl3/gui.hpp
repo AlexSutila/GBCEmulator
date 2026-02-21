@@ -58,6 +58,7 @@ private:
   void build_settings_window(UiState& state, SDLHost& host);
   void build_keybinds_window(UiState& state);
   static void build_about_window(UiState& state);
+  static void build_cart_info_window(UiState& state);
   void build_notification_window(UiState& state) const;
   void build_rom_source_window(UiState& state) const;
 
