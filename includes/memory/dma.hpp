@@ -19,7 +19,7 @@ class AddressBus;
  */
 class ObjAttrDMA {
 public:
-  DMA::DMA * get_dma_reg();
+  DMA::DMA *get_dma_reg();
   explicit ObjAttrDMA(AddressBus &bus);
 
   struct DMAState {
@@ -58,10 +58,10 @@ class VDMA {
 public:
   explicit VDMA(AddressBus &bus, runtime_sys_info &sys);
   MMIORegister *get_vdma1() { return &vdma1_; }
-  MMIORegister* get_vdma2() { return &vdma2_; }
-  MMIORegister* get_vdma3() { return &vdma3_; }
-  MMIORegister* get_vdma4() { return &vdma4_; }
-  MMIORegister* get_vdma5() { return &vdma5_; }
+  MMIORegister *get_vdma2() { return &vdma2_; }
+  MMIORegister *get_vdma3() { return &vdma3_; }
+  MMIORegister *get_vdma4() { return &vdma4_; }
+  MMIORegister *get_vdma5() { return &vdma5_; }
 
   struct DMAState {
     addr_t dest_base_address;
@@ -80,11 +80,15 @@ public:
   void step();
 
   /* For enabling and observing the state of both HDMA and GDMA procedures. */
-  [[nodiscard]] bool enabled() const { return gdma_enabled() || hdma_enabled(); }
+  [[nodiscard]] bool enabled() const {
+    return gdma_enabled() || hdma_enabled();
+  }
   void enable(DMA::VDMATransferMode mode, byte_t blks);
 
   /* To be used by the VDMA5 register to interrogate the progress of HDMA */
-  [[nodiscard]] bool waiting_on_hblank() const { return state == STATE_HDMA_WAIT; }
+  [[nodiscard]] bool waiting_on_hblank() const {
+    return state == STATE_HDMA_WAIT;
+  }
   [[nodiscard]] bool complete() const { return state == STATE_DISABLED; }
   [[nodiscard]] byte_t get_blks_remaining() const;
 
@@ -123,8 +127,8 @@ private:
   void do_init(State next_state);
 
   /* See details about these registers under their definitions in `cgb.hpp` */
-  MMIORegister vdma1_, vdma2_; // Source low and high registers
-  MMIORegister vdma3_, vdma4_; // Destination low and high registers
+  DMA::VDMA_ADDR vdma1_, vdma2_; // Source low and high registers
+  DMA::VDMA_ADDR vdma3_, vdma4_; // Destination low and high registers
   DMA::VDMA_MODE_LEN vdma5_;
 
   /* Core VDMA logic implementation */
@@ -136,8 +140,8 @@ private:
   void do_hdma_wait();
 
   /* Helpers for working with source and destination address registers. */
-  static void set_addr(MMIORegister &lo, MMIORegister &hi, addr_t addr);
-  static addr_t get_addr(const MMIORegister& lo, const MMIORegister& hi);
+  static void set_addr(DMA::VDMA_ADDR &lo, DMA::VDMA_ADDR &hi, addr_t addr);
+  static addr_t get_addr(const DMA::VDMA_ADDR &lo, const DMA::VDMA_ADDR &hi);
 
   /* Timing metadata */
   std::optional<std::size_t> clocks_remaining;
@@ -145,4 +149,4 @@ private:
   AddressBus &bus_;
 };
 
-#endif //GBC_DMA_HPP
+#endif // GBC_DMA_HPP

@@ -135,12 +135,12 @@ VDMA::DMAState VDMA::get_state() const {
   return s;
 }
 
-addr_t VDMA::get_addr(const MMIORegister &lo, const MMIORegister &hi) {
-  const byte_t hi_byte = hi.peek(), lo_byte = lo.peek();
+addr_t VDMA::get_addr(const DMA::VDMA_ADDR &lo, const DMA::VDMA_ADDR &hi) {
+  const byte_t hi_byte = hi.get_addr_bits(), lo_byte = lo.get_addr_bits();
   return (static_cast<addr_t>(hi_byte) << 8) | static_cast<addr_t>(lo_byte);
 }
 
-void VDMA::set_addr(MMIORegister &lo, MMIORegister &hi, const addr_t addr) {
+void VDMA::set_addr(DMA::VDMA_ADDR &lo, DMA::VDMA_ADDR &hi, const addr_t addr) {
   hi.write(static_cast<byte_t>((addr >> 8) & 0xFF));
   lo.write(static_cast<byte_t>(addr & 0xFF));
 }

@@ -98,6 +98,15 @@ ObjectPriorityMode OPRI::get_prio_mode() const {
 
 namespace DMA {
 
+void VDMA_ADDR::write(const byte_t value) { state = value; }
+[[nodiscard]] byte_t VDMA_ADDR::peek() const { return 0xFF; }
+byte_t VDMA_ADDR::read() { return peek(); }
+
+// Internal DMA usage only, the value read off the address bus is always FF, but
+// we need to be able to see what was written to calculate source/dest addresses
+// for dma transfers.
+[[nodiscard]] byte_t VDMA_ADDR::get_addr_bits() const { return state; }
+
 void VDMA_MODE_LEN::write(const byte_t value) {
   const byte_t mode_bit = (value & 0x80) >> 7;
   const auto mode = static_cast<VDMATransferMode>(mode_bit);
@@ -122,8 +131,6 @@ byte_t VDMA_MODE_LEN::peek() const {
 }
 byte_t VDMA_MODE_LEN::read() { return peek(); }
 
-void VDMA_MODE_LEN::update_size(const byte_t bytes_transferred) {
-}
 } // namespace DMA
 
 void WramBank::write(const byte_t value) { state = value | 0xF8; }
