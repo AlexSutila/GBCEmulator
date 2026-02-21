@@ -135,7 +135,7 @@ VDMA::DMAState VDMA::get_state() const {
   return s;
 }
 
-addr_t VDMA::get_addr(const MMIORegister& lo, const MMIORegister& hi) {
+addr_t VDMA::get_addr(const MMIORegister &lo, const MMIORegister &hi) {
   const byte_t hi_byte = hi.peek(), lo_byte = lo.peek();
   return (static_cast<addr_t>(hi_byte) << 8) | static_cast<addr_t>(lo_byte);
 }
