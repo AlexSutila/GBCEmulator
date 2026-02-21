@@ -655,8 +655,14 @@ void GbcImGui::build_about_window(UiState &state) {
                            "https://github.com/kazum1kun");
 
     ImGui::SeparatorText("Credits");
-    ImGui::Text("We would like to thank the following open source projects for providing tools and resources that were instrumental in the development of IroGB:");
+    ImGui::TextWrapped("We would like to thank the following open source projects for providing tools and resources that were instrumental in the development of IroGB:");
     populate_credits();
+
+    ImGui::SeparatorText("License");
+    ImGui::Text("IroGB is licensed under the GPLv3 License. See ");
+    ImGui::TextLinkOpenURL("LICENSE", "https://kaze.moe/TismForge/IroGB/raw/branch/release/LICENSE");
+    ImGui::SameLine(0.0f, 0.0f);
+    ImGui::Text(" in the repository for details.");
   }
   ImGui::End();
 }
