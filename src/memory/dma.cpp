@@ -187,8 +187,18 @@ byte_t VDMA::get_blks_remaining() const {
 }
 
 void VDMA::transfer_byte(const addr_t offset) const {
-  const byte_t data = bus_.read_byte(src_base_addr + offset);
-  bus_.write_byte(dest_base_addr + offset, data);
+  const bool src_addr_ok =
+      ((src_base_addr >= 0x0000 && src_base_addr <= 0x7FF0) ||
+       (src_base_addr >= 0xA000 && src_base_addr <= 0xDFF0));
+  const bool dest_addr_ok =
+      (dest_base_addr >= 0x8000 && dest_base_addr <= 0x9FF0);
+
+  // Only transfer the byte if both the source and destination addresses of
+  // the byte being copied are within a valid address range.
+  if (src_addr_ok && dest_addr_ok) {
+    const byte_t data = bus_.read_byte(src_base_addr + offset);
+    bus_.write_byte(dest_base_addr + offset, data);
+  }
 }
 
 void VDMA::do_init(const State next_state) {
