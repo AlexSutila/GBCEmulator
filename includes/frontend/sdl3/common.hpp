@@ -6,6 +6,7 @@
 #include <array>
 #include <atomic>
 #include <fstream>
+#include <map>
 #include <nlohmann/json.hpp>
 #include <string>
 #include <vector>
@@ -32,6 +33,7 @@ struct Settings {
   std::array<SDL_Keycode, 5> general_keybinds{SDLK_G, SDLK_F, SDLK_EQUALS,
                                               SDLK_MINUS, SDLK_M};
   std::vector<std::string> recent_roms;
+  std::map<std::string, std::string> save_path_by_rom_hash;
   static Settings load(const std::string &filename = ".gbc.config.json");
   void save(const std::string &filename = ".gbc.config.json") const;
   void add_recent_rom(const std::string &path);
@@ -40,7 +42,8 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Settings, volume,
                                                 force_mono_dmg,
                                                 keybind_preset_index, rom_dir,
                                                 prev_bios_path, bios_dir,
-                                                keybinds, recent_roms)
+                                                keybinds, recent_roms,
+                                                save_path_by_rom_hash)
 
 inline Settings Settings::load(const std::string &filename) {
   Settings s;
@@ -136,6 +139,12 @@ struct UiState {
   std::string save_dialog_path;
   std::string save_dialog_start_dir;
   std::string save_dialog_default_name;
+  bool request_open_load_save_dialog{false};
+  bool load_save_dialog_result_ready{false};
+  bool load_save_dialog_accepted{false};
+  std::string load_save_dialog_path;
+  std::string load_save_dialog_start_dir;
+  std::string load_save_dialog_default_name;
   bool request_quit{false};
 
   // ROM I/O status (downloads, unzip, etc.)

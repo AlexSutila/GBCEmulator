@@ -3,10 +3,12 @@
 #include "SDL3/SDL_gamepad.h"
 #include "debugger/print.hpp"
 #include <algorithm>
+#include <array>
 #include <fstream>
 #include <random>
 #include <curl/curl.h>
 #include <miniz.h>
+#include <picosha2.h>
 
 
 namespace {
@@ -97,6 +99,12 @@ namespace {
     }
     return path;
   }
+
+  std::string sha256_hex(const std::span<const byte_t> data) {
+    std::string out;
+    picosha2::hash256_hex_string(data.begin(), data.end(), out);
+    return out;
+  }
 }
 void SDL3Frontend::sync_io_status_to_ui() {
   ui_state.io_busy = io_busy.load(std::memory_order_relaxed);
@@ -131,6 +139,19 @@ bool SDL3Frontend::consume_save_dialog_result(std::string &save_path,
   return true;
 }
 
+bool SDL3Frontend::consume_load_save_dialog_result(std::string &save_path,
+                                                   bool &accepted) {
+  std::lock_guard lock(ui_mutex);
+  if (!ui_state.load_save_dialog_result_ready)
+    return false;
+  accepted = ui_state.load_save_dialog_accepted;
+  save_path = ui_state.load_save_dialog_path;
+  ui_state.load_save_dialog_result_ready = false;
+  ui_state.load_save_dialog_accepted = false;
+  ui_state.load_save_dialog_path.clear();
+  return true;
+}
+
 std::filesystem::path SDL3Frontend::suggest_save_path(
     const cart &c, const std::string &display_label) {
   const auto name_from_label = [&]() -> std::string {
@@ -155,14 +176,57 @@ std::filesystem::path SDL3Frontend::suggest_save_path(
   return dir / (stem + ".sav");
 }
 
+void SDL3Frontend::remember_save_path_for_active_rom(
+    const std::filesystem::path &save_path) {
+  if (active_rom_hash.empty() || save_path.empty())
+    return;
+
+  const std::string normalized = save_path.lexically_normal().string();
+  if (normalized.empty())
+    return;
+
+  auto &settings = gui.get_settings();
+  if (const auto it = settings.save_path_by_rom_hash.find(active_rom_hash);
+      it != settings.save_path_by_rom_hash.end() && it->second == normalized) {
+    return;
+  }
+  settings.save_path_by_rom_hash[active_rom_hash] = normalized;
+  settings.save();
+}
+
 void SDL3Frontend::setup_save_context(const cart &c,
-                                      const std::string &display_label) {
-  suggested_save_path_ = suggest_save_path(c, display_label);
+                                      const std::string &display_label,
+                                      const std::string &rom_hash) {
+  active_rom_hash = rom_hash;
+  const std::filesystem::path default_suggested = suggest_save_path(c, display_label);
+  suggested_save_path_ = default_suggested;
   active_save_path.reset();
-  if (!suggested_save_path_.empty()) {
+
+  std::optional<std::filesystem::path> mapped_path = std::nullopt;
+  if (!active_rom_hash.empty()) {
+    if (const auto it = gui.get_settings_c().save_path_by_rom_hash.find(active_rom_hash);
+        it != gui.get_settings_c().save_path_by_rom_hash.end() &&
+        !it->second.empty()) {
+      mapped_path = std::filesystem::path(it->second);
+      suggested_save_path_ = *mapped_path;
+    }
+  }
+
+  if (mapped_path.has_value()) {
     std::error_code ec;
-    if (std::filesystem::exists(suggested_save_path_, ec))
-      active_save_path = suggested_save_path_;
+    if (std::filesystem::exists(*mapped_path, ec))
+      active_save_path = *mapped_path;
+  }
+  if (!active_save_path.has_value() && !default_suggested.empty()) {
+    std::error_code ec;
+    if (std::filesystem::exists(default_suggested, ec)) {
+      active_save_path = default_suggested;
+      suggested_save_path_ = default_suggested;
+    }
+  }
+
+  if (active_save_path.has_value()) {
+    remember_save_path_for_active_rom(*active_save_path);
   }
 
   {
@@ -181,6 +245,12 @@ void SDL3Frontend::setup_save_context(const cart &c,
   ui_state.save_dialog_path.clear();
   ui_state.save_dialog_default_name.clear();
   ui_state.save_dialog_start_dir.clear();
+  ui_state.request_open_load_save_dialog = false;
+  ui_state.load_save_dialog_result_ready = false;
+  ui_state.load_save_dialog_accepted = false;
+  ui_state.load_save_dialog_path.clear();
+  ui_state.load_save_dialog_default_name.clear();
+  ui_state.load_save_dialog_start_dir.clear();
 }
 
 void SDL3Frontend::enqueue_save_snapshot(std::vector<byte_t> snapshot) {
@@ -211,6 +281,7 @@ void SDL3Frontend::process_pending_save() {
     if (accepted && !dialog_path.empty()) {
       active_save_path = std::filesystem::path(dialog_path);
       suggested_save_path_ = *active_save_path;
+      remember_save_path_for_active_rom(*active_save_path);
     } else {
       Logger::push(LogLevel::Info, "Save", "Save cancelled",
                    "Battery save data changed but no save file was selected.");
@@ -609,6 +680,23 @@ void SDL3Frontend::queue_audio_samples(const float *samples,
 }
 
 void SDL3Frontend::start() {
+  auto start_emulation = [this](cart cart_ctx, const std::string &display_label,
+                                const std::string &rom_hash,
+                                const std::optional<std::string> &bios_path,
+                                const std::optional<std::filesystem::path> &initial_save_path) {
+    active_rom_hash = rom_hash;
+    emulation_thread = std::jthread(
+        std::bind_front(&SDL3Frontend::emulation_thread_fn, this), cart_ctx,
+        bios_path, initial_save_path);
+    {
+      std::lock_guard lock(ui_mutex);
+      ui_state.load_rom_path = display_label;
+      ui_state.load_rom_name = cart_ctx.header.title();
+      ui_state.cart_info = Debug::describe_cart(cart_ctx);
+    }
+    gui.update_rom_path(strip_colons(display_label));
+  };
+
   std::optional<std::string> bios_path =
       gui.get_settings_c().prev_bios_path.empty()
           ? std::nullopt
@@ -619,30 +707,77 @@ void SDL3Frontend::start() {
   while (running.load()) {
     if (consume_load_rom_request(rom_source)) {
       join_emu_thread_if_running();
+      pending_cart_for_save_prompt.reset();
+      pending_cart_label.clear();
+      pending_cart_rom_hash.clear();
+      waiting_for_load_save_dialog = false;
+      {
+        std::lock_guard lock(ui_mutex);
+        ui_state.request_open_load_save_dialog = false;
+        ui_state.load_save_dialog_result_ready = false;
+        ui_state.load_save_dialog_accepted = false;
+        ui_state.load_save_dialog_path.clear();
+      }
       process_pending_save();
+      active_rom_hash.clear();
       start_rom_io_job(rom_source);
     }
     std::string rom_on_disk;
     if (std::string display_label; consume_rom_io_result(rom_on_disk, display_label)) {
       try {
         cart cart_ctx = load_cart_fs(rom_on_disk.c_str());
-        setup_save_context(cart_ctx, display_label);
-        const std::optional<std::filesystem::path> initial_save_path =
-            suggested_save_path_.empty()
-                ? std::nullopt
-                : std::make_optional(suggested_save_path_);
-        emulation_thread = std::jthread(
-          std::bind_front(&SDL3Frontend::emulation_thread_fn, this),
-                                        cart_ctx, bios_path, initial_save_path);
-        {
+        const std::string rom_hash = sha256_hex(cart_ctx.rom_span());
+        setup_save_context(cart_ctx, display_label, rom_hash);
+        const bool has_persistent_save =
+            type_has_battery(cart_ctx.header.cartridge_type) ||
+            cart_ctx.header.cartridge_type == 0x20; // MBC6 flash persistence
+
+        if (has_persistent_save && !active_save_path.has_value()) {
+          pending_cart_for_save_prompt = std::move(cart_ctx);
+          pending_cart_label = display_label;
+          pending_cart_rom_hash = rom_hash;
+          waiting_for_load_save_dialog = true;
+
           std::lock_guard lock(ui_mutex);
-          ui_state.load_rom_path = display_label;
-          ui_state.load_rom_name = cart_ctx.header.title();
-          ui_state.cart_info = Debug::describe_cart(cart_ctx);
+          ui_state.load_save_dialog_start_dir =
+              suggested_save_path_.parent_path().string().empty()
+                  ? gui.get_settings_c().rom_dir
+                  : suggested_save_path_.parent_path().string();
+          ui_state.load_save_dialog_default_name =
+              suggested_save_path_.filename().string().empty()
+                  ? "cartridge.sav"
+                  : suggested_save_path_.filename().string();
+          ui_state.load_save_dialog_path.clear();
+          ui_state.load_save_dialog_result_ready = false;
+          ui_state.load_save_dialog_accepted = false;
+          ui_state.request_open_load_save_dialog = true;
+        } else {
+          start_emulation(std::move(cart_ctx), display_label, rom_hash, bios_path,
+                          active_save_path);
         }
-        gui.update_rom_path(strip_colons(display_label));
       } catch (std::exception &e) {
         Logger::push(LogLevel::Warning, "ROM", "Failed to load ROM", e.what());
+      }
+    }
+
+    if (waiting_for_load_save_dialog && pending_cart_for_save_prompt.has_value()) {
+      std::string selected_path;
+      bool accepted = false;
+      if (consume_load_save_dialog_result(selected_path, accepted)) {
+        std::optional<std::filesystem::path> initial_save_path = std::nullopt;
+        if (accepted && !selected_path.empty()) {
+          active_save_path = std::filesystem::path(selected_path);
+          suggested_save_path_ = *active_save_path;
+          remember_save_path_for_active_rom(*active_save_path);
+          initial_save_path = active_save_path;
+        }
+        start_emulation(std::move(*pending_cart_for_save_prompt),
+                        pending_cart_label, pending_cart_rom_hash, bios_path,
+                        initial_save_path);
+        pending_cart_for_save_prompt.reset();
+        pending_cart_label.clear();
+        pending_cart_rom_hash.clear();
+        waiting_for_load_save_dialog = false;
       }
     }
 
@@ -788,7 +923,7 @@ void SDL3Frontend::render_frame() {
 
 void SDL3Frontend::emulation_thread_fn(
     const std::stop_token &st, const cart &c, const std::optional<std::string> &bios,
-    std::optional<std::filesystem::path> initial_save_path) {
+    const std::optional<std::filesystem::path>& initial_save_path) {
   bool ff = false;
   clear(black);
 

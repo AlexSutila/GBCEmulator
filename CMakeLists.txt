@@ -49,6 +49,15 @@ if (NOT EMSCRIPTEN)
     )
     FetchContent_MakeAvailable(json)
 
+    # SHA-256: PicoSHA2 (header-only)
+    FetchContent_Declare(
+            picosha2
+            GIT_REPOSITORY https://github.com/okdshin/PicoSHA2.git
+            GIT_TAG 27fcf6979298949e8a462e16d09a0351c18fcaf2
+    )
+    FetchContent_MakeAvailable(picosha2)
+    target_include_directories(picosha2 INTERFACE ${picosha2_src_SOURCE_DIR})
+
     # --- ROM I/O deps ---
     # ZIP: miniz
     FetchContent_Declare(
@@ -319,6 +328,7 @@ else ()
             PRIVATE imgui
             PRIVATE nlohmann_json::nlohmann_json
             PRIVATE miniz
+            PRIVATE picosha2
             PRIVATE CURL::libcurl
     )
     target_include_directories(gbc_full

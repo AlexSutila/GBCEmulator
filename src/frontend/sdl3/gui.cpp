@@ -334,6 +334,19 @@ void GbcImGui::build_status_bar(UiState &state) const {
 
 void GbcImGui::build_file_dialogs(UiState &state) const {
   auto [max_size, min_size] = get_min_dialog_size();
+  if (state.request_open_load_save_dialog) {
+    IGFD::FileDialogConfig load_conf;
+    load_conf.path = state.load_save_dialog_start_dir.empty() ? rom_sel_conf.path
+                                                               : state.load_save_dialog_start_dir;
+    load_conf.fileName = state.load_save_dialog_default_name;
+    load_conf.flags =
+        ImGuiFileDialogFlags_Modal | ImGuiFileDialogFlags_ReadOnlyFileNameField;
+    ImGuiFileDialog::Instance()->OpenDialog(
+        "LoadSaveFileDialog", "Load save data", save_filters.data(),
+        load_conf);
+    state.request_open_load_save_dialog = false;
+  }
+
   if (state.request_open_save_dialog) {
     IGFD::FileDialogConfig save_conf;
     save_conf.path = state.save_dialog_start_dir.empty() ? rom_sel_conf.path
@@ -341,7 +354,7 @@ void GbcImGui::build_file_dialogs(UiState &state) const {
     save_conf.fileName = state.save_dialog_default_name;
     save_conf.flags = ImGuiFileDialogFlags_Modal;
     ImGuiFileDialog::Instance()->OpenDialog(
-        "SaveFileDialog", "Save battery data", save_filters.data(), save_conf);
+        "SaveFileDialog", "Save data", save_filters.data(), save_conf);
     state.request_open_save_dialog = false;
   }
 
@@ -379,6 +392,18 @@ void GbcImGui::build_file_dialogs(UiState &state) const {
       state.save_dialog_path = ImGuiFileDialog::Instance()->GetFilePathName();
     } else {
       state.save_dialog_path.clear();
+    }
+    ImGuiFileDialog::Instance()->Close();
+  }
+
+  if (ImGuiFileDialog::Instance()->Display(
+          "LoadSaveFileDialog", ImGuiWindowFlags_NoCollapse, min_size, max_size)) {
+    state.load_save_dialog_result_ready = true;
+    state.load_save_dialog_accepted = ImGuiFileDialog::Instance()->IsOk();
+    if (state.load_save_dialog_accepted) {
+      state.load_save_dialog_path = ImGuiFileDialog::Instance()->GetFilePathName();
+    } else {
+      state.load_save_dialog_path.clear();
     }
     ImGuiFileDialog::Instance()->Close();
   }
