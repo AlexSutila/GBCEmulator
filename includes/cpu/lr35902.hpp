@@ -26,7 +26,14 @@ public:
   [[nodiscard]] const byte_t cur_opcode() const {
     return bus->read_byte(ins_base_addr, false);
   }
-  [[nodiscard]] std::string disasm() const { return ins_->describe(); };
+  [[nodiscard]] std::string disasm() const {
+    if (ins_)
+      return ins_->describe();
+
+    // Edge case, there is nothing stopping frontends from calling this
+    // before an instruction fetch, hence handle to avoid crash.
+    return "";
+  };
   void step();
 
   struct ProcessorState {

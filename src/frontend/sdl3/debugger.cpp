@@ -78,7 +78,7 @@ void DebuggerImGui::update_state_from_core(
   // Address bus relevant information
   ctx.oam_dma_state = Debug::to_string(address_bus->get_oam_dma().get_state());
   ctx.vdma_state = Debug::to_string(address_bus->get_vdma().get_state());
-  read_bus_data(core, ctx.bus_content_base_addr);
+  read_bus_data(core, ctx.bus_content_base_addr & 0xFF00);
 
   // Interrupt enable bits and flags
   const InterruptBits *const ie_reg = dynamic_cast<InterruptBits *>(
@@ -195,8 +195,9 @@ void DebuggerImGui::build_memory_viewer_window(
       state.hex_view_base_addr & 0xFF00, ctx.bus_content);
   ImGui::Text("%s", sexy_ahh_hex_view.c_str());
 
-  ImGui::InputScalar("", ImGuiDataType_U16, &ctx.bus_content_base_addr, nullptr,
-                     nullptr, "%04X", ImGuiInputTextFlags_CharsHexadecimal);
+  ImGui::InputScalar("##mem_view_addr", ImGuiDataType_U16,
+                     &ctx.bus_content_base_addr, nullptr, nullptr, "%04X",
+                     ImGuiInputTextFlags_CharsHexadecimal);
   ImGui::SameLine();
   if (ImGui::Button("GoTo")) {
     read_bus_data(core, ctx.bus_content_base_addr & mask);
@@ -260,8 +261,7 @@ void DebuggerImGui::build_breakpoints_window(
   ImGui::End();
 }
 
-void DebuggerImGui::build_ppu_viewer_window(
-  UiState& state) const {
+void DebuggerImGui::build_ppu_viewer_window(UiState &state) const {
   std::lock_guard lock(dbg_mutex);
 
   ImGui::Begin("Pixel Processor Viewer", &state.show_ppu_viewer);
@@ -313,8 +313,7 @@ void DebuggerImGui::build_config_breakpoint_window(
   }
 }
 
-void DebuggerImGui::render_vram_tile_data(
-  const size_t vram_bank_idx) const {
+void DebuggerImGui::render_vram_tile_data(const size_t vram_bank_idx) const {
   constexpr float scale = 1.5f; // Lol, hardcoded bc idc
   constexpr ImVec2 size(tile_data_width_px * scale,
                         tile_data_height_px * scale);
@@ -362,7 +361,8 @@ void DebuggerImGui::read_vram_tile_data(
 
 void DebuggerImGui::read_bus_data(const std::unique_ptr<GameBoyColor> &core,
                                   const addr_t start_addr) {
-  const auto bus = core->get_bus(); // Be sure not to mess with memory mapped regs
+  const auto bus =
+      core->get_bus(); // Be sure not to mess with memory mapped regs
   for (std::size_t offset{0}; offset < hex_viewer_bytes_shown; ++offset) {
     const addr_t cur_addr_full = (start_addr + offset) & 0xFFFF;
     ctx.bus_content.at(offset) = bus->read_byte_safe(cur_addr_full);

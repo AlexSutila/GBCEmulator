@@ -4,108 +4,115 @@
 #include "debugger/print.hpp"
 #include <algorithm>
 #include <array>
-#include <fstream>
-#include <random>
 #include <curl/curl.h>
+#include <fstream>
 #include <miniz.h>
 #include <picosha2.h>
-
+#include <random>
 
 namespace {
-  bool looks_like_url(const std::string &s) {
-    return s.rfind("http://", 0) == 0 || s.rfind("https://", 0) == 0;
-  }
-
-  std::string to_lower(std::string s) {
-    for (char &c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    return s;
-  }
-
-  bool has_ext(const std::string &path, const std::string &ext) {
-    const auto p = to_lower(path);
-    const auto e = to_lower(ext);
-    if (p.size() < e.size()) return false;
-    return p.compare(p.size() - e.size(), e.size(), e) == 0;
-  }
-
-  bool file_starts_with_zip_magic(const std::filesystem::path &p) {
-    std::ifstream f(p, std::ios::binary);
-    if (!f) return false;
-    unsigned char sig[4]{};
-    f.read(reinterpret_cast<char *>(sig), 4);
-    return sig[0] == 0x50 && sig[1] == 0x4B && sig[2] == 0x03 && sig[3] == 0x04;
-  }
-
-  std::filesystem::path make_temp_file(const std::filesystem::path &root,
-                                              std::string_view suffix) {
-    std::random_device rd;
-    std::mt19937_64 gen(rd());
-    std::uniform_int_distribution<std::uint64_t> dis;
-
-    for (int attempt = 0; attempt < 32; ++attempt) {
-      const auto name = "gbc_" + std::to_string(dis(gen)) + std::string(suffix);
-      auto p = root / name;
-      if (std::error_code ec; !std::filesystem::exists(p, ec)) return p;
-    }
-
-    const auto name =
-        "gbc_" +
-        std::to_string(std::chrono::high_resolution_clock::now().time_since_epoch().count()) +
-        std::string(suffix);
-    return root / name;
-  }
-
-  struct CurlDownloadCtx {
-    std::atomic<float> *progress{};
-    std::stop_token st;
-  };
-
-  size_t curl_write_file_cb(const char *ptr, const size_t size, const size_t nmemb, void *userdata) {
-    auto *fp = static_cast<FILE *>(userdata);
-    return std::fwrite(ptr, size, nmemb, fp) * size;
-  }
-
-  int curl_xferinfo_cb(void *clientp, const curl_off_t dltotal, const curl_off_t dlnow,
-                              curl_off_t, curl_off_t) {
-    const auto *ctx = static_cast<CurlDownloadCtx *>(clientp);
-    if (ctx && ctx->st.stop_requested()) return 1;
-    if (!ctx || !ctx->progress) return 0;
-
-    if (dltotal > 0) {
-      const float p = static_cast<float>(dlnow) / static_cast<float>(dltotal);
-      ctx->progress->store(std::clamp(p, 0.0f, 1.0f), std::memory_order_relaxed);
-    } else {
-      ctx->progress->store(-1.0f, std::memory_order_relaxed);
-    }
-    return 0;
-  }
-
-  std::int64_t steady_now_ns() {
-    return std::chrono::duration_cast<std::chrono::nanoseconds>(
-               Clock::now().time_since_epoch())
-        .count();
-  }
-
-  std::string process_path(const std::string &path) {
-    if (path.find("file:/", 0) == 0) {
-      return path.substr(6);
-    }
-    return path;
-  }
-
-  std::string strip_colons(const std::string &path) {
-    if (const auto i = path.find(" ::"); i != std::string::npos) {
-      return path.substr(0, i);
-    }
-    return path;
-  }
-
-  std::string sha256_hex(const std::span<const byte_t> data) {
-    std::string out;
-    picosha2::hash256_hex_string(data.begin(), data.end(), out);
-    return out;
-  }
+bool looks_like_url(const std::string &s) {
+  return s.rfind("http://", 0) == 0 || s.rfind("https://", 0) == 0;
 }
+
+std::string to_lower(std::string s) {
+  for (char &c : s)
+    c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+  return s;
+}
+
+bool has_ext(const std::string &path, const std::string &ext) {
+  const auto p = to_lower(path);
+  const auto e = to_lower(ext);
+  if (p.size() < e.size())
+    return false;
+  return p.compare(p.size() - e.size(), e.size(), e) == 0;
+}
+
+bool file_starts_with_zip_magic(const std::filesystem::path &p) {
+  std::ifstream f(p, std::ios::binary);
+  if (!f)
+    return false;
+  unsigned char sig[4]{};
+  f.read(reinterpret_cast<char *>(sig), 4);
+  return sig[0] == 0x50 && sig[1] == 0x4B && sig[2] == 0x03 && sig[3] == 0x04;
+}
+
+std::filesystem::path make_temp_file(const std::filesystem::path &root,
+                                     std::string_view suffix) {
+  std::random_device rd;
+  std::mt19937_64 gen(rd());
+  std::uniform_int_distribution<std::uint64_t> dis;
+
+  for (int attempt = 0; attempt < 32; ++attempt) {
+    const auto name = "gbc_" + std::to_string(dis(gen)) + std::string(suffix);
+    auto p = root / name;
+    if (std::error_code ec; !std::filesystem::exists(p, ec))
+      return p;
+  }
+
+  const auto name = "gbc_" +
+                    std::to_string(std::chrono::high_resolution_clock::now()
+                                       .time_since_epoch()
+                                       .count()) +
+                    std::string(suffix);
+  return root / name;
+}
+
+struct CurlDownloadCtx {
+  std::atomic<float> *progress{};
+  std::stop_token st;
+};
+
+size_t curl_write_file_cb(const char *ptr, const size_t size,
+                          const size_t nmemb, void *userdata) {
+  auto *fp = static_cast<FILE *>(userdata);
+  return std::fwrite(ptr, size, nmemb, fp) * size;
+}
+
+int curl_xferinfo_cb(void *clientp, const curl_off_t dltotal,
+                     const curl_off_t dlnow, curl_off_t, curl_off_t) {
+  const auto *ctx = static_cast<CurlDownloadCtx *>(clientp);
+  if (ctx && ctx->st.stop_requested())
+    return 1;
+  if (!ctx || !ctx->progress)
+    return 0;
+
+  if (dltotal > 0) {
+    const float p = static_cast<float>(dlnow) / static_cast<float>(dltotal);
+    ctx->progress->store(std::clamp(p, 0.0f, 1.0f), std::memory_order_relaxed);
+  } else {
+    ctx->progress->store(-1.0f, std::memory_order_relaxed);
+  }
+  return 0;
+}
+
+std::int64_t steady_now_ns() {
+  return std::chrono::duration_cast<std::chrono::nanoseconds>(
+             Clock::now().time_since_epoch())
+      .count();
+}
+
+std::string process_path(const std::string &path) {
+  if (path.find("file:/", 0) == 0) {
+    return path.substr(6);
+  }
+  return path;
+}
+
+std::string strip_colons(const std::string &path) {
+  if (const auto i = path.find(" ::"); i != std::string::npos) {
+    return path.substr(0, i);
+  }
+  return path;
+}
+
+std::string sha256_hex(const std::span<const byte_t> data) {
+  std::string out;
+  picosha2::hash256_hex_string(data.begin(), data.end(), out);
+  return out;
+}
+} // namespace
 void SDL3Frontend::sync_io_status_to_ui() {
   ui_state.io_busy = io_busy.load(std::memory_order_relaxed);
   ui_state.io_progress = io_progress.load(std::memory_order_relaxed);
@@ -116,9 +123,10 @@ void SDL3Frontend::sync_io_status_to_ui() {
 }
 
 bool SDL3Frontend::consume_rom_io_result(std::string &rom_path_on_disk,
-                                        std::string &display_label) {
+                                         std::string &display_label) {
   std::lock_guard lk(rom_io_mutex);
-  if (!rom_ready_path) return false;
+  if (!rom_ready_path)
+    return false;
   rom_path_on_disk = std::move(*rom_ready_path);
   display_label = std::move(rom_ready_label);
   rom_ready_path.reset();
@@ -152,8 +160,9 @@ bool SDL3Frontend::consume_load_save_dialog_result(std::string &save_path,
   return true;
 }
 
-std::filesystem::path SDL3Frontend::suggest_save_path(
-    const cart &c, const std::string &display_label) {
+std::filesystem::path
+SDL3Frontend::suggest_save_path(const cart &c,
+                                const std::string &display_label) {
   const auto name_from_label = [&]() -> std::string {
     if (const auto p = display_label.find(" :: ");
         p != std::string::npos && p + 4 < display_label.size()) {
@@ -161,7 +170,9 @@ std::filesystem::path SDL3Frontend::suggest_save_path(
     }
     if (!c.file_path.empty())
       return c.file_path.filename().string();
-    return std::filesystem::path(strip_colons(display_label)).filename().string();
+    return std::filesystem::path(strip_colons(display_label))
+        .filename()
+        .string();
   };
 
   std::string stem = std::filesystem::path(name_from_label()).stem().string();
@@ -198,13 +209,15 @@ void SDL3Frontend::setup_save_context(const cart &c,
                                       const std::string &display_label,
                                       const std::string &rom_hash) {
   active_rom_hash = rom_hash;
-  const std::filesystem::path default_suggested = suggest_save_path(c, display_label);
+  const std::filesystem::path default_suggested =
+      suggest_save_path(c, display_label);
   suggested_save_path_ = default_suggested;
   active_save_path.reset();
 
   std::optional<std::filesystem::path> mapped_path = std::nullopt;
   if (!active_rom_hash.empty()) {
-    if (const auto it = gui.get_settings_c().save_path_by_rom_hash.find(active_rom_hash);
+    if (const auto it =
+            gui.get_settings_c().save_path_by_rom_hash.find(active_rom_hash);
         it != gui.get_settings_c().save_path_by_rom_hash.end() &&
         !it->second.empty()) {
       mapped_path = std::filesystem::path(it->second);
@@ -342,9 +355,9 @@ void SDL3Frontend::process_pending_save() {
   save_dialog_inflight = true;
 }
 
-int SDL3Frontend::request_zip_choice_blocking(const std::string &zip_label,
-                                              const std::vector<std::string> &entries,
-                                              const std::stop_token &st) {
+int SDL3Frontend::request_zip_choice_blocking(
+    const std::string &zip_label, const std::vector<std::string> &entries,
+    const std::stop_token &st) {
   {
     std::lock_guard lock(ui_mutex);
     ui_state.zip_picker_title = zip_label;
@@ -359,9 +372,11 @@ int SDL3Frontend::request_zip_choice_blocking(const std::string &zip_label,
   zip_choice_result = -1;
   zip_choice_cancelled = false;
 
-  zip_choice_cv.wait(lk, [&] { return !zip_choice_pending || st.stop_requested(); });
+  zip_choice_cv.wait(
+      lk, [&] { return !zip_choice_pending || st.stop_requested(); });
 
-  if (st.stop_requested() || zip_choice_cancelled) return -1;
+  if (st.stop_requested() || zip_choice_cancelled)
+    return -1;
   return zip_choice_result;
 }
 
@@ -376,11 +391,13 @@ void SDL3Frontend::poll_zip_choice_response() {
     ui_state.zip_picker_title.clear();
     ui_state.zip_rom_entries.clear();
   }
-  if (action == 0) return;
+  if (action == 0)
+    return;
 
   {
     std::lock_guard lk(zip_choice_mutex);
-    if (!zip_choice_pending) return;
+    if (!zip_choice_pending)
+      return;
     zip_choice_result = idx;
     zip_choice_cancelled = (action == 2);
     zip_choice_pending = false;
@@ -389,9 +406,10 @@ void SDL3Frontend::poll_zip_choice_response() {
 }
 
 void SDL3Frontend::handle_drop(const SDL_Event &e) {
-  if (!e.drop.data) return;
+  if (!e.drop.data)
+    return;
   std::lock_guard lock(ui_mutex);
-  ui_state.load_rom_path = process_path(e.drop.data);   // file path or URL text
+  ui_state.load_rom_path = process_path(e.drop.data); // file path or URL text
   ui_state.load_rom_name = "";
   ui_state.request_load_rom = true;
 }
@@ -415,7 +433,7 @@ void SDL3Frontend::start_rom_io_job(const std::string &source) {
     io_status = "Preparing ROM...";
   }
 
-  rom_io_thread = std::jthread([this, source](const std::stop_token& st) {
+  rom_io_thread = std::jthread([this, source](const std::stop_token &st) {
     auto set_status = [&](std::string s) {
       std::lock_guard lk(io_status_mutex);
       io_status = std::move(s);
@@ -423,8 +441,10 @@ void SDL3Frontend::start_rom_io_job(const std::string &source) {
 
     auto cleanup_temp = [&] {
       std::error_code ec;
-      if (last_tmp_rom) std::filesystem::remove(*last_tmp_rom, ec);
-      if (last_tmp_zip) std::filesystem::remove(*last_tmp_zip, ec);
+      if (last_tmp_rom)
+        std::filesystem::remove(*last_tmp_rom, ec);
+      if (last_tmp_zip)
+        std::filesystem::remove(*last_tmp_zip, ec);
       last_tmp_rom.reset();
       last_tmp_zip.reset();
     };
@@ -437,7 +457,8 @@ void SDL3Frontend::start_rom_io_job(const std::string &source) {
       io_busy.store(false, std::memory_order_relaxed);
     };
 
-    auto succeed = [&](const std::string &rom_on_disk, const std::string &label) {
+    auto succeed = [&](const std::string &rom_on_disk,
+                       const std::string &label) {
       {
         std::lock_guard lk(rom_io_mutex);
         rom_ready_path = rom_on_disk;
@@ -458,12 +479,15 @@ void SDL3Frontend::start_rom_io_job(const std::string &source) {
       std::string suffix = ".bin";
       {
         const auto q = source.find_first_of("?#");
-        const std::string base = (q == std::string::npos) ? source : source.substr(0, q);
+        const std::string base =
+            (q == std::string::npos) ? source : source.substr(0, q);
         const auto slash = base.find_last_of('/');
         const auto dot = base.find_last_of('.');
-        if (dot != std::string::npos && (slash == std::string::npos || dot > slash)) {
+        if (dot != std::string::npos &&
+            (slash == std::string::npos || dot > slash)) {
           suffix = base.substr(dot);
-          if (suffix.size() > 16) suffix = ".bin";
+          if (suffix.size() > 16)
+            suffix = ".bin";
         }
       }
 
@@ -529,7 +553,8 @@ void SDL3Frontend::start_rom_io_job(const std::string &source) {
                         file_starts_with_zip_magic(local_path);
 
     if (!is_zip) {
-      if (looks_like_url(source)) last_tmp_rom = local_path;
+      if (looks_like_url(source))
+        last_tmp_rom = local_path;
       succeed(local_path.string(), label);
       return;
     }
@@ -548,10 +573,13 @@ void SDL3Frontend::start_rom_io_job(const std::string &source) {
       }
       const int n = static_cast<int>(mz_zip_reader_get_num_files(&zip));
       for (int i = 0; i < n; ++i) {
-        if (mz_zip_reader_is_file_a_directory(&zip, i)) continue;
+        if (mz_zip_reader_is_file_a_directory(&zip, i))
+          continue;
         mz_zip_archive_file_stat stt{};
-        if (!mz_zip_reader_file_stat(&zip, i, &stt)) continue;
-        const std::string name = stt.m_filename[0] != '\0' ? stt.m_filename : "";
+        if (!mz_zip_reader_file_stat(&zip, i, &stt))
+          continue;
+        const std::string name =
+            stt.m_filename[0] != '\0' ? stt.m_filename : "";
         if (has_ext(name, ".gb") || has_ext(name, ".gbc")) {
           candidate_indices.push_back(i);
           candidate_names.push_back(name);
@@ -585,7 +613,8 @@ void SDL3Frontend::start_rom_io_job(const std::string &source) {
     set_status("Extracting ROM...");
     io_progress.store(-1.0f, std::memory_order_relaxed);
 
-    const std::string out_suffix = has_ext(chosen_name, ".gbc") ? ".gbc" : ".gb";
+    const std::string out_suffix =
+        has_ext(chosen_name, ".gbc") ? ".gbc" : ".gb";
     const auto out_rom = make_temp_file(tmp_root, out_suffix);
 
     {
@@ -594,8 +623,8 @@ void SDL3Frontend::start_rom_io_job(const std::string &source) {
         fail("Failed to re-open ZIP for extraction");
         return;
       }
-      const bool ok =
-          mz_zip_reader_extract_to_file(&zip, chosen_idx, out_rom.string().c_str(), 0) != 0;
+      const bool ok = mz_zip_reader_extract_to_file(
+                          &zip, chosen_idx, out_rom.string().c_str(), 0) != 0;
       mz_zip_reader_end(&zip);
       if (!ok) {
         std::error_code ec;
@@ -626,6 +655,7 @@ SDL3Frontend::SDL3Frontend() : host(framebuf_width, framebuf_height, scale) {
   std::error_code ec;
   tmp_root = std::filesystem::temp_directory_path(ec) / "tmp";
   std::filesystem::create_directories(tmp_root, ec);
+  debugger.update_state_from_core(gbc);
 
   // We have to update this manually once because the emulation loop has not
   // started yet to do it for us. If we don't do this, we may end up seeing a
@@ -680,22 +710,23 @@ void SDL3Frontend::queue_audio_samples(const float *samples,
 }
 
 void SDL3Frontend::start() {
-  auto start_emulation = [this](cart cart_ctx, const std::string &display_label,
-                                const std::string &rom_hash,
-                                const std::optional<std::string> &bios_path,
-                                const std::optional<std::filesystem::path> &initial_save_path) {
-    active_rom_hash = rom_hash;
-    emulation_thread = std::jthread(
-        std::bind_front(&SDL3Frontend::emulation_thread_fn, this), cart_ctx,
-        bios_path, initial_save_path);
-    {
-      std::lock_guard lock(ui_mutex);
-      ui_state.load_rom_path = display_label;
-      ui_state.load_rom_name = cart_ctx.header.title();
-      ui_state.cart_info = Debug::describe_cart(cart_ctx);
-    }
-    gui.update_rom_path(strip_colons(display_label));
-  };
+  auto start_emulation =
+      [this](cart cart_ctx, const std::string &display_label,
+             const std::string &rom_hash,
+             const std::optional<std::string> &bios_path,
+             const std::optional<std::filesystem::path> &initial_save_path) {
+        active_rom_hash = rom_hash;
+        emulation_thread = std::jthread(
+            std::bind_front(&SDL3Frontend::emulation_thread_fn, this), cart_ctx,
+            bios_path, initial_save_path);
+        {
+          std::lock_guard lock(ui_mutex);
+          ui_state.load_rom_path = display_label;
+          ui_state.load_rom_name = cart_ctx.header.title();
+          ui_state.cart_info = Debug::describe_cart(cart_ctx);
+        }
+        gui.update_rom_path(strip_colons(display_label));
+      };
 
   std::optional<std::string> bios_path =
       gui.get_settings_c().prev_bios_path.empty()
@@ -723,7 +754,8 @@ void SDL3Frontend::start() {
       start_rom_io_job(rom_source);
     }
     std::string rom_on_disk;
-    if (std::string display_label; consume_rom_io_result(rom_on_disk, display_label)) {
+    if (std::string display_label;
+        consume_rom_io_result(rom_on_disk, display_label)) {
       try {
         cart cart_ctx = load_cart_fs(rom_on_disk.c_str());
         const std::string rom_hash = sha256_hex(cart_ctx.rom_span());
@@ -752,15 +784,16 @@ void SDL3Frontend::start() {
           ui_state.load_save_dialog_accepted = false;
           ui_state.request_open_load_save_dialog = true;
         } else {
-          start_emulation(std::move(cart_ctx), display_label, rom_hash, bios_path,
-                          active_save_path);
+          start_emulation(std::move(cart_ctx), display_label, rom_hash,
+                          bios_path, active_save_path);
         }
       } catch (std::exception &e) {
         Logger::push(LogLevel::Warning, "ROM", "Failed to load ROM", e.what());
       }
     }
 
-    if (waiting_for_load_save_dialog && pending_cart_for_save_prompt.has_value()) {
+    if (waiting_for_load_save_dialog &&
+        pending_cart_for_save_prompt.has_value()) {
       std::string selected_path;
       bool accepted = false;
       if (consume_load_save_dialog_result(selected_path, accepted)) {
@@ -787,9 +820,10 @@ void SDL3Frontend::start() {
     process_pending_save();
     // Don't force a redraw if the watcher just forced it
     const auto now_ns = steady_now_ns();
-    if (const auto last_forced = last_forced_redraw_ns.load(std::memory_order_relaxed);
-      now_ns - last_forced > 2'000'000) // ~2ms
-         render_frame();
+    if (const auto last_forced =
+            last_forced_redraw_ns.load(std::memory_order_relaxed);
+        now_ns - last_forced > 2'000'000) // ~2ms
+      render_frame();
   }
 
   /* Kill emulation thread */
@@ -823,7 +857,8 @@ void SDL3Frontend::process_events() {
       std::lock_guard lock(ui_mutex);
       consumed = gui.process_event(e, ui_state);
     }
-    if (consumed) continue;
+    if (consumed)
+      continue;
 
     if (e.type == SDL_EVENT_KEY_DOWN || e.type == SDL_EVENT_KEY_UP) {
       const bool pressed = (e.type == SDL_EVENT_KEY_DOWN);
@@ -845,8 +880,12 @@ void SDL3Frontend::process_events() {
 void SDL3Frontend::render_frame() {
   // --- PHASE 1: PREPARE TEXTURE ---
   // 0. Check if we need to update the texture (avoid redundant GPU uploads)
-  if (render_guard.test_and_set(std::memory_order_acquire)) return;
-  struct Guard { std::atomic_flag &f; ~Guard(){ f.clear(std::memory_order_release); } } g{render_guard};
+  if (render_guard.test_and_set(std::memory_order_acquire))
+    return;
+  struct Guard {
+    std::atomic_flag &f;
+    ~Guard() { f.clear(std::memory_order_release); }
+  } g{render_guard};
 
   const auto now_ns = steady_now_ns();
   const auto until_ns = suppress_vsync_until_ns.load(std::memory_order_relaxed);
@@ -854,7 +893,7 @@ void SDL3Frontend::render_frame() {
 
   // 1. Get the latest frame buffer and current parameters
   const bool force_mono = gui.get_settings_c().force_mono_dmg;
-  const bool cgb_mode   = is_cgb.load(std::memory_order_relaxed);
+  const bool cgb_mode = is_cgb.load(std::memory_order_relaxed);
   if (force_mono != last_force_mono_dmg || cgb_mode != last_cgb_mode) {
     last_force_mono_dmg = force_mono;
     last_cgb_mode = cgb_mode;
@@ -896,11 +935,13 @@ void SDL3Frontend::render_frame() {
     gui.render(ui_state, host);
     poll_zip_choice_response();
     request_quit = ui_state.request_quit;
-    if (request_quit) ui_state.request_quit = false;
+    if (request_quit)
+      ui_state.request_quit = false;
     ff_local = ui_state.fast_forward;
   }
   fast_forward.store(ff_local, std::memory_order_relaxed);
-  if (request_quit) running = false;
+  if (request_quit)
+    running = false;
 
   // 3. Build debugger windows (if active)
   if (ui_state.show_main_debug_viewer || ui_state.show_breakpoints ||
@@ -922,8 +963,9 @@ void SDL3Frontend::render_frame() {
 }
 
 void SDL3Frontend::emulation_thread_fn(
-    const std::stop_token &st, const cart &c, const std::optional<std::string> &bios,
-    const std::optional<std::filesystem::path>& initial_save_path) {
+    const std::stop_token &st, const cart &c,
+    const std::optional<std::string> &bios,
+    const std::optional<std::filesystem::path> &initial_save_path) {
   bool ff = false;
   clear(black);
 
@@ -948,7 +990,8 @@ void SDL3Frontend::emulation_thread_fn(
   if (auto *bus = gbc->get_bus(); bus && initial_save_path.has_value()) {
     if (auto *cart_ptr = bus->get_cartridge(); cart_ptr) {
       std::error_code ec;
-      if (cart_ptr->has_battery() && std::filesystem::exists(*initial_save_path, ec) &&
+      if (cart_ptr->has_battery() &&
+          std::filesystem::exists(*initial_save_path, ec) &&
           !cart_ptr->load_save_file(*initial_save_path)) {
         Logger::push(LogLevel::Warning, "Save", "Failed to load save file",
                      "Could not load battery save data from: " +
@@ -985,9 +1028,11 @@ void SDL3Frontend::emulation_thread_fn(
 
     // If we are ahead of the target (and not fast-forwarding), sleep briefly.
     // 1ms should be short enough to prevent underruns
-    const int bytes_per_frame = host.get_audio_spec().channels * static_cast<int>(sizeof(float));
-    const int bytes_per_sec   = host.get_audio_spec().freq * bytes_per_frame;
-    const int queued_ms       = bytes_per_sec > 0 ? queued_bytes * 1000 / bytes_per_sec : 0;
+    const int bytes_per_frame =
+        host.get_audio_spec().channels * static_cast<int>(sizeof(float));
+    const int bytes_per_sec = host.get_audio_spec().freq * bytes_per_frame;
+    const int queued_ms =
+        bytes_per_sec > 0 ? queued_bytes * 1000 / bytes_per_sec : 0;
     if (!ff && queued_ms > target_queue_ms) {
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
       continue;
@@ -1029,10 +1074,9 @@ void SDL3Frontend::emulation_thread_fn(
     if (auto *cart_ptr = bus->get_cartridge();
         cart_ptr && cart_ptr->consume_save_event()) {
       const auto ram_view = cart_ptr->ram();
-      if (!ram_view.empty() &&
-          (ram_view.size() != last_saved_snapshot.size() ||
-           !std::equal(ram_view.begin(), ram_view.end(),
-                       last_saved_snapshot.begin()))) {
+      if (!ram_view.empty() && (ram_view.size() != last_saved_snapshot.size() ||
+                                !std::equal(ram_view.begin(), ram_view.end(),
+                                            last_saved_snapshot.begin()))) {
         enqueue_save_snapshot(
             std::vector<byte_t>(ram_view.begin(), ram_view.end()));
       }
@@ -1173,7 +1217,8 @@ bool SDLCALL SDL3Frontend::event_watcher(void *userdata,
       event->type == SDL_EVENT_WINDOW_EXPOSED) {
 
     static auto last_draw = std::chrono::steady_clock::now();
-    const int min_interval_ms = (event->type == SDL_EVENT_WINDOW_MOVED) ? 33 : 16;
+    const int min_interval_ms =
+        (event->type == SDL_EVENT_WINDOW_MOVED) ? 33 : 16;
 
     // Force a frame update immediately
     // When the main loop is blocked during windows resizing
@@ -1182,7 +1227,9 @@ bool SDLCALL SDL3Frontend::event_watcher(void *userdata,
             .count() >= min_interval_ms) {
       auto *self = static_cast<SDL3Frontend *>(userdata);
 
-      const auto now_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count();
+      const auto now_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                              now.time_since_epoch())
+                              .count();
       // Never block in the watcher (avoids deadlocks on DPI-crossing cascades)
       // If UI is currently being updated, skip this forced draw
       if (!self->ui_mutex.try_lock()) {

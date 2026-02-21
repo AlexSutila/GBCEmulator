@@ -1,7 +1,7 @@
 #include <utility>
 
-#include "debugger/debugger.hpp"
 #include "debugger/breakpoint.hpp"
+#include "debugger/debugger.hpp"
 
 namespace Debug {
 
