@@ -205,7 +205,7 @@ void VDMA::transfer_byte(const addr_t offset) const {
 }
 
 void VDMA::do_init(const State next_state) {
-  constexpr auto total_init_clks = 4 * 4; // 4 M-cycles, 8 T-cycles
+  constexpr auto total_init_clks = 4; // Four T-cycles
 
   // State entry logic
   if (!clocks_remaining.has_value()) {
@@ -245,7 +245,7 @@ void VDMA::do_hdma_init() {
 }
 
 void VDMA::do_gdma_tran() {
-  constexpr auto byte_transfer_clks = 2 * 4; // 2 M-cycles, 8 T-cycles
+  constexpr auto byte_transfer_clks = 2; // 2 T-cycles
 
   // State entry logic
   if (!clocks_remaining.has_value())
@@ -265,9 +265,9 @@ void VDMA::do_gdma_tran() {
 }
 
 void VDMA::do_hdma_tran() {
-  constexpr auto byte_transfer_clks = 2 * 4; // 2 M-cycles, 8 T-cycles
-  constexpr auto blk_size_bytes = 0x10;      // Fixed transfer size
-  if (sys_.halted)                           // HDMA is paused when halted
+  constexpr auto byte_transfer_clks = 2; // 2 T-cycles
+  constexpr auto blk_size_bytes = 0x10;  // Fixed transfer size
+  if (sys_.halted)                       // HDMA is paused when halted
     return;
 
   // State entry logic, always transfers exactly one block

@@ -22,7 +22,8 @@
 // Store DMG color index in alpha bits bc we're just based like that lmao
 #define DMG_COLOR_PRESERVE_HACK(rgb, idx) ((rgb & 0x00FFFFFF) | (idx << 24))
 
-template <typename T> T *init_mmio(AddressBus *bus, const IORegisterMapping reg_id) {
+template <typename T>
+T *init_mmio(AddressBus *bus, const IORegisterMapping reg_id) {
   auto *reg = bus->get_mmio(reg_id);
   if (auto *casted = dynamic_cast<T *>(reg))
     return casted;
@@ -32,12 +33,12 @@ template <typename T> T *init_mmio(AddressBus *bus, const IORegisterMapping reg_
 PixelProcessingUnit::PixelProcessingUnit(
     AddressBus *bus, Frontend &fe, std::optional<Debug::Debugger> &debugger,
     runtime_sys_info &sys)
-    : Debuggable(debugger), // Scanline/frame breakpoints
-      sys_(sys),                   // General operating mode info
-      fe_(fe),                     // To access frame buffer(s)
-      vram(bus->get_vram()),       // Tile data/map/attribute content
-      oam(bus->get_oam()),         // Object (sprite) attribute memory
-      vdma_(bus->get_vdma()),      // Performs GDMA and HDMA in CGB mode
+    : Debuggable(debugger),   // Scanline/frame breakpoints
+      sys_(sys),              // General operating mode info
+      fe_(fe),                // To access frame buffer(s)
+      vram(bus->get_vram()),  // Tile data/map/attribute content
+      oam(bus->get_oam()),    // Object (sprite) attribute memory
+      vdma_(bus->get_vdma()), // Performs GDMA and HDMA in CGB mode
       obj_cram(std::make_unique<ColorRam>()), // CGB sprite color RAM
       bg_cram(std::make_unique<ColorRam>())   // CGB background color RAM
 {
@@ -99,6 +100,7 @@ PixelProcessingUnit::PixelProcessingUnit(
 
 PixelProcessingUnit::PPUState PixelProcessingUnit::get_state() const {
   PPUState state_{};
+  state_.state = state; // Does not necessarily match STAT due to delay
   state_.lcdc = lcdc_.peek();
   state_.stat = stat_.peek();
   state_.scx = scx_.peek();
@@ -163,9 +165,10 @@ std::uint32_t PixelProcessingUnit::get_obj_rgb(const pixel &px) const {
      * of the OBP0/OBP1 registers to translate the monochrome color index. */
     const byte_t palette_idx = px.palette_idx & 0x1;
     const byte_t true_color_idx = (palette_idx == 0)
-                                ? obp0_.get_color_idx(px.color_idx)
-                                : obp1_.get_color_idx(px.color_idx);
-    const std::uint32_t rgb = obj_cram->get_cgb_color(true_color_idx, palette_idx);
+                                      ? obp0_.get_color_idx(px.color_idx)
+                                      : obp1_.get_color_idx(px.color_idx);
+    const std::uint32_t rgb =
+        obj_cram->get_cgb_color(true_color_idx, palette_idx);
     return DMG_COLOR_PRESERVE_HACK(rgb, true_color_idx);
   }
   // CGB palette is denoted directly by the attributes themselves
@@ -281,7 +284,7 @@ void PixelProcessingUnit::do_disabled() {
 }
 
 void PixelProcessingUnit::do_oam_scan() {
-  constexpr auto max_sprites = 10;         // Per-scanline hardware limitation
+  constexpr auto max_sprites = 10; // Per-scanline hardware limitation
   using modes = PPU::StatModes;
 
   // OAM scan always happens on visible scanlines
@@ -409,7 +412,8 @@ void PixelProcessingUnit::do_draw() {
   }
 
   // Rendering incomplete
-  if (constexpr std::size_t pixels_per_row = 160; row_pixels_rendered < pixels_per_row)
+  if (constexpr std::size_t pixels_per_row = 160;
+      row_pixels_rendered < pixels_per_row)
     return;
 
   // The window uses an internal scanline counter to track it's vertical
