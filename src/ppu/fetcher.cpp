@@ -37,13 +37,9 @@ Fetcher::Fetcher(std::array<std::unique_ptr<byte_t[]>, 2> &vram,
 }
 
 void Fetcher::reset(const bool window_started) {
-  coarse_scroll_x = scx_.peek();
-  fine_scroll_x = coarse_scroll_x & 0x7;
+  fine_scroll_x = scx_.peek() & 0x7;
   state = STATE_READ_TILE;
   pixels_discarded = 0;
-
-  // Capture the entire scroll value here since full rows are fetched at once
-  fine_scroll_y = scy_.peek();
 
   // Reset fetcher data, x_coor most important
   data = {
@@ -101,17 +97,17 @@ byte_t Fetcher::read_vram_byte(const addr_t addr, const byte_t bank) const {
 byte_t Fetcher::calc_bgwin_pixel_y() const {
   if (win_started)
     return win_internal_ly & 0xFF;
-  return (ly_.peek() + fine_scroll_y) & 0xFF;
+  return (ly_.peek() + scy_.peek()) & 0xFF;
 }
 
 byte_t Fetcher::calc_bgwin_tile_x() const {
   if (win_started)
     return data.x_coor & 0x1F;
   // Since returning unit tiles, can only be 32 max
-  return (data.x_coor + (coarse_scroll_x / pixels_per_row)) & 0x1F;
+  return (data.x_coor + (scx_.peek() / pixels_per_row)) & 0x1F;
 }
 
-byte_t Fetcher::calc_obj_pixel_y(const Sprite& sprite) const {
+byte_t Fetcher::calc_obj_pixel_y(const Sprite &sprite) const {
   return (ly_.peek() - (sprite.y_pos - 16)) & 0xFF;
 }
 
@@ -143,7 +139,7 @@ addr_t Fetcher::calc_tile_metadata_addr() const {
  * sprite which appears earliest in the scanline based on x-pos. In other words
  * we only write over 'transparent' pixels in the FIFO. In CGB mode, this can be
  * done as well, but you can also choose based on OAM index optionally. */
-bool Fetcher::has_priority(const pixel& old_px, const byte_t new_oam_idx,
+bool Fetcher::has_priority(const pixel &old_px, const byte_t new_oam_idx,
                            const byte_t new_color_idx) const {
   using prioMode = PPU::ObjectPriorityMode;
   const prioMode prio = opri_.get_prio_mode();
@@ -165,8 +161,9 @@ bool Fetcher::has_priority(const pixel& old_px, const byte_t new_oam_idx,
   return new_oam_idx < old_px.oam_index;
 }
 
-byte_t Fetcher::calc_sprite_tile_idx(const Sprite& sprite) const {
-  if (const bool tall = lcdc_.obj_size() == PPU::SpriteHeight::TALL_SPRITES; !tall)
+byte_t Fetcher::calc_sprite_tile_idx(const Sprite &sprite) const {
+  if (const bool tall = lcdc_.obj_size() == PPU::SpriteHeight::TALL_SPRITES;
+      !tall)
     // Regular 8x8 sprites do not have their LSB set by hardware
     return sprite.tile_idx;
 
@@ -221,7 +218,7 @@ byte_t Fetcher::fetch_bgwin_tile_data(const bool high) const {
   }
 }
 
-byte_t Fetcher::fetch_obj_tile_data(const Sprite& sprite,
+byte_t Fetcher::fetch_obj_tile_data(const Sprite &sprite,
                                     const bool high) const {
   constexpr auto tile_size_bytes = 16;
   constexpr auto tile_row_bytes = 2;
