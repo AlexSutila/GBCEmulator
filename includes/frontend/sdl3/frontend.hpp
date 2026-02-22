@@ -132,6 +132,7 @@ private:
   std::atomic<bool> force_redraw{false};
   bool last_force_mono_dmg{false};
   bool last_cgb_mode{false};
+  bool startup_window_size_adjusted{false};
 
   // Main loop helpers
   void process_events();

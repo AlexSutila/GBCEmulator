@@ -10,7 +10,7 @@ SDLHost::SDLHost(const int width, const int height, const int scale) {
     throw std::runtime_error(SDL_GetError());
 
   window =
-    SDL_CreateWindow("IroGB", width * scale, height * scale + 19 * 2,
+    SDL_CreateWindow("IroGB", width * scale, height * scale,
                      SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
   if (!window)
     throw std::runtime_error(SDL_GetError());

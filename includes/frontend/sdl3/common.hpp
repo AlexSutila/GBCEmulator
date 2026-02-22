@@ -177,6 +177,8 @@ struct UiState {
   // FPS Tracking
   double current_fps{};
   float frame_time_ms{};
+  float menu_bar_height{0.0f};
+  float status_bar_height{0.0f};
 
   // Miscellaneous
   std::optional<std::size_t> waiting_for_bind{};

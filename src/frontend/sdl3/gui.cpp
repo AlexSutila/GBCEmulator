@@ -168,7 +168,9 @@ void GbcImGui::update_bios_path(const std::string &bios_path) {
 
 /* ImGui windows */
 void GbcImGui::build_main_menu_bar(UiState &state) const {
+  state.menu_bar_height = ImGui::GetFrameHeight();
   if (ImGui::BeginMainMenuBar()) {
+    state.menu_bar_height = ImGui::GetWindowHeight();
     if (ImGui::BeginMenu("File")) {
       if (ImGui::MenuItem("Load ROM..."))
         ImGuiFileDialog::Instance()->OpenDialog(
@@ -242,6 +244,7 @@ void GbcImGui::build_main_menu_bar(UiState &state) const {
 
 void GbcImGui::build_status_bar(UiState &state) const {
   const float height = ImGui::GetFrameHeight();
+  state.status_bar_height = height;
   const ImGuiViewport *viewport = ImGui::GetMainViewport();
 
   // Position at bottom of the main viewport
@@ -264,6 +267,7 @@ void GbcImGui::build_status_bar(UiState &state) const {
       ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNav;
 
   if (ImGui::Begin("StatusBar", nullptr, flags)) {
+    state.status_bar_height = ImGui::GetWindowHeight();
     if (state.io_busy) {
       if (state.io_progress >= 0.0f) {
         ImGui::Text("%s (%.0f%%)", state.io_status.c_str(), state.io_progress * 100.0f);

@@ -643,6 +643,9 @@ void SDL3Frontend::start_rom_io_job(const std::string &source) {
 SDL3Frontend::SDL3Frontend() : host(framebuf_width, framebuf_height, scale) {
   host.init_audio();
   gui.init(host);
+  const auto bar_height_px = static_cast<int>(std::ceil(ImGui::GetFrameHeight()));
+  SDL_SetWindowSize(host.get_window(), framebuf_width * scale,
+                    framebuf_height * scale + bar_height_px * 2);
   debugger.init(host);
   SDL_AddEventWatch(reinterpret_cast<SDL_EventFilter>(event_watcher), this);
   framebuffers[0] =
@@ -929,6 +932,8 @@ void SDL3Frontend::render_frame() {
   // 2. Build the UI Windows
   bool request_quit = false;
   bool ff_local = false;
+  float menu_bar_height = ImGui::GetFrameHeight();
+  float status_bar_height = ImGui::GetFrameHeight();
   {
     std::lock_guard lock(ui_mutex);
     sync_io_status_to_ui();
@@ -938,10 +943,31 @@ void SDL3Frontend::render_frame() {
     if (request_quit)
       ui_state.request_quit = false;
     ff_local = ui_state.fast_forward;
+    menu_bar_height = ui_state.menu_bar_height;
+    status_bar_height = ui_state.status_bar_height;
   }
   fast_forward.store(ff_local, std::memory_order_relaxed);
   if (request_quit)
     running = false;
+
+  if (!startup_window_size_adjusted && menu_bar_height > 0.0f &&
+      status_bar_height > 0.0f) {
+    if (SDL_Window *window = host.get_window()) {
+      const Uint32 flags = SDL_GetWindowFlags(window);
+      if (!(flags & (SDL_WINDOW_MAXIMIZED | SDL_WINDOW_FULLSCREEN))) {
+        constexpr int target_w = framebuf_width * scale;
+        const int target_h = framebuf_height * scale + static_cast<int>(
+            std::lround(menu_bar_height + status_bar_height));
+        int cur_w = 0;
+        int cur_h = 0;
+        SDL_GetWindowSize(window, &cur_w, &cur_h);
+        if (cur_w != target_w || cur_h != target_h) {
+          SDL_SetWindowSize(window, target_w, target_h);
+        }
+      }
+    }
+    startup_window_size_adjusted = true;
+  }
 
   // 3. Build debugger windows (if active)
   if (ui_state.show_main_debug_viewer || ui_state.show_breakpoints ||
@@ -955,7 +981,7 @@ void SDL3Frontend::render_frame() {
   // 1. Clear background
   host.clear_screen();
   // 2. Draw the Emulator Output
-  host.draw_texture(ImGui::GetFrameHeight(), ImGui::GetFrameHeight());
+  host.draw_texture(menu_bar_height, status_bar_height);
   // 3. Draw the ImGui Overlay
   host.draw_overlay(ImGui::GetDrawData());
   // 4. Swap buffers
