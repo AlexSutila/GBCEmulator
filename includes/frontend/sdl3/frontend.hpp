@@ -67,7 +67,6 @@ private:
   bool consume_load_rom_request(std::string& rom_path);
   bool consume_load_bios_request(std::optional<std::string>& bios_path);
   bool consume_load_save_dialog_result(std::string& save_path, bool& accepted);
-  bool consume_save_dialog_result(std::string& save_path, bool& accepted);
 
   void start_rom_io_job(const std::string& source);
   bool consume_rom_io_result(std::string& rom_path_on_disk, std::string& display_label);
@@ -119,7 +118,7 @@ private:
   std::filesystem::path suggested_save_path_;
   std::vector<byte_t> deferred_save_data;
   bool deferred_save_pending{false};
-  bool save_dialog_inflight{false};
+  bool load_save_dialog_inflight{false};
   std::string active_rom_hash;
 
   // Resize/move redraw tuning
@@ -132,6 +131,7 @@ private:
   std::atomic<bool> force_redraw{false};
   bool last_force_mono_dmg{false};
   bool last_cgb_mode{false};
+  bool startup_window_size_adjusted{false};
 
   // Main loop helpers
   void process_events();

@@ -134,19 +134,6 @@ bool SDL3Frontend::consume_rom_io_result(std::string &rom_path_on_disk,
   return true;
 }
 
-bool SDL3Frontend::consume_save_dialog_result(std::string &save_path,
-                                              bool &accepted) {
-  std::lock_guard lock(ui_mutex);
-  if (!ui_state.save_dialog_result_ready)
-    return false;
-  accepted = ui_state.save_dialog_accepted;
-  save_path = ui_state.save_dialog_path;
-  ui_state.save_dialog_result_ready = false;
-  ui_state.save_dialog_accepted = false;
-  ui_state.save_dialog_path.clear();
-  return true;
-}
-
 bool SDL3Frontend::consume_load_save_dialog_result(std::string &save_path,
                                                    bool &accepted) {
   std::lock_guard lock(ui_mutex);
@@ -249,15 +236,9 @@ void SDL3Frontend::setup_save_context(const cart &c,
   }
   deferred_save_data.clear();
   deferred_save_pending = false;
-  save_dialog_inflight = false;
+  load_save_dialog_inflight = false;
 
   std::lock_guard lock(ui_mutex);
-  ui_state.request_open_save_dialog = false;
-  ui_state.save_dialog_result_ready = false;
-  ui_state.save_dialog_accepted = false;
-  ui_state.save_dialog_path.clear();
-  ui_state.save_dialog_default_name.clear();
-  ui_state.save_dialog_start_dir.clear();
   ui_state.request_open_load_save_dialog = false;
   ui_state.load_save_dialog_result_ready = false;
   ui_state.load_save_dialog_accepted = false;
@@ -287,17 +268,19 @@ void SDL3Frontend::process_pending_save() {
     deferred_save_pending = true;
   }
 
-  std::string dialog_path;
-  bool accepted = false;
-  if (consume_save_dialog_result(dialog_path, accepted)) {
-    save_dialog_inflight = false;
-    if (accepted && !dialog_path.empty()) {
-      active_save_path = std::filesystem::path(dialog_path);
-      suggested_save_path_ = *active_save_path;
-      remember_save_path_for_active_rom(*active_save_path);
-    } else {
-      Logger::push(LogLevel::Info, "Save", "Save cancelled",
-                   "Battery save data changed but no save file was selected.");
+  if (load_save_dialog_inflight) {
+    std::string dialog_path;
+    bool accepted = false;
+    if (consume_load_save_dialog_result(dialog_path, accepted)) {
+      load_save_dialog_inflight = false;
+      if (accepted && !dialog_path.empty()) {
+        active_save_path = std::filesystem::path(dialog_path);
+        suggested_save_path_ = *active_save_path;
+        remember_save_path_for_active_rom(*active_save_path);
+      } else {
+        Logger::push(LogLevel::Info, "Save", "Save cancelled",
+                     "Battery save data changed but no save file was selected.");
+      }
     }
   }
 
@@ -333,7 +316,7 @@ void SDL3Frontend::process_pending_save() {
     return;
   }
 
-  if (save_dialog_inflight)
+  if (load_save_dialog_inflight)
     return;
 
   std::string start_dir = suggested_save_path_.parent_path().string();
@@ -345,14 +328,14 @@ void SDL3Frontend::process_pending_save() {
 
   {
     std::lock_guard lock(ui_mutex);
-    ui_state.save_dialog_start_dir = start_dir;
-    ui_state.save_dialog_default_name = default_name;
-    ui_state.save_dialog_path.clear();
-    ui_state.save_dialog_result_ready = false;
-    ui_state.save_dialog_accepted = false;
-    ui_state.request_open_save_dialog = true;
+    ui_state.load_save_dialog_start_dir = start_dir;
+    ui_state.load_save_dialog_default_name = default_name;
+    ui_state.load_save_dialog_path.clear();
+    ui_state.load_save_dialog_result_ready = false;
+    ui_state.load_save_dialog_accepted = false;
+    ui_state.request_open_load_save_dialog = true;
   }
-  save_dialog_inflight = true;
+  load_save_dialog_inflight = true;
 }
 
 int SDL3Frontend::request_zip_choice_blocking(
@@ -643,6 +626,9 @@ void SDL3Frontend::start_rom_io_job(const std::string &source) {
 SDL3Frontend::SDL3Frontend() : host(framebuf_width, framebuf_height, scale) {
   host.init_audio();
   gui.init(host);
+  const auto bar_height_px = static_cast<int>(std::ceil(ImGui::GetFrameHeight()));
+  SDL_SetWindowSize(host.get_window(), framebuf_width * scale,
+                    framebuf_height * scale + bar_height_px * 2);
   debugger.init(host);
   SDL_AddEventWatch(reinterpret_cast<SDL_EventFilter>(event_watcher), this);
   framebuffers[0] =
@@ -742,12 +728,15 @@ void SDL3Frontend::start() {
       pending_cart_label.clear();
       pending_cart_rom_hash.clear();
       waiting_for_load_save_dialog = false;
+      load_save_dialog_inflight = false;
       {
         std::lock_guard lock(ui_mutex);
         ui_state.request_open_load_save_dialog = false;
         ui_state.load_save_dialog_result_ready = false;
         ui_state.load_save_dialog_accepted = false;
         ui_state.load_save_dialog_path.clear();
+        ui_state.load_save_dialog_default_name.clear();
+        ui_state.load_save_dialog_start_dir.clear();
       }
       process_pending_save();
       active_rom_hash.clear();
@@ -929,6 +918,8 @@ void SDL3Frontend::render_frame() {
   // 2. Build the UI Windows
   bool request_quit = false;
   bool ff_local = false;
+  float menu_bar_height = ImGui::GetFrameHeight();
+  float status_bar_height = ImGui::GetFrameHeight();
   {
     std::lock_guard lock(ui_mutex);
     sync_io_status_to_ui();
@@ -938,10 +929,31 @@ void SDL3Frontend::render_frame() {
     if (request_quit)
       ui_state.request_quit = false;
     ff_local = ui_state.fast_forward;
+    menu_bar_height = ui_state.menu_bar_height;
+    status_bar_height = ui_state.status_bar_height;
   }
   fast_forward.store(ff_local, std::memory_order_relaxed);
   if (request_quit)
     running = false;
+
+  if (!startup_window_size_adjusted && menu_bar_height > 0.0f &&
+      status_bar_height > 0.0f) {
+    if (SDL_Window *window = host.get_window()) {
+      const Uint32 flags = SDL_GetWindowFlags(window);
+      if (!(flags & (SDL_WINDOW_MAXIMIZED | SDL_WINDOW_FULLSCREEN))) {
+        constexpr int target_w = framebuf_width * scale;
+        const int target_h = framebuf_height * scale + static_cast<int>(
+            std::lround(menu_bar_height + status_bar_height));
+        int cur_w = 0;
+        int cur_h = 0;
+        SDL_GetWindowSize(window, &cur_w, &cur_h);
+        if (cur_w != target_w || cur_h != target_h) {
+          SDL_SetWindowSize(window, target_w, target_h);
+        }
+      }
+    }
+    startup_window_size_adjusted = true;
+  }
 
   // 3. Build debugger windows (if active)
   if (ui_state.show_main_debug_viewer || ui_state.show_breakpoints ||
@@ -955,7 +967,7 @@ void SDL3Frontend::render_frame() {
   // 1. Clear background
   host.clear_screen();
   // 2. Draw the Emulator Output
-  host.draw_texture(ImGui::GetFrameHeight(), ImGui::GetFrameHeight());
+  host.draw_texture(menu_bar_height, status_bar_height);
   // 3. Draw the ImGui Overlay
   host.draw_overlay(ImGui::GetDrawData());
   // 4. Swap buffers
@@ -1063,7 +1075,7 @@ void SDL3Frontend::emulation_thread_fn(
                            last_saved_snapshot.begin()))) {
             last_saved_snapshot.assign(ram_view.begin(), ram_view.end());
             enqueue_save_snapshot(
-                std::vector<byte_t>(ram_view.begin(), ram_view.end()));
+                std::vector(ram_view.begin(), ram_view.end()));
           }
         }
       }
@@ -1078,7 +1090,7 @@ void SDL3Frontend::emulation_thread_fn(
                                 !std::equal(ram_view.begin(), ram_view.end(),
                                             last_saved_snapshot.begin()))) {
         enqueue_save_snapshot(
-            std::vector<byte_t>(ram_view.begin(), ram_view.end()));
+            std::vector(ram_view.begin(), ram_view.end()));
       }
     }
   }

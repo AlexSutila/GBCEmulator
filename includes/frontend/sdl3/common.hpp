@@ -134,12 +134,6 @@ struct UiState {
   std::string load_rom_path;
   bool request_load_bios{false};
   std::string load_bios_path;
-  bool request_open_save_dialog{false};
-  bool save_dialog_result_ready{false};
-  bool save_dialog_accepted{false};
-  std::string save_dialog_path;
-  std::string save_dialog_start_dir;
-  std::string save_dialog_default_name;
   bool request_open_load_save_dialog{false};
   bool load_save_dialog_result_ready{false};
   bool load_save_dialog_accepted{false};
@@ -177,6 +171,8 @@ struct UiState {
   // FPS Tracking
   double current_fps{};
   float frame_time_ms{};
+  float menu_bar_height{0.0f};
+  float status_bar_height{0.0f};
 
   // Miscellaneous
   std::optional<std::size_t> waiting_for_bind{};
