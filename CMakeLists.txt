@@ -318,6 +318,8 @@ else ()
     add_executable(gbc_full
             src/frontend/sdl3/debugger.cpp
             src/frontend/sdl3/frontend.cpp
+            src/frontend/sdl3/frontend_rom_io.cpp
+            src/frontend/sdl3/frontend_save.cpp
             src/frontend/sdl3/sdl_host.cpp
             src/frontend/sdl3/main.cpp
             src/frontend/sdl3/gui.cpp
