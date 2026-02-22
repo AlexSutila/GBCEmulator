@@ -134,19 +134,6 @@ bool SDL3Frontend::consume_rom_io_result(std::string &rom_path_on_disk,
   return true;
 }
 
-bool SDL3Frontend::consume_save_dialog_result(std::string &save_path,
-                                              bool &accepted) {
-  std::lock_guard lock(ui_mutex);
-  if (!ui_state.save_dialog_result_ready)
-    return false;
-  accepted = ui_state.save_dialog_accepted;
-  save_path = ui_state.save_dialog_path;
-  ui_state.save_dialog_result_ready = false;
-  ui_state.save_dialog_accepted = false;
-  ui_state.save_dialog_path.clear();
-  return true;
-}
-
 bool SDL3Frontend::consume_load_save_dialog_result(std::string &save_path,
                                                    bool &accepted) {
   std::lock_guard lock(ui_mutex);
@@ -249,15 +236,9 @@ void SDL3Frontend::setup_save_context(const cart &c,
   }
   deferred_save_data.clear();
   deferred_save_pending = false;
-  save_dialog_inflight = false;
+  load_save_dialog_inflight = false;
 
   std::lock_guard lock(ui_mutex);
-  ui_state.request_open_save_dialog = false;
-  ui_state.save_dialog_result_ready = false;
-  ui_state.save_dialog_accepted = false;
-  ui_state.save_dialog_path.clear();
-  ui_state.save_dialog_default_name.clear();
-  ui_state.save_dialog_start_dir.clear();
   ui_state.request_open_load_save_dialog = false;
   ui_state.load_save_dialog_result_ready = false;
   ui_state.load_save_dialog_accepted = false;
@@ -287,17 +268,19 @@ void SDL3Frontend::process_pending_save() {
     deferred_save_pending = true;
   }
 
-  std::string dialog_path;
-  bool accepted = false;
-  if (consume_save_dialog_result(dialog_path, accepted)) {
-    save_dialog_inflight = false;
-    if (accepted && !dialog_path.empty()) {
-      active_save_path = std::filesystem::path(dialog_path);
-      suggested_save_path_ = *active_save_path;
-      remember_save_path_for_active_rom(*active_save_path);
-    } else {
-      Logger::push(LogLevel::Info, "Save", "Save cancelled",
-                   "Battery save data changed but no save file was selected.");
+  if (load_save_dialog_inflight) {
+    std::string dialog_path;
+    bool accepted = false;
+    if (consume_load_save_dialog_result(dialog_path, accepted)) {
+      load_save_dialog_inflight = false;
+      if (accepted && !dialog_path.empty()) {
+        active_save_path = std::filesystem::path(dialog_path);
+        suggested_save_path_ = *active_save_path;
+        remember_save_path_for_active_rom(*active_save_path);
+      } else {
+        Logger::push(LogLevel::Info, "Save", "Save cancelled",
+                     "Battery save data changed but no save file was selected.");
+      }
     }
   }
 
@@ -333,7 +316,7 @@ void SDL3Frontend::process_pending_save() {
     return;
   }
 
-  if (save_dialog_inflight)
+  if (load_save_dialog_inflight)
     return;
 
   std::string start_dir = suggested_save_path_.parent_path().string();
@@ -345,14 +328,14 @@ void SDL3Frontend::process_pending_save() {
 
   {
     std::lock_guard lock(ui_mutex);
-    ui_state.save_dialog_start_dir = start_dir;
-    ui_state.save_dialog_default_name = default_name;
-    ui_state.save_dialog_path.clear();
-    ui_state.save_dialog_result_ready = false;
-    ui_state.save_dialog_accepted = false;
-    ui_state.request_open_save_dialog = true;
+    ui_state.load_save_dialog_start_dir = start_dir;
+    ui_state.load_save_dialog_default_name = default_name;
+    ui_state.load_save_dialog_path.clear();
+    ui_state.load_save_dialog_result_ready = false;
+    ui_state.load_save_dialog_accepted = false;
+    ui_state.request_open_load_save_dialog = true;
   }
-  save_dialog_inflight = true;
+  load_save_dialog_inflight = true;
 }
 
 int SDL3Frontend::request_zip_choice_blocking(
@@ -745,12 +728,15 @@ void SDL3Frontend::start() {
       pending_cart_label.clear();
       pending_cart_rom_hash.clear();
       waiting_for_load_save_dialog = false;
+      load_save_dialog_inflight = false;
       {
         std::lock_guard lock(ui_mutex);
         ui_state.request_open_load_save_dialog = false;
         ui_state.load_save_dialog_result_ready = false;
         ui_state.load_save_dialog_accepted = false;
         ui_state.load_save_dialog_path.clear();
+        ui_state.load_save_dialog_default_name.clear();
+        ui_state.load_save_dialog_start_dir.clear();
       }
       process_pending_save();
       active_rom_hash.clear();
@@ -1089,7 +1075,7 @@ void SDL3Frontend::emulation_thread_fn(
                            last_saved_snapshot.begin()))) {
             last_saved_snapshot.assign(ram_view.begin(), ram_view.end());
             enqueue_save_snapshot(
-                std::vector<byte_t>(ram_view.begin(), ram_view.end()));
+                std::vector(ram_view.begin(), ram_view.end()));
           }
         }
       }
@@ -1104,7 +1090,7 @@ void SDL3Frontend::emulation_thread_fn(
                                 !std::equal(ram_view.begin(), ram_view.end(),
                                             last_saved_snapshot.begin()))) {
         enqueue_save_snapshot(
-            std::vector<byte_t>(ram_view.begin(), ram_view.end()));
+            std::vector(ram_view.begin(), ram_view.end()));
       }
     }
   }
