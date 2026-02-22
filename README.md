@@ -70,20 +70,17 @@ We cannot realistically expect to pass every single one of these tests, as not a
 This codebase was designed intentionally to make writing new frontends and ports extremely easy.
 
 ## Building
-To compile a release build for the desktop build targets:
+To build one or more desktop build targets in either `Release` or `Debug` mode, the following commands can be used:
 ```bash
-mkdir Release && cd Release
-cmake .. -DCMAKE_BUILD_TYPE=Release && make -j$(nproc)
+# From repository root dir
+mkdir build/ && cd build/
+cmake .. -DCMAKE_BUILD_TYPE=Release \
+    -DBUILD_FULL=ON     \
+    -DBUILD_SIMPLE=ON   \
+    -DBUILD_PYTHON=ON
 ```
 
-To compile a debug build for the desktop build targets:
-```bash
-mkdir Debug && cd Debug
-cmake .. -DCMAKE_BUILD_TYPE=Debug && make -j$(nproc)
-```
-
-To compile the web version, reference the GitHub action. To self host it, you will need to deploy as an HTTP server.
-- The GitHub action which builds and deploys the web frontend can be found [here](https://github.com/AlexSutila/GBCEmulator/blob/release/.github/workflows/deploy-to-pages.yml)
+This command builds all desktop build targets. To select one or more, simply exclude the corresponding `-DBUILD=...` argument. Building the WASM frontend follows a similar procedure but using the [emsdk](https://emscripten.org/docs/tools_reference/emsdk.html) rather than vanilla `cmake` and choice of C/C++ compiler.
 
 ## Authors
 1. Alex Sutila (https://github.com/alexsutila)

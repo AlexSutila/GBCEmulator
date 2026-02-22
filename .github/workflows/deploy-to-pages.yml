@@ -36,7 +36,7 @@ jobs:
         run: |
           mkdir -p build
           cd build
-          emcmake cmake .. -DCMAKE_BUILD_TYPE=Release
+          emcmake cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_SIMPE=ON
 
       - name: Build (emmake)
         run: |
