@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.15)
 set(CMAKE_POLICY_VERSION_MINIMUM 3.10)
 project(gbc LANGUAGES CXX)
 
+
 # ===========================================================================
 # Global Settings
 # ===========================================================================
@@ -98,16 +99,7 @@ endif()
 # Dependencies: BUILD_FULL
 # ===========================================================================
 if(BUILD_FULL)
-    set(SDL_SHARED OFF CACHE BOOL "" FORCE)
-    set(SDL_STATIC ON CACHE BOOL "" FORCE)
-    set(SDL_TEST OFF CACHE BOOL "" FORCE)
-
-    FetchContent_Declare(
-        SDL3
-        GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
-        GIT_TAG release-3.4.0
-    )
-    FetchContent_MakeAvailable(SDL3)
+    find_package(SDL3 REQUIRED CONFIG)
 
     FetchContent_Declare(
         imgui
@@ -163,6 +155,7 @@ if(BUILD_FULL)
             GIT_TAG v4.0.0
         )
         FetchContent_MakeAvailable(mbedtls)
+
         # Provide what FindMbedTLS.cmake expects, using the in-tree MbedTLS build/targets
         set(MBEDTLS_INCLUDE_DIR "${mbedtls_SOURCE_DIR}/include" CACHE PATH "" FORCE)
         set(MBEDTLS_LIBRARY mbedtls CACHE STRING "" FORCE)
