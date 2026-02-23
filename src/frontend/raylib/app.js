@@ -73,6 +73,126 @@ const ACTIONS = [
 
 const KEYMAP_KEY = "gbc_keymap_v1";
 const VOLUME_KEY = "gbc_volume_v1";
+const SRAM_KEY_PREFIX = "gbc_save_v1:";
+const saveRuntimeState = {
+  activeRomId: "",
+  activeRomName: "",
+};
+
+function bytesToHex(bytes) {
+  let out = "";
+  for (let i = 0; i < bytes.length; i++) {
+    out += bytes[i].toString(16).padStart(2, "0");
+  }
+  return out;
+}
+
+function bytesToBase64(bytes) {
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const end = Math.min(bytes.length, i + chunkSize);
+    let chunk = "";
+    for (let j = i; j < end; j++) chunk += String.fromCharCode(bytes[j]);
+    binary += chunk;
+  }
+  return btoa(binary);
+}
+
+function base64ToBytes(b64) {
+  const binary = atob(b64);
+  const out = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i) & 0xff;
+  return out;
+}
+
+function fnv1a64Hex(bytes) {
+  let h = 0xcbf29ce484222325n;
+  const prime = 0x100000001b3n;
+  const mask = 0xffffffffffffffffn;
+  for (let i = 0; i < bytes.length; i++) {
+    h ^= BigInt(bytes[i]);
+    h = (h * prime) & mask;
+  }
+  return h.toString(16).padStart(16, "0");
+}
+
+async function computeRomContentId(bytes) {
+  try {
+    if (globalThis.crypto?.subtle?.digest) {
+      const digest = await globalThis.crypto.subtle.digest("SHA-256", bytes);
+      return `sha256:${bytesToHex(new Uint8Array(digest))}`;
+    }
+  } catch (err) {
+    console.warn("SHA-256 unavailable, falling back to FNV-1a:", err);
+  }
+  return `fnv1a64:${fnv1a64Hex(bytes)}`;
+}
+
+function getActiveSramStorageKey() {
+  if (!saveRuntimeState.activeRomId) return "";
+  return `${SRAM_KEY_PREFIX}${saveRuntimeState.activeRomId}`;
+}
+
+function setActiveRomSaveIdentity(romId, romName) {
+  saveRuntimeState.activeRomId = String(romId || "");
+  saveRuntimeState.activeRomName = String(romName || "");
+}
+
+globalThis.IroGBSaves = {
+  setActiveRomSaveIdentity,
+  getActiveSramKey() {
+    return getActiveSramStorageKey();
+  },
+  loadActiveSram() {
+    try {
+      const key = getActiveSramStorageKey();
+      if (!key) return null;
+
+      const raw = localStorage.getItem(key);
+      if (!raw) return null;
+
+      let payload = null;
+      try {
+        payload = JSON.parse(raw);
+      } catch {
+        // Accept legacy/plain values if needed.
+      }
+
+      if (payload && typeof payload.b64 === "string") {
+        return base64ToBytes(payload.b64);
+      }
+      if (typeof raw === "string" && raw) {
+        return base64ToBytes(raw);
+      }
+      return null;
+    } catch (err) {
+      console.warn("Failed to read SRAM from localStorage:", err);
+      return null;
+    }
+  },
+  saveActiveSram(bytes) {
+    try {
+      if (!(bytes instanceof Uint8Array)) return false;
+      const key = getActiveSramStorageKey();
+      if (!key) return false;
+
+      const payload = {
+        v: 1,
+        romId: saveRuntimeState.activeRomId,
+        romName: saveRuntimeState.activeRomName,
+        len: bytes.length,
+        updatedAt: Date.now(),
+        b64: bytesToBase64(bytes),
+      };
+      localStorage.setItem(key, JSON.stringify(payload));
+      return true;
+    } catch (err) {
+      console.warn("Failed to write SRAM to localStorage:", err);
+      return false;
+    }
+  },
+};
 
 function defaultKeymap() {
   const m = {};
@@ -509,6 +629,18 @@ var Module = {
     const volumeValue = document.getElementById("volumeValue");
     const keybindList = document.getElementById("keybindList");
     const keybindReset = document.getElementById("keybindReset");
+    const flushSramNow = () => {
+      try {
+        if (typeof Module._emscripten_flush_save === "function") {
+          Module._emscripten_flush_save();
+        }
+      } catch (err) {
+        console.warn("SRAM flush on page unload failed:", err);
+      }
+    };
+
+    window.addEventListener("pagehide", flushSramNow);
+    window.addEventListener("beforeunload", flushSramNow);
 
     setupCanvasFocus(canvas);
     setupFullscreen(canvas);
@@ -632,6 +764,9 @@ var Module = {
 
     const loadRomBytes = async (bytes, nameForUi) => {
       touch.clearAll();
+      status.textContent = "Hashing ROM…";
+      const romId = await computeRomContentId(bytes);
+      setActiveRomSaveIdentity(romId, nameForUi || "ROM");
       setLoadedUI(nameForUi);
       FS.writeFile("/rom.bin", bytes);
 

@@ -18,6 +18,11 @@ EMSCRIPTEN_KEEPALIVE void emscripten_start() {
   g_frontend = std::make_unique<RaylibFrontend>(c);
   g_frontend->start();
 }
+
+EMSCRIPTEN_KEEPALIVE void emscripten_flush_save() {
+  if (g_frontend)
+    g_frontend->flush_web_save_now();
+}
 }
 
 int main() { return 0; }

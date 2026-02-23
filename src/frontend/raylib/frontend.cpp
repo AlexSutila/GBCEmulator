@@ -2,12 +2,50 @@
 #include "gbc.hpp"
 #include "memory/mmio/dmg.hpp"
 #include "memory/mmio/mmio.hpp"
+#include <algorithm>
+#include <cstdint>
 #include <cstring>
 #include <raylib.h>
 #include <stdexcept>
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
+
+EM_JS(int, web_load_active_save, (std::uint8_t * out_ptr, int out_cap), {
+  try {
+    if (!out_ptr || out_cap <= 0) return 0;
+    const api = globalThis.IroGBSaves;
+    if (!api || typeof api.loadActiveSram !== "function") return 0;
+
+    const bytes = api.loadActiveSram();
+    if (!(bytes instanceof Uint8Array) || bytes.length === 0) return 0;
+
+    const n = Math.min(bytes.length, out_cap | 0) | 0;
+    HEAPU8.set(bytes.subarray(0, n), out_ptr >>> 0);
+    return n;
+  } catch (err) {
+    console.warn("Failed to restore SRAM from localStorage:", err);
+    return -1;
+  }
+});
+
+EM_JS(int, web_save_active_save, (const std::uint8_t * data_ptr, int len), {
+  try {
+    if (!data_ptr || len <= 0) return 0;
+    const api = globalThis.IroGBSaves;
+    if (!api || typeof api.saveActiveSram !== "function") return 0;
+
+    const start = data_ptr >>> 0;
+    const end = (start + (len | 0)) >>> 0;
+    const bytes = new Uint8Array(HEAPU8.subarray(start, end));
+    return api.saveActiveSram(bytes) ? 1 : 0;
+  } catch (err) {
+    console.warn("Failed to persist SRAM to localStorage:", err);
+    return -1;
+  }
+});
+
+constexpr double kWebSramFlushDebounceMs = 750.0;
 
 static std::uint8_t g_web_input_state = 0;
 
@@ -71,6 +109,9 @@ static std::uint32_t format_color(const std::uint32_t c) {
 RaylibFrontend::RaylibFrontend(const cart &c) { gbc->insert_cartridge(c); }
 
 RaylibFrontend::~RaylibFrontend() {
+#ifdef __EMSCRIPTEN__
+  flush_web_save_now();
+#endif
   if (audio_ready)
     ::UnloadAudioStream(audio_stream);
   CloseAudioDevice();
@@ -298,6 +339,54 @@ void RaylibFrontend::tick_common(double dt_ms) {
 }
 
 #ifdef __EMSCRIPTEN__
+void RaylibFrontend::restore_web_save() {
+  auto *const bus = gbc ? gbc->get_bus() : nullptr;
+  auto *const cart = bus ? bus->get_cartridge() : nullptr;
+  if (!cart || !cart->has_battery())
+    return;
+
+  auto ram = cart->ram();
+  if (ram.empty())
+    return;
+
+  (void)web_load_active_save(ram.data(), static_cast<int>(ram.size()));
+  cart->consume_save_event();
+}
+
+void RaylibFrontend::flush_web_save_now() {
+  auto *const bus = gbc ? gbc->get_bus() : nullptr;
+  auto *const cart = bus ? bus->get_cartridge() : nullptr;
+  if (!cart || !cart->has_battery())
+    return;
+
+  const auto ram = cart->ram();
+  if (ram.empty())
+    return;
+
+  (void)web_save_active_save(ram.data(), static_cast<int>(ram.size()));
+  web_save_pending_flush = false;
+  web_save_flush_deadline_ms = 0.0;
+}
+
+void RaylibFrontend::poll_web_save_persistence() {
+  auto *const bus = gbc ? gbc->get_bus() : nullptr;
+  auto *const cart = bus ? bus->get_cartridge() : nullptr;
+  if (!cart || !cart->has_battery())
+    return;
+
+  if (cart->ram().empty())
+    return;
+
+  const double now_ms = emscripten_get_now();
+  if (cart->consume_save_event()) {
+    web_save_pending_flush = true;
+    web_save_flush_deadline_ms = now_ms + kWebSramFlushDebounceMs;
+  }
+
+  if (web_save_pending_flush && now_ms >= web_save_flush_deadline_ms)
+    flush_web_save_now();
+}
+
 void RaylibFrontend::tick_web() {
   const double now_ms = emscripten_get_now();
   if (web_last_ms <= 0.0)
@@ -308,6 +397,7 @@ void RaylibFrontend::tick_web() {
   dt_ms = std::clamp(dt_ms, 0.0, 100.0);
 
   tick_common(dt_ms);
+  poll_web_save_persistence();
 }
 #endif
 
@@ -341,6 +431,7 @@ void RaylibFrontend::start() {
   SetTargetFPS(target_fps);
 
 #ifdef __EMSCRIPTEN__
+  restore_web_save();
   emscripten_set_main_loop_arg(frame_cb, this, 0, true);
 #else
 
