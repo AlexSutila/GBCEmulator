@@ -25,7 +25,7 @@ target_compile_options(gbc_py
     PRIVATE ${GBC_COMPILE_OPTIONS}
 )
 set_target_properties(gbc_py PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
+    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 
 ## Windows fix
