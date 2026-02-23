@@ -2,9 +2,16 @@
 #define GBC_FIFO_HPP
 
 #include "ppu/pixel.hpp"
+#include "savestate/codec.hpp"
 #include <array>
 #include <cstddef>
 #include <stdexcept>
+#include <type_traits>
+
+namespace Savestate {
+class Reader;
+class Writer;
+}
 
 /*
  * Custom FIFO implemented via circular buffer to prevent repeated heap
@@ -64,6 +71,8 @@ public:
   }
 
   void clear() noexcept { head = tail = count = 0; }
+  void savestate_serialize(Savestate::Writer &out) const;
+  void savestate_deserialize(Savestate::Reader &in);
 
 private:
   void advance_head() {
@@ -80,6 +89,51 @@ private:
   std::array<T, cap> buf{};
 };
 
+template <typename T, std::size_t cap>
+void CircularFifo<T, cap>::savestate_serialize(Savestate::Writer &out) const {
+  static_assert(std::is_trivially_copyable_v<T>);
+  out.field_u32(1, static_cast<std::uint32_t>(head));
+  out.field_u32(2, static_cast<std::uint32_t>(tail));
+  out.field_u32(3, static_cast<std::uint32_t>(count));
+  out.field(4, [&](Savestate::Writer &w) {
+    for (const auto &item : buf) {
+      const auto *p = reinterpret_cast<const byte_t *>(&item);
+      w.bytes({p, sizeof(T)});
+    }
+  });
+}
+
+template <typename T, std::size_t cap>
+void CircularFifo<T, cap>::savestate_deserialize(Savestate::Reader &in) {
+  static_assert(std::is_trivially_copyable_v<T>);
+  while (const auto field = in.next_field()) {
+    auto [id, payload] = *field;
+    switch (id) {
+    case 1:
+      head = payload.u32();
+      break;
+    case 2:
+      tail = payload.u32();
+      break;
+    case 3:
+      count = payload.u32();
+      break;
+    case 4:
+      for (auto &item : buf) {
+        auto *p = reinterpret_cast<byte_t *>(&item);
+        payload.bytes({p, sizeof(T)});
+      }
+      break;
+    default:
+      payload.skip(payload.remaining());
+      break;
+    }
+    payload.expect_eof();
+  }
+  if (head >= cap || tail >= cap || count > cap)
+    throw std::runtime_error("CircularFifo::savestate_deserialize()");
+}
+
 class BgPixelFifo {
 public:
   BgPixelFifo();
@@ -93,6 +147,8 @@ public:
   /* Should have error checking for over pushing/popping */
   void push(pixel px);
   pixel pop();
+  void savestate_serialize(Savestate::Writer &out) const;
+  void savestate_deserialize(Savestate::Reader &in);
 
 private:
   CircularFifo<pixel, 16> fifo;
@@ -113,6 +169,8 @@ public:
   /* Should have error checking for over pushing/popping */
   [[nodiscard]] bool can_pop() const;
   pixel pop();
+  void savestate_serialize(Savestate::Writer &out) const;
+  void savestate_deserialize(Savestate::Reader &in);
 
 private:
   CircularFifo<pixel, 8> fifo; // Yeah, pandocs is wrong lol

@@ -3,6 +3,7 @@
 #include "memory/bus.hpp"
 #include "memory/mmio/dmg.hpp"
 #include "memory/mmio/mmio.hpp"
+#include "savestate/codec.hpp"
 #include <stdexcept>
 
 /*
@@ -28,4 +29,29 @@ SerialUnit::SerialUnit(AddressBus *const bus)
   if (!if_reg)
     throw std::runtime_error("Failed to configure serial MMIO");
   serial_ctrl.set_interrupt_reg(if_reg);
+}
+
+enum : std::uint16_t { F_SB = 1, F_SC = 2 };
+void SerialUnit::savestate_serialize(Savestate::Writer &out) const {
+
+  out.field_u8(F_SB, serial_data.peek());
+  out.field_u8(F_SC, serial_ctrl.MMIORegister::peek());
+}
+
+void SerialUnit::savestate_deserialize(Savestate::Reader &in) {
+  while (const auto field = in.next_field()) {
+    auto [id, payload] = *field;
+    switch (id) {
+    case F_SB:
+      serial_data.MMIORegister::write(payload.u8());
+      break;
+    case F_SC:
+      serial_ctrl.MMIORegister::write(payload.u8());
+      break;
+    default:
+      payload.skip(payload.remaining());
+      break;
+    }
+    payload.expect_eof();
+  }
 }

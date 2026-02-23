@@ -81,6 +81,8 @@ public:
   void enable(bool delayed);
   void disable();
   [[nodiscard]] bool is_enabled() const;
+  [[nodiscard]] byte_t raw_state() const;
+  void load_raw_state(byte_t state);
 
   /* Call once per instruction */
   void step();

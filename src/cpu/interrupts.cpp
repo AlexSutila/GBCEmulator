@@ -65,6 +65,22 @@ bool InterruptMasterEnable::is_enabled() const {
   return ime_state == IME_ENABLED;
 }
 
+byte_t InterruptMasterEnable::raw_state() const {
+  return static_cast<byte_t>(ime_state);
+}
+
+void InterruptMasterEnable::load_raw_state(const byte_t state) {
+  switch (state) {
+  case IME_DELAYED:
+  case IME_ENABLED:
+  case IME_DISABLED:
+    ime_state = static_cast<ImeStates>(state);
+    return;
+  default:
+    throw std::runtime_error("InterruptMasterEnable::load_raw_state()");
+  }
+}
+
 /* Responsible for handling the delayed enable of the IME through `ei`. As a
  * result, this must be invoked once per instruction. */
 void InterruptMasterEnable::step() {

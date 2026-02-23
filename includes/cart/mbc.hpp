@@ -10,6 +10,10 @@
 #include <span>
 
 struct cart;
+namespace Savestate {
+class Reader;
+class Writer;
+}
 
 class Mbc {
 public:
@@ -26,6 +30,11 @@ public:
     return {};
   }
   virtual std::span<byte_t> ram() noexcept { return {}; }
+  [[nodiscard]] virtual const char *savestate_tag() const noexcept {
+    return "UNSP";
+  }
+  virtual void savestate_serialize(Savestate::Writer &) const {}
+  virtual void savestate_deserialize(Savestate::Reader &) {}
 };
 
 std::unique_ptr<Mbc> make_mbc(const cart &c);

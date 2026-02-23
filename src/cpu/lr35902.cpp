@@ -6,6 +6,7 @@
 #include "debugger/debugger.hpp"
 #include "gbc.hpp"
 #include "memory/mmio/mmio.hpp"
+#include "savestate/codec.hpp"
 
 #include <iomanip>
 #include <ios>
@@ -87,6 +88,134 @@ LR35902::ProcessorState LR35902::get_state() const {
   /* Snapshot effective IME state only */
   state_.ime_enabled = ime.is_enabled();
   return state_;
+}
+
+bool LR35902::savestate_ready() const {
+  return state == STATE_FETCH || state == STATE_HALTED;
+}
+
+enum : std::uint16_t {
+  F_PC = 1,
+  F_SP,
+  F_A,
+  F_B,
+  F_C,
+  F_D,
+  F_E,
+  F_F,
+  F_H,
+  F_L,
+  F_IME_RAW,
+  F_HALT_BUG,
+  F_CPU_STATE,
+  F_INS_BASE,
+  F_IE,
+  F_IF,
+};
+
+void LR35902::savestate_serialize(Savestate::Writer &out) const {
+  if (!savestate_ready())
+    throw std::runtime_error("LR35902::savestate_serialize() not at boundary");
+  const auto regs = get_state();
+  out.field_u16(F_PC, regs.pc);
+  out.field_u16(F_SP, regs.sp);
+  out.field_u8(F_A, regs.a);
+  out.field_u8(F_B, regs.b);
+  out.field_u8(F_C, regs.c);
+  out.field_u8(F_D, regs.d);
+  out.field_u8(F_E, regs.e);
+  out.field_u8(F_F, regs.f);
+  out.field_u8(F_H, regs.h);
+  out.field_u8(F_L, regs.l);
+  out.field_u8(F_IME_RAW, ime.raw_state());
+  out.field_bool(F_HALT_BUG, reg_file.halt_bug_triggered);
+  out.field_u8(F_CPU_STATE, static_cast<byte_t>(state));
+  out.field_u16(F_INS_BASE, ins_base_addr);
+  out.field_u8(F_IE, ie_reg.peek());
+  out.field_u8(F_IF, if_reg.peek());
+}
+
+void LR35902::savestate_deserialize(Savestate::Reader &in) {
+  ProcessorState regs = get_state();
+  byte_t ime_state = ime.raw_state();
+  reg_file.halt_bug_triggered = false;
+  auto cpu_state = static_cast<byte_t>(state);
+  byte_t ie = ie_reg.peek();
+  byte_t iff = if_reg.peek();
+
+  while (const auto field = in.next_field()) {
+    auto [id, payload] = *field;
+    switch (id) {
+    case F_PC:
+      regs.pc = payload.u16();
+      break;
+    case F_SP:
+      regs.sp = payload.u16();
+      break;
+    case F_A:
+      regs.a = payload.u8();
+      break;
+    case F_B:
+      regs.b = payload.u8();
+      break;
+    case F_C:
+      regs.c = payload.u8();
+      break;
+    case F_D:
+      regs.d = payload.u8();
+      break;
+    case F_E:
+      regs.e = payload.u8();
+      break;
+    case F_F:
+      regs.f = payload.u8();
+      break;
+    case F_H:
+      regs.h = payload.u8();
+      break;
+    case F_L:
+      regs.l = payload.u8();
+      break;
+    case F_IME_RAW:
+      ime_state = payload.u8();
+      break;
+    case F_HALT_BUG:
+      reg_file.halt_bug_triggered = payload.boolean();
+      break;
+    case F_CPU_STATE:
+      cpu_state = payload.u8();
+      break;
+    case F_INS_BASE:
+      ins_base_addr = payload.u16();
+      break;
+    case F_IE:
+      ie = payload.u8();
+      break;
+    case F_IF:
+      iff = payload.u8();
+      break;
+    default:
+      payload.skip(payload.remaining());
+      break;
+    }
+    payload.expect_eof();
+  }
+
+  if (cpu_state != STATE_FETCH && cpu_state != STATE_HALTED)
+    throw std::runtime_error(
+        "LR35902::savestate_deserialize() invalid pipeline state");
+
+  regs.ime_enabled = false;
+  load_state(regs);
+  ime.load_raw_state(ime_state);
+
+  ie_reg.write(ie);
+  if_reg.write(iff);
+
+  state = static_cast<CpuStates>(cpu_state);
+  ins_ = nullptr;
+  total_ins_clks.reset();
+  cur_ins_clks = 0;
 }
 
 // Lower bits get higher priority, return true if interrupted

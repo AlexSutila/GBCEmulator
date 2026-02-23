@@ -17,6 +17,10 @@
 
 struct runtime_sys_info;
 class BootROM;
+namespace Savestate {
+class Reader;
+class Writer;
+}
 
 enum BusConflictTypes : std::uint32_t {
   BUS_CONFLICT_NONE = 0,
@@ -88,6 +92,8 @@ public:
   void init_test_bed();
   [[nodiscard]] Cartridge *get_cartridge() noexcept { return cart_.get(); }
   [[nodiscard]] const Cartridge *get_cartridge() const noexcept { return cart_.get(); }
+  void savestate_serialize(Savestate::Writer &out) const;
+  void savestate_deserialize(Savestate::Reader &in);
 
   /* Convenience getters for PixelProcessor */
   std::array<std::unique_ptr<byte_t[]>, 2> &get_vram() { return vram; }
@@ -102,11 +108,11 @@ private:
   Joypad::JOYP joypad_;
 
   /* Facilitators for memory access and optimizing instruction fetches */
-  byte_t &vram_byte(const addr_t addr) const;
-  byte_t &wram_byte(const addr_t addr) const;
-  byte_t &echo_byte(const addr_t addr) const;
-  byte_t &oam_byte(const addr_t addr) const;
-  byte_t &hram_byte(const addr_t addr) const;
+  [[nodiscard]] byte_t &vram_byte(addr_t addr) const;
+  [[nodiscard]] byte_t &wram_byte(addr_t addr) const;
+  [[nodiscard]] byte_t &echo_byte(addr_t addr) const;
+  [[nodiscard]] byte_t &oam_byte(addr_t addr) const;
+  [[nodiscard]] byte_t &hram_byte(addr_t addr) const;
 
   /* System control registers: (speed mode, backwards compatability, etc.) */
   SYS::KEY0 key0; // Controls DMG backwards compatability

@@ -6,6 +6,11 @@
 
 #include <array>
 
+namespace Savestate {
+class Reader;
+class Writer;
+}
+
 class ColorRam {
 public:
   [[nodiscard]] std::uint32_t get_cgb_color(byte_t color_idx,
@@ -13,6 +18,8 @@ public:
   PPU::PaletteData *get_data_reg();
   PPU::PaletteIdx *get_idx_reg();
   ColorRam();
+  void savestate_serialize(Savestate::Writer &out) const;
+  void savestate_deserialize(Savestate::Reader &in);
 
 private:
   // Order here matters because C++ sucks

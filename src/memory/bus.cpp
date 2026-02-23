@@ -6,6 +6,7 @@
 #include "memory/mmio/cgb.hpp"
 #include "memory/mmio/dmg.hpp"
 #include "memory/mmio/mmio.hpp"
+#include "savestate/codec.hpp"
 
 #include <cassert>
 #include <cstddef>
@@ -268,4 +269,165 @@ void AddressBus::acquire(const BusConflictTypes conflict_mask) {
 
 void AddressBus::release(const BusConflictTypes conflict_mask) {
   bus_conflicts = bus_conflicts & ~conflict_mask;
+}
+
+enum : std::uint16_t {
+  F_VRAM = 1,
+  F_WRAM,
+  F_HRAM,
+  F_OAM,
+  F_JOYP,
+  F_VRAM_BANK_CTRL,
+  F_WRAM_BANK_CTRL,
+  F_KEY0,
+  F_KEY1,
+  F_BOOT_ROM_CTRL,
+  F_BOOT_ROM_ENABLED,
+  F_BUS_CONFLICTS,
+  F_OAM_DMA,
+  F_VDMA,
+  F_HAS_CART,
+  F_CART,
+};
+
+void AddressBus::savestate_serialize(Savestate::Writer &out) const {
+  constexpr std::size_t vram_bank_size = 0x2000;
+  constexpr std::size_t wram_bank_size = 0x1000;
+  constexpr std::size_t hram_size = 0x7F;
+  constexpr std::size_t oam_size = 0xA0;
+
+  out.field(F_VRAM, [&](Savestate::Writer &w) {
+    for (const auto &bank : vram)
+      w.bytes({bank.get(), vram_bank_size});
+  });
+  out.field(F_WRAM, [&](Savestate::Writer &w) {
+    for (const auto &bank : wram)
+      w.bytes({bank.get(), wram_bank_size});
+  });
+  out.field(F_HRAM, [&](Savestate::Writer &w) { w.bytes({hram.get(), hram_size}); });
+  out.field(F_OAM, [&](Savestate::Writer &w) { w.bytes({oam.get(), oam_size}); });
+
+  const auto [buttons, select, last_low] = joypad_.savestate_get();
+  out.field(F_JOYP, [&](Savestate::Writer &w) {
+    w.field_u8(1, buttons);
+    w.field_u8(2, select);
+    w.field_u8(3, last_low);
+  });
+
+  out.field_u8(F_VRAM_BANK_CTRL, vram_bank_ctrl.MMIORegister::peek());
+  out.field_u8(F_WRAM_BANK_CTRL, wram_bank_ctrl.MMIORegister::peek());
+  out.field_u8(F_KEY0, key0.MMIORegister::peek());
+  out.field_u8(F_KEY1, key1.MMIORegister::peek());
+  out.field_u8(F_BOOT_ROM_CTRL, boot_rom_ctrl.MMIORegister::peek());
+  out.field_bool(F_BOOT_ROM_ENABLED, boot_rom_ctrl.boot_rom_enabled());
+  out.field_u32(F_BUS_CONFLICTS, static_cast<std::uint32_t>(bus_conflicts));
+
+  out.field(F_OAM_DMA, [&](Savestate::Writer &w) { oam_dma.savestate_serialize(w); });
+  out.field(F_VDMA, [&](Savestate::Writer &w) { vdma.savestate_serialize(w); });
+
+  out.field_bool(F_HAS_CART, cart_ != nullptr);
+  if (cart_)
+    out.field(F_CART, [&](Savestate::Writer &w) { cart_->savestate_serialize(w); });
+}
+
+void AddressBus::savestate_deserialize(Savestate::Reader &in) {
+  std::optional<bool> has_cart = std::nullopt;
+  while (const auto field = in.next_field()) {
+    constexpr std::size_t vram_bank_size = 0x2000;
+    constexpr std::size_t wram_bank_size = 0x1000;
+    constexpr std::size_t hram_size = 0x7F;
+    constexpr std::size_t oam_size = 0xA0;
+    auto [id, payload] = *field;
+    switch (id) {
+    case F_VRAM:
+      for (auto &bank : vram)
+        payload.bytes({bank.get(), vram_bank_size});
+      break;
+    case F_WRAM:
+      for (auto &bank : wram)
+        payload.bytes({bank.get(), wram_bank_size});
+      break;
+    case F_HRAM:
+      if (payload.remaining() != hram_size)
+        throw std::runtime_error("AddressBus::savestate_deserialize() hram");
+      payload.bytes({hram.get(), hram_size});
+      break;
+    case F_OAM:
+      if (payload.remaining() != oam_size)
+        throw std::runtime_error("AddressBus::savestate_deserialize() oam");
+      payload.bytes({oam.get(), oam_size});
+      break;
+    case F_JOYP: {
+      Joypad::JOYP::SavestateState s{};
+      while (const auto joy_f = payload.next_field()) {
+        auto [id_inner, payload_inner] = *joy_f;
+        switch (id_inner) {
+        case 1:
+          s.buttons = payload_inner.u8();
+          break;
+        case 2:
+          s.select = payload_inner.u8();
+          break;
+        case 3:
+          s.last_low = payload_inner.u8();
+          break;
+        default:
+          payload_inner.skip(payload_inner.remaining());
+          break;
+        }
+        payload_inner.expect_eof();
+      }
+      joypad_.savestate_load(s);
+      break;
+    }
+    case F_VRAM_BANK_CTRL:
+      vram_bank_ctrl.MMIORegister::write(payload.u8());
+      break;
+    case F_WRAM_BANK_CTRL:
+      wram_bank_ctrl.MMIORegister::write(payload.u8());
+      break;
+    case F_KEY0:
+      key0.MMIORegister::write(payload.u8());
+      break;
+    case F_KEY1:
+      key1.MMIORegister::write(payload.u8());
+      break;
+    case F_BOOT_ROM_CTRL:
+      boot_rom_ctrl.MMIORegister::write(payload.u8());
+      break;
+    case F_BOOT_ROM_ENABLED:
+      boot_rom_ctrl.set_boot_rom_enabled(payload.boolean());
+      break;
+    case F_BUS_CONFLICTS:
+      bus_conflicts = static_cast<BusConflictTypes>(payload.u32());
+      break;
+    case F_OAM_DMA:
+      oam_dma.savestate_deserialize(payload);
+      break;
+    case F_VDMA:
+      vdma.savestate_deserialize(payload);
+      break;
+    case F_HAS_CART:
+      has_cart = payload.boolean();
+      break;
+    case F_CART:
+      if (!cart_)
+        throw std::runtime_error("AddressBus::savestate_deserialize() no cart");
+      cart_->savestate_deserialize(payload);
+      break;
+    default:
+      payload.skip(payload.remaining());
+      break;
+    }
+    payload.expect_eof();
+  }
+
+  if (has_cart.has_value()) {
+    if (has_cart.value()) {
+      if (!cart_)
+        throw std::runtime_error("AddressBus::savestate_deserialize() no cart");
+    } else if (cart_) {
+      throw std::runtime_error("AddressBus::savestate_deserialize() cart mismatch");
+    }
+  }
 }

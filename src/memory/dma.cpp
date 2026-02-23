@@ -3,8 +3,10 @@
 #include "memory/bus.hpp"
 #include "memory/mmio/cgb.hpp"
 #include "memory/mmio/dmg.hpp"
+#include "savestate/codec.hpp"
 #include <cassert>
 #include <optional>
+#include <stdexcept>
 
 inline byte_t vdma_bytes_to_blks(const std::size_t bytes) {
   constexpr auto blk_size_bytes = 0x10;
@@ -102,6 +104,56 @@ void ObjAttrDMA::step() {
     break;
   default:
     break;
+  }
+}
+
+enum : std::uint16_t {
+  F_OA_SRC_BASE = 1,
+  F_OA_DATA_OFFSET,
+  F_OA_STATE,
+  F_OA_DMA_REG,
+  F_OA_CLOCKS_REMAINING,
+};
+
+void ObjAttrDMA::savestate_serialize(Savestate::Writer &out) const {
+  out.field_u16(F_OA_SRC_BASE, src_base_addr);
+  out.field_u16(F_OA_DATA_OFFSET, data_offset);
+  out.field_u8(F_OA_STATE, static_cast<byte_t>(state));
+  out.field_u8(F_OA_DMA_REG, dma_.peek());
+  if (clocks_remaining.has_value())
+    out.field_u32(F_OA_CLOCKS_REMAINING,
+                  static_cast<std::uint32_t>(clocks_remaining.value()));
+}
+
+void ObjAttrDMA::savestate_deserialize(Savestate::Reader &in) {
+  clocks_remaining.reset();
+  while (const auto field = in.next_field()) {
+    auto [id, payload] = *field;
+    switch (id) {
+    case F_OA_SRC_BASE:
+      src_base_addr = payload.u16();
+      break;
+    case F_OA_DATA_OFFSET:
+      data_offset = payload.u16();
+      break;
+    case F_OA_STATE: {
+      const auto raw_state = payload.u8();
+      if (raw_state > STATE_OAMDMA_TRAN)
+        throw std::runtime_error("ObjAttrDMA::savestate_deserialize()");
+      state = static_cast<State>(raw_state);
+      break;
+    }
+    case F_OA_DMA_REG:
+      dma_.MMIORegister::write(payload.u8());
+      break;
+    case F_OA_CLOCKS_REMAINING:
+      clocks_remaining = payload.u32();
+      break;
+    default:
+      payload.skip(payload.remaining());
+      break;
+    }
+    payload.expect_eof();
   }
 }
 
@@ -205,10 +257,9 @@ void VDMA::transfer_byte(const addr_t offset) const {
 }
 
 void VDMA::do_init(const State next_state) {
-  constexpr auto total_init_clks = 4; // Four T-cycles
-
   // State entry logic
   if (!clocks_remaining.has_value()) {
+    constexpr auto total_init_clks = 4;
     clocks_remaining = total_init_clks;
 
     // Sample address values and size
@@ -326,5 +377,86 @@ void VDMA::step() {
     break;
   default:
     break;
+  }
+}
+
+enum : std::uint16_t {
+  F_VD_SRC_BASE = 1,
+  F_VD_DEST_BASE,
+  F_VD_DATA_OFFSET,
+  F_VD_TRANSFER_SIZE,
+  F_VD_CAN_START_HDMA,
+  F_VD_STATE,
+  F_VD_VDMA1,
+  F_VD_VDMA2,
+  F_VD_VDMA3,
+  F_VD_VDMA4,
+  F_VD_CLOCKS_REMAINING,
+};
+
+void VDMA::savestate_serialize(Savestate::Writer &out) const {
+
+  out.field_u16(F_VD_SRC_BASE, src_base_addr);
+  out.field_u16(F_VD_DEST_BASE, dest_base_addr);
+  out.field_u16(F_VD_DATA_OFFSET, data_offset);
+  out.field_u16(F_VD_TRANSFER_SIZE, transfer_size);
+  out.field_bool(F_VD_CAN_START_HDMA, can_start_hdma);
+  out.field_u8(F_VD_STATE, static_cast<byte_t>(state));
+  out.field_u8(F_VD_VDMA1, vdma1_.get_addr_bits());
+  out.field_u8(F_VD_VDMA2, vdma2_.get_addr_bits());
+  out.field_u8(F_VD_VDMA3, vdma3_.get_addr_bits());
+  out.field_u8(F_VD_VDMA4, vdma4_.get_addr_bits());
+  if (clocks_remaining.has_value())
+    out.field_u32(F_VD_CLOCKS_REMAINING,
+                  static_cast<std::uint32_t>(clocks_remaining.value()));
+}
+
+void VDMA::savestate_deserialize(Savestate::Reader &in) {
+  clocks_remaining.reset();
+  while (const auto field = in.next_field()) {
+    auto [id, payload] = *field;
+    switch (id) {
+    case F_VD_SRC_BASE:
+      src_base_addr = payload.u16();
+      break;
+    case F_VD_DEST_BASE:
+      dest_base_addr = payload.u16();
+      break;
+    case F_VD_DATA_OFFSET:
+      data_offset = payload.u16();
+      break;
+    case F_VD_TRANSFER_SIZE:
+      transfer_size = payload.u16();
+      break;
+    case F_VD_CAN_START_HDMA:
+      can_start_hdma = payload.boolean();
+      break;
+    case F_VD_STATE: {
+      const auto raw_state = payload.u8();
+      if (raw_state > STATE_HDMA_TRAN)
+        throw std::runtime_error("VDMA::savestate_deserialize()");
+      state = static_cast<State>(raw_state);
+      break;
+    }
+    case F_VD_VDMA1:
+      vdma1_.MMIORegister::write(payload.u8());
+      break;
+    case F_VD_VDMA2:
+      vdma2_.MMIORegister::write(payload.u8());
+      break;
+    case F_VD_VDMA3:
+      vdma3_.MMIORegister::write(payload.u8());
+      break;
+    case F_VD_VDMA4:
+      vdma4_.MMIORegister::write(payload.u8());
+      break;
+    case F_VD_CLOCKS_REMAINING:
+      clocks_remaining = payload.u32();
+      break;
+    default:
+      payload.skip(payload.remaining());
+      break;
+    }
+    payload.expect_eof();
   }
 }

@@ -132,6 +132,10 @@ void BootROMCtrl::write(const byte_t value) {
 
 bool BootROMCtrl::boot_rom_enabled() const { return map_boot_rom; }
 
+void BootROMCtrl::set_boot_rom_enabled(const bool enabled) {
+  map_boot_rom = enabled;
+}
+
 namespace Timer {
 
 DIV::DIV(TimerUnit &t) : t_(t) {}

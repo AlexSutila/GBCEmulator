@@ -14,6 +14,10 @@
 #include <vector>
 
 namespace fs = std::filesystem;
+namespace Savestate {
+class Reader;
+class Writer;
+}
 
 constexpr std::size_t kHeaderStart = 0x0100;
 constexpr std::size_t kHeaderEnd = 0x014F;
@@ -98,6 +102,8 @@ public:
   [[nodiscard]] std::span<byte_t> ram() noexcept { return mbc_->ram(); }
   bool load_save_file(const fs::path &save_path);
   bool write_save_file(const fs::path &save_path) const;
+  void savestate_serialize(Savestate::Writer &out) const;
+  void savestate_deserialize(Savestate::Reader &in);
   bool consume_save_event() noexcept {
     return save_dirty_.exchange(false, std::memory_order_acq_rel);
   }

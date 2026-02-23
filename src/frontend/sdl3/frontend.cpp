@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <fstream>
 #include <picosha2.h>
 #include <span>
 
@@ -437,6 +438,44 @@ void SDL3Frontend::emulation_thread_fn(
   if (!joypad)
     throw std::logic_error("Failed to configure joypad input");
   auto next_save_poll = Clock::now();
+  quicksave_requested.store(false, std::memory_order_relaxed);
+  quickload_requested.store(false, std::memory_order_relaxed);
+  const auto quickstate_path = [&]() -> std::filesystem::path {
+    if (!c.file_path.empty()) {
+      return c.file_path.parent_path() /
+             (c.file_path.stem().string() + ".state");
+    }
+    return std::filesystem::current_path() / "quicksave.state";
+  }();
+  const auto write_blob = [](const std::filesystem::path &path,
+                             const std::vector<byte_t> &data) -> bool {
+    if (path.empty() || data.empty())
+      return false;
+    if (const auto parent = path.parent_path(); !parent.empty()) {
+      std::error_code ec;
+      std::filesystem::create_directories(parent, ec);
+    }
+    std::ofstream f(path, std::ios::binary | std::ios::trunc);
+    if (!f)
+      return false;
+    f.write(reinterpret_cast<const char *>(data.data()),
+            static_cast<std::streamsize>(data.size()));
+    return static_cast<bool>(f);
+  };
+  const auto read_blob = [](const std::filesystem::path &path)
+      -> std::optional<std::vector<byte_t>> {
+    std::ifstream f(path, std::ios::binary | std::ios::ate);
+    if (!f)
+      return std::nullopt;
+    const auto size = f.tellg();
+    if (size <= 0)
+      return std::nullopt;
+    std::vector<byte_t> buf(size);
+    f.seekg(0, std::ios::beg);
+    if (!f.read(reinterpret_cast<char *>(buf.data()), size))
+      return std::nullopt;
+    return buf;
+  };
 
   /* Run emulation in real-time */
   while (!st.stop_requested()) [[likely]] {
@@ -468,6 +507,44 @@ void SDL3Frontend::emulation_thread_fn(
 
     /* Update the fuck ass debugger */
     debugger.forward_stop(gbc);
+
+    if (gbc && gbc->savestate_ready()) {
+      if (quicksave_requested.exchange(false, std::memory_order_acq_rel)) {
+        try {
+          const auto blob = gbc->serialize_savestate();
+          if (!write_blob(quickstate_path, blob)) {
+            Logger::push(LogLevel::Warning, "Savestate",
+                         "Failed to write savestate",
+                         "Could not write savestate to: " +
+                             quickstate_path.string());
+          } else {
+            Logger::push(LogLevel::Info, "Savestate", "Savestate saved",
+                         quickstate_path.string());
+          }
+        } catch (const std::exception &e) {
+          Logger::push(LogLevel::Warning, "Savestate", "Save failed", e.what());
+        }
+      }
+
+      if (quickload_requested.exchange(false, std::memory_order_acq_rel)) {
+        try {
+          if (const auto blob = read_blob(quickstate_path); !blob.has_value()) {
+            Logger::push(LogLevel::Warning, "Savestate",
+                         "Savestate file not found",
+                         "Could not read savestate from: " +
+                             quickstate_path.string());
+          } else {
+            gbc->deserialize_savestate(*blob);
+            host.clear_audio_stream();
+            video_dirty.store(true, std::memory_order_release);
+            Logger::push(LogLevel::Info, "Savestate", "Savestate loaded",
+                         quickstate_path.string());
+          }
+        } catch (const std::exception &e) {
+          Logger::push(LogLevel::Warning, "Savestate", "Load failed", e.what());
+        }
+      }
+    }
 
     if (const auto now = Clock::now(); now >= next_save_poll) {
       next_save_poll = now + std::chrono::milliseconds(250);
@@ -558,6 +635,13 @@ void SDL3Frontend::handle_controller_press(SDL_GamepadButton btn,
 }
 
 void SDL3Frontend::handle_keypress(const SDL_Keycode key, const bool pressed) {
+  if (pressed && key == SDLK_F5) {
+    quicksave_requested.store(true, std::memory_order_release);
+  }
+  if (pressed && key == SDLK_F8) {
+    quickload_requested.store(true, std::memory_order_release);
+  }
+
   // Emulator input
   if (const byte_t mask = button_mask_for_key(key); mask != 0) {
     byte_t current = input_state.buttons.load(std::memory_order_relaxed);

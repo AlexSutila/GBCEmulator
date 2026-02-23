@@ -121,6 +121,10 @@ private:
   bool load_save_dialog_inflight{false};
   std::string active_rom_hash;
 
+  // Savestate hotkeys (handled on emulation thread at safe points)
+  std::atomic<bool> quicksave_requested{false};
+  std::atomic<bool> quickload_requested{false};
+
   // Resize/move redraw tuning
   std::atomic<std::int64_t> suppress_vsync_until_ns{0};
   std::atomic<std::int64_t> last_forced_redraw_ns{0};

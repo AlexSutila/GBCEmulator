@@ -11,6 +11,20 @@ JOYP::JOYP() : MMIORegister(0), select_bits(select_mask), last_low(0x0F) {}
 
 void JOYP::set_interrupt_reg(InterruptBits *reg) { if_reg = reg; }
 
+JOYP::SavestateState JOYP::savestate_get() const {
+  return {
+      .buttons = state,
+      .select = select_bits,
+      .last_low = last_low,
+  };
+}
+
+void JOYP::savestate_load(const SavestateState &snapshot) {
+  state = snapshot.buttons;
+  select_bits = snapshot.select & select_mask;
+  last_low = snapshot.last_low & 0x0F;
+}
+
 void JOYP::set_button(JoypadButton button, const bool pressed) {
   const auto mask = static_cast<byte_t>(button);
   if (pressed)
