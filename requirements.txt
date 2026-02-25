@@ -1,5 +1,0 @@
-matplotlib
-pydantic
-requests
-pandas
-pytest
