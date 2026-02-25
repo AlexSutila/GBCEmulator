@@ -49,8 +49,10 @@ LR35902::LR35902(AddressBus *bus_ptr, std::optional<Debug::Debugger> &debugger,
   /* Configure interrupts */
   if (!bus)
     throw std::logic_error("LR35902::LR35902() bus_ptr is `nullptr`");
-  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_INT_FLAGS), &if_reg);
-  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_INT_ENABLE), &ie_reg);
+  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_INT_FLAGS), &if_reg,
+                    MMIOSavestatePolicy::BusAuto);
+  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_INT_ENABLE), &ie_reg,
+                    MMIOSavestatePolicy::BusAuto);
 }
 
 void LR35902::load_state(const ProcessorState state_) {
@@ -109,8 +111,6 @@ enum : std::uint16_t {
   F_HALT_BUG,
   F_CPU_STATE,
   F_INS_BASE,
-  F_IE,
-  F_IF,
 };
 
 void LR35902::savestate_serialize(Savestate::Writer &out) const {
@@ -131,8 +131,6 @@ void LR35902::savestate_serialize(Savestate::Writer &out) const {
   out.field_bool(F_HALT_BUG, reg_file.halt_bug_triggered);
   out.field_u8(F_CPU_STATE, static_cast<byte_t>(state));
   out.field_u16(F_INS_BASE, ins_base_addr);
-  out.field_u8(F_IE, ie_reg.peek());
-  out.field_u8(F_IF, if_reg.peek());
 }
 
 void LR35902::savestate_deserialize(Savestate::Reader &in) {
@@ -140,8 +138,6 @@ void LR35902::savestate_deserialize(Savestate::Reader &in) {
   byte_t ime_state = ime.raw_state();
   reg_file.halt_bug_triggered = false;
   auto cpu_state = static_cast<byte_t>(state);
-  byte_t ie = ie_reg.peek();
-  byte_t iff = if_reg.peek();
 
   while (const auto field = in.next_field()) {
     auto [id, payload] = *field;
@@ -188,12 +184,6 @@ void LR35902::savestate_deserialize(Savestate::Reader &in) {
     case F_INS_BASE:
       ins_base_addr = payload.u16();
       break;
-    case F_IE:
-      ie = payload.u8();
-      break;
-    case F_IF:
-      iff = payload.u8();
-      break;
     default:
       payload.skip(payload.remaining());
       break;
@@ -208,9 +198,6 @@ void LR35902::savestate_deserialize(Savestate::Reader &in) {
   regs.ime_enabled = false;
   load_state(regs);
   ime.load_raw_state(ime_state);
-
-  ie_reg.write(ie);
-  if_reg.write(iff);
 
   state = static_cast<CpuStates>(cpu_state);
   ins_ = nullptr;

@@ -63,7 +63,7 @@ constexpr BusConflictTypes operator~(const BusConflictTypes a) {
  */
 class AddressBus final : Debug::Debuggable {
 public:
-  void write_byte(addr_t addr, byte_t value);
+  void write_byte(addr_t addr, byte_t value) const;
   [[nodiscard]] byte_t read_byte(addr_t addr, bool debug = true) const;
   ObjAttrDMA &get_oam_dma() { return oam_dma; };
   VDMA &get_vdma() { return vdma; }
@@ -78,7 +78,8 @@ public:
              std::optional<BootROM> &bios);
 
   /* For attaching MMIO component interface registers */
-  void connect_mmio(addr_t addr, MMIORegister *reg);
+  void connect_mmio(addr_t addr, MMIORegister *reg,
+                    MMIOSavestatePolicy policy = MMIOSavestatePolicy::OwnerManaged);
   [[nodiscard]] MMIORegister *get_mmio(IORegisterMapping mapping) const;
 
   /* Bus conflict management */
@@ -134,7 +135,11 @@ private:
   [[nodiscard]] bool is_conflicting(addr_t addr) const;
   BusConflictTypes bus_conflicts{};
 
-  std::map<addr_t, MMIORegister *> io_registers{};
+  struct ConnectedMMIO {
+    MMIORegister *reg{};
+    MMIOSavestatePolicy savestate_policy{MMIOSavestatePolicy::OwnerManaged};
+  };
+  std::map<addr_t, ConnectedMMIO> io_registers{};
   [[nodiscard]] bool is_boot_rom_range(addr_t a) const;
   std::optional<BootROM> &bios_;
   [[maybe_unused]] runtime_sys_info &sys_;

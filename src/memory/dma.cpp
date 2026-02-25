@@ -111,7 +111,6 @@ enum : std::uint16_t {
   F_OA_SRC_BASE = 1,
   F_OA_DATA_OFFSET,
   F_OA_STATE,
-  F_OA_DMA_REG,
   F_OA_CLOCKS_REMAINING,
 };
 
@@ -119,7 +118,6 @@ void ObjAttrDMA::savestate_serialize(Savestate::Writer &out) const {
   out.field_u16(F_OA_SRC_BASE, src_base_addr);
   out.field_u16(F_OA_DATA_OFFSET, data_offset);
   out.field_u8(F_OA_STATE, static_cast<byte_t>(state));
-  out.field_u8(F_OA_DMA_REG, dma_.peek());
   if (clocks_remaining.has_value())
     out.field_u32(F_OA_CLOCKS_REMAINING,
                   static_cast<std::uint32_t>(clocks_remaining.value()));
@@ -143,9 +141,6 @@ void ObjAttrDMA::savestate_deserialize(Savestate::Reader &in) {
       state = static_cast<State>(raw_state);
       break;
     }
-    case F_OA_DMA_REG:
-      dma_.MMIORegister::write(payload.u8());
-      break;
     case F_OA_CLOCKS_REMAINING:
       clocks_remaining = payload.u32();
       break;
@@ -387,10 +382,6 @@ enum : std::uint16_t {
   F_VD_TRANSFER_SIZE,
   F_VD_CAN_START_HDMA,
   F_VD_STATE,
-  F_VD_VDMA1,
-  F_VD_VDMA2,
-  F_VD_VDMA3,
-  F_VD_VDMA4,
   F_VD_CLOCKS_REMAINING,
 };
 
@@ -402,10 +393,6 @@ void VDMA::savestate_serialize(Savestate::Writer &out) const {
   out.field_u16(F_VD_TRANSFER_SIZE, transfer_size);
   out.field_bool(F_VD_CAN_START_HDMA, can_start_hdma);
   out.field_u8(F_VD_STATE, static_cast<byte_t>(state));
-  out.field_u8(F_VD_VDMA1, vdma1_.get_addr_bits());
-  out.field_u8(F_VD_VDMA2, vdma2_.get_addr_bits());
-  out.field_u8(F_VD_VDMA3, vdma3_.get_addr_bits());
-  out.field_u8(F_VD_VDMA4, vdma4_.get_addr_bits());
   if (clocks_remaining.has_value())
     out.field_u32(F_VD_CLOCKS_REMAINING,
                   static_cast<std::uint32_t>(clocks_remaining.value()));
@@ -438,18 +425,6 @@ void VDMA::savestate_deserialize(Savestate::Reader &in) {
       state = static_cast<State>(raw_state);
       break;
     }
-    case F_VD_VDMA1:
-      vdma1_.MMIORegister::write(payload.u8());
-      break;
-    case F_VD_VDMA2:
-      vdma2_.MMIORegister::write(payload.u8());
-      break;
-    case F_VD_VDMA3:
-      vdma3_.MMIORegister::write(payload.u8());
-      break;
-    case F_VD_VDMA4:
-      vdma4_.MMIORegister::write(payload.u8());
-      break;
     case F_VD_CLOCKS_REMAINING:
       clocks_remaining = payload.u32();
       break;

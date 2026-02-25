@@ -42,6 +42,8 @@ public:
   void write(byte_t value) override;
   [[nodiscard]] byte_t peek() const override;
   byte_t read() override;
+  void savestate_serialize(Savestate::Writer &out) const override;
+  void savestate_deserialize(Savestate::Reader &in) override;
   explicit InterruptBits(bool pull_unused_high);
 
   void put_flag(InterruptFlagMask flag, bool value);

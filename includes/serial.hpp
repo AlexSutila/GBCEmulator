@@ -13,8 +13,8 @@ class Writer;
 class SerialUnit {
 public:
   explicit SerialUnit(AddressBus *bus);
-  void savestate_serialize(Savestate::Writer &out) const;
-  void savestate_deserialize(Savestate::Reader &in);
+  static void savestate_serialize(Savestate::Writer &out);
+  static void savestate_deserialize(Savestate::Reader &in);
 
 private:
   MMIORegister serial_data;

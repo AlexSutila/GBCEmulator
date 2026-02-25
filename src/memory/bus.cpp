@@ -82,26 +82,41 @@ AddressBus::AddressBus(runtime_sys_info &sys,
   bus_conflicts = BUS_CONFLICT_NONE;
 
   /* Connect memory mapped IO owned by address bus */
-  connect_mmio(static_cast<addr_t>(mmio::MMIO_JOYPAD), &joypad_);
-  connect_mmio(static_cast<addr_t>(mmio::MMIO_BOOT_ROM_CTRL), &boot_rom_ctrl);
-  connect_mmio(static_cast<addr_t>(mmio::MMIO_WRAM_BANK), &wram_bank_ctrl);
-  connect_mmio(static_cast<addr_t>(mmio::MMIO_VRAM_BANK), &vram_bank_ctrl);
-  connect_mmio(static_cast<addr_t>(mmio::MMIO_SPD_KEY0), &key0);
-  connect_mmio(static_cast<addr_t>(mmio::MMIO_SPD_KEY1), &key1);
+  connect_mmio(static_cast<addr_t>(mmio::MMIO_JOYPAD), &joypad_,
+               MMIOSavestatePolicy::BusAuto);
+  connect_mmio(static_cast<addr_t>(mmio::MMIO_BOOT_ROM_CTRL), &boot_rom_ctrl,
+               MMIOSavestatePolicy::BusAuto);
+  connect_mmio(static_cast<addr_t>(mmio::MMIO_WRAM_BANK), &wram_bank_ctrl,
+               MMIOSavestatePolicy::BusAuto);
+  connect_mmio(static_cast<addr_t>(mmio::MMIO_VRAM_BANK), &vram_bank_ctrl,
+               MMIOSavestatePolicy::BusAuto);
+  connect_mmio(static_cast<addr_t>(mmio::MMIO_SPD_KEY0), &key0,
+               MMIOSavestatePolicy::BusAuto);
+  connect_mmio(static_cast<addr_t>(mmio::MMIO_SPD_KEY1), &key1,
+               MMIOSavestatePolicy::BusAuto);
 
   /* Connect memory mapped IO owned by DMA modules */
-  connect_mmio(static_cast<addr_t>(mmio::MMIO_OAM_DMA), oam_dma.get_dma_reg());
-  connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA1), vdma.get_vdma1());
-  connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA2), vdma.get_vdma2());
-  connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA3), vdma.get_vdma3());
-  connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA4), vdma.get_vdma4());
+  connect_mmio(static_cast<addr_t>(mmio::MMIO_OAM_DMA), oam_dma.get_dma_reg(),
+               MMIOSavestatePolicy::BusAuto);
+  connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA1), vdma.get_vdma1(),
+               MMIOSavestatePolicy::BusAuto);
+  connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA2), vdma.get_vdma2(),
+               MMIOSavestatePolicy::BusAuto);
+  connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA3), vdma.get_vdma3(),
+               MMIOSavestatePolicy::BusAuto);
+  connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA4), vdma.get_vdma4(),
+               MMIOSavestatePolicy::BusAuto);
   connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA5), vdma.get_vdma5());
 }
 
-void AddressBus::connect_mmio(const addr_t addr, MMIORegister *const reg) {
+void AddressBus::connect_mmio(const addr_t addr, MMIORegister *const reg,
+                              const MMIOSavestatePolicy policy) {
   if (!reg)
     throw std::logic_error("AddressBus::connect_mmio() connected `nullptr`");
-  io_registers[addr] = reg;
+  io_registers[addr] = ConnectedMMIO{
+      .reg = reg,
+      .savestate_policy = policy,
+  };
 }
 
 void AddressBus::insert_cartridge(cart c) {
@@ -145,7 +160,7 @@ byte_t AddressBus::read_byte_safe(const addr_t addr) const {
   if (io_registers.contains(addr)) {
     assert((addr >= 0xFF00 && addr <= 0xFF7F) || addr == 0xFFFF);
     const auto &mmio = io_registers.at(addr);
-    return mmio->peek(); // Const
+    return mmio.reg->peek(); // Const
   }
   return read_byte(addr, false);
 }
@@ -182,8 +197,8 @@ byte_t AddressBus::read_byte(const addr_t addr, bool debug) const {
   /* Read from memory mapped IO register */
   if (io_registers.contains(addr)) {
     assert((addr >= 0xFF00 && addr <= 0xFF7F) || addr == 0xFFFF);
-    auto const &mmio = io_registers.at(addr);
-    return mmio->read();
+    const auto & [reg, savestate_policy] = io_registers.at(addr);
+    return reg->read();
   }
 
   /* Read from to High RAM */
@@ -193,7 +208,7 @@ byte_t AddressBus::read_byte(const addr_t addr, bool debug) const {
   return open_bus();
 }
 
-void AddressBus::write_byte(const addr_t addr, const byte_t value) {
+void AddressBus::write_byte(const addr_t addr, const byte_t value) const {
   if (is_conflicting(addr)) [[unlikely]]
     return;
 
@@ -221,7 +236,7 @@ void AddressBus::write_byte(const addr_t addr, const byte_t value) {
   else if (io_registers.contains(addr)) {
     assert((addr >= 0xFF00 && addr <= 0xFF7F) || addr == 0xFFFF);
     auto const &mmio = io_registers.at(addr);
-    mmio->write(value);
+    mmio.reg->write(value);
   }
 
   /* Write to High RAM */
@@ -237,7 +252,7 @@ MMIORegister *AddressBus::get_mmio(IORegisterMapping mapping) const {
   const auto addr = static_cast<addr_t>(mapping);
   assert(io_registers.contains(addr));
   /* The address bus maintains ownership, so raw pointers are fine. */
-  return io_registers.at(addr);
+  return io_registers.at(addr).reg;
 }
 
 /**
@@ -276,13 +291,7 @@ enum : std::uint16_t {
   F_WRAM,
   F_HRAM,
   F_OAM,
-  F_JOYP,
-  F_VRAM_BANK_CTRL,
-  F_WRAM_BANK_CTRL,
-  F_KEY0,
-  F_KEY1,
-  F_BOOT_ROM_CTRL,
-  F_BOOT_ROM_ENABLED,
+  F_MMIO_REGS,
   F_BUS_CONFLICTS,
   F_OAM_DMA,
   F_VDMA,
@@ -306,21 +315,17 @@ void AddressBus::savestate_serialize(Savestate::Writer &out) const {
   });
   out.field(F_HRAM, [&](Savestate::Writer &w) { w.bytes({hram.get(), hram_size}); });
   out.field(F_OAM, [&](Savestate::Writer &w) { w.bytes({oam.get(), oam_size}); });
-
-  const auto [buttons, select, last_low] = joypad_.savestate_get();
-  out.field(F_JOYP, [&](Savestate::Writer &w) {
-    w.field_u8(1, buttons);
-    w.field_u8(2, select);
-    w.field_u8(3, last_low);
+  out.field(F_MMIO_REGS, [&](Savestate::Writer &w) {
+    for (const auto &[addr, mmio] : io_registers) {
+      if (mmio.savestate_policy != MMIOSavestatePolicy::BusAuto)
+        continue;
+      w.field(addr,
+              [&](Savestate::Writer &mmio_w) {
+                mmio.reg->savestate_serialize(mmio_w);
+              });
+    }
   });
-
-  out.field_u8(F_VRAM_BANK_CTRL, vram_bank_ctrl.MMIORegister::peek());
-  out.field_u8(F_WRAM_BANK_CTRL, wram_bank_ctrl.MMIORegister::peek());
-  out.field_u8(F_KEY0, key0.MMIORegister::peek());
-  out.field_u8(F_KEY1, key1.MMIORegister::peek());
-  out.field_u8(F_BOOT_ROM_CTRL, boot_rom_ctrl.MMIORegister::peek());
-  out.field_bool(F_BOOT_ROM_ENABLED, boot_rom_ctrl.boot_rom_enabled());
-  out.field_u32(F_BUS_CONFLICTS, static_cast<std::uint32_t>(bus_conflicts));
+  out.field_u32(F_BUS_CONFLICTS, bus_conflicts);
 
   out.field(F_OAM_DMA, [&](Savestate::Writer &w) { oam_dma.savestate_serialize(w); });
   out.field(F_VDMA, [&](Savestate::Writer &w) { vdma.savestate_serialize(w); });
@@ -357,46 +362,18 @@ void AddressBus::savestate_deserialize(Savestate::Reader &in) {
         throw std::runtime_error("AddressBus::savestate_deserialize() oam");
       payload.bytes({oam.get(), oam_size});
       break;
-    case F_JOYP: {
-      Joypad::JOYP::SavestateState s{};
-      while (const auto joy_f = payload.next_field()) {
-        auto [id_inner, payload_inner] = *joy_f;
-        switch (id_inner) {
-        case 1:
-          s.buttons = payload_inner.u8();
-          break;
-        case 2:
-          s.select = payload_inner.u8();
-          break;
-        case 3:
-          s.last_low = payload_inner.u8();
-          break;
-        default:
-          payload_inner.skip(payload_inner.remaining());
-          break;
+    case F_MMIO_REGS:
+      while (const auto mmio_field = payload.next_field()) {
+        auto [mmio_addr, mmio_payload] = *mmio_field;
+        const auto it = io_registers.find(static_cast<addr_t>(mmio_addr));
+        if (it != io_registers.end() &&
+            it->second.savestate_policy == MMIOSavestatePolicy::BusAuto) {
+          it->second.reg->savestate_deserialize(mmio_payload);
+        } else {
+          mmio_payload.skip(mmio_payload.remaining());
         }
-        payload_inner.expect_eof();
+        mmio_payload.expect_eof();
       }
-      joypad_.savestate_load(s);
-      break;
-    }
-    case F_VRAM_BANK_CTRL:
-      vram_bank_ctrl.MMIORegister::write(payload.u8());
-      break;
-    case F_WRAM_BANK_CTRL:
-      wram_bank_ctrl.MMIORegister::write(payload.u8());
-      break;
-    case F_KEY0:
-      key0.MMIORegister::write(payload.u8());
-      break;
-    case F_KEY1:
-      key1.MMIORegister::write(payload.u8());
-      break;
-    case F_BOOT_ROM_CTRL:
-      boot_rom_ctrl.MMIORegister::write(payload.u8());
-      break;
-    case F_BOOT_ROM_ENABLED:
-      boot_rom_ctrl.set_boot_rom_enabled(payload.boolean());
       break;
     case F_BUS_CONFLICTS:
       bus_conflicts = static_cast<BusConflictTypes>(payload.u32());
