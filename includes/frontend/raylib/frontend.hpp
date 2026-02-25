@@ -24,6 +24,7 @@ public:
 
 #ifdef __EMSCRIPTEN__
   void tick_web();
+  void flush_web_save_now();
 #endif
 
   // samples: interleaved float PCM in [-1, 1]
@@ -82,7 +83,11 @@ private:
   void tick_common(double dt_ms);
 
 #ifdef __EMSCRIPTEN__
+  void restore_web_save();
+  void poll_web_save_persistence();
   double web_last_ms{0.0};
+  bool web_save_pending_flush{false};
+  double web_save_flush_deadline_ms{0.0};
 #endif
 
 #ifdef __EMSCRIPTEN__
