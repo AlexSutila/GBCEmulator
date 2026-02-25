@@ -23,8 +23,47 @@ class GameBoyColor:
         if cartridge is not None:
             self.insert_cartridge(cartridge)
 
+    '''
+
+    Internal helpers for argument correctness checks
+
+    '''
+
+    def _check_bitwidth_byte(self, value: int):
+        if value > 0xFF or value < 0x00:
+            raise ValueError("`value` must be 8-bits")
+
+    def _check_bitwidth_addr(self, addr: int):
+        if addr > 0xFFFF or addr < 0x0000:
+            raise ValueError("`addr` must be 16-bits")
+
+    '''
+
+    Publicly exposed interface implementation
+
+    '''
+
     def insert_cartridge(self, cartridge: Cartridge):
         self._gbc.insert_cartridge(cartridge._raw)
+
+    def read_byte(self, addr: int):
+        self._check_bitwidth_addr(addr)
+        addr_bus = self._gbc.get_bus()
+        return addr_bus.read_byte(addr)
+
+    def write_byte(self, addr: int, value: int):
+        self._check_bitwidth_addr(addr)
+        self._check_bitwidth_byte(value)
+        addr_bus = self._gbc.get_bus()
+        return addr_bus.write_byte(addr, value)
+
+    def step_frame(self):
+        cycles = 70224  # One frame worth of t-cycles
+        self.step(cycles=cycles)
+
+    def step_scanline(self):
+        cycles = 456  # One scanline worth of t-cycles
+        self.step(cycles=cycles)
 
     def step(self, cycles: int = None):
         if cycles is not None:
