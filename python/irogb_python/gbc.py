@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Callable
 
+from .ppu import PPUState, RenderedFrame
 from .cart import Cartridge
 from . import gbc_py as core
 
@@ -42,6 +43,26 @@ class GameBoyColor:
     Publicly exposed interface implementation
 
     '''
+
+    @property
+    def ppu_state(self):
+        try:
+            ppu = self._gbc.get_ppu()
+        except Exception as e:
+            raise RuntimeError(
+                "Failed to initialize PPUState core instance"
+            ) from e
+        return PPUState(ppu.get_state())
+
+    @property
+    def frame(self):
+        try:
+            frame = self._gbc.get_frame()
+        except Exception as e:
+            raise RuntimeError(
+                "Failed to acquire frame from core"
+            ) from e
+        return RenderedFrame(frame)
 
     def insert_cartridge(self, cartridge: Cartridge):
         self._gbc.insert_cartridge(cartridge._raw)
