@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Callable
 
+from .cpu import ProcessorState
 from .ppu import PPUState, RenderedFrame
 from .cart import Cartridge
 from . import gbc_py as core
@@ -43,6 +44,16 @@ class GameBoyColor:
     Publicly exposed interface implementation
 
     '''
+
+    @property
+    def cpu_state(self):
+        try:
+            cpu = self._gbc.get_cpu()
+        except Exception as e:
+            raise RuntimeError(
+                "Failed to initialize ProcessorState core instance"
+            ) from e
+        return ProcessorState(cpu.get_state())
 
     @property
     def ppu_state(self):

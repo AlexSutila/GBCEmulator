@@ -8,9 +8,14 @@ from .ppu import (
     RenderedFrame,
     PPUState,
 )
+from .utils.mooneye import (
+    run_mooneye_test,
+    eval_mooneye_cpu_state,
+)
 
 # We export some enumerations directly from the core
 from .gbc_py import (
+    # Enumerations
     BreakReason,
     StatModes,
 )
@@ -29,4 +34,8 @@ __all__ = [
     # Pixel processor sources
     "RenderedFrame",
     "PPUState",
+
+    # Utilities
+    "run_mooneye_test",
+    "eval_mooneye_cpu_state",
 ]
