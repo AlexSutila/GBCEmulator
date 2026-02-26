@@ -1,4 +1,5 @@
 #include "debugger/breakpoint.hpp"
+#include "emu_types.hpp"
 #include <iomanip>
 #include <sstream>
 #include <stdexcept>
@@ -32,7 +33,7 @@ bool Breakpoint::has_flag(const BreakReason flag) const {
   std::ostringstream out;
   out << "BP " << (exec ? 'E' : '-') << (read ? 'R' : '-')
       << (write ? 'W' : '-') << " @ 0x" << std::hex << std::uppercase
-      << std::setw(4) << std::setfill('0') << addr;
+      << std::setw(4) << std::setfill('0') << static_cast<unsigned>(addr);
   return out.str();
 }
 
