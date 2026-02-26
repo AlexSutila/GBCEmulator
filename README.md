@@ -76,11 +76,18 @@ To build one or more desktop build targets in either `Release` or `Debug` mode, 
 mkdir build/ && cd build/
 cmake .. -DCMAKE_BUILD_TYPE=Release \
     -DBUILD_FULL=ON     \
-    -DBUILD_SIMPLE=ON   \
-    -DBUILD_PYTHON=ON
+    -DBUILD_SIMPLE=ON
 ```
 
 This command builds all desktop build targets. To select one or more, simply exclude the corresponding `-DBUILD=...` argument. Building the WASM frontend follows a similar procedure but using the [emsdk](https://emscripten.org/docs/tools_reference/emsdk.html) rather than vanilla `cmake` and choice of C/C++ compiler.
+
+## Python Library
+To use as a python library, you can install the python bindings to a virtual environment built from source as follows:
+```bash
+# From repository root dir, assuming you are in a virtual environment
+python3 -m venv .venv && source .venv/bin/activate
+python3 -m pip install -e .
+```
 
 ## Authors
 1. Alex Sutila (https://github.com/alexsutila)
