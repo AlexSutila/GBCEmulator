@@ -198,37 +198,14 @@ void TimerUnit::savestate_serialize(Savestate::Writer &out) const {
 }
 
 void TimerUnit::savestate_deserialize(Savestate::Reader &in) {
-  while (const auto field = in.next_field()) {
-    auto [id, payload] = *field;
-    switch (id) {
-    case F_SYS_COUNTER:
-      sys_counter_ = payload.u16();
-      break;
-    case F_TIMA:
-      tima_ = payload.u8();
-      break;
-    case F_TMA:
-      tma_ = payload.u8();
-      break;
-    case F_TAC:
-      tac_ = static_cast<byte_t>(payload.u8() & 0x07);
-      break;
-    case F_OVERFLOW_PENDING:
-      overflow_pending_ = payload.boolean();
-      break;
-    case F_OVERFLOW_DELAY:
-      overflow_delay_ = payload.u8();
-      break;
-    case F_RELOAD_LATCH:
-      reload_latch_ = payload.boolean();
-      break;
-    case F_RELOAD_DELAY:
-      reload_delay_ = payload.u8();
-      break;
-    default:
-      payload.skip(payload.remaining());
-      break;
-    }
-    payload.expect_eof();
-  }
+  GBC_SS_DESERIALIZE_BEGIN(in)
+  GBC_SS_CASE_U16(F_SYS_COUNTER, sys_counter_);
+  GBC_SS_CASE_U8(F_TIMA, tima_);
+  GBC_SS_CASE_U8(F_TMA, tma_);
+  GBC_SS_CASE_U8_MASK(F_TAC, tac_, 0x07);
+  GBC_SS_CASE_BOOL(F_OVERFLOW_PENDING, overflow_pending_);
+  GBC_SS_CASE_U8(F_OVERFLOW_DELAY, overflow_delay_);
+  GBC_SS_CASE_BOOL(F_RELOAD_LATCH, reload_latch_);
+  GBC_SS_CASE_U8(F_RELOAD_DELAY, reload_delay_);
+  GBC_SS_DESERIALIZE_END();
 }

@@ -336,68 +336,59 @@ void AddressBus::savestate_serialize(Savestate::Writer &out) const {
 }
 
 void AddressBus::savestate_deserialize(Savestate::Reader &in) {
+  constexpr std::size_t vram_bank_size = 0x2000;
+  constexpr std::size_t wram_bank_size = 0x1000;
+  constexpr std::size_t hram_size = 0x7F;
+  constexpr std::size_t oam_size = 0xA0;
   std::optional<bool> has_cart = std::nullopt;
-  while (const auto field = in.next_field()) {
-    constexpr std::size_t vram_bank_size = 0x2000;
-    constexpr std::size_t wram_bank_size = 0x1000;
-    constexpr std::size_t hram_size = 0x7F;
-    constexpr std::size_t oam_size = 0xA0;
-    auto [id, payload] = *field;
-    switch (id) {
-    case F_VRAM:
-      for (auto &bank : vram)
-        payload.bytes({bank.get(), vram_bank_size});
-      break;
-    case F_WRAM:
-      for (auto &bank : wram)
-        payload.bytes({bank.get(), wram_bank_size});
-      break;
-    case F_HRAM:
-      if (payload.remaining() != hram_size)
-        throw std::runtime_error("AddressBus::savestate_deserialize() hram");
-      payload.bytes({hram.get(), hram_size});
-      break;
-    case F_OAM:
-      if (payload.remaining() != oam_size)
-        throw std::runtime_error("AddressBus::savestate_deserialize() oam");
-      payload.bytes({oam.get(), oam_size});
-      break;
-    case F_MMIO_REGS:
-      while (const auto mmio_field = payload.next_field()) {
-        auto [mmio_addr, mmio_payload] = *mmio_field;
-        const auto it = io_registers.find(static_cast<addr_t>(mmio_addr));
-        if (it != io_registers.end() &&
-            it->second.savestate_policy == MMIOSavestatePolicy::BusAuto) {
-          it->second.reg->savestate_deserialize(mmio_payload);
-        } else {
-          mmio_payload.skip(mmio_payload.remaining());
-        }
-        mmio_payload.expect_eof();
+  GBC_SS_DESERIALIZE_BEGIN(in)
+  case F_VRAM:
+    for (auto &bank : vram)
+      payload.bytes({bank.get(), vram_bank_size});
+    break;
+  case F_WRAM:
+    for (auto &bank : wram)
+      payload.bytes({bank.get(), wram_bank_size});
+    break;
+  case F_HRAM:
+    if (payload.remaining() != hram_size)
+      throw std::runtime_error("AddressBus::savestate_deserialize() hram");
+    payload.bytes({hram.get(), hram_size});
+    break;
+  case F_OAM:
+    if (payload.remaining() != oam_size)
+      throw std::runtime_error("AddressBus::savestate_deserialize() oam");
+    payload.bytes({oam.get(), oam_size});
+    break;
+  case F_MMIO_REGS:
+    while (const auto mmio_field = payload.next_field()) {
+      auto [mmio_addr, mmio_payload] = *mmio_field;
+      const auto it = io_registers.find(static_cast<addr_t>(mmio_addr));
+      if (it != io_registers.end() &&
+          it->second.savestate_policy == MMIOSavestatePolicy::BusAuto) {
+        it->second.reg->savestate_deserialize(mmio_payload);
+      } else {
+        mmio_payload.skip(mmio_payload.remaining());
       }
-      break;
-    case F_BUS_CONFLICTS:
-      bus_conflicts = static_cast<BusConflictTypes>(payload.u32());
-      break;
-    case F_OAM_DMA:
-      oam_dma.savestate_deserialize(payload);
-      break;
-    case F_VDMA:
-      vdma.savestate_deserialize(payload);
-      break;
-    case F_HAS_CART:
-      has_cart = payload.boolean();
-      break;
-    case F_CART:
-      if (!cart_)
-        throw std::runtime_error("AddressBus::savestate_deserialize() no cart");
-      cart_->savestate_deserialize(payload);
-      break;
-    default:
-      payload.skip(payload.remaining());
-      break;
+      mmio_payload.expect_eof();
     }
-    payload.expect_eof();
-  }
+    break;
+  case F_BUS_CONFLICTS:
+    bus_conflicts = static_cast<BusConflictTypes>(payload.u32());
+    break;
+  case F_OAM_DMA:
+    oam_dma.savestate_deserialize(payload);
+    break;
+  case F_VDMA:
+    vdma.savestate_deserialize(payload);
+    break;
+  GBC_SS_CASE_BOOL(F_HAS_CART, has_cart);
+  case F_CART:
+    if (!cart_)
+      throw std::runtime_error("AddressBus::savestate_deserialize() no cart");
+    cart_->savestate_deserialize(payload);
+    break;
+  GBC_SS_DESERIALIZE_END();
 
   if (has_cart.has_value()) {
     if (has_cart.value()) {

@@ -233,4 +233,54 @@ inline std::optional<Chunk> Reader::next_chunk() {
 
 } // namespace Savestate
 
+// Common savestate deserialize boilerplate used by many modules.
+// These macros intentionally expose local `id` and `payload` inside the switch.
+#define GBC_SS_DESERIALIZE_BEGIN(reader_)                                         \
+  while (const auto gbc_ss_field_ = (reader_).next_field()) {                     \
+    auto [id, payload] = *gbc_ss_field_;                                           \
+    switch (id) {
+
+#define GBC_SS_DESERIALIZE_END()                                                  \
+    default:                                                                      \
+      payload.skip(payload.remaining());                                          \
+      break;                                                                      \
+    }                                                                             \
+    payload.expect_eof();                                                         \
+  }
+
+#define GBC_SS_CASE_U8(field_id_, target_)                                        \
+    case field_id_:                                                               \
+      (target_) = payload.u8();                                                   \
+      break
+
+#define GBC_SS_CASE_BOOL(field_id_, target_)                                      \
+    case field_id_:                                                               \
+      (target_) = payload.boolean();                                              \
+      break
+
+#define GBC_SS_CASE_U16(field_id_, target_)                                       \
+    case field_id_:                                                               \
+      (target_) = payload.u16();                                                  \
+      break
+
+#define GBC_SS_CASE_U32(field_id_, target_)                                       \
+    case field_id_:                                                               \
+      (target_) = payload.u32();                                                  \
+      break
+
+#define GBC_SS_CASE_U64(field_id_, target_)                                       \
+    case field_id_:                                                               \
+      (target_) = payload.u64();                                                  \
+      break
+
+#define GBC_SS_CASE_U8_MASK(field_id_, target_, mask_)                            \
+    case field_id_:                                                               \
+      (target_) = static_cast<byte_t>(payload.u8() & (mask_));                    \
+      break
+
+#define GBC_SS_CASE_U16_MASK(field_id_, target_, mask_)                           \
+    case field_id_:                                                               \
+      (target_) = static_cast<std::uint16_t>(payload.u16() & (mask_));            \
+      break
+
 #endif // GBC_SAVESTATE_CODEC_HPP

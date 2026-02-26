@@ -484,62 +484,27 @@ void Fetcher::savestate_serialize(Savestate::Writer &out) const {
 
 void Fetcher::savestate_deserialize(Savestate::Reader &in) {
   total_clks.reset();
-  while (const auto field = in.next_field()) {
-    auto [id, payload] = *field;
-    switch (id) {
-    case F_STATE: {
-      const auto raw_state = payload.u8();
-      if (raw_state > STATE_SPRITE_FETCH)
-        throw std::runtime_error("Fetcher::savestate_deserialize() bad state");
-      state = static_cast<FetcherState>(raw_state);
-      break;
-    }
-    case F_PIXELS_DISCARDED:
-      pixels_discarded = payload.u8();
-      break;
-    case F_COARSE_SCROLL_X:
-      coarse_scroll_x = payload.u8();
-      break;
-    case F_FINE_SCROLL_X:
-      fine_scroll_x = payload.u8();
-      break;
-    case F_FINE_SCROLL_Y:
-      fine_scroll_y = payload.u8();
-      break;
-    case F_WIN_INTERNAL_LY:
-      win_internal_ly = payload.u8();
-      break;
-    case F_WIN_ENABLE_SAMPLE:
-      win_enable_sample = payload.boolean();
-      break;
-    case F_WIN_STARTED:
-      win_started = payload.boolean();
-      break;
-    case F_TILE_IDX:
-      data.tile_idx = payload.u32();
-      break;
-    case F_TILE_ATTR:
-      data.tile_attr = payload.u8();
-      break;
-    case F_DATA_LO:
-      data.data_lo = payload.u8();
-      break;
-    case F_DATA_HI:
-      data.data_hi = payload.u8();
-      break;
-    case F_X_COOR:
-      data.x_coor = payload.u32();
-      break;
-    case F_TOTAL_CLKS:
-      total_clks = payload.u32();
-      break;
-    case F_CUR_CLKS:
-      cur_clks = payload.u32();
-      break;
-    default:
-      payload.skip(payload.remaining());
-      break;
-    }
-    payload.expect_eof();
+  GBC_SS_DESERIALIZE_BEGIN(in)
+  case F_STATE: {
+    const auto raw_state = payload.u8();
+    if (raw_state > STATE_SPRITE_FETCH)
+      throw std::runtime_error("Fetcher::savestate_deserialize() bad state");
+    state = static_cast<FetcherState>(raw_state);
+    break;
   }
+  GBC_SS_CASE_U8(F_PIXELS_DISCARDED, pixels_discarded);
+  GBC_SS_CASE_U8(F_COARSE_SCROLL_X, coarse_scroll_x);
+  GBC_SS_CASE_U8(F_FINE_SCROLL_X, fine_scroll_x);
+  GBC_SS_CASE_U8(F_FINE_SCROLL_Y, fine_scroll_y);
+  GBC_SS_CASE_U8(F_WIN_INTERNAL_LY, win_internal_ly);
+  GBC_SS_CASE_BOOL(F_WIN_ENABLE_SAMPLE, win_enable_sample);
+  GBC_SS_CASE_BOOL(F_WIN_STARTED, win_started);
+  GBC_SS_CASE_U32(F_TILE_IDX, data.tile_idx);
+  GBC_SS_CASE_U8(F_TILE_ATTR, data.tile_attr);
+  GBC_SS_CASE_U8(F_DATA_LO, data.data_lo);
+  GBC_SS_CASE_U8(F_DATA_HI, data.data_hi);
+  GBC_SS_CASE_U32(F_X_COOR, data.x_coor);
+  GBC_SS_CASE_U32(F_TOTAL_CLKS, total_clks);
+  GBC_SS_CASE_U32(F_CUR_CLKS, cur_clks);
+  GBC_SS_DESERIALIZE_END();
 }

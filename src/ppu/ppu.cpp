@@ -610,21 +610,27 @@ enum : std::uint16_t {
   F_BG_CRAM,
 };
 
+#define PPU_SS_FOR_EACH_MMIO_REG(X)                                               \
+  X(F_LCDC, lcdc_)                                                                 \
+  X(F_STAT, stat_)                                                                 \
+  X(F_LYC, lyc_)                                                                   \
+  X(F_SCY, scy_)                                                                   \
+  X(F_SCX, scx_)                                                                   \
+  X(F_WY, wy_)                                                                     \
+  X(F_WX, wx_)                                                                     \
+  X(F_LY, ly_)                                                                     \
+  X(F_BGP, bgp_)                                                                   \
+  X(F_OBP0, obp0_)                                                                 \
+  X(F_OBP1, obp1_)                                                                 \
+  X(F_OPRI, opri_)
+
 void PixelProcessingUnit::savestate_serialize(Savestate::Writer &out) const {
   out.field_bool(F_FLUSH_ON_DISABLE, flush_on_disable);
 
-  out.field_u8(F_LCDC, lcdc_.MMIORegister::peek());
-  out.field_u8(F_STAT, stat_.MMIORegister::peek());
-  out.field_u8(F_LYC, lyc_.MMIORegister::peek());
-  out.field_u8(F_SCY, scy_.MMIORegister::peek());
-  out.field_u8(F_SCX, scx_.MMIORegister::peek());
-  out.field_u8(F_WY, wy_.MMIORegister::peek());
-  out.field_u8(F_WX, wx_.MMIORegister::peek());
-  out.field_u8(F_LY, ly_.MMIORegister::peek());
-  out.field_u8(F_BGP, bgp_.MMIORegister::peek());
-  out.field_u8(F_OBP0, obp0_.MMIORegister::peek());
-  out.field_u8(F_OBP1, obp1_.MMIORegister::peek());
-  out.field_u8(F_OPRI, opri_.MMIORegister::peek());
+  #define PPU_SS_WRITE_MMIO_REG(id_, reg_)                                         \
+    out.field_u8(id_, reg_.MMIORegister::peek());
+  PPU_SS_FOR_EACH_MMIO_REG(PPU_SS_WRITE_MMIO_REG)
+  #undef PPU_SS_WRITE_MMIO_REG
 
   out.field_u32(F_ROW_PIXELS_RENDERED, static_cast<std::uint32_t>(row_pixels_rendered));
   out.field_u32(F_SPRITES_FETCHED, static_cast<std::uint32_t>(sprites_fetched));
@@ -661,63 +667,20 @@ void PixelProcessingUnit::savestate_serialize(Savestate::Writer &out) const {
 
 void PixelProcessingUnit::savestate_deserialize(Savestate::Reader &in) {
   total_mode_clks.reset();
-  while (const auto field = in.next_field()) {
-    auto [id, payload] = *field;
-    switch (id) {
-    case F_FLUSH_ON_DISABLE:
-      flush_on_disable = payload.boolean();
+  GBC_SS_DESERIALIZE_BEGIN(in)
+  GBC_SS_CASE_BOOL(F_FLUSH_ON_DISABLE, flush_on_disable);
+  #define PPU_SS_READ_MMIO_REG(id_, reg_)                                          \
+    case id_:                                                                       \
+      reg_.MMIORegister::write(payload.u8());                                       \
       break;
-    case F_LCDC:
-      lcdc_.MMIORegister::write(payload.u8());
-      break;
-    case F_STAT:
-      stat_.MMIORegister::write(payload.u8());
-      break;
-    case F_LYC:
-      lyc_.MMIORegister::write(payload.u8());
-      break;
-    case F_SCY:
-      scy_.MMIORegister::write(payload.u8());
-      break;
-    case F_SCX:
-      scx_.MMIORegister::write(payload.u8());
-      break;
-    case F_WY:
-      wy_.MMIORegister::write(payload.u8());
-      break;
-    case F_WX:
-      wx_.MMIORegister::write(payload.u8());
-      break;
-    case F_LY:
-      ly_.MMIORegister::write(payload.u8());
-      break;
-    case F_BGP:
-      bgp_.MMIORegister::write(payload.u8());
-      break;
-    case F_OBP0:
-      obp0_.MMIORegister::write(payload.u8());
-      break;
-    case F_OBP1:
-      obp1_.MMIORegister::write(payload.u8());
-      break;
-    case F_OPRI:
-      opri_.MMIORegister::write(payload.u8());
-      break;
-    case F_ROW_PIXELS_RENDERED:
-      row_pixels_rendered = payload.u32();
-      break;
-    case F_SPRITES_FETCHED:
-      sprites_fetched = payload.u32();
-      break;
-    case F_SCANLINE_153_BUG:
-      scanline_153_bug = payload.boolean();
-      break;
-    case F_SPRITES_SEARCHED:
-      sprites_searched = payload.u32();
-      break;
-    case F_PPU_ENABLE_OAM_BUG:
-      ppu_enable_oam_bug = payload.boolean();
-      break;
+  PPU_SS_FOR_EACH_MMIO_REG(PPU_SS_READ_MMIO_REG)
+  #undef PPU_SS_READ_MMIO_REG
+
+  GBC_SS_CASE_U32(F_ROW_PIXELS_RENDERED, row_pixels_rendered);
+  GBC_SS_CASE_U32(F_SPRITES_FETCHED, sprites_fetched);
+  GBC_SS_CASE_BOOL(F_SCANLINE_153_BUG, scanline_153_bug);
+  GBC_SS_CASE_U32(F_SPRITES_SEARCHED, sprites_searched);
+  GBC_SS_CASE_BOOL(F_PPU_ENABLE_OAM_BUG, ppu_enable_oam_bug);
     case F_OAM_DATA: {
       const auto sprite_count = static_cast<std::size_t>(payload.u32());
       oam_data.clear();
@@ -733,21 +696,13 @@ void PixelProcessingUnit::savestate_deserialize(Savestate::Reader &in) {
       }
       break;
     }
-    case F_STAT_IRQ_EDGE:
-      stat_irq_signal_edge = payload.boolean();
-      break;
+  GBC_SS_CASE_BOOL(F_STAT_IRQ_EDGE, stat_irq_signal_edge);
     case F_STAT_DELAY:
       stat_delay.savestate_deserialize(payload);
       break;
-    case F_TOTAL_MODE_CLKS:
-      total_mode_clks = payload.u32();
-      break;
-    case F_CUR_SCANLINE_CLKS:
-      cur_scanline_clks = payload.u32();
-      break;
-    case F_CUR_MODE_CLKS:
-      cur_mode_clks = payload.u32();
-      break;
+  GBC_SS_CASE_U32(F_TOTAL_MODE_CLKS, total_mode_clks);
+  GBC_SS_CASE_U32(F_CUR_SCANLINE_CLKS, cur_scanline_clks);
+  GBC_SS_CASE_U32(F_CUR_MODE_CLKS, cur_mode_clks);
     case F_STATE: {
       const auto raw_state = payload.u8();
       if (raw_state > static_cast<byte_t>(PPU::StatModes::MODE_DRAWING))
@@ -770,12 +725,9 @@ void PixelProcessingUnit::savestate_deserialize(Savestate::Reader &in) {
     case F_BG_CRAM:
       bg_cram->savestate_deserialize(payload);
       break;
-    default:
-      payload.skip(payload.remaining());
-      break;
-    }
-    payload.expect_eof();
-  }
+  GBC_SS_DESERIALIZE_END();
 }
+
+#undef PPU_SS_FOR_EACH_MMIO_REG
 
 #undef DMG_COLOR_PRESERVE_HACK

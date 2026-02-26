@@ -446,49 +446,36 @@ void Cartridge::savestate_deserialize(Savestate::Reader &in) {
   bool ram_present = false;
   bool mapper_state_present = false;
 
-  while (const auto field = in.next_field()) {
-    auto [id, payload] = *field;
-    switch (id) {
-    case F_ROM_SIZE:
-      rom_size = static_cast<std::size_t>(payload.u32());
-      break;
-    case F_GLOBAL_CHECKSUM:
-      global_checksum = payload.u16();
-      break;
-    case F_HEADER_CHECKSUM:
-      header_checksum = payload.u8();
-      break;
-    case F_CART_TYPE:
-      cart_type = payload.u8();
-      break;
-    case F_MAPPER_TAG:
-      for (auto &c : tag)
-        c = static_cast<char>(payload.u8());
-      tag_present = true;
-      break;
-    case F_RAM: {
-      if (!mbc_)
-        throw std::runtime_error("Savestate: mapper missing");
-      auto ram_view = mbc_->ram();
-      if (const auto ram_size = static_cast<std::size_t>(payload.u32());
-          ram_size != ram_view.size())
-        throw std::runtime_error("Savestate: cartridge RAM size mismatch");
-      payload.bytes(ram_view);
-      ram_present = true;
-      break;
-    }
-    case F_MAPPER_STATE:
-      if (!mbc_)
-        throw std::runtime_error("Savestate: mapper missing");
-      mbc_->savestate_deserialize(payload);
-      mapper_state_present = true;
-      break;
-    default:
-      payload.skip(payload.remaining());
-      break;
-    }
-    payload.expect_eof();
+  GBC_SS_DESERIALIZE_BEGIN(in)
+  case F_ROM_SIZE:
+    rom_size = static_cast<std::size_t>(payload.u32());
+    break;
+  GBC_SS_CASE_U16(F_GLOBAL_CHECKSUM, global_checksum);
+  GBC_SS_CASE_U8(F_HEADER_CHECKSUM, header_checksum);
+  GBC_SS_CASE_U8(F_CART_TYPE, cart_type);
+  case F_MAPPER_TAG:
+    for (auto &c : tag)
+      c = static_cast<char>(payload.u8());
+    tag_present = true;
+    break;
+  case F_RAM: {
+    if (!mbc_)
+      throw std::runtime_error("Savestate: mapper missing");
+    auto ram_view = mbc_->ram();
+    if (const auto ram_size = static_cast<std::size_t>(payload.u32());
+        ram_size != ram_view.size())
+      throw std::runtime_error("Savestate: cartridge RAM size mismatch");
+    payload.bytes(ram_view);
+    ram_present = true;
+    break;
   }
+  case F_MAPPER_STATE:
+    if (!mbc_)
+      throw std::runtime_error("Savestate: mapper missing");
+    mbc_->savestate_deserialize(payload);
+    mapper_state_present = true;
+    break;
+  GBC_SS_DESERIALIZE_END();
 
   if (rom_size != image_.rom_size() ||
       global_checksum != image_.computed_global_checksum ||
