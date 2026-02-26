@@ -139,57 +139,22 @@ void LR35902::savestate_deserialize(Savestate::Reader &in) {
   reg_file.halt_bug_triggered = false;
   auto cpu_state = static_cast<byte_t>(state);
 
-  while (const auto field = in.next_field()) {
-    auto [id, payload] = *field;
-    switch (id) {
-    case F_PC:
-      regs.pc = payload.u16();
-      break;
-    case F_SP:
-      regs.sp = payload.u16();
-      break;
-    case F_A:
-      regs.a = payload.u8();
-      break;
-    case F_B:
-      regs.b = payload.u8();
-      break;
-    case F_C:
-      regs.c = payload.u8();
-      break;
-    case F_D:
-      regs.d = payload.u8();
-      break;
-    case F_E:
-      regs.e = payload.u8();
-      break;
-    case F_F:
-      regs.f = payload.u8();
-      break;
-    case F_H:
-      regs.h = payload.u8();
-      break;
-    case F_L:
-      regs.l = payload.u8();
-      break;
-    case F_IME_RAW:
-      ime_state = payload.u8();
-      break;
-    case F_HALT_BUG:
-      reg_file.halt_bug_triggered = payload.boolean();
-      break;
-    case F_CPU_STATE:
-      cpu_state = payload.u8();
-      break;
-    case F_INS_BASE:
-      ins_base_addr = payload.u16();
-      break;
-    default:
-      payload.skip(payload.remaining());
-      break;
-    }
-    payload.expect_eof();
-  }
+  GBC_SS_DESERIALIZE_BEGIN(in)
+  GBC_SS_CASE_U16(F_PC, regs.pc);
+  GBC_SS_CASE_U16(F_SP, regs.sp);
+  GBC_SS_CASE_U8(F_A, regs.a);
+  GBC_SS_CASE_U8(F_B, regs.b);
+  GBC_SS_CASE_U8(F_C, regs.c);
+  GBC_SS_CASE_U8(F_D, regs.d);
+  GBC_SS_CASE_U8(F_E, regs.e);
+  GBC_SS_CASE_U8(F_F, regs.f);
+  GBC_SS_CASE_U8(F_H, regs.h);
+  GBC_SS_CASE_U8(F_L, regs.l);
+  GBC_SS_CASE_U8(F_IME_RAW, ime_state);
+  GBC_SS_CASE_BOOL(F_HALT_BUG, reg_file.halt_bug_triggered);
+  GBC_SS_CASE_U8(F_CPU_STATE, cpu_state);
+  GBC_SS_CASE_U16(F_INS_BASE, ins_base_addr);
+  GBC_SS_DESERIALIZE_END();
 
   if (cpu_state != STATE_FETCH && cpu_state != STATE_HALTED)
     throw std::runtime_error(
