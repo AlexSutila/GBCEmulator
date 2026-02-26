@@ -1,0 +1,29 @@
+[build-system]
+requires = [
+    "scikit-build-core>=0.9",
+    "pybind11>=2.11"
+]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "irogb_python"
+version = "0.1.0"
+description = "Python wrapper around the IroGB core"
+requires-python = ">=3.8"
+dependencies = [
+    "matplotlib",
+    "pydantic",
+    "requests",
+    "pandas",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[tool.scikit-build]
+build-dir = "build/{wheel_tag}"
+wheel.packages = ["python/irogb_python"]
+
+[tool.scikit-build.cmake]
+build-type = "Release"
+args = ["-DBUILD_PYTHON=ON"]

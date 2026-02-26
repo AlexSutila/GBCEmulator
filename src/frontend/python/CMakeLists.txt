@@ -24,13 +24,15 @@ target_include_directories(gbc_py
 target_compile_options(gbc_py
     PRIVATE ${GBC_COMPILE_OPTIONS}
 )
-set_target_properties(gbc_py PROPERTIES
-    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
-)
 
-## Windows fix
+# Windows fix
 target_link_options(gbc_py PRIVATE
     -static-libgcc
     -static-libstdc++
     -lpthread
+)
+
+# Install target into proper location for usage as library
+install(TARGETS gbc_py
+    LIBRARY DESTINATION irogb_python
 )

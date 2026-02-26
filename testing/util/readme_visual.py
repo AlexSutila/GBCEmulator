@@ -1,30 +1,21 @@
 #!/usr/bin/env python3
-from gbc_py import (
-    load_cart_fs,
+from irogb_python import (
+    load_cart_filesystem,
     GameBoyColor,
 )
 from matplotlib.patches import Rectangle
 import matplotlib.pyplot as plt
 from typing import List
-import numpy as np
+import os
 
 
-def __run_and_get_frame(path: str, seconds: int) -> List[int]:
-    cart = load_cart_fs(path)
-    gbc = GameBoyColor()
-    gbc.insert_cartridge(cart)
+def run_and_get_frame(path: str, seconds: int) -> List[int]:
+    cart = load_cart_filesystem(path)
+    gbc = GameBoyColor(cartridge=cart)
 
-    gbc.step_cycles(70224 * 60 * seconds)
-    return gbc.get_frame()
-
-
-def __render_from_path(path, seconds):
-    frame = __run_and_get_frame(path, seconds)
-    frame = np.asarray(frame, dtype=np.uint32)
-
-    pixels = frame.view(np.uint8).reshape((144, 160, 4))
-    img = pixels[..., [2, 1, 0]]  # ARGB8888 → RGB
-    return img
+    for _ in range(seconds * 60):
+        gbc.step_frame()
+    return gbc.frame.as_numpy()
 
 
 def __run_test_set(
@@ -32,8 +23,10 @@ def __run_test_set(
     seconds: List[int],
     out_path: str,
 ):
-    images = [__render_from_path(path, second)
-              for path, second in zip(paths, seconds)]
+    images = [
+        run_and_get_frame(path, second)
+        for path, second in zip(paths, seconds)
+    ]
     n = len(images)
 
     rows, cols = 2, 4
@@ -67,16 +60,16 @@ def __run_test_set(
 def make_dmg_demo():
     __run_test_set(
         paths=[
-            '/home/dorce/Documents/git/GBCEmulator/roms/kirby.gb',
-            '/home/dorce/Documents/git/GBCEmulator/roms/duck_tales.gb',
-            '/home/dorce/Documents/git/GBCEmulator/roms/smb2.gb',
-            '/home/dorce/Documents/git/GBCEmulator/roms/smb.gb',
-            '/home/dorce/Documents/git/GBCEmulator/roms/zelda.gb',
-            '/home/dorce/Documents/git/GBCEmulator/roms/pk_blue.gb',
-            '/home/dorce/Documents/git/GBCEmulator/roms/pk_red.gb',
-            '/home/dorce/Documents/git/GBCEmulator/roms/castlevania.gb',
+            f'{os.getenv('ROMS')}/kirby.gb',
+            f'{os.getenv('ROMS')}/duck_tales.gb',
+            f'{os.getenv('ROMS')}/smb2.gb',
+            f'{os.getenv('ROMS')}/smb.gb',
+            f'{os.getenv('ROMS')}/zelda.gb',
+            f'{os.getenv('ROMS')}/tetris.gb',
+            f'{os.getenv('ROMS')}/pk_red.gb',
+            f'{os.getenv('ROMS')}/castlevania.gb',
         ],
-        seconds=[8, 5, 5, 7, 65, 30, 30, 15],
+        seconds=[8, 5, 5, 7, 65, 20, 30, 15],
         out_path='assets/dmg_demo.png'
     )
 
@@ -84,16 +77,16 @@ def make_dmg_demo():
 def make_cgb_demo():
     __run_test_set(
         paths=[
-            '/home/dorce/Documents/git/GBCEmulator/roms/pk_crystal.gbc',
-            '/home/dorce/Documents/git/GBCEmulator/roms/pk_silver.gbc',
-            '/home/dorce/Documents/git/GBCEmulator/roms/pk_yellow.gbc',
-            '/home/dorce/Documents/git/GBCEmulator/roms/tetris.gbc',
-            '/home/dorce/Documents/git/GBCEmulator/roms/zelda.gbc',
-            '/home/dorce/Documents/git/GBCEmulator/roms/zelda_oracle_of_seasons.gbc',
-            '/home/dorce/Documents/git/GBCEmulator/roms/zelda_oracle_of_ages.gbc',
-            '/home/dorce/Documents/git/GBCEmulator/roms/smb.gbc',
+            f'{os.getenv('ROMS')}/pk_crystal.gbc',
+            f'{os.getenv('ROMS')}/pk_silver.gbc',
+            f'{os.getenv('ROMS')}/pk_yellow.gbc',
+            f'{os.getenv('ROMS')}/tetris.gbc',
+            f'{os.getenv('ROMS')}/zelda.gbc',
+            f'{os.getenv('ROMS')}/shantae.gbc',
+            f'{os.getenv('ROMS')}/wario3.gbc',
+            f'{os.getenv('ROMS')}/smb.gbc',
         ],
-        seconds=[66, 66, 40, 20, 65, 100, 100, 15],
+        seconds=[66, 66, 38, 20, 65, 25, 45, 15],
         out_path='assets/cgb_demo.png'
     )
 

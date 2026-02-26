@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-from gbc_py import (
-    load_cart_raw,
+from irogb_python import (
+    make_cart_bytes,
     GameBoyColor,
-    Cart
+    Cartridge,
 )
 from matplotlib.patches import Rectangle
 from typing import Optional, List
@@ -75,44 +75,35 @@ BLARGG_CASES = [
 ]
 
 
-def __load_cart_from_url(url: str) -> Cart:
+def load_cart_from_url(url: str) -> Cartridge:
     resp = requests.get(url, timeout=30)
     resp.raise_for_status()
-    return load_cart_raw(resp.content)
+    return make_cart_bytes(resp.content)
 
 
-def __run_and_get_frame(url: str) -> List[int]:
-    cart = __load_cart_from_url(url)
-    gbc = GameBoyColor()
-    gbc.insert_cartridge(cart)
+def run_and_get_frame(url: str) -> List[int]:
+    cart = load_cart_from_url(url)
+    gbc = GameBoyColor(cart)
 
     # Runs for roughly one minute
-    gbc.step_cycles(70224 * 60 * 60)
-    return gbc.get_frame()
+    for _ in range(60 * 60):
+        gbc.step_frame()
+    return gbc.frame.as_numpy()
 
 
-def __render_from_url(url):
-    frame = __run_and_get_frame(url)
-    frame = np.asarray(frame, dtype=np.uint32)
-
-    pixels = frame.view(np.uint8).reshape((144, 160, 4))
-    img = pixels[..., [2, 1, 0]]  # ARGB8888 → RGB
-    return img
-
-
-def __to_digest(img: np.ndarray) -> str:
+def to_digest(img: np.ndarray) -> str:
     img = np.ascontiguousarray(img, dtype=np.uint32)
     return hashlib.md5(img.tobytes()).hexdigest()
 
 
-def __run_test_set_rendered(
+def run_test_set_rendered(
     urls: List[str],
     out_path: str,
     rows: int,
     cols: int,
     titles: Optional[List[str]] = None,
 ):
-    images = [__render_from_url(url) for url in urls]
+    images = [run_and_get_frame(url) for url in urls]
     n = len(images)
 
     if titles is not None and len(titles) != n:
@@ -154,7 +145,7 @@ def __run_test_set_rendered(
 
 
 def run_acid_test_suite():
-    __run_test_set_rendered(
+    run_test_set_rendered(
         urls=[i[1] for i in ACID_CASES],
         titles=[i[0] for i in ACID_CASES],
         rows=1,
@@ -164,7 +155,7 @@ def run_acid_test_suite():
 
 
 def run_blargg_cpu_tests():
-    __run_test_set_rendered(
+    run_test_set_rendered(
         urls=[i[1] for i in BLARGG_CASES],
         titles=[i[0] for i in BLARGG_CASES],
         rows=2,
@@ -175,15 +166,15 @@ def run_blargg_cpu_tests():
 
 @pytest.mark.parametrize("title,url,expected_md5", ACID_CASES)
 def test_acid_suite(title: str, url: str, expected_md5: str):
-    img = __render_from_url(url)
-    digest = __to_digest(img)
+    img = run_and_get_frame(url)
+    digest = to_digest(img)
     assert digest == expected_md5, f"{title} failed (got {digest})"
 
 
 @pytest.mark.parametrize("title,url,expected_md5", BLARGG_CASES)
 def test_blargg_suite(title: str, url: str, expected_md5: str):
-    img = __render_from_url(url)
-    digest = __to_digest(img)
+    img = run_and_get_frame(url)
+    digest = to_digest(img)
     assert digest == expected_md5, f"{title} failed (got {digest})"
 
 

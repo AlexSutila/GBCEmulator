@@ -78,17 +78,17 @@ static void bind_processor(const py::module_ &m) {
   // For processor state interrogation
   py::class_<LR35902::ProcessorState>(m, "ProcessorState")
       .def(py::init<>())
-      .def_readwrite("pc", &LR35902::ProcessorState::pc)
-      .def_readwrite("sp", &LR35902::ProcessorState::sp)
-      .def_readwrite("a", &LR35902::ProcessorState::a)
-      .def_readwrite("b", &LR35902::ProcessorState::b)
-      .def_readwrite("c", &LR35902::ProcessorState::c)
-      .def_readwrite("d", &LR35902::ProcessorState::d)
-      .def_readwrite("e", &LR35902::ProcessorState::e)
-      .def_readwrite("f", &LR35902::ProcessorState::f)
-      .def_readwrite("h", &LR35902::ProcessorState::h)
-      .def_readwrite("l", &LR35902::ProcessorState::l)
-      .def_readwrite("ime_enabled", &LR35902::ProcessorState::ime_enabled);
+      .def_readonly("pc", &LR35902::ProcessorState::pc)
+      .def_readonly("sp", &LR35902::ProcessorState::sp)
+      .def_readonly("a", &LR35902::ProcessorState::a)
+      .def_readonly("b", &LR35902::ProcessorState::b)
+      .def_readonly("c", &LR35902::ProcessorState::c)
+      .def_readonly("d", &LR35902::ProcessorState::d)
+      .def_readonly("e", &LR35902::ProcessorState::e)
+      .def_readonly("f", &LR35902::ProcessorState::f)
+      .def_readonly("h", &LR35902::ProcessorState::h)
+      .def_readonly("l", &LR35902::ProcessorState::l)
+      .def_readonly("ime_enabled", &LR35902::ProcessorState::ime_enabled);
 }
 
 static void bind_timer(const py::module_ &m) {
