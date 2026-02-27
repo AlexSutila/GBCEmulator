@@ -1,3 +1,5 @@
+#include "debugger/breakpoint.hpp"
+#include "emu_types.hpp"
 #include "frontend/python/testing.hpp"
 #include "frontend/python/wrappers.hpp"
 #include "ppu/ppu.hpp"
@@ -120,7 +122,7 @@ static void bind_ppu(const py::module_ &m) {
 }
 
 static void bind_debugger(const py::module_ &m) {
-  py::enum_<Debug::BreakReason>(m, "BreakReason")
+  py::enum_<Debug::BreakReason>(m, "BreakReason", py::arithmetic())
       .value("BRK_CONTINUE", Debug::BreakReason::BRK_CONTINUE)
       .value("BRK_ADDRESS_EXECUTED", Debug::BreakReason::BRK_ADDRESS_EXECUTED)
       .value("BRK_ADDRESS_READ", Debug::BreakReason::BRK_ADDRESS_READ)
@@ -129,6 +131,18 @@ static void bind_debugger(const py::module_ &m) {
       .value("BRK_STEP_INSTRUCTION", Debug::BreakReason::BRK_STEP_INSTRUCTION)
       .value("BRK_STEP_SCANLINE", Debug::BreakReason::BRK_STEP_SCANLINE)
       .value("BRK_STEP_FRAME", Debug::BreakReason::BRK_STEP_FRAME);
+  py::class_<Debug::Breakpoint>(m, "Breakpoint")
+      .def(py::init<Debug::BreakReason, addr_t>(), py::arg("reason_flags"),
+           py::arg("watch_addr"))
+      .def("eval", &Debug::Breakpoint::eval, py::arg("reason_flags"))
+      .def("has_flag", &Debug::Breakpoint::has_flag, py::arg("flag"))
+      .def("to_string", &Debug::Breakpoint::to_string);
+  py::class_<Debug::Debugger>(m, "Debugger")
+      .def(py::init<std::function<Debug::BreakReason()>>(), py::arg("callback"))
+      .def("breakpoint_add", &Debug::Debugger::breakpoint_add, py::arg("addr"),
+           py::arg("reason"))
+      .def("breakpoint_del", &Debug::Debugger::breakpoint_del, py::arg("addr"))
+      .def("get_breakpoints", &Debug::Debugger::get_breakpoints);
 }
 
 static void bind_gbc(const py::module_ &m) {
@@ -147,6 +161,8 @@ static void bind_gbc(const py::module_ &m) {
       .def("get_ppu", &PyGameBoyColor::get_ppu,
            py::return_value_policy::reference_internal)
       .def("get_timer", &PyGameBoyColor::get_timer,
+           py::return_value_policy::reference_internal)
+      .def("get_debugger", &PyGameBoyColor::get_debugger,
            py::return_value_policy::reference_internal)
       .def("put_joyp_state", &PyGameBoyColor::put_joyp_state,
            py::return_value_policy::reference_internal)

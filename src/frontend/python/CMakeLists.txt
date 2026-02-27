@@ -25,13 +25,6 @@ target_compile_options(gbc_py
     PRIVATE ${GBC_COMPILE_OPTIONS}
 )
 
-# Windows fix
-target_link_options(gbc_py PRIVATE
-    -static-libgcc
-    -static-libstdc++
-    -lpthread
-)
-
 # Install target into proper location for usage as library
 install(TARGETS gbc_py
     LIBRARY DESTINATION irogb_python

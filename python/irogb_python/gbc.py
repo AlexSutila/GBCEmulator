@@ -2,18 +2,23 @@ from __future__ import annotations
 
 from typing import Callable
 
-from .cpu import ProcessorState
 from .ppu import PPUState, RenderedFrame
+from .cpu import ProcessorState
+from .debugger import Debugger
 from .cart import Cartridge
 from . import gbc_py as core
 
 
 class GameBoyColor:
-    def __init__(self, cartridge: Cartridge = None, break_cb: Callable = None):
+    def __init__(
+        self,
+        cartridge: Cartridge = None,
+        dbg_callback: Callable = None
+    ):
         try:
             self._gbc = (
-                core.GameBoyColor(break_cb)
-                if break_cb is not None
+                core.GameBoyColor(dbg_callback)
+                if dbg_callback is not None
                 else core.GameBoyColor()
             )
         except Exception as e:
@@ -64,6 +69,16 @@ class GameBoyColor:
                 "Failed to initialize PPUState core instance"
             ) from e
         return PPUState(ppu.get_state())
+
+    @property
+    def debugger(self):
+        try:
+            debugger = self._gbc.get_debugger()
+        except Exception as e:
+            raise RuntimeError(
+                "Failed to initialize Debugger core instance"
+            ) from e
+        return Debugger(debugger)
 
     @property
     def frame(self):

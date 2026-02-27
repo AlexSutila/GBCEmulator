@@ -6,8 +6,9 @@
 #include "memory/bus.hpp"
 #include "memory/mmio/dmg.hpp"
 #include "memory/mmio/mmio.hpp"
+#include <optional>
 
-PyGameBoyColor::PyGameBoyColor(const pybind11::function& callback) {
+PyGameBoyColor::PyGameBoyColor(const pybind11::function &callback) {
   const auto &gbc = fe_.get();
 
   // Need to wrap callback and make it Python-call safe
@@ -53,6 +54,11 @@ void PyGameBoyColor::step() {
 void PyGameBoyColor::init_test_bed() {
   auto &gbc = fe_.get();
   gbc->init_test_bed();
+}
+
+std::optional<Debug::Debugger> &PyGameBoyColor::get_debugger() {
+  auto &gbc = fe_.get();
+  return gbc->get_debugger();
 }
 
 PixelProcessingUnit *PyGameBoyColor::get_ppu() {

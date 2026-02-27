@@ -2,10 +2,12 @@
 #define GBC_PY_FRONTEND_WRAPPERS_HPP
 
 #include "debugger/breakpoint.hpp"
+#include "debugger/debugger.hpp"
 #include "emu_types.hpp"
 #include "frontend/python/frontend.hpp"
 #include <array>
 #include <functional>
+#include <optional>
 #include <pybind11/pybind11.h>
 
 class PixelProcessingUnit;
@@ -46,6 +48,7 @@ public:
    * Getters exposing individual hardware components. Just because its fun, we
    * intentionally allow you to alter the state of these components arbitrarily.
    */
+  std::optional<Debug::Debugger> &get_debugger();
   PixelProcessingUnit *get_ppu();
   AddressBus *get_bus();
   TimerUnit *get_timer();
