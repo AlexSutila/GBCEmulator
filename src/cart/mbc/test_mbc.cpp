@@ -8,8 +8,8 @@
 // ---------------------------
 // This MBC does not exist lol. Basically, we want a convenient way to test the
 // accuracy of the components we are emulating, so we devised this fabricated
-// memory bank controller to act like a fat block of straight up RAM. This MBC
-// allows us to freely read and write what ever addresses we want.
+// memory bank controller to act like a fat block of straight-up RAM. This MBC
+// allows us to freely read and write whatever addresses we want.
 
 class TestMbc final : public Mbc {
 public:

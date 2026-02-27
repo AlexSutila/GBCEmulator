@@ -1,6 +1,7 @@
 #include "cart/cart.hpp"
 #include "cart/mbc.hpp"
 #include "cart/mbc_creator.hpp"
+#include "savestate/codec.hpp"
 
 // ---------------------------
 // M161 (32 KiB multicart, one-time bank switch)
@@ -37,6 +38,23 @@ public:
 
     bank_ = static_cast<byte_t>(val & 0x07);
     latched_ = true; // Any write consumes the single allowed bank switch.
+  }
+
+  [[nodiscard]] const char *savestate_tag() const noexcept override {
+    return "M161";
+  }
+  enum : std::uint16_t { F_BANK = 1, F_LATCHED };
+  void savestate_serialize(Savestate::Writer &out) const override {
+    out.field_u8(F_BANK, bank_);
+    out.field_bool(F_LATCHED, latched_);
+  }
+  void savestate_deserialize(Savestate::Reader &in) override {
+    GBC_SS_DESERIALIZE_BEGIN(in)
+    case F_BANK:
+      bank_ = static_cast<byte_t>(payload.u8() & 0x07);
+      break;
+    GBC_SS_CASE_BOOL(F_LATCHED, latched_);
+    GBC_SS_DESERIALIZE_END();
   }
 
 private:

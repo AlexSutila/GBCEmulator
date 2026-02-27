@@ -1,6 +1,7 @@
 #include "cart/cart.hpp"
 #include "cart/mbc.hpp"
 #include "cart/mbc_creator.hpp"
+#include "savestate/codec.hpp"
 
 // ---------------------------
 // TAMA5 (Bandai)
@@ -129,6 +130,60 @@ public:
     return save_;
   }
   std::span<byte_t> ram() noexcept override { return save_; }
+  [[nodiscard]] const char *savestate_tag() const noexcept override {
+    return "TAM5";
+  }
+  enum : std::uint16_t {
+    F_UNLOCKED = 1,
+    F_UNLOCK_PENDING,
+    F_PATTERN_FLIP,
+    F_REG_SEL,
+    F_REGS,
+    F_RTC_PAGE_REG,
+    F_CACHED_MIN,
+    F_CACHED_HOUR,
+  };
+  void savestate_serialize(Savestate::Writer &out) const override {
+    out.field_bool(F_UNLOCKED, unlocked_);
+    out.field_bool(F_UNLOCK_PENDING, unlock_pending_);
+    out.field_bool(F_PATTERN_FLIP, pattern_flip_);
+    out.field_u8(F_REG_SEL, reg_sel_);
+    out.field(F_REGS, [&](Savestate::Writer &w) {
+      w.bytes({regs_, sizeof(regs_)});
+    });
+    out.field_u8(F_RTC_PAGE_REG, rtc_page_reg_);
+    out.field_u8(F_CACHED_MIN, cached_min_);
+    out.field_u8(F_CACHED_HOUR, cached_hour_);
+  }
+  void savestate_deserialize(Savestate::Reader &in) override {
+    rtc_page_reg_ = static_cast<byte_t>(rtc_page_reg_slot_() & 0x0F);
+    GBC_SS_DESERIALIZE_BEGIN(in)
+    GBC_SS_CASE_BOOL(F_UNLOCKED, unlocked_);
+    GBC_SS_CASE_BOOL(F_UNLOCK_PENDING, unlock_pending_);
+    GBC_SS_CASE_BOOL(F_PATTERN_FLIP, pattern_flip_);
+    case F_REG_SEL:
+      reg_sel_ = static_cast<byte_t>(payload.u8() & 0x0F);
+      break;
+    case F_REGS:
+      if (payload.remaining() != sizeof(regs_))
+        throw std::runtime_error("Tama5::savestate_deserialize() regs");
+      for (auto &reg : regs_)
+        reg = static_cast<byte_t>(payload.u8() & 0x0F);
+      break;
+    case F_RTC_PAGE_REG:
+      rtc_page_reg_ = static_cast<byte_t>(payload.u8() & 0x0F);
+      break;
+    case F_CACHED_MIN:
+      cached_min_ = static_cast<byte_t>(payload.u8() % 60);
+      break;
+    case F_CACHED_HOUR:
+      cached_hour_ = static_cast<byte_t>(payload.u8() % 24);
+      break;
+    GBC_SS_DESERIALIZE_END();
+    update_rom_bank_();
+    rtc_page_reg_ = static_cast<byte_t>(rtc_page_reg_ & 0x0F);
+    rtc_page_reg_slot_() = rtc_page_reg_;
+  }
 
 private:
   std::span<const byte_t> rom_;
