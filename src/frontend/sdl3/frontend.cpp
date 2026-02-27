@@ -133,20 +133,6 @@ void SDL3Frontend::start() {
     if (consume_load_rom_request(rom_source)) {
       join_emu_thread_if_running();
       reset_savestate_context();
-      pending_cart_for_save_prompt.reset();
-      pending_cart_label.clear();
-      pending_cart_rom_hash.clear();
-      waiting_for_load_save_dialog = false;
-      load_save_dialog_inflight = false;
-      {
-        std::lock_guard lock(ui_mutex);
-        ui_state.request_open_load_save_dialog = false;
-        ui_state.load_save_dialog_result_ready = false;
-        ui_state.load_save_dialog_accepted = false;
-        ui_state.load_save_dialog_path.clear();
-        ui_state.load_save_dialog_default_name.clear();
-        ui_state.load_save_dialog_start_dir.clear();
-      }
       process_pending_save();
       active_rom_hash.clear();
       start_rom_io_job(rom_source);
@@ -158,57 +144,10 @@ void SDL3Frontend::start() {
         cart cart_ctx = load_cart_fs(rom_on_disk.c_str());
         const std::string rom_hash = sha256_hex(cart_ctx.rom_span());
         setup_save_context(cart_ctx, display_label, rom_hash);
-        const bool has_persistent_save =
-            type_has_battery(cart_ctx.header.cartridge_type) ||
-            cart_ctx.header.cartridge_type == 0x20; // MBC6 flash persistence
-
-        if (has_persistent_save && !active_save_path.has_value()) {
-          pending_cart_for_save_prompt = std::move(cart_ctx);
-          pending_cart_label = display_label;
-          pending_cart_rom_hash = rom_hash;
-          waiting_for_load_save_dialog = true;
-
-          std::lock_guard lock(ui_mutex);
-          ui_state.load_save_dialog_start_dir =
-              suggested_save_path_.parent_path().string().empty()
-                  ? gui.get_settings_c().rom_dir
-                  : suggested_save_path_.parent_path().string();
-          ui_state.load_save_dialog_default_name =
-              suggested_save_path_.filename().string().empty()
-                  ? "cartridge.sav"
-                  : suggested_save_path_.filename().string();
-          ui_state.load_save_dialog_path.clear();
-          ui_state.load_save_dialog_result_ready = false;
-          ui_state.load_save_dialog_accepted = false;
-          ui_state.request_open_load_save_dialog = true;
-        } else {
-          start_emulation(std::move(cart_ctx), display_label, rom_hash,
-                          bios_path, active_save_path);
-        }
+        start_emulation(std::move(cart_ctx), display_label, rom_hash, bios_path,
+                        active_save_path);
       } catch (std::exception &e) {
         Logger::push(LogLevel::Warning, "ROM", "Failed to load ROM", e.what());
-      }
-    }
-
-    if (waiting_for_load_save_dialog &&
-        pending_cart_for_save_prompt.has_value()) {
-      std::string selected_path;
-      bool accepted = false;
-      if (consume_load_save_dialog_result(selected_path, accepted)) {
-        std::optional<std::filesystem::path> initial_save_path = std::nullopt;
-        if (accepted && !selected_path.empty()) {
-          active_save_path = std::filesystem::path(selected_path);
-          suggested_save_path_ = *active_save_path;
-          remember_save_path_for_active_rom(*active_save_path);
-          initial_save_path = active_save_path;
-        }
-        start_emulation(std::move(*pending_cart_for_save_prompt),
-                        pending_cart_label, pending_cart_rom_hash, bios_path,
-                        initial_save_path);
-        pending_cart_for_save_prompt.reset();
-        pending_cart_label.clear();
-        pending_cart_rom_hash.clear();
-        waiting_for_load_save_dialog = false;
       }
     }
 

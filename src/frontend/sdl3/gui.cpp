@@ -382,21 +382,6 @@ void GbcImGui::build_status_bar(UiState &state) const {
 
 void GbcImGui::build_file_dialogs(UiState &state) const {
   auto [max_size, min_size] = get_min_dialog_size();
-  if (state.request_open_load_save_dialog) {
-    IGFD::FileDialogConfig load_conf;
-    load_conf.path = state.load_save_dialog_start_dir.empty() ? rom_sel_conf.path
-                                                               : state.load_save_dialog_start_dir;
-    load_conf.fileName = state.load_save_dialog_default_name;
-    // Combined load/save selection: allow choosing an existing file
-    // or entering a new file path that will be created on first write
-    load_conf.flags = ImGuiFileDialogFlags_Modal;
-    ImGuiFileDialog::Instance()->OpenDialog(
-        "LoadSaveFileDialog", "Choose save data file (existing or new)",
-        save_filters.data(),
-        load_conf);
-    state.request_open_load_save_dialog = false;
-  }
-
   if (ImGuiFileDialog::Instance()->Display(
           "RomFileDialog", ImGuiWindowFlags_NoCollapse, min_size, max_size)) {
     if (ImGuiFileDialog::Instance()->IsOk()) {
@@ -419,18 +404,6 @@ void GbcImGui::build_file_dialogs(UiState &state) const {
         Logger::push(LogLevel::Warning, "BIOS", "Failed to load BIOS",
                      e.what());
       }
-    }
-    ImGuiFileDialog::Instance()->Close();
-  }
-
-  if (ImGuiFileDialog::Instance()->Display(
-          "LoadSaveFileDialog", ImGuiWindowFlags_NoCollapse, min_size, max_size)) {
-    state.load_save_dialog_result_ready = true;
-    state.load_save_dialog_accepted = ImGuiFileDialog::Instance()->IsOk();
-    if (state.load_save_dialog_accepted) {
-      state.load_save_dialog_path = ImGuiFileDialog::Instance()->GetFilePathName();
-    } else {
-      state.load_save_dialog_path.clear();
     }
     ImGuiFileDialog::Instance()->Close();
   }
@@ -528,6 +501,31 @@ void GbcImGui::build_settings_window(UiState &state, SDLHost &host) {
   ImGui::Checkbox("Fast forward", &state.fast_forward);
   ImGui::Checkbox("Force DMG monochrome", &settings.force_mono_dmg);
   {
+    static std::array<char, 512> save_root_input{};
+    static std::string last_save_root;
+    if (last_save_root != settings.save_root_dir) {
+      snprintf(save_root_input.data(), save_root_input.size(), "%s",
+               settings.save_root_dir.c_str());
+      last_save_root = settings.save_root_dir;
+    }
+
+    ImGui::SetNextItemWidth(320.0f * dpi_scale);
+    if (ImGui::InputText("Save dir", save_root_input.data(),
+                         save_root_input.size())) {
+      settings.save_root_dir = save_root_input.data();
+      last_save_root = settings.save_root_dir;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Reset##save_root")) {
+      settings.save_root_dir = "./saves";
+      snprintf(save_root_input.data(), save_root_input.size(), "%s",
+               settings.save_root_dir.c_str());
+      last_save_root = settings.save_root_dir;
+    }
+    ImGui::TextDisabled(
+        "Saves: game-name - checksum.sav");
+  }
+  {
     static std::array<char, 512> savestate_root_input{};
     static std::string last_savestate_root;
     if (last_savestate_root != settings.savestate_root_dir) {
@@ -537,7 +535,7 @@ void GbcImGui::build_settings_window(UiState &state, SDLHost &host) {
     }
 
     ImGui::SetNextItemWidth(320.0f * dpi_scale);
-    if (ImGui::InputText("Savestate root", savestate_root_input.data(),
+    if (ImGui::InputText("Savestate dir", savestate_root_input.data(),
                          savestate_root_input.size())) {
       settings.savestate_root_dir = savestate_root_input.data();
       last_savestate_root = settings.savestate_root_dir;

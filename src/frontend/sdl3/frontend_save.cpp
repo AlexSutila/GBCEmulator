@@ -22,14 +22,6 @@ std::string normalize_hex_lower(std::string text) {
   return text;
 }
 
-bool is_hex_string(const std::string &value) {
-  if (value.empty())
-    return false;
-  return std::ranges::all_of(value, [](const char c) {
-    return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
-  });
-}
-
 constexpr int kSavestateThumbWidth = 80;
 constexpr int kSavestateThumbHeight = 72;
 constexpr int kMaxQuickSavestates = 10;
@@ -126,6 +118,23 @@ std::string shorten_checksum(std::string checksum_hex,
   return checksum_hex;
 }
 
+std::filesystem::path resolve_save_root_dir(std::string dir_text) {
+  if (dir_text.empty())
+    dir_text = "./saves";
+
+  std::filesystem::path root = dir_text;
+  if (root.empty())
+    root = "./saves";
+
+  if (root.is_relative()) {
+    std::error_code ec;
+    if (const auto cwd = std::filesystem::current_path(ec); !ec) {
+      root = cwd / root;
+    }
+  }
+  return root.lexically_normal();
+}
+
 std::filesystem::path resolve_savestate_root_dir(std::string dir_text) {
   if (dir_text.empty())
     dir_text = "./savestates";
@@ -141,48 +150,6 @@ std::filesystem::path resolve_savestate_root_dir(std::string dir_text) {
     }
   }
   return root.lexically_normal();
-}
-
-std::optional<std::filesystem::path>
-find_savestate_dir_by_checksum(const std::filesystem::path &root,
-                               std::string checksum_hex_full) {
-  if (root.empty() || checksum_hex_full.empty())
-    return std::nullopt;
-
-  checksum_hex_full = normalize_hex_lower(std::move(checksum_hex_full));
-
-  std::error_code ec;
-  if (!std::filesystem::exists(root, ec))
-    return std::nullopt;
-
-  std::optional<std::filesystem::path> best = std::nullopt;
-  std::size_t best_match_len = 0;
-  for (const auto &de : std::filesystem::directory_iterator(root, ec)) {
-    if (ec)
-      break;
-    if (!de.is_directory(ec)) {
-      ec.clear();
-      continue;
-    }
-    const std::string candidate_name =
-        normalize_hex_lower(de.path().filename().string());
-    const auto split_pos = candidate_name.rfind(" - ");
-    if (split_pos == std::string::npos || split_pos + 3 >= candidate_name.size())
-      continue;
-    const std::string candidate_checksum = candidate_name.substr(split_pos + 3);
-    if (!is_hex_string(candidate_checksum))
-      continue;
-    if (checksum_hex_full.rfind(candidate_checksum, 0) != 0)
-      continue;
-
-    if (!best.has_value() || candidate_checksum.size() > best_match_len ||
-        (candidate_checksum.size() == best_match_len &&
-         de.path().filename().string() < best->filename().string())) {
-      best = de.path();
-      best_match_len = candidate_checksum.size();
-    }
-  }
-  return best;
 }
 
 std::string savestate_timestamp_slug(const std::time_t t) {
@@ -248,100 +215,33 @@ bool is_savestate_file(const std::filesystem::directory_entry &de) {
 }
 } // namespace
 
-bool SDL3Frontend::consume_load_save_dialog_result(std::string &save_path,
-                                                   bool &accepted) {
-  std::lock_guard lock(ui_mutex);
-  if (!ui_state.load_save_dialog_result_ready)
-    return false;
-  accepted = ui_state.load_save_dialog_accepted;
-  save_path = ui_state.load_save_dialog_path;
-  ui_state.load_save_dialog_result_ready = false;
-  ui_state.load_save_dialog_accepted = false;
-  ui_state.load_save_dialog_path.clear();
-  return true;
-}
-
-std::filesystem::path
-SDL3Frontend::suggest_save_path(const cart &c,
-                                const std::string &display_label) {
-  const auto name_from_label = [&]() -> std::string {
-    if (const auto p = display_label.find(" :: ");
-        p != std::string::npos && p + 4 < display_label.size()) {
-      return display_label.substr(p + 4);
-    }
-    if (!c.file_path.empty())
-      return c.file_path.filename().string();
-    return std::filesystem::path(strip_colons(display_label))
-        .filename()
-        .string();
-  };
-
-  std::string stem = std::filesystem::path(name_from_label()).stem().string();
-  if (stem.empty())
-    stem = c.header.title().empty() ? "cartridge" : c.header.title();
-  if (stem.empty())
-    stem = "cartridge";
-
-  std::filesystem::path dir = c.file_path.parent_path();
-  if (dir.empty())
-    dir = std::filesystem::current_path();
-  return dir / (stem + ".sav");
-}
-
-void SDL3Frontend::remember_save_path_for_active_rom(
-    const std::filesystem::path &save_path) {
-  if (active_rom_hash.empty() || save_path.empty())
-    return;
-
-  const std::string normalized = save_path.lexically_normal().string();
-  if (normalized.empty())
-    return;
-
-  auto &settings = gui.get_settings();
-  if (const auto it = settings.save_path_by_rom_hash.find(active_rom_hash);
-      it != settings.save_path_by_rom_hash.end() && it->second == normalized) {
-    return;
-  }
-  settings.save_path_by_rom_hash[active_rom_hash] = normalized;
-  settings.save();
-}
-
 void SDL3Frontend::setup_save_context(const cart &c,
                                       const std::string &display_label,
                                       const std::string &rom_hash) {
   active_rom_hash = rom_hash;
   setup_savestate_context(c, display_label, rom_hash);
-  const std::filesystem::path default_suggested =
-      suggest_save_path(c, display_label);
-  suggested_save_path_ = default_suggested;
-  active_save_path.reset();
 
-  std::optional<std::filesystem::path> mapped_path = std::nullopt;
-  if (!active_rom_hash.empty()) {
-    if (const auto it =
-            gui.get_settings_c().save_path_by_rom_hash.find(active_rom_hash);
-        it != gui.get_settings_c().save_path_by_rom_hash.end() &&
-        !it->second.empty()) {
-      mapped_path = std::filesystem::path(it->second);
-      suggested_save_path_ = *mapped_path;
-    }
-  }
+  std::string stem = c.file_path.stem().string();
+  if (stem.empty())
+    stem = std::filesystem::path(strip_colons(display_label)).stem().string();
+  if (stem.empty())
+    stem = c.header.title();
+  if (stem.empty())
+    stem = "cartridge";
+  stem = sanitize_savestate_label(stem, kSavestateGameDirNameMaxChars);
+  if (stem.empty())
+    stem = "cartridge";
 
-  if (mapped_path.has_value()) {
-    std::error_code ec;
-    if (std::filesystem::exists(*mapped_path, ec))
-      active_save_path = *mapped_path;
-  }
-  if (!active_save_path.has_value() && !default_suggested.empty()) {
-    std::error_code ec;
-    if (std::filesystem::exists(default_suggested, ec)) {
-      active_save_path = default_suggested;
-      suggested_save_path_ = default_suggested;
-    }
-  }
-
-  if (active_save_path.has_value()) {
-    remember_save_path_for_active_rom(*active_save_path);
+  const std::string checksum_short =
+      shorten_checksum(normalize_hex_lower(rom_hash), kSavestateChecksumShortChars);
+  const std::filesystem::path save_root =
+      resolve_save_root_dir(gui.get_settings_c().save_root_dir);
+  std::error_code ec;
+  std::filesystem::create_directories(save_root, ec);
+  if (checksum_short.empty()) {
+    active_save_path = save_root / (stem + ".sav");
+  } else {
+    active_save_path = save_root / (stem + " - " + checksum_short + ".sav");
   }
 
   {
@@ -351,15 +251,6 @@ void SDL3Frontend::setup_save_context(const cart &c,
   }
   deferred_save_data.clear();
   deferred_save_pending = false;
-  load_save_dialog_inflight = false;
-
-  std::lock_guard lock(ui_mutex);
-  ui_state.request_open_load_save_dialog = false;
-  ui_state.load_save_dialog_result_ready = false;
-  ui_state.load_save_dialog_accepted = false;
-  ui_state.load_save_dialog_path.clear();
-  ui_state.load_save_dialog_default_name.clear();
-  ui_state.load_save_dialog_start_dir.clear();
 }
 
 void SDL3Frontend::enqueue_save_snapshot(std::vector<byte_t> snapshot) {
@@ -383,22 +274,6 @@ void SDL3Frontend::process_pending_save() {
     deferred_save_pending = true;
   }
 
-  if (load_save_dialog_inflight) {
-    std::string dialog_path;
-    bool accepted = false;
-    if (consume_load_save_dialog_result(dialog_path, accepted)) {
-      load_save_dialog_inflight = false;
-      if (accepted && !dialog_path.empty()) {
-        active_save_path = std::filesystem::path(dialog_path);
-        suggested_save_path_ = *active_save_path;
-        remember_save_path_for_active_rom(*active_save_path);
-      } else {
-        Logger::push(LogLevel::Status, "Save", "Save cancelled",
-                     "Battery save data changed but no save file was selected.");
-      }
-    }
-  }
-
   if (!deferred_save_pending)
     return;
 
@@ -419,38 +294,22 @@ void SDL3Frontend::process_pending_save() {
     return static_cast<bool>(f);
   };
 
-  if (active_save_path.has_value()) {
-    if (write_snapshot(*active_save_path, deferred_save_data)) {
-      deferred_save_pending = false;
-      deferred_save_data.clear();
-    } else {
-      Logger::push(LogLevel::Warning, "Save", "Failed to write save file",
-                   "Could not write save data to: " +
-                       active_save_path->string() + ".");
-    }
+  if (!active_save_path.has_value()) {
+    Logger::push(LogLevel::Warning, "Save", "Missing save path",
+                 "Could not resolve the save destination.");
+    deferred_save_pending = false;
+    deferred_save_data.clear();
     return;
   }
 
-  if (load_save_dialog_inflight)
-    return;
-
-  std::string start_dir = suggested_save_path_.parent_path().string();
-  if (start_dir.empty())
-    start_dir = gui.get_settings_c().rom_dir;
-  std::string default_name = suggested_save_path_.filename().string();
-  if (default_name.empty())
-    default_name = "cartridge.sav";
-
-  {
-    std::lock_guard lock(ui_mutex);
-    ui_state.load_save_dialog_start_dir = start_dir;
-    ui_state.load_save_dialog_default_name = default_name;
-    ui_state.load_save_dialog_path.clear();
-    ui_state.load_save_dialog_result_ready = false;
-    ui_state.load_save_dialog_accepted = false;
-    ui_state.request_open_load_save_dialog = true;
+  if (write_snapshot(*active_save_path, deferred_save_data)) {
+    deferred_save_pending = false;
+    deferred_save_data.clear();
+  } else {
+    Logger::push(LogLevel::Warning, "Save", "Failed to write save file",
+                 "Could not write save data to: " +
+                     active_save_path->string() + ".");
   }
-  load_save_dialog_inflight = true;
 }
 
 void SDL3Frontend::release_savestate_textures_locked() {
@@ -504,16 +363,10 @@ void SDL3Frontend::setup_savestate_context(const cart &c,
       resolve_savestate_root_dir(gui.get_settings_c().savestate_root_dir);
   std::error_code ec;
   std::filesystem::create_directories(root_dir, ec);
-
-  if (const auto existing =
-          find_savestate_dir_by_checksum(root_dir, checksum_full);
-      existing.has_value()) {
-    savestate_dir_ = *existing;
-  } else if (!checksum_short.empty()) {
+  if (!checksum_short.empty())
     savestate_dir_ = root_dir / (stem + " - " + checksum_short);
-  } else {
+  else
     savestate_dir_ = root_dir / stem;
-  }
 
   savestate_manual_label_input_.fill('\0');
   {

@@ -6,7 +6,6 @@
 #include <array>
 #include <atomic>
 #include <fstream>
-#include <map>
 #include <nlohmann/json.hpp>
 #include <string>
 #include <vector>
@@ -27,6 +26,7 @@ struct Settings {
   std::string rom_dir{"."};
   std::string prev_bios_path;
   std::string bios_dir{"."};
+  std::string save_root_dir{"./saves"};
   std::string savestate_root_dir{"./savestates"};
   std::array<SDL_Keycode, 8> keybinds{SDLK_D,         SDLK_A,     SDLK_W,
                                       SDLK_S,         SDLK_J,     SDLK_K,
@@ -34,7 +34,6 @@ struct Settings {
   std::array<SDL_Keycode, 7> general_keybinds{
       SDLK_G, SDLK_F, SDLK_EQUALS, SDLK_MINUS, SDLK_M, SDLK_F5, SDLK_F8};
   std::vector<std::string> recent_roms;
-  std::map<std::string, std::string> save_path_by_rom_hash;
   static Settings load(const std::string &filename = ".gbc.config.json");
   void save(const std::string &filename = ".gbc.config.json") const;
   void add_recent_rom(const std::string &path);
@@ -43,10 +42,10 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Settings, volume,
                                                 force_mono_dmg,
                                                 keybind_preset_index, rom_dir,
                                                 prev_bios_path, bios_dir,
+                                                save_root_dir,
                                                 savestate_root_dir,
                                                 keybinds, general_keybinds,
-                                                recent_roms,
-                                                save_path_by_rom_hash)
+                                                recent_roms)
 
 inline Settings Settings::load(const std::string &filename) {
   Settings s;
@@ -149,12 +148,6 @@ struct UiState {
   std::string load_rom_path;
   bool request_load_bios{false};
   std::string load_bios_path;
-  bool request_open_load_save_dialog{false};
-  bool load_save_dialog_result_ready{false};
-  bool load_save_dialog_accepted{false};
-  std::string load_save_dialog_path;
-  std::string load_save_dialog_start_dir;
-  std::string load_save_dialog_default_name;
   bool request_quit{false};
 
   // ROM I/O status (downloads, unzip, etc.)
