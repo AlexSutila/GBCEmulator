@@ -40,6 +40,19 @@ public:
   void clear(std::uint32_t c) override;
 
 private:
+  struct SavestateEntry {
+    std::filesystem::path state_path;
+    std::filesystem::path thumb_path;
+    std::string kind;
+    std::string label;
+    std::time_t created_at{};
+    std::uintmax_t file_size{};
+    int thumb_w{};
+    int thumb_h{};
+    SDL_Texture *thumb_texture{nullptr};
+    bool thumb_texture_attempted{false};
+  };
+
   // Subsystems
   SDLHost host;
   GbcImGui gui;
@@ -125,6 +138,18 @@ private:
   std::atomic<bool> quicksave_requested{false};
   std::atomic<bool> quickload_requested{false};
 
+  // Savestate manager
+  std::filesystem::path savestate_dir_;
+  std::mutex savestate_request_mutex;
+  std::optional<std::filesystem::path> pending_savestate_load_path_;
+  std::string pending_manual_savestate_label_;
+  std::atomic<bool> manual_savestate_requested{false};
+  std::atomic<bool> savestate_list_dirty{true};
+  std::vector<SavestateEntry> savestate_entries_;
+  std::optional<std::filesystem::path> savestate_selected_path_;
+  std::array<char, 96> savestate_manual_label_input_{};
+  Clock::time_point next_savestate_scan_{Clock::now()};
+
   // Resize/move redraw tuning
   std::atomic<std::int64_t> suppress_vsync_until_ns{0};
   std::atomic<std::int64_t> last_forced_redraw_ns{0};
@@ -145,6 +170,21 @@ private:
                            const std::optional<std::filesystem::path>& initial_save_path);
   void join_emu_thread_if_running();
   byte_t button_mask_for_key(SDL_Keycode key) const;
+  void build_savestate_manager_window_locked();
+  void refresh_savestate_entries_locked(bool force_refresh = false);
+  void release_savestate_textures_locked();
+  void reset_savestate_context();
+  void setup_savestate_context(const cart& c, const std::string& display_label);
+  std::vector<std::uint32_t> capture_savestate_thumbnail() const;
+  std::optional<std::filesystem::path> consume_savestate_load_request();
+  std::optional<std::string> consume_manual_savestate_request();
+  void queue_savestate_load_request(const std::filesystem::path& path);
+  void queue_manual_savestate_request(std::string label);
+  [[nodiscard]] std::optional<std::filesystem::path>
+  write_savestate_bundle(const std::vector<byte_t>& blob, bool quick,
+                         const std::string& label = {});
+  [[nodiscard]] std::optional<std::filesystem::path>
+  latest_savestate_path() const;
 
   // Input helpers
   InputState input_state{};

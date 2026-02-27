@@ -233,11 +233,11 @@ inline std::optional<Chunk> Reader::next_chunk() {
 
 } // namespace Savestate
 
-// Common savestate deserialize boilerplate used by many modules.
-// These macros intentionally expose local `id` and `payload` inside the switch.
+// Common savestate deserialize boilerplate used by many modules
+// These macros intentionally expose local `id` and `payload` inside the switch
 #define GBC_SS_DESERIALIZE_BEGIN(reader_)                                         \
   while (const auto gbc_ss_field_ = (reader_).next_field()) {                     \
-    auto [id, payload] = *gbc_ss_field_;                                           \
+    auto [id, payload] = *gbc_ss_field_;                                          \
     switch (id) {
 
 #define GBC_SS_DESERIALIZE_END()                                                  \

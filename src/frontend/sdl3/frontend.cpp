@@ -59,6 +59,7 @@ SDL3Frontend::SDL3Frontend() : host(framebuf_width, framebuf_height, scale) {
 
 SDL3Frontend::~SDL3Frontend() {
   SDL_RemoveEventWatch(reinterpret_cast<SDL_EventFilter>(event_watcher), this);
+  release_savestate_textures_locked();
   gui.shutdown();
   // The rest of destruction is handled in SDLHost destructor,
   // which should be called automatically at this point
@@ -131,6 +132,7 @@ void SDL3Frontend::start() {
   while (running.load()) {
     if (consume_load_rom_request(rom_source)) {
       join_emu_thread_if_running();
+      reset_savestate_context();
       pending_cart_for_save_prompt.reset();
       pending_cart_label.clear();
       pending_cart_rom_hash.clear();
@@ -331,6 +333,7 @@ void SDL3Frontend::render_frame() {
     std::lock_guard lock(ui_mutex);
     sync_io_status_to_ui();
     gui.render(ui_state, host);
+    build_savestate_manager_window_locked();
     poll_zip_choice_response();
     request_quit = ui_state.request_quit;
     if (request_quit)
@@ -413,7 +416,7 @@ void SDL3Frontend::emulation_thread_fn(
           std::filesystem::exists(*initial_save_path, ec) &&
           !cart_ptr->load_save_file(*initial_save_path)) {
         Logger::push(LogLevel::Warning, "Save", "Failed to load save file",
-                     "Could not load battery save data from: " +
+                     "Could not load save data from: " +
                          initial_save_path->string());
       }
     }
@@ -440,28 +443,6 @@ void SDL3Frontend::emulation_thread_fn(
   auto next_save_poll = Clock::now();
   quicksave_requested.store(false, std::memory_order_relaxed);
   quickload_requested.store(false, std::memory_order_relaxed);
-  const auto quickstate_path = [&]() -> std::filesystem::path {
-    if (!c.file_path.empty()) {
-      return c.file_path.parent_path() /
-             (c.file_path.stem().string() + ".state");
-    }
-    return std::filesystem::current_path() / "quicksave.state";
-  }();
-  const auto write_blob = [](const std::filesystem::path &path,
-                             const std::vector<byte_t> &data) -> bool {
-    if (path.empty() || data.empty())
-      return false;
-    if (const auto parent = path.parent_path(); !parent.empty()) {
-      std::error_code ec;
-      std::filesystem::create_directories(parent, ec);
-    }
-    std::ofstream f(path, std::ios::binary | std::ios::trunc);
-    if (!f)
-      return false;
-    f.write(reinterpret_cast<const char *>(data.data()),
-            static_cast<std::streamsize>(data.size()));
-    return static_cast<bool>(f);
-  };
   const auto read_blob = [](const std::filesystem::path &path)
       -> std::optional<std::vector<byte_t>> {
     std::ifstream f(path, std::ios::binary | std::ios::ate);
@@ -512,33 +493,71 @@ void SDL3Frontend::emulation_thread_fn(
       if (quicksave_requested.exchange(false, std::memory_order_acq_rel)) {
         try {
           const auto blob = gbc->serialize_savestate();
-          if (!write_blob(quickstate_path, blob)) {
+          if (const auto path = write_savestate_bundle(blob, true); !path.has_value()) {
             Logger::push(LogLevel::Warning, "Savestate",
-                         "Failed to write savestate",
-                         "Could not write savestate to: " +
-                             quickstate_path.string());
+                         "Failed to create",
+                         "Could not create a quicksave. Check that the savestate directory is accessible.");
           } else {
-            Logger::push(LogLevel::Info, "Savestate", "Savestate saved",
-                         quickstate_path.string());
+            Logger::push(LogLevel::Status, "Savestate", "Savestate created",
+                         path->string());
           }
         } catch (const std::exception &e) {
-          Logger::push(LogLevel::Warning, "Savestate", "Save failed", e.what());
+          Logger::push(LogLevel::Warning, "Savestate", "Failed to create", e.what());
+        }
+      }
+
+      if (const auto manual_label = consume_manual_savestate_request();
+          manual_label.has_value()) {
+        try {
+          const auto blob = gbc->serialize_savestate();
+          if (const auto path =
+                  write_savestate_bundle(blob, false, *manual_label);
+              !path.has_value()) {
+            Logger::push(LogLevel::Warning, "Savestate",
+                         "Failed to create",
+                         "Could not create a savestate. Check that the savestate directory is accessible.");
+              }
+        } catch (const std::exception &e) {
+          Logger::push(LogLevel::Warning, "Savestate", "Failed to create", e.what());
         }
       }
 
       if (quickload_requested.exchange(false, std::memory_order_acq_rel)) {
         try {
-          if (const auto blob = read_blob(quickstate_path); !blob.has_value()) {
+          if (const auto latest_path = latest_savestate_path(); !latest_path.has_value()) {
+            Logger::push(LogLevel::Status, "Savestate",
+                         "No savestate available",
+                         "No savestate is available to load.");
+          } else if (const auto blob = read_blob(*latest_path); !blob.has_value()) {
             Logger::push(LogLevel::Warning, "Savestate",
-                         "Savestate file not found",
+                         "Inaccessible",
                          "Could not read savestate from: " +
-                             quickstate_path.string());
+                             latest_path->string() + ". It may have been moved or deleted.");
           } else {
             gbc->deserialize_savestate(*blob);
             host.clear_audio_stream();
             video_dirty.store(true, std::memory_order_release);
-            Logger::push(LogLevel::Info, "Savestate", "Savestate loaded",
-                         quickstate_path.string());
+            Logger::push(LogLevel::Status, "Savestate", "Savestate loaded",
+                         latest_path->string());
+          }
+        } catch (const std::exception &e) {
+          Logger::push(LogLevel::Warning, "Savestate", "Load failed", e.what());
+        }
+      }
+
+      if (const auto load_path = consume_savestate_load_request();
+          load_path.has_value()) {
+        try {
+          if (const auto blob = read_blob(*load_path); !blob.has_value()) {
+            Logger::push(LogLevel::Warning, "Savestate",
+                         "File not found",
+                         "Could not read savestate from: " + load_path->string());
+          } else {
+            gbc->deserialize_savestate(*blob);
+            host.clear_audio_stream();
+            video_dirty.store(true, std::memory_order_release);
+            Logger::push(LogLevel::Status, "Savestate", "Savestate loaded",
+                         load_path->string());
           }
         } catch (const std::exception &e) {
           Logger::push(LogLevel::Warning, "Savestate", "Load failed", e.what());
@@ -635,13 +654,6 @@ void SDL3Frontend::handle_controller_press(SDL_GamepadButton btn,
 }
 
 void SDL3Frontend::handle_keypress(const SDL_Keycode key, const bool pressed) {
-  if (pressed && key == SDLK_F5) {
-    quicksave_requested.store(true, std::memory_order_release);
-  }
-  if (pressed && key == SDLK_F8) {
-    quickload_requested.store(true, std::memory_order_release);
-  }
-
   // Emulator input
   if (const byte_t mask = button_mask_for_key(key); mask != 0) {
     byte_t current = input_state.buttons.load(std::memory_order_relaxed);
@@ -657,24 +669,29 @@ void SDL3Frontend::handle_keypress(const SDL_Keycode key, const bool pressed) {
   auto &settings = gui.get_settings();
 
   // FF toggle
-  if (pressed && key == binds[0])
+  if (pressed && key == binds[GK_FF_TOGGLE])
     ui_state.fast_forward = !ui_state.fast_forward;
   // FF Hold (overrides toggle)
-  if (key == binds[1])
+  if (key == binds[GK_FF_HOLD])
     ui_state.fast_forward = pressed;
   // Volume up
-  if (pressed && key == binds[2]) {
+  if (pressed && key == binds[GK_VOL_UP]) {
     settings.volume = std::min(1.5f, settings.volume + 0.05f);
     host.set_volume(settings.volume);
   }
   // Volume Down
-  if (pressed && key == binds[3]) {
+  if (pressed && key == binds[GK_VOL_DOWN]) {
     settings.volume = std::max(0.0f, settings.volume - 0.05f);
     host.set_volume(settings.volume);
   }
   // Monochrome
-  if (pressed && key == binds[4])
+  if (pressed && key == binds[GK_MONOCHROME])
     settings.force_mono_dmg = !settings.force_mono_dmg;
+  // Savestate shortcuts
+  if (pressed && key == binds[GK_QUICKSAVE])
+    quicksave_requested.store(true, std::memory_order_release);
+  if (pressed && key == binds[GK_QUICKLOAD])
+    quickload_requested.store(true, std::memory_order_release);
 }
 
 byte_t SDL3Frontend::button_mask_for_key(const SDL_Keycode key) const {

@@ -670,8 +670,8 @@ void PixelProcessingUnit::savestate_deserialize(Savestate::Reader &in) {
   GBC_SS_DESERIALIZE_BEGIN(in)
   GBC_SS_CASE_BOOL(F_FLUSH_ON_DISABLE, flush_on_disable);
   #define PPU_SS_READ_MMIO_REG(id_, reg_)                                          \
-    case id_:                                                                       \
-      reg_.MMIORegister::write(payload.u8());                                       \
+    case id_:                                                                      \
+      reg_.MMIORegister::write(payload.u8());                                      \
       break;
   PPU_SS_FOR_EACH_MMIO_REG(PPU_SS_READ_MMIO_REG)
   #undef PPU_SS_READ_MMIO_REG

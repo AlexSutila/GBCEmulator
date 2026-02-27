@@ -50,10 +50,14 @@ void GbcImGui::shutdown() const {
 }
 
 void GbcImGui::render(UiState &state, SDLHost &host) {
-  // Sync all logs (errors) generated since last cycle
+  // Sync all logs generated since last cycle.
   for (const auto new_logs = Logger::consume();
        const auto &[level, type, summary, message, timestamp] : new_logs) {
-    push_notification(state, level, type, summary, message, timestamp);
+    if (level == LogLevel::Status) {
+      push_transient_status(state, level, type, summary, message);
+    } else {
+      push_notification(state, level, type, summary, message, timestamp);
+    }
   }
   build_main_menu_bar(state);
   build_status_bar(state);
@@ -106,8 +110,15 @@ bool GbcImGui::process_event(const SDL_Event &e, UiState &ui_state) {
     // Handle key rebinding (highest priority - consumes input)
     if (ui_state.waiting_for_bind && e.type == SDL_EVENT_KEY_DOWN) {
       if (e.key.key != SDLK_ESCAPE) {
-        settings.keybinds[*ui_state.waiting_for_bind] = e.key.key;
-        settings.keybind_preset_index = kCustomPresetIndex;
+        const std::size_t bind_idx = *ui_state.waiting_for_bind;
+        if (bind_idx < settings.keybinds.size()) {
+          settings.keybinds[bind_idx] = e.key.key;
+          settings.keybind_preset_index = kCustomPresetIndex;
+        } else {
+          const std::size_t general_idx = bind_idx - settings.keybinds.size();
+          if (general_idx < settings.general_keybinds.size())
+            settings.general_keybinds[general_idx] = e.key.key;
+        }
       }
       ui_state.waiting_for_bind.reset();
       return true; // CONSUMED: this keypress won't press a button in-game
@@ -137,6 +148,19 @@ void GbcImGui::push_notification(UiState &state, const LogLevel level,
 
   // Auto-open if it's a critical error
   // if (level == LogLevel::Error) state.show_notifications = true;
+}
+
+void GbcImGui::push_transient_status(UiState &state, const LogLevel level,
+                                     const std::string &type,
+                                     const std::string &summary,
+                                     const std::string &details,
+                                     const Uint64 duration_ms) {
+  state.transient_status_level = level;
+  state.transient_status_text =
+      type.empty() ? summary : ("[" + type + "] " + summary);
+  state.transient_status_details =
+      details.empty() ? state.transient_status_text : details;
+  state.transient_status_until_ticks = SDL_GetTicks() + duration_ms;
 }
 
 void GbcImGui::update_rom_path(const std::string &rom_path) {
@@ -215,6 +239,8 @@ void GbcImGui::build_main_menu_bar(UiState &state) const {
         state.show_settings = true;
       if (ImGui::MenuItem("Keybinds"))
         state.show_keybinds = true;
+      if (ImGui::MenuItem("Savestate Manager"))
+        state.show_savestate_manager = true;
       ImGui::EndMenu();
     }
 
@@ -246,6 +272,12 @@ void GbcImGui::build_status_bar(UiState &state) const {
   const float height = ImGui::GetFrameHeight();
   state.status_bar_height = height;
   const ImGuiViewport *viewport = ImGui::GetMainViewport();
+  const Uint64 now_ticks = SDL_GetTicks();
+  if (!state.transient_status_text.empty() &&
+      now_ticks >= state.transient_status_until_ticks) {
+    state.transient_status_text.clear();
+    state.transient_status_details.clear();
+  }
 
   // Position at bottom of the main viewport
   // (Viewport Y + Viewport Height - Bar Height)
@@ -273,6 +305,14 @@ void GbcImGui::build_status_bar(UiState &state) const {
         ImGui::Text("%s (%.0f%%)", state.io_status.c_str(), state.io_progress * 100.0f);
       } else {
         ImGui::Text("%s", state.io_status.c_str());
+      }
+    } else if (!state.transient_status_text.empty()) {
+      ImGui::PushStyleColor(ImGuiCol_Text, get_level_color(state.transient_status_level));
+      ImGui::Text("%s", state.transient_status_text.c_str());
+      ImGui::PopStyleColor();
+      if (ImGui::IsItemHovered() && !state.transient_status_details.empty() &&
+          state.transient_status_details != state.transient_status_text) {
+        ImGui::SetTooltip("%s", state.transient_status_details.c_str());
       }
     } else if (!state.load_rom_path.empty()) {
       ImGui::Text("Loaded: %s", state.load_rom_name.c_str());
@@ -546,7 +586,7 @@ void GbcImGui::build_keybinds_window(UiState &state) {
   if (ImGui::Combo("Preset", &settings.keybind_preset_index,
                    preset_names.data(), preset_names.size())) {
     // Only apply immediately if not currently rebinding
-    if (state.waiting_for_bind < 0) {
+    if (!state.waiting_for_bind.has_value()) {
       apply_keybind_preset(settings.keybinds, settings.keybind_preset_index);
     } else {
       // revert change while waiting for bind
@@ -753,6 +793,7 @@ ImVec4 GbcImGui::get_level_color(const LogLevel level) {
     return {0.80f, 0.40f, 0.40f, 1.0f}; // Light red #cc6666
   case LogLevel::Warning:
     return {0.94f, 0.78f, 0.45f, 1.0f}; // Yellow #f0c674
+  case LogLevel::Status:
   case LogLevel::Info:
     return {0.71f, 0.74f, 0.40f, 1.0f}; // Light green #b5bd68
   default:

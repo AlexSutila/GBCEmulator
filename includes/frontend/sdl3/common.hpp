@@ -30,8 +30,8 @@ struct Settings {
   std::array<SDL_Keycode, 8> keybinds{SDLK_D,         SDLK_A,     SDLK_W,
                                       SDLK_S,         SDLK_J,     SDLK_K,
                                       SDLK_BACKSPACE, SDLK_RETURN};
-  std::array<SDL_Keycode, 5> general_keybinds{SDLK_G, SDLK_F, SDLK_EQUALS,
-                                              SDLK_MINUS, SDLK_M};
+  std::array<SDL_Keycode, 7> general_keybinds{
+      SDLK_G, SDLK_F, SDLK_EQUALS, SDLK_MINUS, SDLK_M, SDLK_F5, SDLK_F8};
   std::vector<std::string> recent_roms;
   std::map<std::string, std::string> save_path_by_rom_hash;
   static Settings load(const std::string &filename = ".gbc.config.json");
@@ -42,7 +42,8 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Settings, volume,
                                                 force_mono_dmg,
                                                 keybind_preset_index, rom_dir,
                                                 prev_bios_path, bios_dir,
-                                                keybinds, recent_roms,
+                                                keybinds, general_keybinds,
+                                                recent_roms,
                                                 save_path_by_rom_hash)
 
 inline Settings Settings::load(const std::string &filename) {
@@ -103,6 +104,17 @@ struct InputState {
   std::atomic<byte_t> buttons{};
 };
 
+enum GeneralKeybindIndex : std::size_t {
+  GK_FF_TOGGLE = 0,
+  GK_FF_HOLD,
+  GK_VOL_UP,
+  GK_VOL_DOWN,
+  GK_MONOCHROME,
+  GK_QUICKSAVE,
+  GK_QUICKLOAD,
+  GK_COUNT
+};
+
 /* ---------- Notifications ---------- */
 struct Notification {
   int id;
@@ -122,6 +134,7 @@ struct UiState {
   bool show_keybinds{false};
   bool show_about{false};
   bool show_cart_info{false};
+  bool show_savestate_manager{false};
   bool fast_forward{false};
 
   // Hex memory reader specific
@@ -167,6 +180,10 @@ struct UiState {
   std::vector<Notification> notifications;
   bool show_notifications{false};
   int next_notify_id{};
+  std::string transient_status_text;
+  std::string transient_status_details;
+  LogLevel transient_status_level{LogLevel::Status};
+  Uint64 transient_status_until_ticks{};
 
   // FPS Tracking
   double current_fps{};
