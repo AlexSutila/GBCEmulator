@@ -527,6 +527,31 @@ void GbcImGui::build_settings_window(UiState &state, SDLHost &host) {
   ImGui::SeparatorText("General");
   ImGui::Checkbox("Fast forward", &state.fast_forward);
   ImGui::Checkbox("Force DMG monochrome", &settings.force_mono_dmg);
+  {
+    static std::array<char, 512> savestate_root_input{};
+    static std::string last_savestate_root;
+    if (last_savestate_root != settings.savestate_root_dir) {
+      snprintf(savestate_root_input.data(), savestate_root_input.size(), "%s",
+               settings.savestate_root_dir.c_str());
+      last_savestate_root = settings.savestate_root_dir;
+    }
+
+    ImGui::SetNextItemWidth(320.0f * dpi_scale);
+    if (ImGui::InputText("Savestate root", savestate_root_input.data(),
+                         savestate_root_input.size())) {
+      settings.savestate_root_dir = savestate_root_input.data();
+      last_savestate_root = settings.savestate_root_dir;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Reset##savestate_root")) {
+      settings.savestate_root_dir = "./savestates";
+      snprintf(savestate_root_input.data(), savestate_root_input.size(), "%s",
+               settings.savestate_root_dir.c_str());
+      last_savestate_root = settings.savestate_root_dir;
+    }
+    ImGui::TextDisabled(
+        "Savestate folders: game-name - checksum");
+  }
   ImGui::SeparatorText("Audio");
   // Volume slider
   ImGui::SetNextItemWidth(200.0f * dpi_scale);

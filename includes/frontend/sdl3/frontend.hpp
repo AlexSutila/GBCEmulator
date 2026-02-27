@@ -174,7 +174,8 @@ private:
   void refresh_savestate_entries_locked(bool force_refresh = false);
   void release_savestate_textures_locked();
   void reset_savestate_context();
-  void setup_savestate_context(const cart& c, const std::string& display_label);
+  void setup_savestate_context(const cart& c, const std::string& display_label,
+                               const std::string& rom_hash);
   std::vector<std::uint32_t> capture_savestate_thumbnail() const;
   std::optional<std::filesystem::path> consume_savestate_load_request();
   std::optional<std::string> consume_manual_savestate_request();

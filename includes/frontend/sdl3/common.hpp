@@ -27,6 +27,7 @@ struct Settings {
   std::string rom_dir{"."};
   std::string prev_bios_path;
   std::string bios_dir{"."};
+  std::string savestate_root_dir{"./savestates"};
   std::array<SDL_Keycode, 8> keybinds{SDLK_D,         SDLK_A,     SDLK_W,
                                       SDLK_S,         SDLK_J,     SDLK_K,
                                       SDLK_BACKSPACE, SDLK_RETURN};
@@ -42,6 +43,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Settings, volume,
                                                 force_mono_dmg,
                                                 keybind_preset_index, rom_dir,
                                                 prev_bios_path, bios_dir,
+                                                savestate_root_dir,
                                                 keybinds, general_keybinds,
                                                 recent_roms,
                                                 save_path_by_rom_hash)

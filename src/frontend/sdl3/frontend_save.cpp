@@ -1,5 +1,6 @@
 #include "frontend/sdl3/frontend.hpp"
 #include <algorithm>
+#include <cctype>
 #include <ctime>
 #include <fstream>
 #include <iomanip>
@@ -14,9 +15,26 @@ std::string strip_colons(const std::string &path) {
   return path;
 }
 
+std::string normalize_hex_lower(std::string text) {
+  for (char &c : text) {
+    c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+  }
+  return text;
+}
+
+bool is_hex_string(const std::string &value) {
+  if (value.empty())
+    return false;
+  return std::ranges::all_of(value, [](const char c) {
+    return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
+  });
+}
+
 constexpr int kSavestateThumbWidth = 80;
 constexpr int kSavestateThumbHeight = 72;
 constexpr int kMaxQuickSavestates = 10;
+constexpr std::size_t kSavestateGameDirNameMaxChars = 25;
+constexpr std::size_t kSavestateChecksumShortChars = 12;
 
 struct SavestateMeta {
   int version{1};
@@ -83,7 +101,8 @@ std::time_t file_time_to_time_t(const std::filesystem::file_time_type &ft) {
   return std::chrono::system_clock::to_time_t(sctp);
 }
 
-std::string sanitize_savestate_label(std::string s) {
+std::string sanitize_savestate_label(std::string s,
+                                     const std::size_t max_len = 32) {
   for (char &c : s) {
     const bool keep = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
                       (c >= '0' && c <= '9') || c == '-' || c == '_';
@@ -92,11 +111,78 @@ std::string sanitize_savestate_label(std::string s) {
   s.erase(std::remove(s.begin(), s.end(), '\0'), s.end());
   while (!s.empty() && s.front() == '_')
     s.erase(s.begin());
+  if (s.size() > max_len)
+    s.resize(max_len);
   while (!s.empty() && s.back() == '_')
     s.pop_back();
-  if (s.size() > 32)
-    s.resize(32);
   return s;
+}
+
+std::string shorten_checksum(std::string checksum_hex,
+                             const std::size_t max_len) {
+  checksum_hex = normalize_hex_lower(std::move(checksum_hex));
+  if (checksum_hex.size() > max_len)
+    checksum_hex.resize(max_len);
+  return checksum_hex;
+}
+
+std::filesystem::path resolve_savestate_root_dir(std::string dir_text) {
+  if (dir_text.empty())
+    dir_text = "./savestates";
+
+  std::filesystem::path root = std::move(dir_text);
+  if (root.empty())
+    root = "./savestates";
+
+  if (root.is_relative()) {
+    std::error_code ec;
+    if (const auto cwd = std::filesystem::current_path(ec); !ec) {
+      root = cwd / root;
+    }
+  }
+  return root.lexically_normal();
+}
+
+std::optional<std::filesystem::path>
+find_savestate_dir_by_checksum(const std::filesystem::path &root,
+                               std::string checksum_hex_full) {
+  if (root.empty() || checksum_hex_full.empty())
+    return std::nullopt;
+
+  checksum_hex_full = normalize_hex_lower(std::move(checksum_hex_full));
+
+  std::error_code ec;
+  if (!std::filesystem::exists(root, ec))
+    return std::nullopt;
+
+  std::optional<std::filesystem::path> best = std::nullopt;
+  std::size_t best_match_len = 0;
+  for (const auto &de : std::filesystem::directory_iterator(root, ec)) {
+    if (ec)
+      break;
+    if (!de.is_directory(ec)) {
+      ec.clear();
+      continue;
+    }
+    const std::string candidate_name =
+        normalize_hex_lower(de.path().filename().string());
+    const auto split_pos = candidate_name.rfind(" - ");
+    if (split_pos == std::string::npos || split_pos + 3 >= candidate_name.size())
+      continue;
+    const std::string candidate_checksum = candidate_name.substr(split_pos + 3);
+    if (!is_hex_string(candidate_checksum))
+      continue;
+    if (checksum_hex_full.rfind(candidate_checksum, 0) != 0)
+      continue;
+
+    if (!best.has_value() || candidate_checksum.size() > best_match_len ||
+        (candidate_checksum.size() == best_match_len &&
+         de.path().filename().string() < best->filename().string())) {
+      best = de.path();
+      best_match_len = candidate_checksum.size();
+    }
+  }
+  return best;
 }
 
 std::string savestate_timestamp_slug(const std::time_t t) {
@@ -224,7 +310,7 @@ void SDL3Frontend::setup_save_context(const cart &c,
                                       const std::string &display_label,
                                       const std::string &rom_hash) {
   active_rom_hash = rom_hash;
-  setup_savestate_context(c, display_label);
+  setup_savestate_context(c, display_label, rom_hash);
   const std::filesystem::path default_suggested =
       suggest_save_path(c, display_label);
   suggested_save_path_ = default_suggested;
@@ -394,14 +480,11 @@ void SDL3Frontend::reset_savestate_context() {
 }
 
 void SDL3Frontend::setup_savestate_context(const cart &c,
-                                           const std::string &display_label) {
+                                           const std::string &display_label,
+                                           const std::string &rom_hash) {
   release_savestate_textures_locked();
   savestate_entries_.clear();
   savestate_selected_path_.reset();
-
-  std::filesystem::path parent = c.file_path.parent_path();
-  if (parent.empty())
-    parent = std::filesystem::current_path();
 
   std::string stem = c.file_path.stem().string();
   if (stem.empty())
@@ -410,11 +493,28 @@ void SDL3Frontend::setup_savestate_context(const cart &c,
     stem = c.header.title();
   if (stem.empty())
     stem = "cartridge";
-  stem = sanitize_savestate_label(stem);
+  stem = sanitize_savestate_label(stem, kSavestateGameDirNameMaxChars);
   if (stem.empty())
     stem = "cartridge";
 
-  savestate_dir_ = parent / (stem + ".savestates");
+  const std::string checksum_full = normalize_hex_lower(rom_hash);
+  const std::string checksum_short =
+      shorten_checksum(checksum_full, kSavestateChecksumShortChars);
+  const std::filesystem::path root_dir =
+      resolve_savestate_root_dir(gui.get_settings_c().savestate_root_dir);
+  std::error_code ec;
+  std::filesystem::create_directories(root_dir, ec);
+
+  if (const auto existing =
+          find_savestate_dir_by_checksum(root_dir, checksum_full);
+      existing.has_value()) {
+    savestate_dir_ = *existing;
+  } else if (!checksum_short.empty()) {
+    savestate_dir_ = root_dir / (stem + " - " + checksum_short);
+  } else {
+    savestate_dir_ = root_dir / stem;
+  }
+
   savestate_manual_label_input_.fill('\0');
   {
     std::lock_guard lock(savestate_request_mutex);
