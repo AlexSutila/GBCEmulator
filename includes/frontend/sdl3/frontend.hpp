@@ -160,8 +160,12 @@ private:
   std::vector<byte_t> prime_sram_saves(
       const std::optional<std::filesystem::path> &initial_save_path,
       Cartridge *const cart_ptr);
-  void digest_sram_save(const std::vector<byte_t> save_snapshot,
-                        Cartridge *const cart_ptr);
+  void process_sram_save_events(const std::vector<byte_t> save_snapshot,
+                                Cartridge *const cart_ptr);
+  void process_save_state_events(
+      const std::optional<std::filesystem::path> &manual_save_label,
+      const std::optional<std::filesystem::path> &manual_load_path,
+      const bool quicksave, const bool quickload);
   void emulation_thread_fn(
       const std::stop_token &st, const cart &cart,
       const std::optional<std::string> &bios,

@@ -390,8 +390,8 @@ std::vector<byte_t> SDL3Frontend::prime_sram_saves(
   return save_snapshot;
 }
 
-void SDL3Frontend::digest_sram_save(std::vector<byte_t> save_snapshot,
-                                    Cartridge *const cart_ptr) {
+void SDL3Frontend::process_sram_save_events(std::vector<byte_t> save_snapshot,
+                                            Cartridge *const cart_ptr) {
   if (!cart_ptr->has_battery() || !cart_ptr->consume_sram_save())
     return;
   const auto ram_view = cart_ptr->ram();
@@ -404,6 +404,100 @@ void SDL3Frontend::digest_sram_save(std::vector<byte_t> save_snapshot,
     if (altered) [[unlikely]] {
       save_snapshot.assign(ram_view.begin(), ram_view.end());
       enqueue_save_snapshot(std::vector(ram_view.begin(), ram_view.end()));
+    }
+  }
+}
+
+void SDL3Frontend::process_save_state_events(
+    const std::optional<std::filesystem::path> &manual_save_label,
+    const std::optional<std::filesystem::path> &manual_load_path,
+    const bool quicksave, const bool quickload) {
+  const auto read_blob = [](const std::filesystem::path &path)
+      -> std::optional<std::vector<byte_t>> {
+    std::ifstream f(path, std::ios::binary | std::ios::ate);
+    if (!f)
+      return std::nullopt;
+    const auto size = f.tellg();
+    if (size <= 0)
+      return std::nullopt;
+    std::vector<byte_t> buf(size);
+    f.seekg(0, std::ios::beg);
+    if (!f.read(reinterpret_cast<char *>(buf.data()), size))
+      return std::nullopt;
+    return buf;
+  };
+
+  if (quicksave) [[unlikely]] {
+    try {
+      const auto blob = gbc->serialize_savestate();
+      if (const auto path = write_savestate_bundle(blob, true);
+          !path.has_value()) {
+        Logger::push(LogLevel::Warning, "Savestate", "Failed to create",
+                     "Could not create a quicksave. Check that the "
+                     "savestate directory is accessible.");
+      } else {
+        Logger::push(LogLevel::Status, "Savestate", "Savestate created",
+                     path->string());
+      }
+    } catch (const std::exception &e) {
+      Logger::push(LogLevel::Warning, "Savestate", "Failed to create",
+                   e.what());
+    }
+  }
+
+  else if (quickload) [[unlikely]] {
+    try {
+      if (const auto latest_path = latest_savestate_path();
+          !latest_path.has_value()) {
+        Logger::push(LogLevel::Status, "Savestate", "No savestate available",
+                     "No savestate is available to load.");
+      } else if (const auto blob = read_blob(*latest_path); !blob.has_value()) {
+        Logger::push(LogLevel::Warning, "Savestate", "Inaccessible",
+                     "Could not read savestate from: " + latest_path->string() +
+                         ". It may have been moved or deleted.");
+      } else {
+        gbc->deserialize_savestate(*blob);
+        host.clear_audio_stream();
+        video_dirty.store(true, std::memory_order_release);
+        Logger::push(LogLevel::Status, "Savestate", "Savestate loaded",
+                     latest_path->string());
+      }
+    } catch (const std::exception &e) {
+      Logger::push(LogLevel::Warning, "Savestate", "Load failed", e.what());
+    }
+  }
+
+  else if (manual_save_label.has_value()) [[unlikely]] {
+    const auto &manual_label = manual_save_label.value();
+    try {
+      const auto blob = gbc->serialize_savestate();
+      if (const auto path = write_savestate_bundle(blob, false, manual_label);
+          !path.has_value()) {
+        Logger::push(LogLevel::Warning, "Savestate", "Failed to create",
+                     "Could not create a savestate. Check that the "
+                     "savestate directory is accessible.");
+      }
+    } catch (const std::exception &e) {
+      Logger::push(LogLevel::Warning, "Savestate", "Failed to create",
+                   e.what());
+    }
+  }
+
+  else if (manual_load_path.has_value()) [[unlikely]] {
+    const auto &load_path = manual_load_path.value();
+    try {
+      if (const auto blob = read_blob(load_path); !blob.has_value()) {
+        Logger::push(LogLevel::Warning, "Savestate", "File not found",
+                     "Could not read savestate from: " + load_path.string());
+      } else {
+        gbc->deserialize_savestate(*blob);
+        host.clear_audio_stream();
+        video_dirty.store(true, std::memory_order_release);
+        Logger::push(LogLevel::Status, "Savestate", "Savestate loaded",
+                     load_path.string());
+      }
+    } catch (const std::exception &e) {
+      Logger::push(LogLevel::Warning, "Savestate", "Load failed", e.what());
     }
   }
 }
@@ -436,25 +530,9 @@ void SDL3Frontend::emulation_thread_fn(
   std::vector<byte_t> last_saved_snapshot =
       prime_sram_saves(initial_save_path, cart_ptr);
 
-  const auto read_blob = [](const std::filesystem::path &path)
-      -> std::optional<std::vector<byte_t>> {
-    std::ifstream f(path, std::ios::binary | std::ios::ate);
-    if (!f)
-      return std::nullopt;
-    const auto size = f.tellg();
-    if (size <= 0)
-      return std::nullopt;
-    std::vector<byte_t> buf(size);
-    f.seekg(0, std::ios::beg);
-    if (!f.read(reinterpret_cast<char *>(buf.data()), size))
-      return std::nullopt;
-    return buf;
-  };
-
   /* Run emulation in real-time */
   while (!st.stop_requested()) [[likely]] {
-    // Audio sync logic
-    // Check how much audio is currently buffered
+    // Audio sync logic, check how much audio is currently buffered
     const int queued_bytes = host.get_queued_audio_bytes();
 
     // If we are ahead of the target (and not fast-forwarding), sleep briefly.
@@ -480,97 +558,28 @@ void SDL3Frontend::emulation_thread_fn(
     ff = fast_forward.load();
     debugger.forward_stop(gbc);
 
-    if (gbc && gbc->savestate_ready()) {
-      if (quicksave_requested.exchange(false, std::memory_order_acq_rel)) {
-        try {
-          const auto blob = gbc->serialize_savestate();
-          if (const auto path = write_savestate_bundle(blob, true);
-              !path.has_value()) {
-            Logger::push(LogLevel::Warning, "Savestate", "Failed to create",
-                         "Could not create a quicksave. Check that the "
-                         "savestate directory is accessible.");
-          } else {
-            Logger::push(LogLevel::Status, "Savestate", "Savestate created",
-                         path->string());
-          }
-        } catch (const std::exception &e) {
-          Logger::push(LogLevel::Warning, "Savestate", "Failed to create",
-                       e.what());
-        }
-      }
-
-      if (const auto manual_label = consume_manual_savestate_request();
-          manual_label.has_value()) {
-        try {
-          const auto blob = gbc->serialize_savestate();
-          if (const auto path =
-                  write_savestate_bundle(blob, false, *manual_label);
-              !path.has_value()) {
-            Logger::push(LogLevel::Warning, "Savestate", "Failed to create",
-                         "Could not create a savestate. Check that the "
-                         "savestate directory is accessible.");
-          }
-        } catch (const std::exception &e) {
-          Logger::push(LogLevel::Warning, "Savestate", "Failed to create",
-                       e.what());
-        }
-      }
-
-      if (quickload_requested.exchange(false, std::memory_order_acq_rel)) {
-        try {
-          if (const auto latest_path = latest_savestate_path();
-              !latest_path.has_value()) {
-            Logger::push(LogLevel::Status, "Savestate",
-                         "No savestate available",
-                         "No savestate is available to load.");
-          } else if (const auto blob = read_blob(*latest_path);
-                     !blob.has_value()) {
-            Logger::push(
-                LogLevel::Warning, "Savestate", "Inaccessible",
-                "Could not read savestate from: " + latest_path->string() +
-                    ". It may have been moved or deleted.");
-          } else {
-            gbc->deserialize_savestate(*blob);
-            host.clear_audio_stream();
-            video_dirty.store(true, std::memory_order_release);
-            Logger::push(LogLevel::Status, "Savestate", "Savestate loaded",
-                         latest_path->string());
-          }
-        } catch (const std::exception &e) {
-          Logger::push(LogLevel::Warning, "Savestate", "Load failed", e.what());
-        }
-      }
-
-      if (const auto load_path = consume_savestate_load_request();
-          load_path.has_value()) {
-        try {
-          if (const auto blob = read_blob(*load_path); !blob.has_value()) {
-            Logger::push(LogLevel::Warning, "Savestate", "File not found",
-                         "Could not read savestate from: " +
-                             load_path->string());
-          } else {
-            gbc->deserialize_savestate(*blob);
-            host.clear_audio_stream();
-            video_dirty.store(true, std::memory_order_release);
-            Logger::push(LogLevel::Status, "Savestate", "Savestate loaded",
-                         load_path->string());
-          }
-        } catch (const std::exception &e) {
-          Logger::push(LogLevel::Warning, "Savestate", "Load failed", e.what());
-        }
-      }
+    // TODO: This is still not 100% where I want it yet
+    if (gbc->savestate_ready()) {
+      const auto manual_save_label = consume_manual_savestate_request();
+      const auto manual_load_path = consume_savestate_load_request();
+      const bool quicksave =
+          quicksave_requested.exchange(false, std::memory_order_acq_rel);
+      const bool quickload =
+          quickload_requested.exchange(false, std::memory_order_acq_rel);
+      process_save_state_events(manual_save_label, manual_load_path, quicksave,
+                                quickload);
     }
 
     // Periodic SRAM save backups in case of unexpected quit / crash
     if (const auto now = Clock::now(); now >= next_save_poll) {
       constexpr auto polling_period = std::chrono::milliseconds(250);
-      digest_sram_save(last_saved_snapshot, cart_ptr);
+      process_sram_save_events(last_saved_snapshot, cart_ptr);
       next_save_poll = now + polling_period;
     }
   }
 
   // Handle dangling SRAM save backups before quitting
-  digest_sram_save(last_saved_snapshot, cart_ptr);
+  process_sram_save_events(last_saved_snapshot, cart_ptr);
 }
 
 void SDL3Frontend::join_emu_thread_if_running() {
