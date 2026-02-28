@@ -17,7 +17,7 @@ namespace fs = std::filesystem;
 namespace Savestate {
 class Reader;
 class Writer;
-}
+} // namespace Savestate
 
 constexpr std::size_t kHeaderStart = 0x0100;
 constexpr std::size_t kHeaderEnd = 0x014F;
@@ -36,7 +36,7 @@ enum SpecialMbc {
 };
 
 struct rom_header {
-  std::array<byte_t, 4> entry_point{};      // 0100-0103
+  std::array<byte_t, 4> entry_point{}; // 0100-0103
   std::array<byte_t, 16>
       title_area{}; // 0134-0143 (optionally title / manufacturer / cgb_flag)
   std::array<byte_t, 2> new_licensee_code{}; // 0144-0145
@@ -85,10 +85,11 @@ class Cartridge {
 public:
   explicit Cartridge(cart image)
       : image_(std::move(image)), mbc_(make_mbc(image_)) {}
-  explicit Cartridge()
-      : image_({}), mbc_(make_test_mbc()) {}
+  explicit Cartridge() : image_({}), mbc_(make_test_mbc()) {}
 
-  [[nodiscard]] byte_t read_byte(const addr_t addr) const { return mbc_->read(addr); }
+  [[nodiscard]] byte_t read_byte(const addr_t addr) const {
+    return mbc_->read(addr);
+  }
   void write(addr_t addr, byte_t v);
 
   [[nodiscard]] const cart &image() const noexcept { return image_; }
@@ -104,14 +105,12 @@ public:
   bool write_save_file(const fs::path &save_path) const;
   void savestate_serialize(Savestate::Writer &out) const;
   void savestate_deserialize(Savestate::Reader &in);
-  bool consume_save_event() noexcept {
-    return save_dirty_.exchange(false, std::memory_order_acq_rel);
-  }
+  bool consume_sram_save() noexcept;
 
 private:
   cart image_;
   std::unique_ptr<Mbc> mbc_;
-  std::atomic<bool> save_dirty_{false};
+  bool save_dirty_{false};
 };
 
 [[nodiscard]] cart load_cart_raw(std::vector<byte_t> rom_bytes);

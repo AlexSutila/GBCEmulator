@@ -157,8 +157,11 @@ private:
   build_emulator_instance(
       const cart &cart, const std::optional<std::string> &bios,
       const std::optional<std::filesystem::path> &initial_save_path);
-  void prime_sram_save(const std::filesystem::path &initial_save_path,
-                       Cartridge *const cart_ptr);
+  std::vector<byte_t> prime_sram_saves(
+      const std::optional<std::filesystem::path> &initial_save_path,
+      Cartridge *const cart_ptr);
+  void digest_sram_save(const std::vector<byte_t> save_snapshot,
+                        Cartridge *const cart_ptr);
   void emulation_thread_fn(
       const std::stop_token &st, const cart &cart,
       const std::optional<std::string> &bios,

@@ -368,15 +368,43 @@ SDL3Frontend::build_emulator_instance(
 /* Not to be confused with FULL-SYSTEM save states, this is specifically
  * tailored to restoring the contents of random access memory saved on
  * cartridges leveraging a battery. */
-void SDL3Frontend::prime_sram_save(
-    const std::filesystem::path &initial_save_path, Cartridge *const cart_ptr) {
-  std::error_code ec;
-  if (cart_ptr->has_battery() &&
-      std::filesystem::exists(initial_save_path, ec) &&
-      !cart_ptr->load_save_file(initial_save_path)) {
-    Logger::push(LogLevel::Warning, "Save", "Failed to load save file",
-                 "Could not load save data from: " +
-                     initial_save_path.string());
+std::vector<byte_t> SDL3Frontend::prime_sram_saves(
+    const std::optional<std::filesystem::path> &initial_save_path,
+    Cartridge *const cart_ptr) {
+  using namespace std::filesystem;
+  std::vector<byte_t> save_snapshot{};
+  std::error_code ec{};
+
+  // Prime existing SRAM save, if it exists
+  if (cart_ptr->has_battery() && initial_save_path.has_value()) {
+    const auto &save_path = initial_save_path.value();
+    if (!exists(save_path) || !cart_ptr->load_save_file(save_path))
+      Logger::push(LogLevel::Warning, "Save", "Failed to load save file",
+                   "Could not load save data from: " + save_path.string());
+  }
+
+  if (cart_ptr->has_battery()) {
+    const auto ram_view = cart_ptr->ram();
+    save_snapshot.assign(ram_view.begin(), ram_view.end());
+  }
+  return save_snapshot;
+}
+
+void SDL3Frontend::digest_sram_save(std::vector<byte_t> save_snapshot,
+                                    Cartridge *const cart_ptr) {
+  if (!cart_ptr->has_battery() || !cart_ptr->consume_sram_save())
+    return;
+  const auto ram_view = cart_ptr->ram();
+
+  if (!ram_view.empty()) [[unlikely]] {
+    const bool altered =
+        ram_view.size() != save_snapshot.size() ||
+        !std::equal(ram_view.begin(), ram_view.end(), save_snapshot.begin());
+
+    if (altered) [[unlikely]] {
+      save_snapshot.assign(ram_view.begin(), ram_view.end());
+      enqueue_save_snapshot(std::vector(ram_view.begin(), ram_view.end()));
+    }
   }
 }
 
@@ -405,17 +433,8 @@ void SDL3Frontend::emulation_thread_fn(
   }));
 
   /* Restore previous SRAM content (i.e., emulate battery backed save data) */
-  if (initial_save_path.has_value())
-    prime_sram_save(initial_save_path.value(), cart_ptr);
-
-  std::vector<byte_t> last_saved_snapshot;
-  if (auto *bus = gbc->get_bus(); bus) {
-    if (auto *cart_ptr = bus->get_cartridge();
-        cart_ptr && cart_ptr->has_battery()) {
-      const auto ram_view = cart_ptr->ram();
-      last_saved_snapshot.assign(ram_view.begin(), ram_view.end());
-    }
-  }
+  std::vector<byte_t> last_saved_snapshot =
+      prime_sram_saves(initial_save_path, cart_ptr);
 
   const auto read_blob = [](const std::filesystem::path &path)
       -> std::optional<std::vector<byte_t>> {
@@ -459,8 +478,6 @@ void SDL3Frontend::emulation_thread_fn(
     /* Update additional meta-data, avoid mutex acquisition */
     is_cgb.store(gbc->get_sys().cgb_mode);
     ff = fast_forward.load();
-
-    /* Update the fuck ass debugger */
     debugger.forward_stop(gbc);
 
     if (gbc && gbc->savestate_ready()) {
@@ -544,36 +561,16 @@ void SDL3Frontend::emulation_thread_fn(
       }
     }
 
+    // Periodic SRAM save backups in case of unexpected quit / crash
     if (const auto now = Clock::now(); now >= next_save_poll) {
-      next_save_poll = now + std::chrono::milliseconds(250);
-      if (auto *bus = gbc->get_bus(); bus) {
-        if (auto *cart_ptr = bus->get_cartridge();
-            cart_ptr && cart_ptr->consume_save_event()) {
-          const auto ram_view = cart_ptr->ram();
-          if (!ram_view.empty() &&
-              (ram_view.size() != last_saved_snapshot.size() ||
-               !std::equal(ram_view.begin(), ram_view.end(),
-                           last_saved_snapshot.begin()))) {
-            last_saved_snapshot.assign(ram_view.begin(), ram_view.end());
-            enqueue_save_snapshot(
-                std::vector(ram_view.begin(), ram_view.end()));
-          }
-        }
-      }
+      constexpr auto polling_period = std::chrono::milliseconds(250);
+      digest_sram_save(last_saved_snapshot, cart_ptr);
+      next_save_poll = now + polling_period;
     }
   }
 
-  if (auto *bus = gbc->get_bus(); bus) {
-    if (auto *cart_ptr = bus->get_cartridge();
-        cart_ptr && cart_ptr->consume_save_event()) {
-      const auto ram_view = cart_ptr->ram();
-      if (!ram_view.empty() && (ram_view.size() != last_saved_snapshot.size() ||
-                                !std::equal(ram_view.begin(), ram_view.end(),
-                                            last_saved_snapshot.begin()))) {
-        enqueue_save_snapshot(std::vector(ram_view.begin(), ram_view.end()));
-      }
-    }
-  }
+  // Handle dangling SRAM save backups before quitting
+  digest_sram_save(last_saved_snapshot, cart_ptr);
 }
 
 void SDL3Frontend::join_emu_thread_if_running() {
