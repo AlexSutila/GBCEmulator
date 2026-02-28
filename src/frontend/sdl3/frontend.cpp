@@ -6,6 +6,7 @@
 #include "memory/mmio/mmio.hpp"
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <fstream>
 #include <memory>
@@ -468,10 +469,10 @@ void SDL3Frontend::process_save_state_events(
   }
 
   else if (manual_save_label.has_value()) [[unlikely]] {
-    const auto &manual_label = manual_save_label.value();
+    const auto &lab = manual_save_label.value();
     try {
       const auto blob = gbc->serialize_savestate();
-      if (const auto path = write_savestate_bundle(blob, false, manual_label);
+      if (const auto path = write_savestate_bundle(blob, false, lab);
           !path.has_value()) {
         Logger::push(LogLevel::Warning, "Savestate", "Failed to create",
                      "Could not create a savestate. Check that the "
@@ -484,17 +485,17 @@ void SDL3Frontend::process_save_state_events(
   }
 
   else if (manual_load_path.has_value()) [[unlikely]] {
-    const auto &load_path = manual_load_path.value();
+    const auto &path = manual_load_path.value();
     try {
-      if (const auto blob = read_blob(load_path); !blob.has_value()) {
+      if (const auto blob = read_blob(path); !blob.has_value()) {
         Logger::push(LogLevel::Warning, "Savestate", "File not found",
-                     "Could not read savestate from: " + load_path.string());
+                     "Could not read savestate from: " + path.string());
       } else {
         gbc->deserialize_savestate(*blob);
         host.clear_audio_stream();
         video_dirty.store(true, std::memory_order_release);
         Logger::push(LogLevel::Status, "Savestate", "Savestate loaded",
-                     load_path.string());
+                     path.string());
       }
     } catch (const std::exception &e) {
       Logger::push(LogLevel::Warning, "Savestate", "Load failed", e.what());
@@ -550,25 +551,12 @@ void SDL3Frontend::emulation_thread_fn(
     /* Read input state and catch up with audio stream, the max_catchup_cycles
      * is ~17556 cycles (~4ms of emulated time) */
     joyp_ptr->set_state(input_state.buttons.load(std::memory_order_relaxed));
-    for (auto i{0}; i < max_catchup_cycles; i++)
-      gbc->step();
+    advance_emulator_core(max_catchup_cycles);
 
     /* Update additional meta-data, avoid mutex acquisition */
     is_cgb.store(gbc->get_sys().cgb_mode);
     ff = fast_forward.load();
     debugger.forward_stop(gbc);
-
-    // TODO: This is still not 100% where I want it yet
-    if (gbc->savestate_ready()) {
-      const auto manual_save_label = consume_manual_savestate_request();
-      const auto manual_load_path = consume_savestate_load_request();
-      const bool quicksave =
-          quicksave_requested.exchange(false, std::memory_order_acq_rel);
-      const bool quickload =
-          quickload_requested.exchange(false, std::memory_order_acq_rel);
-      process_save_state_events(manual_save_label, manual_load_path, quicksave,
-                                quickload);
-    }
 
     // Periodic SRAM save backups in case of unexpected quit / crash
     if (const auto now = Clock::now(); now >= next_save_poll) {
@@ -580,6 +568,29 @@ void SDL3Frontend::emulation_thread_fn(
 
   // Handle dangling SRAM save backups before quitting
   process_sram_save_events(last_saved_snapshot, cart_ptr);
+}
+
+void SDL3Frontend::advance_emulator_core(const int cycles) {
+  constexpr auto acc = std::memory_order_acq_rel;
+  const bool quick_save = quicksave_requested.exchange(false, acc);
+  const bool quick_load = quickload_requested.exchange(false, acc);
+  const auto save_label = consume_manual_savestate_request();
+  const auto load_path = consume_savestate_load_request();
+  bool preempt = save_label.has_value() || load_path.has_value() ||
+                 quick_save || quick_load;
+
+  /* If a save event came in prior to this advancement, we want to preempt the
+   * main emulation loop and handle it as soon as the system is in a safe state
+   * to do so. */
+  for (auto i{0}; i < cycles; i++) {
+    gbc->step();
+
+    // Note: Keep short circuit eval on `gbc->savestate_ready()` if possible
+    if (preempt && gbc->savestate_ready()) [[unlikely]] {
+      process_save_state_events(save_label, load_path, quick_save, quick_load);
+      return; // Drop the rest of the cycles for this synchronization perdiod
+    }
+  }
 }
 
 void SDL3Frontend::join_emu_thread_if_running() {

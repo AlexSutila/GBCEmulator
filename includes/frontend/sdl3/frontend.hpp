@@ -170,6 +170,7 @@ private:
       const std::stop_token &st, const cart &cart,
       const std::optional<std::string> &bios,
       const std::optional<std::filesystem::path> &initial_save_path);
+  void advance_emulator_core(const int cycles);
   void join_emu_thread_if_running();
 
   // Main loop helpers
