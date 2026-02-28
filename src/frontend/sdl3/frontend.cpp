@@ -2,12 +2,16 @@
 #include "SDL3/SDL_events.h"
 #include "SDL3/SDL_gamepad.h"
 #include "debugger/print.hpp"
+#include "gbc.hpp"
+#include "memory/mmio/mmio.hpp"
 #include <algorithm>
 #include <array>
 #include <chrono>
 #include <fstream>
+#include <memory>
 #include <picosha2.h>
 #include <span>
+#include <stdexcept>
 
 namespace {
 std::int64_t steady_now_ns() {
@@ -175,8 +179,6 @@ const std::uint32_t *SDL3Frontend::get_front_buffer() const {
   return framebuffers[front_index.load(std::memory_order_acquire)].get();
 }
 
-/* Main loop helpers */
-
 void SDL3Frontend::process_events() {
   SDL_Event e;
   while (SDL_PollEvent(&e)) {
@@ -325,10 +327,64 @@ void SDL3Frontend::render_frame() {
   host.present();
 }
 
+std::tuple<AddressBus *const, Cartridge *const, Joypad::JOYP *const>
+SDL3Frontend::build_emulator_instance(
+    const cart &cart, const std::optional<std::string> &bios,
+    const std::optional<std::filesystem::path> &initial_save_path) {
+
+  /* Allocate emulator core, which constructor is used depends on existence of
+   * an optional BIOS file. */
+  if (bios.has_value()) {
+    try {
+      auto bios_rom = BootROM(bios.value());
+      gbc = std::make_unique<GameBoyColor>(*this, bios_rom);
+    }
+
+    // Failure to load should resort to no BIOS as fallback
+    catch (std::runtime_error &e) {
+      Logger::push(LogLevel::Warning, "BIOS", "Failed to load BIOS", e.what());
+      gui.get_settings().prev_bios_path = "";
+      gbc = std::make_unique<GameBoyColor>(*this);
+    }
+  }
+  gbc->insert_cartridge(cart);
+
+  /* Attempt generic resource acquisition of stuff needed later on in the
+   * emulation loop. It is better to do all the error handling early on and
+   * promise availability downstream. */
+  auto *const bus_ptr = gbc->get_bus();
+  if (!bus_ptr)
+    throw std::runtime_error("Failed to acquire AddressBus resource");
+  auto *const cart_ptr = bus_ptr->get_cartridge();
+  if (!bus_ptr)
+    throw std::runtime_error("Failed to acquire Cartridge resource");
+  auto *joyp_ptr = dynamic_cast<Joypad::JOYP *>(
+      gbc->get_bus()->get_mmio(IORegisterMapping::MMIO_JOYPAD));
+  if (!joyp_ptr)
+    throw std::runtime_error("Failed to acquire Cartridge resource");
+  return {bus_ptr, cart_ptr, joyp_ptr};
+}
+
+/* Not to be confused with FULL-SYSTEM save states, this is specifically
+ * tailored to restoring the contents of random access memory saved on
+ * cartridges leveraging a battery. */
+void SDL3Frontend::prime_sram_save(
+    const std::filesystem::path &initial_save_path, Cartridge *const cart_ptr) {
+  std::error_code ec;
+  if (cart_ptr->has_battery() &&
+      std::filesystem::exists(initial_save_path, ec) &&
+      !cart_ptr->load_save_file(initial_save_path)) {
+    Logger::push(LogLevel::Warning, "Save", "Failed to load save file",
+                 "Could not load save data from: " +
+                     initial_save_path.string());
+  }
+}
+
 void SDL3Frontend::emulation_thread_fn(
-    const std::stop_token &st, const cart &c,
+    const std::stop_token &st, const cart &cart,
     const std::optional<std::string> &bios,
     const std::optional<std::filesystem::path> &initial_save_path) {
+  auto next_save_poll = Clock::now();
   bool ff = false;
   clear(black);
 
@@ -336,32 +392,22 @@ void SDL3Frontend::emulation_thread_fn(
   front_index.store(0, std::memory_order_relaxed);
   host.clear_audio_stream();
 
-  /* Re-instantiate emulator instance */
-  if (bios.has_value()) {
-    try {
-      auto bios_rom = BootROM(bios.value());
-      gbc = std::make_unique<GameBoyColor>(*this, bios_rom);
-    } catch (std::runtime_error &e) {
-      Logger::push(LogLevel::Warning, "BIOS", "Failed to load BIOS", e.what());
-      gui.get_settings().prev_bios_path = "";
-      gbc = std::make_unique<GameBoyColor>(*this);
-    }
-  } else {
-    gbc = std::make_unique<GameBoyColor>(*this);
-  }
-  gbc->insert_cartridge(c);
-  if (auto *bus = gbc->get_bus(); bus && initial_save_path.has_value()) {
-    if (auto *cart_ptr = bus->get_cartridge(); cart_ptr) {
-      std::error_code ec;
-      if (cart_ptr->has_battery() &&
-          std::filesystem::exists(*initial_save_path, ec) &&
-          !cart_ptr->load_save_file(*initial_save_path)) {
-        Logger::push(LogLevel::Warning, "Save", "Failed to load save file",
-                     "Could not load save data from: " +
-                         initial_save_path->string());
-      }
-    }
-  }
+  /* Prime save state control mechanism */
+  quicksave_requested.store(false, std::memory_order_relaxed);
+  quickload_requested.store(false, std::memory_order_relaxed);
+
+  /* Re-instantiate emulator instance. We create the callback in this scope so
+   * that we can pass along the stop token by reference easily. */
+  const auto [bus_ptr, cart_ptr, joyp_ptr] =
+      build_emulator_instance(cart, bios, initial_save_path);
+  gbc->configure_debugger(Debug::Debugger([this, st]() -> Debug::BreakReason {
+    return debugger.on_breakpoint(st, gbc);
+  }));
+
+  /* Restore previous SRAM content (i.e., emulate battery backed save data) */
+  if (initial_save_path.has_value())
+    prime_sram_save(initial_save_path.value(), cart_ptr);
+
   std::vector<byte_t> last_saved_snapshot;
   if (auto *bus = gbc->get_bus(); bus) {
     if (auto *cart_ptr = bus->get_cartridge();
@@ -371,19 +417,6 @@ void SDL3Frontend::emulation_thread_fn(
     }
   }
 
-  auto callback = [this, st]() -> Debug::BreakReason {
-    return debugger.on_breakpoint(st, gbc);
-  };
-  gbc->configure_debugger(Debug::Debugger(callback));
-
-  /* Establish connection with button state */
-  auto *joypad = dynamic_cast<Joypad::JOYP *>(
-      gbc->get_bus()->get_mmio(IORegisterMapping::MMIO_JOYPAD));
-  if (!joypad)
-    throw std::logic_error("Failed to configure joypad input");
-  auto next_save_poll = Clock::now();
-  quicksave_requested.store(false, std::memory_order_relaxed);
-  quickload_requested.store(false, std::memory_order_relaxed);
   const auto read_blob = [](const std::filesystem::path &path)
       -> std::optional<std::vector<byte_t>> {
     std::ifstream f(path, std::ios::binary | std::ios::ate);
@@ -419,7 +452,7 @@ void SDL3Frontend::emulation_thread_fn(
 
     /* Read input state and catch up with audio stream, the max_catchup_cycles
      * is ~17556 cycles (~4ms of emulated time) */
-    joypad->set_state(input_state.buttons.load(std::memory_order_relaxed));
+    joyp_ptr->set_state(input_state.buttons.load(std::memory_order_relaxed));
     for (auto i{0}; i < max_catchup_cycles; i++)
       gbc->step();
 
