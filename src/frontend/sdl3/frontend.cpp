@@ -409,10 +409,12 @@ void SDL3Frontend::process_sram_save_events(std::vector<byte_t> save_snapshot,
   }
 }
 
-void SDL3Frontend::process_save_state_events(
-    const std::optional<std::filesystem::path> &manual_save_label,
-    const std::optional<std::filesystem::path> &manual_load_path,
-    const bool quicksave, const bool quickload) {
+void SDL3Frontend::process_save_state_events() {
+  constexpr auto acq = std::memory_order_acq_rel;
+  const bool quick_save = quicksave_requested.exchange(false, acq);
+  const bool quick_load = quickload_requested.exchange(false, acq);
+  const bool manual = manual_preempt_emu_loop.exchange(false, acq);
+
   const auto read_blob = [](const std::filesystem::path &path)
       -> std::optional<std::vector<byte_t>> {
     std::ifstream f(path, std::ios::binary | std::ios::ate);
@@ -428,7 +430,7 @@ void SDL3Frontend::process_save_state_events(
     return buf;
   };
 
-  if (quicksave) [[unlikely]] {
+  if (quick_save) [[unlikely]] {
     try {
       const auto blob = gbc->serialize_savestate();
       if (const auto path = write_savestate_bundle(blob, true);
@@ -446,7 +448,7 @@ void SDL3Frontend::process_save_state_events(
     }
   }
 
-  else if (quickload) [[unlikely]] {
+  else if (quick_load) [[unlikely]] {
     try {
       if (const auto latest_path = latest_savestate_path();
           !latest_path.has_value()) {
@@ -468,37 +470,47 @@ void SDL3Frontend::process_save_state_events(
     }
   }
 
-  else if (manual_save_label.has_value()) [[unlikely]] {
-    const auto &lab = manual_save_label.value();
-    try {
-      const auto blob = gbc->serialize_savestate();
-      if (const auto path = write_savestate_bundle(blob, false, lab);
-          !path.has_value()) {
-        Logger::push(LogLevel::Warning, "Savestate", "Failed to create",
-                     "Could not create a savestate. Check that the "
-                     "savestate directory is accessible.");
-      }
-    } catch (const std::exception &e) {
-      Logger::push(LogLevel::Warning, "Savestate", "Failed to create",
-                   e.what());
-    }
-  }
+  /* Manual is set when manual events happen (rather than quick). In this case,
+   * since some manual event has come through, we consume any manual saves or
+   * load requests and assume one of them will be handled. */
+  else if (manual) [[unlikely]] {
+    const auto manual_save_label = consume_manual_savestate_request();
+    const auto manual_load_path = consume_savestate_load_request();
 
-  else if (manual_load_path.has_value()) [[unlikely]] {
-    const auto &path = manual_load_path.value();
-    try {
-      if (const auto blob = read_blob(path); !blob.has_value()) {
-        Logger::push(LogLevel::Warning, "Savestate", "File not found",
-                     "Could not read savestate from: " + path.string());
-      } else {
-        gbc->deserialize_savestate(*blob);
-        host.clear_audio_stream();
-        video_dirty.store(true, std::memory_order_release);
-        Logger::push(LogLevel::Status, "Savestate", "Savestate loaded",
-                     path.string());
+    // Process manual save event
+    if (manual_save_label.has_value()) {
+      const auto &lab = manual_save_label.value();
+      try {
+        const auto blob = gbc->serialize_savestate();
+        if (const auto path = write_savestate_bundle(blob, false, lab);
+            !path.has_value()) {
+          Logger::push(LogLevel::Warning, "Savestate", "Failed to create",
+                       "Could not create a savestate. Check that the "
+                       "savestate directory is accessible.");
+        }
+      } catch (const std::exception &e) {
+        Logger::push(LogLevel::Warning, "Savestate", "Failed to create",
+                     e.what());
       }
-    } catch (const std::exception &e) {
-      Logger::push(LogLevel::Warning, "Savestate", "Load failed", e.what());
+    }
+
+    // Process manual load event
+    else if (manual_load_path.has_value()) {
+      const auto &path = manual_load_path.value();
+      try {
+        if (const auto blob = read_blob(path); !blob.has_value()) {
+          Logger::push(LogLevel::Warning, "Savestate", "File not found",
+                       "Could not read savestate from: " + path.string());
+        } else {
+          gbc->deserialize_savestate(*blob);
+          host.clear_audio_stream();
+          video_dirty.store(true, std::memory_order_release);
+          Logger::push(LogLevel::Status, "Savestate", "Savestate loaded",
+                       path.string());
+        }
+      } catch (const std::exception &e) {
+        Logger::push(LogLevel::Warning, "Savestate", "Load failed", e.what());
+      }
     }
   }
 }
@@ -571,13 +583,7 @@ void SDL3Frontend::emulation_thread_fn(
 }
 
 void SDL3Frontend::advance_emulator_core(const int cycles) {
-  constexpr auto acc = std::memory_order_acq_rel;
-  const bool quick_save = quicksave_requested.exchange(false, acc);
-  const bool quick_load = quickload_requested.exchange(false, acc);
-  const auto save_label = consume_manual_savestate_request();
-  const auto load_path = consume_savestate_load_request();
-  bool preempt = save_label.has_value() || load_path.has_value() ||
-                 quick_save || quick_load;
+  const bool preempt = should_preempt_emu_loop(); // Heads up, this is latent
 
   /* If a save event came in prior to this advancement, we want to preempt the
    * main emulation loop and handle it as soon as the system is in a safe state
@@ -587,8 +593,9 @@ void SDL3Frontend::advance_emulator_core(const int cycles) {
 
     // Note: Keep short circuit eval on `gbc->savestate_ready()` if possible
     if (preempt && gbc->savestate_ready()) [[unlikely]] {
-      process_save_state_events(save_label, load_path, quick_save, quick_load);
-      return; // Drop the rest of the cycles for this synchronization perdiod
+      process_save_state_events();
+      return; // Drop the rest of the cycles for this synchronization perdiod,
+              // if we hear an audio pop it's not the end of the world.
     }
   }
 }

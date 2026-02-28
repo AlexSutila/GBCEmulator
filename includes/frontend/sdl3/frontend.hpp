@@ -127,6 +127,7 @@ private:
   // Savestate hotkeys (handled on emulation thread at safe points)
   std::atomic<bool> quicksave_requested{false};
   std::atomic<bool> quickload_requested{false};
+  std::atomic<bool> manual_preempt_emu_loop{false}; // Used for both load/save
 
   // Savestate manager
   std::filesystem::path savestate_dir_;
@@ -162,10 +163,7 @@ private:
       Cartridge *const cart_ptr);
   void process_sram_save_events(const std::vector<byte_t> save_snapshot,
                                 Cartridge *const cart_ptr);
-  void process_save_state_events(
-      const std::optional<std::filesystem::path> &manual_save_label,
-      const std::optional<std::filesystem::path> &manual_load_path,
-      const bool quicksave, const bool quickload);
+  void process_save_state_events();
   void emulation_thread_fn(
       const std::stop_token &st, const cart &cart,
       const std::optional<std::string> &bios,
@@ -193,6 +191,7 @@ private:
                          const std::string &label = {});
   [[nodiscard]] std::optional<std::filesystem::path>
   latest_savestate_path() const;
+  [[nodiscard]] bool should_preempt_emu_loop() const;
 
   // Input helpers
   InputState input_state{};

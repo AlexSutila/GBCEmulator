@@ -1,5 +1,6 @@
 #include "frontend/sdl3/frontend.hpp"
 #include <algorithm>
+#include <atomic>
 #include <cctype>
 #include <ctime>
 #include <fstream>
@@ -391,6 +392,7 @@ void SDL3Frontend::queue_savestate_load_request(
     return;
   {
     std::lock_guard lock(savestate_request_mutex);
+    manual_preempt_emu_loop.store(true, std::memory_order_release);
     pending_savestate_load_path_ = path;
   }
 }
@@ -408,6 +410,7 @@ SDL3Frontend::consume_savestate_load_request() {
 void SDL3Frontend::queue_manual_savestate_request(std::string label) {
   {
     std::lock_guard lock(savestate_request_mutex);
+    manual_preempt_emu_loop.store(true, std::memory_order_release);
     pending_manual_savestate_label_ = std::move(label);
   }
   manual_savestate_requested.store(true, std::memory_order_release);
@@ -650,7 +653,7 @@ void SDL3Frontend::build_savestate_manager_window_locked() {
 
   refresh_savestate_entries_locked(false);
   ImGui::SetNextWindowSize(ImVec2(920, 560), ImGuiCond_FirstUseEver);
-  if (!ImGui::Begin("Savestate Manager", &ui_state.show_savestate_manager)) {
+  if (!ImGui::Begin("Save States", &ui_state.show_savestate_manager)) {
     ImGui::End();
     return;
   }
@@ -817,4 +820,12 @@ void SDL3Frontend::build_savestate_manager_window_locked() {
   }
 
   ImGui::End();
+}
+
+[[nodiscard]] bool SDL3Frontend::should_preempt_emu_loop() const {
+  constexpr auto ord = std::memory_order_relaxed;
+  const bool quick_save = quicksave_requested.load(ord);
+  const bool quick_load = quickload_requested.load(ord);
+  const bool manual = manual_preempt_emu_loop.load(ord);
+  return quick_save || quick_load || manual;
 }
