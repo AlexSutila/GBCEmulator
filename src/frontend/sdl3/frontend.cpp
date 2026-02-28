@@ -33,7 +33,8 @@ std::string sha256_hex(const std::span<const byte_t> data) {
 SDL3Frontend::SDL3Frontend() : host(framebuf_width, framebuf_height, scale) {
   host.init_audio();
   gui.init(host);
-  const auto bar_height_px = static_cast<int>(std::ceil(ImGui::GetFrameHeight()));
+  const auto bar_height_px =
+      static_cast<int>(std::ceil(ImGui::GetFrameHeight()));
   SDL_SetWindowSize(host.get_window(), framebuf_width * scale,
                     framebuf_height * scale + bar_height_px * 2);
   debugger.init(host);
@@ -291,8 +292,9 @@ void SDL3Frontend::render_frame() {
       const Uint32 flags = SDL_GetWindowFlags(window);
       if (!(flags & (SDL_WINDOW_MAXIMIZED | SDL_WINDOW_FULLSCREEN))) {
         constexpr int target_w = framebuf_width * scale;
-        const int target_h = framebuf_height * scale + static_cast<int>(
-            std::lround(menu_bar_height + status_bar_height));
+        const int target_h =
+            framebuf_height * scale +
+            static_cast<int>(std::lround(menu_bar_height + status_bar_height));
         int cur_w = 0;
         int cur_h = 0;
         SDL_GetWindowSize(window, &cur_w, &cur_h);
@@ -432,16 +434,18 @@ void SDL3Frontend::emulation_thread_fn(
       if (quicksave_requested.exchange(false, std::memory_order_acq_rel)) {
         try {
           const auto blob = gbc->serialize_savestate();
-          if (const auto path = write_savestate_bundle(blob, true); !path.has_value()) {
-            Logger::push(LogLevel::Warning, "Savestate",
-                         "Failed to create",
-                         "Could not create a quicksave. Check that the savestate directory is accessible.");
+          if (const auto path = write_savestate_bundle(blob, true);
+              !path.has_value()) {
+            Logger::push(LogLevel::Warning, "Savestate", "Failed to create",
+                         "Could not create a quicksave. Check that the "
+                         "savestate directory is accessible.");
           } else {
             Logger::push(LogLevel::Status, "Savestate", "Savestate created",
                          path->string());
           }
         } catch (const std::exception &e) {
-          Logger::push(LogLevel::Warning, "Savestate", "Failed to create", e.what());
+          Logger::push(LogLevel::Warning, "Savestate", "Failed to create",
+                       e.what());
         }
       }
 
@@ -452,26 +456,29 @@ void SDL3Frontend::emulation_thread_fn(
           if (const auto path =
                   write_savestate_bundle(blob, false, *manual_label);
               !path.has_value()) {
-            Logger::push(LogLevel::Warning, "Savestate",
-                         "Failed to create",
-                         "Could not create a savestate. Check that the savestate directory is accessible.");
-              }
+            Logger::push(LogLevel::Warning, "Savestate", "Failed to create",
+                         "Could not create a savestate. Check that the "
+                         "savestate directory is accessible.");
+          }
         } catch (const std::exception &e) {
-          Logger::push(LogLevel::Warning, "Savestate", "Failed to create", e.what());
+          Logger::push(LogLevel::Warning, "Savestate", "Failed to create",
+                       e.what());
         }
       }
 
       if (quickload_requested.exchange(false, std::memory_order_acq_rel)) {
         try {
-          if (const auto latest_path = latest_savestate_path(); !latest_path.has_value()) {
+          if (const auto latest_path = latest_savestate_path();
+              !latest_path.has_value()) {
             Logger::push(LogLevel::Status, "Savestate",
                          "No savestate available",
                          "No savestate is available to load.");
-          } else if (const auto blob = read_blob(*latest_path); !blob.has_value()) {
-            Logger::push(LogLevel::Warning, "Savestate",
-                         "Inaccessible",
-                         "Could not read savestate from: " +
-                             latest_path->string() + ". It may have been moved or deleted.");
+          } else if (const auto blob = read_blob(*latest_path);
+                     !blob.has_value()) {
+            Logger::push(
+                LogLevel::Warning, "Savestate", "Inaccessible",
+                "Could not read savestate from: " + latest_path->string() +
+                    ". It may have been moved or deleted.");
           } else {
             gbc->deserialize_savestate(*blob);
             host.clear_audio_stream();
@@ -488,9 +495,9 @@ void SDL3Frontend::emulation_thread_fn(
           load_path.has_value()) {
         try {
           if (const auto blob = read_blob(*load_path); !blob.has_value()) {
-            Logger::push(LogLevel::Warning, "Savestate",
-                         "File not found",
-                         "Could not read savestate from: " + load_path->string());
+            Logger::push(LogLevel::Warning, "Savestate", "File not found",
+                         "Could not read savestate from: " +
+                             load_path->string());
           } else {
             gbc->deserialize_savestate(*blob);
             host.clear_audio_stream();
@@ -530,8 +537,7 @@ void SDL3Frontend::emulation_thread_fn(
       if (!ram_view.empty() && (ram_view.size() != last_saved_snapshot.size() ||
                                 !std::equal(ram_view.begin(), ram_view.end(),
                                             last_saved_snapshot.begin()))) {
-        enqueue_save_snapshot(
-            std::vector(ram_view.begin(), ram_view.end()));
+        enqueue_save_snapshot(std::vector(ram_view.begin(), ram_view.end()));
       }
     }
   }
