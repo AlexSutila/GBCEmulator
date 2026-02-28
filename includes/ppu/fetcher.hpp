@@ -14,6 +14,10 @@
 #include <optional>
 
 struct runtime_sys_info;
+namespace Savestate {
+class Reader;
+class Writer;
+}
 
 class Fetcher {
 public:
@@ -49,6 +53,8 @@ public:
   [[nodiscard]] bool was_window_visible() const { return win_started; }
   void inc_win_ly() { ++win_internal_ly; }
   void reset_win_ly() { win_internal_ly = 0; } // Reset end of every frame
+  void savestate_serialize(Savestate::Writer &out) const;
+  void savestate_deserialize(Savestate::Reader &in);
 
 private:
   enum FetcherState {

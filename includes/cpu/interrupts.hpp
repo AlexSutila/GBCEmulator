@@ -42,6 +42,8 @@ public:
   void write(byte_t value) override;
   [[nodiscard]] byte_t peek() const override;
   byte_t read() override;
+  void savestate_serialize(Savestate::Writer &out) const override;
+  void savestate_deserialize(Savestate::Reader &in) override;
   explicit InterruptBits(bool pull_unused_high);
 
   void put_flag(InterruptFlagMask flag, bool value);
@@ -81,6 +83,8 @@ public:
   void enable(bool delayed);
   void disable();
   [[nodiscard]] bool is_enabled() const;
+  [[nodiscard]] byte_t raw_state() const;
+  void load_raw_state(byte_t state);
 
   /* Call once per instruction */
   void step();

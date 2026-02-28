@@ -1,4 +1,5 @@
 #include "cpu/interrupts.hpp"
+#include "savestate/codec.hpp"
 #include <array>
 #include <format>
 #include <stdexcept>
@@ -33,6 +34,28 @@ void InterruptBits::write(const byte_t value) {
 byte_t InterruptBits::peek() const { return pull_high ? raw | 0xE0 : raw; }
 byte_t InterruptBits::read() { return peek(); }
 
+void InterruptBits::savestate_serialize(Savestate::Writer &out) const {
+  out.field_u8(1, raw);
+}
+
+void InterruptBits::savestate_deserialize(Savestate::Reader &in) {
+  while (const auto field = in.next_field()) {
+    auto [id, payload] = *field;
+    // Silly placeholder for now
+    switch (id) {
+    case 1:
+      raw = payload.u8();
+      if (pull_high)
+        raw |= 0xE0;
+      break;
+    default:
+      payload.skip(payload.remaining());
+      break;
+    }
+    payload.expect_eof();
+  }
+}
+
 void InterruptBits::put_flag(InterruptFlagMask flag, const bool value) {
   const auto mask = static_cast<byte_t>(flag);
   raw = raw & ~mask;
@@ -63,6 +86,22 @@ void InterruptMasterEnable::disable() { ime_state = IME_DISABLED; }
 
 bool InterruptMasterEnable::is_enabled() const {
   return ime_state == IME_ENABLED;
+}
+
+byte_t InterruptMasterEnable::raw_state() const {
+  return static_cast<byte_t>(ime_state);
+}
+
+void InterruptMasterEnable::load_raw_state(const byte_t state) {
+  switch (state) {
+  case IME_DELAYED:
+  case IME_ENABLED:
+  case IME_DISABLED:
+    ime_state = static_cast<ImeStates>(state);
+    return;
+  default:
+    throw std::runtime_error("InterruptMasterEnable::load_raw_state()");
+  }
 }
 
 /* Responsible for handling the delayed enable of the IME through `ei`. As a

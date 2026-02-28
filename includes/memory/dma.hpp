@@ -10,6 +10,10 @@
 
 struct runtime_sys_info;
 class AddressBus;
+namespace Savestate {
+class Reader;
+class Writer;
+}
 
 [[nodiscard]] inline byte_t vdma_bytes_to_blks(std::size_t bytes);
 [[nodiscard]] inline std::size_t vdma_blks_to_bytes(byte_t blks);
@@ -28,6 +32,8 @@ public:
     bool active;
   };
   [[nodiscard]] DMAState get_state() const;
+  void savestate_serialize(Savestate::Writer &out) const;
+  void savestate_deserialize(Savestate::Reader &in);
 
   void start(byte_t addr_high); // Begins the actual data transfer
   void step();
@@ -72,6 +78,8 @@ public:
     bool gdma_active;
   };
   [[nodiscard]] DMAState get_state() const;
+  void savestate_serialize(Savestate::Writer &out) const;
+  void savestate_deserialize(Savestate::Reader &in);
 
   /* The initialization phase of DMA is impacted by double speed mode, but the
    * actual transfer itself is not. Hence, `step_fast_cycle()` exists to run the
@@ -100,8 +108,8 @@ public:
    * consulting a pair of two 8-bit MMIORegisters to form a 16-bit address. */
   void set_dest_addr(addr_t addr);
   void set_src_addr(addr_t addr);
-  addr_t get_dest_addr() const;
-  addr_t get_src_addr() const;
+  [[nodiscard]] addr_t get_dest_addr() const;
+  [[nodiscard]] addr_t get_src_addr() const;
 
 private:
   addr_t src_base_addr{}, dest_base_addr{}, data_offset{}, transfer_size{};

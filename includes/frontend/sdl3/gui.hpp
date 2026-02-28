@@ -14,12 +14,11 @@ class GbcImGui {
     "ROM files (*.gb *.gbc){.gb,.gbc},ZIP files (*.zip){.zip},All files (*.*){.*}";
   static constexpr std::string_view bios_filters =
       "BIOS files (*.bin){.bin},All files (*.*){.*}";
-  static constexpr std::string_view save_filters =
-      "Save files (*.sav){.sav},All files (*.*){.*}";
   static constexpr std::array<std::string_view, KCount> control_labels{
     "Right", "Left", "Up", "Down", "A", "B", "Select", "Start"};
-  static constexpr std::array<std::string_view, 5> general_labels{
-    "FF Toggle", "FF (Hold)", "Vol Up" , "Vol Down", "Monochrome"};
+  static constexpr std::array<std::string_view, GK_COUNT> general_labels{
+    "FF Toggle", "FF (Hold)", "Vol Up", "Vol Down", "Monochrome",
+    "Quicksave", "Quickload"};
   static constexpr float max_font_scale = 3.0f;
   static constexpr float base_font_size = 16.0f;
   const std::string font = "../fonts/TerminessNerdFontMono-Regular.ttf";
@@ -89,6 +88,9 @@ private:
   static ImVec4 get_darkened_color(ImVec4 color, float factor);
   static void apply_keybind_preset(std::array<SDL_Keycode, 8>& array, int keybind_preset_index);
   static ImVec4 get_level_color(LogLevel level) ;
+  static void push_transient_status(UiState& state, LogLevel level, const std::string& type,
+                                    const std::string& summary, const std::string& details = "",
+                                    Uint64 duration_ms = 2000);
   static void populate_credits();
 };
 

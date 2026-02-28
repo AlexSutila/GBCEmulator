@@ -8,6 +8,7 @@
 #include "memory/mmio/mmio.hpp"
 #include "ppu/palette.hpp"
 #include "ppu/ppu.hpp"
+#include "savestate/codec.hpp"
 #include "timer.hpp"
 #include <memory>
 #include <optional>
@@ -232,4 +233,127 @@ void GameBoyColor::step() {
     step_dma(true);
     timer->step();
   }
+}
+
+bool GameBoyColor::savestate_ready() const {
+  return cpu && cpu->savestate_ready();
+}
+
+std::vector<byte_t> GameBoyColor::serialize_savestate() const {
+  if (!bus || !cpu || !ppu || !timer || !serial)
+    throw std::runtime_error("GameBoyColor::serialize_savestate() uninitialized");
+  if (!savestate_ready())
+    throw std::runtime_error("GameBoyColor::serialize_savestate() unsafe point");
+
+  Savestate::Writer out;
+  out.tag("GBCS");
+  out.u16(1); // format version
+
+  out.chunk("SYS ", 1, [&](Savestate::Writer &w) {
+    w.field_u64(1, sys_.elapsed_clocks);
+    w.field_bool(2, sys_.cgb_mode);
+    w.field_bool(3, sys_.halted);
+    w.field_bool(4, sys_.speed_switch_armed);
+    w.field_bool(5, sys_.double_speed);
+  });
+  out.chunk("BUS ", 1, [&](Savestate::Writer &w) { bus->savestate_serialize(w); });
+  out.chunk("CPU ", 1, [&](Savestate::Writer &w) { cpu->savestate_serialize(w); });
+  out.chunk("TIMR", 1, [&](Savestate::Writer &w) { timer->savestate_serialize(w); });
+  out.chunk("SERL", 1, [&](Savestate::Writer &w) { serial->savestate_serialize(w); });
+  out.chunk("PPU ", 1, [&](Savestate::Writer &w) { ppu->savestate_serialize(w); });
+
+  return std::move(out).take();
+}
+
+void GameBoyColor::deserialize_savestate(const std::span<const byte_t> data) {
+  if (!bus || !cpu || !ppu || !timer || !serial)
+    throw std::runtime_error("GameBoyColor::deserialize_savestate() uninitialized");
+
+  Savestate::Reader in(data);
+  in.expect_tag("GBCS");
+  if (const auto version = in.u16(); version != 1)
+    throw std::runtime_error("Savestate: unsupported version");
+  bool seen_sys = false, seen_bus = false, seen_cpu = false;
+  bool seen_timer = false, seen_serial = false, seen_ppu = false;
+
+  while (const auto chunk = in.next_chunk()) {
+    auto [tag_arr, version, payload] = *chunk;
+    const auto tag =  std::string_view (tag_arr.data(), tag_arr.size());
+    if (tag == "SYS ") {
+      if (version != 1)
+        throw std::runtime_error("Savestate: unsupported SYS chunk version");
+      seen_sys = true;
+      while (const auto field = payload.next_field()) {
+        auto [id, payload_inner] = *field;
+        switch (id) {
+        case 1:
+          sys_.elapsed_clocks = payload_inner.u64();
+          break;
+        case 2:
+          sys_.cgb_mode = payload_inner.boolean();
+          break;
+        case 3:
+          sys_.halted = payload_inner.boolean();
+          break;
+        case 4:
+          sys_.speed_switch_armed = payload_inner.boolean();
+          break;
+        case 5:
+          sys_.double_speed = payload_inner.boolean();
+          break;
+        default:
+          payload_inner.skip(payload_inner.remaining());
+          break;
+        }
+        payload_inner.expect_eof();
+      }
+      payload.expect_eof();
+      continue;
+    }
+    if (tag == "BUS ") {
+      if (version != 1)
+        throw std::runtime_error("Savestate: unsupported BUS chunk version");
+      seen_bus = true;
+      bus->savestate_deserialize(payload);
+      payload.expect_eof();
+      continue;
+    }
+    if (tag == "CPU ") {
+      if (version != 1)
+        throw std::runtime_error("Savestate: unsupported CPU chunk version");
+      seen_cpu = true;
+      cpu->savestate_deserialize(payload);
+      payload.expect_eof();
+      continue;
+    }
+    if (tag == "TIMR") {
+      if (version != 1)
+        throw std::runtime_error("Savestate: unsupported TIMR chunk version");
+      seen_timer = true;
+      timer->savestate_deserialize(payload);
+      payload.expect_eof();
+      continue;
+    }
+    if (tag == "SERL") {
+      if (version != 1)
+        throw std::runtime_error("Savestate: unsupported SERL chunk version");
+      seen_serial = true;
+      serial->savestate_deserialize(payload);
+      payload.expect_eof();
+      continue;
+    }
+    if (tag == "PPU ") {
+      if (version != 1)
+        throw std::runtime_error("Savestate: unsupported PPU chunk version");
+      seen_ppu = true;
+      ppu->savestate_deserialize(payload);
+      payload.expect_eof();
+      continue;
+    }
+    // Unknown chunk: safely ignored because payload size is known.
+    payload.expect_eof();
+  }
+
+  if (!(seen_sys && seen_bus && seen_cpu && seen_timer && seen_serial && seen_ppu))
+    throw std::runtime_error("Savestate: missing required chunks");
 }

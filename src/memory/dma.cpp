@@ -3,8 +3,10 @@
 #include "memory/bus.hpp"
 #include "memory/mmio/cgb.hpp"
 #include "memory/mmio/dmg.hpp"
+#include "savestate/codec.hpp"
 #include <cassert>
 #include <optional>
+#include <stdexcept>
 
 inline byte_t vdma_bytes_to_blks(const std::size_t bytes) {
   constexpr auto blk_size_bytes = 0x10;
@@ -103,6 +105,38 @@ void ObjAttrDMA::step() {
   default:
     break;
   }
+}
+
+enum : std::uint16_t {
+  F_OA_SRC_BASE = 1,
+  F_OA_DATA_OFFSET,
+  F_OA_STATE,
+  F_OA_CLOCKS_REMAINING,
+};
+
+void ObjAttrDMA::savestate_serialize(Savestate::Writer &out) const {
+  out.field_u16(F_OA_SRC_BASE, src_base_addr);
+  out.field_u16(F_OA_DATA_OFFSET, data_offset);
+  out.field_u8(F_OA_STATE, static_cast<byte_t>(state));
+  if (clocks_remaining.has_value())
+    out.field_u32(F_OA_CLOCKS_REMAINING,
+                  static_cast<std::uint32_t>(clocks_remaining.value()));
+}
+
+void ObjAttrDMA::savestate_deserialize(Savestate::Reader &in) {
+  clocks_remaining.reset();
+  GBC_SS_DESERIALIZE_BEGIN(in)
+  GBC_SS_CASE_U16(F_OA_SRC_BASE, src_base_addr);
+  GBC_SS_CASE_U16(F_OA_DATA_OFFSET, data_offset);
+  case F_OA_STATE: {
+    const auto raw_state = payload.u8();
+    if (raw_state > STATE_OAMDMA_TRAN)
+      throw std::runtime_error("ObjAttrDMA::savestate_deserialize()");
+    state = static_cast<State>(raw_state);
+    break;
+  }
+  GBC_SS_CASE_U32(F_OA_CLOCKS_REMAINING, clocks_remaining);
+  GBC_SS_DESERIALIZE_END();
 }
 
 /* ======================================================================
@@ -205,10 +239,9 @@ void VDMA::transfer_byte(const addr_t offset) const {
 }
 
 void VDMA::do_init(const State next_state) {
-  constexpr auto total_init_clks = 4; // Four T-cycles
-
   // State entry logic
   if (!clocks_remaining.has_value()) {
+    constexpr auto total_init_clks = 4;
     clocks_remaining = total_init_clks;
 
     // Sample address values and size
@@ -327,4 +360,46 @@ void VDMA::step() {
   default:
     break;
   }
+}
+
+enum : std::uint16_t {
+  F_VD_SRC_BASE = 1,
+  F_VD_DEST_BASE,
+  F_VD_DATA_OFFSET,
+  F_VD_TRANSFER_SIZE,
+  F_VD_CAN_START_HDMA,
+  F_VD_STATE,
+  F_VD_CLOCKS_REMAINING,
+};
+
+void VDMA::savestate_serialize(Savestate::Writer &out) const {
+
+  out.field_u16(F_VD_SRC_BASE, src_base_addr);
+  out.field_u16(F_VD_DEST_BASE, dest_base_addr);
+  out.field_u16(F_VD_DATA_OFFSET, data_offset);
+  out.field_u16(F_VD_TRANSFER_SIZE, transfer_size);
+  out.field_bool(F_VD_CAN_START_HDMA, can_start_hdma);
+  out.field_u8(F_VD_STATE, static_cast<byte_t>(state));
+  if (clocks_remaining.has_value())
+    out.field_u32(F_VD_CLOCKS_REMAINING,
+                  static_cast<std::uint32_t>(clocks_remaining.value()));
+}
+
+void VDMA::savestate_deserialize(Savestate::Reader &in) {
+  clocks_remaining.reset();
+  GBC_SS_DESERIALIZE_BEGIN(in)
+  GBC_SS_CASE_U16(F_VD_SRC_BASE, src_base_addr);
+  GBC_SS_CASE_U16(F_VD_DEST_BASE, dest_base_addr);
+  GBC_SS_CASE_U16(F_VD_DATA_OFFSET, data_offset);
+  GBC_SS_CASE_U16(F_VD_TRANSFER_SIZE, transfer_size);
+  GBC_SS_CASE_BOOL(F_VD_CAN_START_HDMA, can_start_hdma);
+  case F_VD_STATE: {
+    const auto raw_state = payload.u8();
+    if (raw_state > STATE_HDMA_TRAN)
+      throw std::runtime_error("VDMA::savestate_deserialize()");
+    state = static_cast<State>(raw_state);
+    break;
+  }
+  GBC_SS_CASE_U32(F_VD_CLOCKS_REMAINING, clocks_remaining);
+  GBC_SS_DESERIALIZE_END();
 }

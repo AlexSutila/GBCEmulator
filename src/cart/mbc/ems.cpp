@@ -1,6 +1,7 @@
 #include "cart/cart.hpp"
 #include "cart/mbc.hpp"
 #include "cart/mbc_creator.hpp"
+#include "savestate/codec.hpp"
 
 // ---------------------------
 // EMS (Flash cart / Multi-ROM selector)
@@ -28,8 +29,7 @@ class Ems final : public Mbc {
 public:
   explicit Ems(std::span<const byte_t> const rom) : rom_(rom) {
     // Default to a menu-like mapping: bank 0 + bank 1.
-    rom0_bank_ = 0;
-    rom1_bank_ = 1;
+    sync_banks_();
   }
 
   byte_t read(addr_t const addr) override {
@@ -66,14 +66,7 @@ public:
 
       case Mode::SelectBank:
         bank_sel_ = val;
-        if (in_game_) {
-          // In game mode, bank select is relative to the latched base.
-          rom1_bank_ = static_cast<std::size_t>(base_bank_) +
-                      static_cast<std::size_t>(bank_sel_);
-        } else {
-          // In menu mode, treat this as selecting the switchable bank.
-          rom1_bank_ = bank_sel_ ? bank_sel_ : 1; // keep 0->1 as a sane default
-        }
+        sync_banks_();
         return;
 
       case Mode::None:
@@ -90,12 +83,8 @@ public:
         // Latch game base and enter game mode.
         in_game_ = true;
         base_bank_ = pending_base_;
-        rom0_bank_ = base_bank_;
-
-        // Default: mirror bank 0 into 4000-7FFF until the menu writes 0x01
-        // (this matches the "write 0x01 so that 32K games work" step).
         bank_sel_ = 0;
-        rom1_bank_ = base_bank_;
+        sync_banks_();
       }
       return;
     }
@@ -106,6 +95,35 @@ public:
   [[nodiscard]] bool has_battery() const noexcept override { return false; }
   [[nodiscard]] std::span<const byte_t> ram() const noexcept override { return {}; }
   std::span<byte_t> ram() noexcept override { return {}; }
+  [[nodiscard]] const char *savestate_tag() const noexcept override {
+    return "EMS ";
+  }
+  enum : std::uint16_t {
+    F_IN_GAME = 1,
+    F_MODE,
+    F_PENDING_BASE,
+    F_BASE_BANK,
+    F_BANK_SEL,
+  };
+  void savestate_serialize(Savestate::Writer &out) const override {
+    out.field_bool(F_IN_GAME, in_game_);
+    out.field_u8(F_MODE, static_cast<byte_t>(mode_));
+    out.field_u8(F_PENDING_BASE, pending_base_);
+    out.field_u8(F_BASE_BANK, base_bank_);
+    out.field_u8(F_BANK_SEL, bank_sel_);
+  }
+  void savestate_deserialize(Savestate::Reader &in) override {
+    GBC_SS_DESERIALIZE_BEGIN(in)
+    GBC_SS_CASE_BOOL(F_IN_GAME, in_game_);
+    case F_MODE:
+      mode_ = mode_from_raw_(payload.u8());
+      break;
+    GBC_SS_CASE_U8(F_PENDING_BASE, pending_base_);
+    GBC_SS_CASE_U8(F_BASE_BANK, base_bank_);
+    GBC_SS_CASE_U8(F_BANK_SEL, bank_sel_);
+    GBC_SS_DESERIALIZE_END();
+    sync_banks_();
+  }
 
 private:
   enum class Mode : byte_t {
@@ -113,6 +131,28 @@ private:
     SelectGameBase,
     SelectBank,
   };
+
+  [[nodiscard]] static Mode mode_from_raw_(const byte_t raw) {
+    switch (raw) {
+    case static_cast<byte_t>(Mode::SelectGameBase):
+      return Mode::SelectGameBase;
+    case static_cast<byte_t>(Mode::SelectBank):
+      return Mode::SelectBank;
+    default:
+      return Mode::None;
+    }
+  }
+
+  void sync_banks_() {
+    if (in_game_) {
+      rom0_bank_ = static_cast<std::size_t>(base_bank_);
+      rom1_bank_ = static_cast<std::size_t>(base_bank_) +
+                   static_cast<std::size_t>(bank_sel_);
+      return;
+    }
+    rom0_bank_ = 0;
+    rom1_bank_ = bank_sel_ ? bank_sel_ : 1;
+  }
 
   std::span<const byte_t> rom_;
 

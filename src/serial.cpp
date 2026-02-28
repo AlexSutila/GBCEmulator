@@ -3,6 +3,7 @@
 #include "memory/bus.hpp"
 #include "memory/mmio/dmg.hpp"
 #include "memory/mmio/mmio.hpp"
+#include "savestate/codec.hpp"
 #include <stdexcept>
 
 /*
@@ -18,8 +19,10 @@ SerialUnit::SerialUnit(AddressBus *const bus)
   using mmio = IORegisterMapping;
 
   /* Configure MMIO register connections over address bus */
-  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_SERIAL_DATA), &serial_data);
-  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_SERIAL_CTRL), &serial_ctrl);
+  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_SERIAL_DATA), &serial_data,
+                    MMIOSavestatePolicy::BusAuto);
+  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_SERIAL_CTRL), &serial_ctrl,
+                    MMIOSavestatePolicy::BusAuto);
 
   /* Configure connection between SC and IF. This really shouldn't happen but
    * we're doing this because we just fire the interrupt on SC writes. */
@@ -29,3 +32,7 @@ SerialUnit::SerialUnit(AddressBus *const bus)
     throw std::runtime_error("Failed to configure serial MMIO");
   serial_ctrl.set_interrupt_reg(if_reg);
 }
+
+void SerialUnit::savestate_serialize(Savestate::Writer &) {}
+
+void SerialUnit::savestate_deserialize(Savestate::Reader &) {}

@@ -17,6 +17,10 @@
 
 struct runtime_sys_info;
 class BootROM;
+namespace Savestate {
+class Reader;
+class Writer;
+}
 
 enum BusConflictTypes : std::uint32_t {
   BUS_CONFLICT_NONE = 0,
@@ -59,7 +63,7 @@ constexpr BusConflictTypes operator~(const BusConflictTypes a) {
  */
 class AddressBus final : Debug::Debuggable {
 public:
-  void write_byte(addr_t addr, byte_t value);
+  void write_byte(addr_t addr, byte_t value) const;
   [[nodiscard]] byte_t read_byte(addr_t addr, bool debug = true) const;
   ObjAttrDMA &get_oam_dma() { return oam_dma; };
   VDMA &get_vdma() { return vdma; }
@@ -74,7 +78,8 @@ public:
              std::optional<BootROM> &bios);
 
   /* For attaching MMIO component interface registers */
-  void connect_mmio(addr_t addr, MMIORegister *reg);
+  void connect_mmio(addr_t addr, MMIORegister *reg,
+                    MMIOSavestatePolicy policy = MMIOSavestatePolicy::OwnerManaged);
   [[nodiscard]] MMIORegister *get_mmio(IORegisterMapping mapping) const;
 
   /* Bus conflict management */
@@ -88,6 +93,8 @@ public:
   void init_test_bed();
   [[nodiscard]] Cartridge *get_cartridge() noexcept { return cart_.get(); }
   [[nodiscard]] const Cartridge *get_cartridge() const noexcept { return cart_.get(); }
+  void savestate_serialize(Savestate::Writer &out) const;
+  void savestate_deserialize(Savestate::Reader &in);
 
   /* Convenience getters for PixelProcessor */
   std::array<std::unique_ptr<byte_t[]>, 2> &get_vram() { return vram; }
@@ -102,11 +109,11 @@ private:
   Joypad::JOYP joypad_;
 
   /* Facilitators for memory access and optimizing instruction fetches */
-  byte_t &vram_byte(const addr_t addr) const;
-  byte_t &wram_byte(const addr_t addr) const;
-  byte_t &echo_byte(const addr_t addr) const;
-  byte_t &oam_byte(const addr_t addr) const;
-  byte_t &hram_byte(const addr_t addr) const;
+  [[nodiscard]] byte_t &vram_byte(addr_t addr) const;
+  [[nodiscard]] byte_t &wram_byte(addr_t addr) const;
+  [[nodiscard]] byte_t &echo_byte(addr_t addr) const;
+  [[nodiscard]] byte_t &oam_byte(addr_t addr) const;
+  [[nodiscard]] byte_t &hram_byte(addr_t addr) const;
 
   /* System control registers: (speed mode, backwards compatability, etc.) */
   SYS::KEY0 key0; // Controls DMG backwards compatability
@@ -128,7 +135,11 @@ private:
   [[nodiscard]] bool is_conflicting(addr_t addr) const;
   BusConflictTypes bus_conflicts{};
 
-  std::map<addr_t, MMIORegister *> io_registers{};
+  struct ConnectedMMIO {
+    MMIORegister *reg{};
+    MMIOSavestatePolicy savestate_policy{MMIOSavestatePolicy::OwnerManaged};
+  };
+  std::map<addr_t, ConnectedMMIO> io_registers{};
   [[nodiscard]] bool is_boot_rom_range(addr_t a) const;
   std::optional<BootROM> &bios_;
   [[maybe_unused]] runtime_sys_info &sys_;

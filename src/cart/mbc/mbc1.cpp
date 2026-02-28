@@ -1,6 +1,7 @@
 #include "cart/cart.hpp"
 #include "cart/mbc.hpp"
 #include "cart/mbc_creator.hpp"
+#include "savestate/codec.hpp"
 
 // ---------------------------
 // MBC1 / MBC1M
@@ -64,6 +65,41 @@ public:
   [[nodiscard]] bool has_battery() const noexcept override { return battery_; }
   [[nodiscard]] std::span<const byte_t> ram() const noexcept override { return ram_; }
   std::span<byte_t> ram() noexcept override { return ram_; }
+  [[nodiscard]] const char *savestate_tag() const noexcept override {
+    return "MBC1";
+  }
+  enum : std::uint16_t { F_UPPER2 = 1, F_MODE, F_RAM_ENABLED, F_ROM_BANK1 };
+  void savestate_serialize(Savestate::Writer &out) const override {
+    out.field_u8(F_UPPER2, upper2_);
+    out.field_u8(F_MODE, mode_);
+    out.field_bool(F_RAM_ENABLED, ram_enabled_);
+    out.field_u8(F_ROM_BANK1, rom_bank1_);
+  }
+  void savestate_deserialize(Savestate::Reader &in) override {
+    while (const auto field = in.next_field()) {
+      auto [id, payload] = *field;
+      switch (id) {
+      case F_UPPER2:
+        upper2_ = static_cast<byte_t>(payload.u8() & 0x03);
+        break;
+      case F_MODE:
+        mode_ = static_cast<byte_t>(payload.u8() & 0x01);
+        break;
+      case F_RAM_ENABLED:
+        ram_enabled_ = payload.boolean();
+        break;
+      case F_ROM_BANK1:
+        rom_bank1_ = static_cast<byte_t>(payload.u8() & 0x1F);
+        break;
+      default:
+        payload.skip(payload.remaining());
+        break;
+      }
+      payload.expect_eof();
+    }
+    if (rom_bank1_ == 0)
+      rom_bank1_ = 1;
+  }
 
 private:
   byte_t upper2_{0b00}; // BANK2: upper 2 bits of rom bank number or ram bank

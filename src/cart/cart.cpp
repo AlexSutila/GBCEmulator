@@ -1,9 +1,11 @@
 #include "cart/cart.hpp"
 #include "frontend/logger.hpp"
+#include "savestate/codec.hpp"
 #include <algorithm>
-#include <fstream>
 #include <bitset>
 #include <cstring>
+#include <fstream>
+#include <string_view>
 
 static std::optional<std::vector<byte_t>> read_all_bytes(const fs::path& p) {
   std::ifstream f(p, std::ios::binary | std::ios::ate);
@@ -398,4 +400,101 @@ bool Cartridge::write_save_file(const fs::path &save_path) const {
   f.write(reinterpret_cast<const char *>(ram_view.data()),
           static_cast<std::streamsize>(ram_view.size()));
   return static_cast<bool>(f);
+}
+
+enum : std::uint16_t {
+  F_ROM_SIZE = 1,
+  F_GLOBAL_CHECKSUM,
+  F_HEADER_CHECKSUM,
+  F_CART_TYPE,
+  F_MAPPER_TAG,
+  F_RAM,
+  F_MAPPER_STATE,
+};
+
+void Cartridge::savestate_serialize(Savestate::Writer &out) const {
+  if (!mbc_)
+    throw std::runtime_error("Cartridge::savestate_serialize() no mapper");
+
+  const char *tag = mbc_->savestate_tag();
+  if (!tag || std::string_view(tag).size() < 4 || std::string_view(tag, 4) == "UNSP")
+    throw std::runtime_error("Savestate: mapper not supported");
+  out.field_u32(F_ROM_SIZE, static_cast<std::uint32_t>(image_.rom_size()));
+  out.field_u16(F_GLOBAL_CHECKSUM, image_.computed_global_checksum);
+  out.field_u8(F_HEADER_CHECKSUM, image_.header.header_checksum);
+  out.field_u8(F_CART_TYPE, image_.header.cartridge_type);
+  out.field(F_MAPPER_TAG,
+            [&](Savestate::Writer &w) { w.tag(std::string_view(tag, 4)); });
+
+  const auto ram_view = mbc_->ram();
+  out.field(F_RAM, [&](Savestate::Writer &w) {
+    w.u32(static_cast<std::uint32_t>(ram_view.size()));
+    w.bytes(ram_view);
+  });
+  out.field(F_MAPPER_STATE,
+            [&](Savestate::Writer &w) { mbc_->savestate_serialize(w); });
+}
+
+void Cartridge::savestate_deserialize(Savestate::Reader &in) {
+
+  auto rom_size = image_.rom_size();
+  auto global_checksum = image_.computed_global_checksum;
+  auto header_checksum = image_.header.header_checksum;
+  auto cart_type = image_.header.cartridge_type;
+  std::array<char, 4> tag{};
+  bool tag_present = false;
+  bool ram_present = false;
+  bool mapper_state_present = false;
+
+  GBC_SS_DESERIALIZE_BEGIN(in)
+  case F_ROM_SIZE:
+    rom_size = static_cast<std::size_t>(payload.u32());
+    break;
+  GBC_SS_CASE_U16(F_GLOBAL_CHECKSUM, global_checksum);
+  GBC_SS_CASE_U8(F_HEADER_CHECKSUM, header_checksum);
+  GBC_SS_CASE_U8(F_CART_TYPE, cart_type);
+  case F_MAPPER_TAG:
+    for (auto &c : tag)
+      c = static_cast<char>(payload.u8());
+    tag_present = true;
+    break;
+  case F_RAM: {
+    if (!mbc_)
+      throw std::runtime_error("Savestate: mapper missing");
+    auto ram_view = mbc_->ram();
+    if (const auto ram_size = static_cast<std::size_t>(payload.u32());
+        ram_size != ram_view.size())
+      throw std::runtime_error("Savestate: cartridge RAM size mismatch");
+    payload.bytes(ram_view);
+    ram_present = true;
+    break;
+  }
+  case F_MAPPER_STATE:
+    if (!mbc_)
+      throw std::runtime_error("Savestate: mapper missing");
+    mbc_->savestate_deserialize(payload);
+    mapper_state_present = true;
+    break;
+  GBC_SS_DESERIALIZE_END();
+
+  if (rom_size != image_.rom_size() ||
+      global_checksum != image_.computed_global_checksum ||
+      header_checksum != image_.header.header_checksum ||
+      cart_type != image_.header.cartridge_type) {
+    throw std::runtime_error("Savestate: cartridge mismatch");
+  }
+
+  if (!mbc_)
+    throw std::runtime_error("Savestate: mapper missing");
+  if (!tag_present)
+    throw std::runtime_error("Savestate: missing mapper tag");
+  if (std::string_view(mbc_->savestate_tag(), 4) !=
+      std::string_view(tag.data(), tag.size())) {
+    throw std::runtime_error("Savestate: mapper mismatch");
+  }
+  if (!ram_present)
+    throw std::runtime_error("Savestate: missing cartridge RAM field");
+  if (!mapper_state_present)
+    throw std::runtime_error("Savestate: missing mapper state field");
+  save_dirty_.store(false, std::memory_order_release);
 }

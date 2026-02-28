@@ -6,7 +6,7 @@
 #include <vector>
 #include <mutex>
 
-enum class LogLevel {Debug, Info, Warning, Error};
+enum class LogLevel {Debug, Info, Status, Warning, Error};
 
 struct LogMessage {
   LogLevel level;

@@ -14,6 +14,8 @@
 
 #include <memory>
 #include <optional>
+#include <span>
+#include <vector>
 
 class Frontend;
 
@@ -38,6 +40,9 @@ public:
   void insert_cartridge(const cart& c);
   void init_test_bed() const;
   void step();
+  [[nodiscard]] bool savestate_ready() const;
+  [[nodiscard]] std::vector<byte_t> serialize_savestate() const;
+  void deserialize_savestate(std::span<const byte_t> data);
 
   /* Optional debugger configurable by frontend */
   void configure_debugger(Debug::Debugger debugger) {

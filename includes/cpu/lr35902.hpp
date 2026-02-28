@@ -14,6 +14,10 @@
 #include <optional>
 
 struct runtime_sys_info;
+namespace Savestate {
+class Reader;
+class Writer;
+}
 
 /*
  * 8-bit 8080-like Sharp CPU (speculated to be a SM83 core), running
@@ -23,7 +27,7 @@ class LR35902 final : Debug::Debuggable {
 public:
   LR35902(AddressBus *bus_ptr, std::optional<Debug::Debugger> &debugger,
           runtime_sys_info &sys);
-  [[nodiscard]] const byte_t cur_opcode() const {
+  [[nodiscard]] byte_t cur_opcode() const {
     return bus->read_byte(ins_base_addr, false);
   }
   [[nodiscard]] std::string disasm() const {
@@ -51,6 +55,9 @@ public:
   };
   void load_state(ProcessorState state_);
   [[nodiscard]] ProcessorState get_state() const;
+  [[nodiscard]] bool savestate_ready() const;
+  void savestate_serialize(Savestate::Writer &out) const;
+  void savestate_deserialize(Savestate::Reader &in);
 
 private:
   static constexpr Debug::BreakReason brk_reason_flags =
