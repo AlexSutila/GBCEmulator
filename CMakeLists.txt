@@ -9,11 +9,11 @@ project(gbc LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS ON)
-include(FetchContent)
 
-option(BUILD_FULL   "ImGui + SDL3 frontend with debugger"   OFF)
-option(BUILD_SIMPLE "Raylib + WASM frontend (dekstop/web)"  OFF)
-option(BUILD_PYTHON "Python bindings to emulator core"      OFF)
+option(BUILD_FULL       "ImGui + SDL3 frontend with debugger"       OFF)
+option(BUILD_SIMPLE     "Raylib + WASM frontend (dekstop/web)"      OFF)
+option(BUILD_LIBRETRO   "Libretro core for retroarch compatability" OFF)
+option(BUILD_PYTHON     "Python bindings to emulator core"          OFF)
 
 
 # ===========================================================================
@@ -104,6 +104,10 @@ endif()
 
 if(BUILD_SIMPLE)
     add_subdirectory(src/frontend/raylib)
+endif()
+
+if(BUILD_LIBRETRO)
+    add_subdirectory(src/frontend/libretro)
 endif()
 
 if(BUILD_PYTHON)
