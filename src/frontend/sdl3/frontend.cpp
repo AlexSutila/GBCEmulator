@@ -2,12 +2,17 @@
 #include "SDL3/SDL_events.h"
 #include "SDL3/SDL_gamepad.h"
 #include "debugger/print.hpp"
+#include "gbc.hpp"
+#include "memory/mmio/mmio.hpp"
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <fstream>
+#include <memory>
 #include <picosha2.h>
 #include <span>
+#include <stdexcept>
 
 namespace {
 std::int64_t steady_now_ns() {
@@ -33,7 +38,8 @@ std::string sha256_hex(const std::span<const byte_t> data) {
 SDL3Frontend::SDL3Frontend() : host(framebuf_width, framebuf_height, scale) {
   host.init_audio();
   gui.init(host);
-  const auto bar_height_px = static_cast<int>(std::ceil(ImGui::GetFrameHeight()));
+  const auto bar_height_px =
+      static_cast<int>(std::ceil(ImGui::GetFrameHeight()));
   SDL_SetWindowSize(host.get_window(), framebuf_width * scale,
                     framebuf_height * scale + bar_height_px * 2);
   debugger.init(host);
@@ -174,8 +180,6 @@ const std::uint32_t *SDL3Frontend::get_front_buffer() const {
   return framebuffers[front_index.load(std::memory_order_acquire)].get();
 }
 
-/* Main loop helpers */
-
 void SDL3Frontend::process_events() {
   SDL_Event e;
   while (SDL_PollEvent(&e)) {
@@ -291,8 +295,9 @@ void SDL3Frontend::render_frame() {
       const Uint32 flags = SDL_GetWindowFlags(window);
       if (!(flags & (SDL_WINDOW_MAXIMIZED | SDL_WINDOW_FULLSCREEN))) {
         constexpr int target_w = framebuf_width * scale;
-        const int target_h = framebuf_height * scale + static_cast<int>(
-            std::lround(menu_bar_height + status_bar_height));
+        const int target_h =
+            framebuf_height * scale +
+            static_cast<int>(std::lround(menu_bar_height + status_bar_height));
         int cur_w = 0;
         int cur_h = 0;
         SDL_GetWindowSize(window, &cur_w, &cur_h);
@@ -323,65 +328,93 @@ void SDL3Frontend::render_frame() {
   host.present();
 }
 
-void SDL3Frontend::emulation_thread_fn(
-    const std::stop_token &st, const cart &c,
-    const std::optional<std::string> &bios,
+std::tuple<AddressBus *const, Cartridge *const, Joypad::JOYP *const>
+SDL3Frontend::build_emulator_instance(
+    const cart &cart, const std::optional<std::string> &bios,
     const std::optional<std::filesystem::path> &initial_save_path) {
-  bool ff = false;
-  clear(black);
 
-  /* Reset visual and auditory components */
-  front_index.store(0, std::memory_order_relaxed);
-  host.clear_audio_stream();
-
-  /* Re-instantiate emulator instance */
+  /* Allocate emulator core, which constructor is used depends on existence of
+   * an optional BIOS file. */
   if (bios.has_value()) {
     try {
       auto bios_rom = BootROM(bios.value());
       gbc = std::make_unique<GameBoyColor>(*this, bios_rom);
-    } catch (std::runtime_error &e) {
+    }
+
+    // Failure to load should resort to no BIOS as fallback
+    catch (std::runtime_error &e) {
       Logger::push(LogLevel::Warning, "BIOS", "Failed to load BIOS", e.what());
       gui.get_settings().prev_bios_path = "";
       gbc = std::make_unique<GameBoyColor>(*this);
     }
-  } else {
-    gbc = std::make_unique<GameBoyColor>(*this);
   }
-  gbc->insert_cartridge(c);
-  if (auto *bus = gbc->get_bus(); bus && initial_save_path.has_value()) {
-    if (auto *cart_ptr = bus->get_cartridge(); cart_ptr) {
-      std::error_code ec;
-      if (cart_ptr->has_battery() &&
-          std::filesystem::exists(*initial_save_path, ec) &&
-          !cart_ptr->load_save_file(*initial_save_path)) {
-        Logger::push(LogLevel::Warning, "Save", "Failed to load save file",
-                     "Could not load save data from: " +
-                         initial_save_path->string());
-      }
-    }
-  }
-  std::vector<byte_t> last_saved_snapshot;
-  if (auto *bus = gbc->get_bus(); bus) {
-    if (auto *cart_ptr = bus->get_cartridge();
-        cart_ptr && cart_ptr->has_battery()) {
-      const auto ram_view = cart_ptr->ram();
-      last_saved_snapshot.assign(ram_view.begin(), ram_view.end());
-    }
-  }
+  gbc->insert_cartridge(cart);
 
-  auto callback = [this, st]() -> Debug::BreakReason {
-    return debugger.on_breakpoint(st, gbc);
-  };
-  gbc->configure_debugger(Debug::Debugger(callback));
-
-  /* Establish connection with button state */
-  auto *joypad = dynamic_cast<Joypad::JOYP *>(
+  /* Attempt generic resource acquisition of stuff needed later on in the
+   * emulation loop. It is better to do all the error handling early on and
+   * promise availability downstream. */
+  auto *const bus_ptr = gbc->get_bus();
+  if (!bus_ptr)
+    throw std::runtime_error("Failed to acquire AddressBus resource");
+  auto *const cart_ptr = bus_ptr->get_cartridge();
+  if (!bus_ptr)
+    throw std::runtime_error("Failed to acquire Cartridge resource");
+  auto *joyp_ptr = dynamic_cast<Joypad::JOYP *>(
       gbc->get_bus()->get_mmio(IORegisterMapping::MMIO_JOYPAD));
-  if (!joypad)
-    throw std::logic_error("Failed to configure joypad input");
-  auto next_save_poll = Clock::now();
-  quicksave_requested.store(false, std::memory_order_relaxed);
-  quickload_requested.store(false, std::memory_order_relaxed);
+  if (!joyp_ptr)
+    throw std::runtime_error("Failed to acquire Cartridge resource");
+  return {bus_ptr, cart_ptr, joyp_ptr};
+}
+
+/* Not to be confused with FULL-SYSTEM save states, this is specifically
+ * tailored to restoring the contents of random access memory saved on
+ * cartridges leveraging a battery. */
+std::vector<byte_t> SDL3Frontend::prime_sram_saves(
+    const std::optional<std::filesystem::path> &initial_save_path,
+    Cartridge *const cart_ptr) {
+  using namespace std::filesystem;
+  std::vector<byte_t> save_snapshot{};
+  std::error_code ec{};
+
+  // Prime existing SRAM save, if it exists
+  if (cart_ptr->has_battery() && initial_save_path.has_value()) {
+    const auto &save_path = initial_save_path.value();
+    if (!exists(save_path) || !cart_ptr->load_save_file(save_path))
+      Logger::push(LogLevel::Warning, "Save", "Failed to load save file",
+                   "Could not load save data from: " + save_path.string());
+  }
+
+  if (cart_ptr->has_battery()) {
+    const auto ram_view = cart_ptr->ram();
+    save_snapshot.assign(ram_view.begin(), ram_view.end());
+  }
+  return save_snapshot;
+}
+
+void SDL3Frontend::process_sram_save_events(std::vector<byte_t> save_snapshot,
+                                            Cartridge *const cart_ptr) {
+  if (!cart_ptr->has_battery() || !cart_ptr->consume_sram_save())
+    return;
+  const auto ram_view = cart_ptr->ram();
+
+  if (!ram_view.empty()) [[unlikely]] {
+    const bool altered =
+        ram_view.size() != save_snapshot.size() ||
+        !std::equal(ram_view.begin(), ram_view.end(), save_snapshot.begin());
+
+    if (altered) [[unlikely]] {
+      save_snapshot.assign(ram_view.begin(), ram_view.end());
+      enqueue_save_snapshot(std::vector(ram_view.begin(), ram_view.end()));
+    }
+  }
+}
+
+void SDL3Frontend::process_save_state_events() {
+  constexpr auto acq = std::memory_order_acq_rel;
+  const bool quick_save = quicksave_requested.exchange(false, acq);
+  const bool quick_load = quickload_requested.exchange(false, acq);
+  const bool manual = manual_preempt_emu_loop.exchange(false, acq);
+
   const auto read_blob = [](const std::filesystem::path &path)
       -> std::optional<std::vector<byte_t>> {
     std::ifstream f(path, std::ios::binary | std::ios::ate);
@@ -397,10 +430,122 @@ void SDL3Frontend::emulation_thread_fn(
     return buf;
   };
 
+  if (quick_save) [[unlikely]] {
+    try {
+      const auto blob = gbc->serialize_savestate();
+      if (const auto path = write_savestate_bundle(blob, true);
+          !path.has_value()) {
+        Logger::push(LogLevel::Warning, "Savestate", "Failed to create",
+                     "Could not create a quicksave. Check that the "
+                     "savestate directory is accessible.");
+      } else {
+        Logger::push(LogLevel::Status, "Savestate", "Savestate created",
+                     path->string());
+      }
+    } catch (const std::exception &e) {
+      Logger::push(LogLevel::Warning, "Savestate", "Failed to create",
+                   e.what());
+    }
+  }
+
+  else if (quick_load) [[unlikely]] {
+    try {
+      if (const auto latest_path = latest_savestate_path();
+          !latest_path.has_value()) {
+        Logger::push(LogLevel::Status, "Savestate", "No savestate available",
+                     "No savestate is available to load.");
+      } else if (const auto blob = read_blob(*latest_path); !blob.has_value()) {
+        Logger::push(LogLevel::Warning, "Savestate", "Inaccessible",
+                     "Could not read savestate from: " + latest_path->string() +
+                         ". It may have been moved or deleted.");
+      } else {
+        gbc->deserialize_savestate(*blob);
+        host.clear_audio_stream();
+        video_dirty.store(true, std::memory_order_release);
+        Logger::push(LogLevel::Status, "Savestate", "Savestate loaded",
+                     latest_path->string());
+      }
+    } catch (const std::exception &e) {
+      Logger::push(LogLevel::Warning, "Savestate", "Load failed", e.what());
+    }
+  }
+
+  /* Manual is set when manual events happen (rather than quick). In this case,
+   * since some manual event has come through, we consume any manual saves or
+   * load requests and assume one of them will be handled. */
+  else if (manual) [[unlikely]] {
+    const auto manual_save_label = consume_manual_savestate_request();
+    const auto manual_load_path = consume_savestate_load_request();
+
+    // Process manual save event
+    if (manual_save_label.has_value()) {
+      const auto &lab = manual_save_label.value();
+      try {
+        const auto blob = gbc->serialize_savestate();
+        if (const auto path = write_savestate_bundle(blob, false, lab);
+            !path.has_value()) {
+          Logger::push(LogLevel::Warning, "Savestate", "Failed to create",
+                       "Could not create a savestate. Check that the "
+                       "savestate directory is accessible.");
+        }
+      } catch (const std::exception &e) {
+        Logger::push(LogLevel::Warning, "Savestate", "Failed to create",
+                     e.what());
+      }
+    }
+
+    // Process manual load event
+    else if (manual_load_path.has_value()) {
+      const auto &path = manual_load_path.value();
+      try {
+        if (const auto blob = read_blob(path); !blob.has_value()) {
+          Logger::push(LogLevel::Warning, "Savestate", "File not found",
+                       "Could not read savestate from: " + path.string());
+        } else {
+          gbc->deserialize_savestate(*blob);
+          host.clear_audio_stream();
+          video_dirty.store(true, std::memory_order_release);
+          Logger::push(LogLevel::Status, "Savestate", "Savestate loaded",
+                       path.string());
+        }
+      } catch (const std::exception &e) {
+        Logger::push(LogLevel::Warning, "Savestate", "Load failed", e.what());
+      }
+    }
+  }
+}
+
+void SDL3Frontend::emulation_thread_fn(
+    const std::stop_token &st, const cart &cart,
+    const std::optional<std::string> &bios,
+    const std::optional<std::filesystem::path> &initial_save_path) {
+  auto next_save_poll = Clock::now();
+  bool ff = false;
+  clear(black);
+
+  /* Reset visual and auditory components */
+  front_index.store(0, std::memory_order_relaxed);
+  host.clear_audio_stream();
+
+  /* Prime save state control mechanism */
+  quicksave_requested.store(false, std::memory_order_relaxed);
+  quickload_requested.store(false, std::memory_order_relaxed);
+
+  /* Re-instantiate emulator instance. We create the callback in this scope so
+   * that we can pass along the stop token by reference easily. */
+  const auto [bus_ptr, cart_ptr, joyp_ptr] =
+      build_emulator_instance(cart, bios, initial_save_path);
+  gbc->configure_debugger(Debug::Debugger([this, st]() -> Debug::BreakReason {
+    return debugger.on_breakpoint(st, gbc);
+  }));
+
+  /* Restore previous SRAM content (i.e., emulate battery backed save data) */
+  std::vector<byte_t> last_saved_snapshot =
+      prime_sram_saves(initial_save_path, cart_ptr);
+
   /* Run emulation in real-time */
   while (!st.stop_requested()) [[likely]] {
-    // Audio sync logic
-    // Check how much audio is currently buffered
+    // Audio sync logic, check how much audio is currently buffered
     const int queued_bytes = host.get_queued_audio_bytes();
 
     // If we are ahead of the target (and not fast-forwarding), sleep briefly.
@@ -417,122 +562,40 @@ void SDL3Frontend::emulation_thread_fn(
 
     /* Read input state and catch up with audio stream, the max_catchup_cycles
      * is ~17556 cycles (~4ms of emulated time) */
-    joypad->set_state(input_state.buttons.load(std::memory_order_relaxed));
-    for (auto i{0}; i < max_catchup_cycles; i++)
-      gbc->step();
+    joyp_ptr->set_state(input_state.buttons.load(std::memory_order_relaxed));
+    advance_emulator_core(max_catchup_cycles);
 
     /* Update additional meta-data, avoid mutex acquisition */
     is_cgb.store(gbc->get_sys().cgb_mode);
     ff = fast_forward.load();
-
-    /* Update the fuck ass debugger */
     debugger.forward_stop(gbc);
 
-    if (gbc && gbc->savestate_ready()) {
-      if (quicksave_requested.exchange(false, std::memory_order_acq_rel)) {
-        try {
-          const auto blob = gbc->serialize_savestate();
-          if (const auto path = write_savestate_bundle(blob, true); !path.has_value()) {
-            Logger::push(LogLevel::Warning, "Savestate",
-                         "Failed to create",
-                         "Could not create a quicksave. Check that the savestate directory is accessible.");
-          } else {
-            Logger::push(LogLevel::Status, "Savestate", "Savestate created",
-                         path->string());
-          }
-        } catch (const std::exception &e) {
-          Logger::push(LogLevel::Warning, "Savestate", "Failed to create", e.what());
-        }
-      }
-
-      if (const auto manual_label = consume_manual_savestate_request();
-          manual_label.has_value()) {
-        try {
-          const auto blob = gbc->serialize_savestate();
-          if (const auto path =
-                  write_savestate_bundle(blob, false, *manual_label);
-              !path.has_value()) {
-            Logger::push(LogLevel::Warning, "Savestate",
-                         "Failed to create",
-                         "Could not create a savestate. Check that the savestate directory is accessible.");
-              }
-        } catch (const std::exception &e) {
-          Logger::push(LogLevel::Warning, "Savestate", "Failed to create", e.what());
-        }
-      }
-
-      if (quickload_requested.exchange(false, std::memory_order_acq_rel)) {
-        try {
-          if (const auto latest_path = latest_savestate_path(); !latest_path.has_value()) {
-            Logger::push(LogLevel::Status, "Savestate",
-                         "No savestate available",
-                         "No savestate is available to load.");
-          } else if (const auto blob = read_blob(*latest_path); !blob.has_value()) {
-            Logger::push(LogLevel::Warning, "Savestate",
-                         "Inaccessible",
-                         "Could not read savestate from: " +
-                             latest_path->string() + ". It may have been moved or deleted.");
-          } else {
-            gbc->deserialize_savestate(*blob);
-            host.clear_audio_stream();
-            video_dirty.store(true, std::memory_order_release);
-            Logger::push(LogLevel::Status, "Savestate", "Savestate loaded",
-                         latest_path->string());
-          }
-        } catch (const std::exception &e) {
-          Logger::push(LogLevel::Warning, "Savestate", "Load failed", e.what());
-        }
-      }
-
-      if (const auto load_path = consume_savestate_load_request();
-          load_path.has_value()) {
-        try {
-          if (const auto blob = read_blob(*load_path); !blob.has_value()) {
-            Logger::push(LogLevel::Warning, "Savestate",
-                         "File not found",
-                         "Could not read savestate from: " + load_path->string());
-          } else {
-            gbc->deserialize_savestate(*blob);
-            host.clear_audio_stream();
-            video_dirty.store(true, std::memory_order_release);
-            Logger::push(LogLevel::Status, "Savestate", "Savestate loaded",
-                         load_path->string());
-          }
-        } catch (const std::exception &e) {
-          Logger::push(LogLevel::Warning, "Savestate", "Load failed", e.what());
-        }
-      }
-    }
-
+    // Periodic SRAM save backups in case of unexpected quit / crash
     if (const auto now = Clock::now(); now >= next_save_poll) {
-      next_save_poll = now + std::chrono::milliseconds(250);
-      if (auto *bus = gbc->get_bus(); bus) {
-        if (auto *cart_ptr = bus->get_cartridge();
-            cart_ptr && cart_ptr->consume_save_event()) {
-          const auto ram_view = cart_ptr->ram();
-          if (!ram_view.empty() &&
-              (ram_view.size() != last_saved_snapshot.size() ||
-               !std::equal(ram_view.begin(), ram_view.end(),
-                           last_saved_snapshot.begin()))) {
-            last_saved_snapshot.assign(ram_view.begin(), ram_view.end());
-            enqueue_save_snapshot(
-                std::vector(ram_view.begin(), ram_view.end()));
-          }
-        }
-      }
+      constexpr auto polling_period = std::chrono::milliseconds(250);
+      process_sram_save_events(last_saved_snapshot, cart_ptr);
+      next_save_poll = now + polling_period;
     }
   }
 
-  if (auto *bus = gbc->get_bus(); bus) {
-    if (auto *cart_ptr = bus->get_cartridge();
-        cart_ptr && cart_ptr->consume_save_event()) {
-      const auto ram_view = cart_ptr->ram();
-      if (!ram_view.empty() && (ram_view.size() != last_saved_snapshot.size() ||
-                                !std::equal(ram_view.begin(), ram_view.end(),
-                                            last_saved_snapshot.begin()))) {
-        enqueue_save_snapshot(
-            std::vector(ram_view.begin(), ram_view.end()));
-      }
+  // Handle dangling SRAM save backups before quitting
+  process_sram_save_events(last_saved_snapshot, cart_ptr);
+}
+
+void SDL3Frontend::advance_emulator_core(const int cycles) {
+  const bool preempt = should_preempt_emu_loop(); // Heads up, this is latent
+
+  /* If a save event came in prior to this advancement, we want to preempt the
+   * main emulation loop and handle it as soon as the system is in a safe state
+   * to do so. */
+  for (auto i{0}; i < cycles; i++) {
+    gbc->step();
+
+    // Note: Keep short circuit eval on `gbc->savestate_ready()` if possible
+    if (preempt && gbc->savestate_ready()) [[unlikely]] {
+      process_save_state_events();
+      return; // Drop the rest of the cycles for this synchronization perdiod,
+              // if we hear an audio pop it's not the end of the world.
     }
   }
 }

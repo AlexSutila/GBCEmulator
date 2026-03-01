@@ -18,10 +18,10 @@
 LR35902::LR35902(AddressBus *bus_ptr, std::optional<Debug::Debugger> &debugger,
                  runtime_sys_info &sys)
     : Debuggable(debugger), // For execution breakpoints on fetch
-      bus(bus_ptr),                // For memory access
-      sys_(sys),                       // Acts as interrupt master enable
-      ie_reg(false),               // Enables individual interrupts
-      if_reg(true),                // Requests individual interrupts
+      bus(bus_ptr),         // For memory access
+      sys_(sys),            // Acts as interrupt master enable
+      ie_reg(false),        // Enables individual interrupts
+      if_reg(true),         // Requests individual interrupts
       isr(&reg_file, bus_ptr, ime, if_reg, ie_reg) {
   using mmio = IORegisterMapping;
 
@@ -114,7 +114,7 @@ enum : std::uint16_t {
 };
 
 void LR35902::savestate_serialize(Savestate::Writer &out) const {
-  if (!savestate_ready())
+  if (!savestate_ready()) [[unlikely]]
     throw std::runtime_error("LR35902::savestate_serialize() not at boundary");
   const auto regs = get_state();
   out.field_u16(F_PC, regs.pc);
@@ -207,7 +207,8 @@ void LR35902::do_fetch() {
   // If the halt bug was triggered, PC freaks out and doesn't increment
   if (reg_file.halt_bug_triggered)
     reg_file.halt_bug_triggered = false;
-  else reg_file.reg_pc++;
+  else
+    reg_file.reg_pc++;
 }
 
 /* Parse operands, prepare for execution */

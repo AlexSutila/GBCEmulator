@@ -239,7 +239,7 @@ void GbcImGui::build_main_menu_bar(UiState &state) const {
         state.show_settings = true;
       if (ImGui::MenuItem("Keybinds"))
         state.show_keybinds = true;
-      if (ImGui::MenuItem("Savestate Manager"))
+      if (ImGui::MenuItem("Save States"))
         state.show_savestate_manager = true;
       ImGui::EndMenu();
     }
