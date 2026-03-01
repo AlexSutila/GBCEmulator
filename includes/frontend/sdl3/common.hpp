@@ -148,6 +148,7 @@ struct UiState {
   std::string load_rom_path;
   bool request_load_bios{false};
   std::string load_bios_path;
+  bool request_unload_bios{false};
   bool request_quit{false};
 
   // ROM I/O status (downloads, unzip, etc.)

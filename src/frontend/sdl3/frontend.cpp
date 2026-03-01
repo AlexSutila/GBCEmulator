@@ -151,7 +151,7 @@ void SDL3Frontend::start() {
       }
     }
 
-    /* Handle BIOS selection, won't take effect until ROM re-inserted */
+    /* Handle BIOS selection/unload, takes effect on next ROM insert */
     consume_load_bios_request(bios_path);
     process_events();
     process_pending_save();
@@ -341,7 +341,7 @@ void SDL3Frontend::emulation_thread_fn(
       gbc = std::make_unique<GameBoyColor>(*this, bios_rom);
     } catch (std::runtime_error &e) {
       Logger::push(LogLevel::Warning, "BIOS", "Failed to load BIOS", e.what());
-      gui.get_settings().prev_bios_path = "";
+      gui.clear_bios_path();
       gbc = std::make_unique<GameBoyColor>(*this);
     }
   } else {
@@ -657,14 +657,25 @@ bool SDL3Frontend::consume_load_rom_request(std::string &rom_path) {
 bool SDL3Frontend::consume_load_bios_request(
     std::optional<std::string> &bios_path) {
   std::lock_guard lock(ui_mutex);
-  if (!ui_state.request_load_bios)
+  if (!ui_state.request_load_bios && !ui_state.request_unload_bios)
     return false;
+
+  if (ui_state.request_unload_bios) {
+    ui_state.request_unload_bios = false;
+    ui_state.request_load_bios = false;
+    ui_state.load_bios_path.clear();
+    bios_path = std::nullopt;
+    gui.clear_bios_path();
+    Logger::push(LogLevel::Status, "BIOS", "BIOS unloaded", "");
+    return true;
+  }
 
   /* Denote new BIOS path */
   ui_state.request_load_bios = false;
   bios_path = ui_state.load_bios_path;
-
   gui.update_bios_path(ui_state.load_bios_path);
+  Logger::push(LogLevel::Status, "BIOS", "BIOS selected",
+               ui_state.load_bios_path);
   return true;
 }
 

@@ -190,6 +190,11 @@ void GbcImGui::update_bios_path(const std::string &bios_path) {
   settings.save();
 }
 
+void GbcImGui::clear_bios_path() {
+  settings.prev_bios_path.clear();
+  settings.save();
+}
+
 /* ImGui windows */
 void GbcImGui::build_main_menu_bar(UiState &state) const {
   state.menu_bar_height = ImGui::GetFrameHeight();
@@ -225,10 +230,28 @@ void GbcImGui::build_main_menu_bar(UiState &state) const {
         }
         ImGui::EndMenu();
       }
-      if (ImGui::MenuItem("Select BIOS"))
-        ImGuiFileDialog::Instance()->OpenDialog(
-            "BiosFileDialog", "Choose a BIN file", bios_filters.data(),
-            bios_sel_conf);
+      const bool bios_loaded = !settings.prev_bios_path.empty();
+      const std::string bios_name =
+          bios_loaded ? fs::path(settings.prev_bios_path).filename().string()
+                      : "None";
+      if (ImGui::BeginMenu("BIOS")) {
+        ImGui::TextDisabled("Current: %s", bios_name.c_str());
+        if (bios_loaded && ImGui::IsItemHovered()) {
+          ImGui::SetTooltip("%s", settings.prev_bios_path.c_str());
+        }
+        ImGui::Separator();
+        if (ImGui::MenuItem("Select BIOS..."))
+          ImGuiFileDialog::Instance()->OpenDialog(
+              "BiosFileDialog", "Choose a BIN file", bios_filters.data(),
+              bios_sel_conf);
+        if (!bios_loaded)
+          ImGui::BeginDisabled();
+        if (ImGui::MenuItem("Unload BIOS"))
+          state.request_unload_bios = true;
+        if (!bios_loaded)
+          ImGui::EndDisabled();
+        ImGui::EndMenu();
+      }
       if (ImGui::MenuItem("Quit"))
         state.request_quit = true;
       ImGui::EndMenu();
@@ -321,6 +344,16 @@ void GbcImGui::build_status_bar(UiState &state) const {
       }
     } else {
       ImGui::TextDisabled("Ready");
+    }
+
+    const bool bios_loaded = !settings.prev_bios_path.empty();
+    const std::string bios_name =
+        bios_loaded ? fs::path(settings.prev_bios_path).filename().string()
+                    : "None";
+    ImGui::SameLine();
+    ImGui::TextDisabled("| BIOS: %s", bios_name.c_str());
+    if (bios_loaded && ImGui::IsItemHovered()) {
+      ImGui::SetTooltip("%s", settings.prev_bios_path.c_str());
     }
 
     const float right_items_width = 175.0f * dpi_scale;
