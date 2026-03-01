@@ -1,10 +1,10 @@
 #include "frontend/sdl3/frontend.hpp"
 #include <algorithm>
 #include <atomic>
-#include <cctype>
 #include <ctime>
 #include <fstream>
 #include <iomanip>
+#include <unordered_set>
 #include <sstream>
 
 namespace {
@@ -24,7 +24,6 @@ std::string normalize_hex_lower(std::string text) {
 
 constexpr int kSavestateThumbWidth = 80;
 constexpr int kSavestateThumbHeight = 72;
-constexpr int kMaxQuickSavestates = 10;
 constexpr std::size_t kSavestateGameDirNameMaxChars = 25;
 constexpr std::size_t kSavestateChecksumShortChars = 12;
 
@@ -105,7 +104,7 @@ std::string sanitize_savestate_label(std::string s,
                       (c >= '0' && c <= '9') || c == '-' || c == '_';
     c = keep ? c : '_';
   }
-  s.erase(std::remove(s.begin(), s.end(), '\0'), s.end());
+  std::erase(s, '\0');
   while (!s.empty() && s.front() == '_')
     s.erase(s.begin());
   if (s.size() > max_len)
@@ -206,8 +205,7 @@ read_thumb_raw_argb(const std::filesystem::path &path, const int w,
   std::ifstream f(path, std::ios::binary | std::ios::ate);
   if (!f)
     return std::nullopt;
-  const auto size = static_cast<std::size_t>(f.tellg());
-  if (size != byte_count)
+  if (const auto size = static_cast<std::size_t>(f.tellg()); size != byte_count)
     return std::nullopt;
   std::vector<std::uint32_t> out(pixel_count);
   f.seekg(0, std::ios::beg);
@@ -334,6 +332,11 @@ void SDL3Frontend::reset_savestate_context() {
   savestate_entries_.clear();
   savestate_selected_path_.reset();
   savestate_dir_.clear();
+  {
+    std::lock_guard lock(quick_savestate_cache_mutex_);
+    quick_savestate_cache_.clear();
+    quick_savestate_cache_valid_ = false;
+  }
   savestate_manual_label_input_.fill('\0');
   {
     std::lock_guard lock(savestate_request_mutex);
@@ -374,6 +377,11 @@ void SDL3Frontend::setup_savestate_context(const cart &c,
     savestate_dir_ = root_dir / (stem + " - " + checksum_short);
   else
     savestate_dir_ = root_dir / stem;
+  {
+    std::lock_guard lock(quick_savestate_cache_mutex_);
+    quick_savestate_cache_.clear();
+    quick_savestate_cache_valid_ = false;
+  }
 
   savestate_manual_label_input_.fill('\0');
   {
@@ -453,6 +461,90 @@ SDL3Frontend::write_savestate_bundle(const std::vector<byte_t> &blob,
   std::error_code ec;
   std::filesystem::create_directories(savestate_dir_, ec);
 
+  const auto oldest_first = [](const SavestateEntry &a,
+                               const SavestateEntry &b) {
+    if (a.created_at != b.created_at)
+      return a.created_at < b.created_at;
+    return a.state_path.filename().string() < b.state_path.filename().string();
+  };
+
+  const auto remove_state_triplet = [&](const std::filesystem::path &state) {
+    std::filesystem::remove(state, ec);
+    std::filesystem::remove(savestate_meta_path(state), ec);
+    std::filesystem::remove(savestate_thumb_path(state), ec);
+  };
+
+  const auto sync_quick_cache_locked = [&]() {
+    if (!quick_savestate_cache_valid_)
+      quick_savestate_cache_.clear();
+
+    // Track which quick state files actually exist on disk
+    std::unordered_set<std::filesystem::path> on_disk;
+
+    std::error_code iter_ec;
+    for (const auto &de :
+         std::filesystem::directory_iterator(savestate_dir_, iter_ec)) {
+      if (!is_savestate_file(de))
+        continue;
+
+      const auto &p = de.path();
+      if (p.stem().string().rfind("quick_", 0) != 0)
+        continue;
+
+      on_disk.insert(p);
+
+      // If we already have it cached, keep it
+      const auto it = std::ranges::find_if(
+          quick_savestate_cache_,
+          [&](const SavestateEntry &e) { return e.state_path == p; });
+      if (it != quick_savestate_cache_.end())
+        continue;
+
+      // Otherwise, create a new cache entry
+      SavestateEntry entry{};
+      entry.state_path = p;
+      entry.thumb_path = savestate_thumb_path(p);
+      entry.kind = "Quick";
+      entry.label = p.stem().string();
+
+      std::error_code time_ec;
+      entry.created_at = file_time_to_time_t(de.last_write_time(time_ec));
+
+      if (const auto meta = read_savestate_meta(savestate_meta_path(p));
+          meta.has_value()) {
+        if (meta->kind != "quick")
+          continue; // don't add to quick cache
+        entry.label = meta->label.empty() ? entry.label : meta->label;
+        if (meta->created_unix > 0)
+          entry.created_at = static_cast<std::time_t>(meta->created_unix);
+      }
+
+      quick_savestate_cache_.push_back(std::move(entry));
+    }
+
+    // Drop cache entries whose files no longer exist
+    std::erase_if(quick_savestate_cache_, [&](const SavestateEntry &e) {
+      return !on_disk.contains(e.state_path);
+    });
+
+    quick_savestate_cache_valid_ = true;
+  };
+
+  const auto enforce_max_quick_locked = [&]() {
+    const int configured_max = gui.get_settings_c().max_quicksaves;
+    if (configured_max <= 0) // 0 means "no limit"
+      return;
+    const auto max_quick = static_cast<std::size_t>(configured_max);
+
+    std::ranges::sort(quick_savestate_cache_, oldest_first);
+
+    while (quick_savestate_cache_.size() > max_quick) {
+      remove_state_triplet(quick_savestate_cache_.front().state_path);
+      quick_savestate_cache_.erase(quick_savestate_cache_.begin());
+    }
+  };
+
+  // ----- Pick output file name -----
   const std::time_t now = std::time(nullptr);
   const std::string prefix = quick ? "quick" : "manual";
   const std::string ts = savestate_timestamp_slug(now);
@@ -460,11 +552,13 @@ SDL3Frontend::write_savestate_bundle(const std::vector<byte_t> &blob,
 
   std::filesystem::path state_path;
   for (int attempt = 0; attempt < 1000; ++attempt) {
-    std::string stem = prefix + "_" + ts;
+    std::string stem = prefix + "_";
+    stem.append(ts);
     if (!sanitized_label.empty())
       stem += "_" + sanitized_label;
     if (attempt > 0)
       stem += "_" + std::to_string(attempt);
+
     const auto candidate = savestate_dir_ / (stem + ".state");
     if (!std::filesystem::exists(candidate, ec)) {
       state_path = candidate;
@@ -474,13 +568,12 @@ SDL3Frontend::write_savestate_bundle(const std::vector<byte_t> &blob,
   if (state_path.empty())
     return std::nullopt;
 
+  // ----- Write files (no deletions before success) -----
   if (!write_blob_file(state_path, blob))
     return std::nullopt;
 
-  const auto thumb_pixels = capture_savestate_thumbnail();
-  if (!thumb_pixels.empty()) {
+  if (const auto thumb_pixels = capture_savestate_thumbnail(); !thumb_pixels.empty())
     write_thumb_raw_argb(savestate_thumb_path(state_path), thumb_pixels);
-  }
 
   SavestateMeta meta{};
   meta.kind = quick ? "quick" : "manual";
@@ -490,44 +583,28 @@ SDL3Frontend::write_savestate_bundle(const std::vector<byte_t> &blob,
   meta.thumb_h = kSavestateThumbHeight;
   write_savestate_meta(savestate_meta_path(state_path), meta);
 
+  // ----- Update quick cache + enforce limit once -----
   if (quick) {
-    struct QuickCandidate {
-      std::filesystem::path state_path;
-      std::time_t created_at{};
-    };
-    std::vector<QuickCandidate> quick_entries;
-    for (const auto &de :
-         std::filesystem::directory_iterator(savestate_dir_, ec)) {
-      if (!is_savestate_file(de))
-        continue;
-      const auto p = de.path();
-      auto meta_opt = read_savestate_meta(savestate_meta_path(p));
-      const bool is_quick = meta_opt.has_value()
-                                ? (meta_opt->kind == "quick")
-                                : (p.stem().string().rfind("quick_", 0) == 0);
-      if (!is_quick)
-        continue;
-      std::time_t created_at = 0;
-      if (meta_opt.has_value() && meta_opt->created_unix > 0)
-        created_at = static_cast<std::time_t>(meta_opt->created_unix);
-      else
-        created_at = file_time_to_time_t(de.last_write_time(ec));
-      quick_entries.push_back({p, created_at});
+    std::lock_guard lock(quick_savestate_cache_mutex_);
+    sync_quick_cache_locked();
+    const auto existing_it = std::ranges::find_if(
+        quick_savestate_cache_,
+        [&](const SavestateEntry &e) { return e.state_path == state_path; });
+    if (existing_it == quick_savestate_cache_.end()) {
+      SavestateEntry new_entry{};
+      new_entry.state_path = state_path;
+      new_entry.thumb_path = savestate_thumb_path(state_path);
+      new_entry.kind = "Quick";
+      new_entry.label = label.empty() ? state_path.stem().string() : label;
+      new_entry.created_at = now;
+      quick_savestate_cache_.push_back(std::move(new_entry));
+    } else {
+      existing_it->thumb_path = savestate_thumb_path(state_path);
+      existing_it->label = label.empty() ? state_path.stem().string() : label;
+      existing_it->created_at = now;
     }
-    std::sort(quick_entries.begin(), quick_entries.end(),
-              [](const QuickCandidate &a, const QuickCandidate &b) {
-                if (a.created_at != b.created_at)
-                  return a.created_at > b.created_at;
-                return a.state_path.filename().string() >
-                       b.state_path.filename().string();
-              });
-    for (std::size_t i = kMaxQuickSavestates; i < quick_entries.size(); ++i) {
-      std::filesystem::remove(quick_entries[i].state_path, ec);
-      std::filesystem::remove(savestate_meta_path(quick_entries[i].state_path),
-                              ec);
-      std::filesystem::remove(savestate_thumb_path(quick_entries[i].state_path),
-                              ec);
-    }
+
+    enforce_max_quick_locked();
   }
 
   savestate_list_dirty.store(true, std::memory_order_release);
@@ -622,13 +699,13 @@ void SDL3Frontend::refresh_savestate_entries_locked(const bool force_refresh) {
     savestate_entries_.push_back(std::move(entry));
   }
 
-  std::sort(savestate_entries_.begin(), savestate_entries_.end(),
-            [](const SavestateEntry &a, const SavestateEntry &b) {
-              if (a.created_at != b.created_at)
-                return a.created_at > b.created_at;
-              return a.state_path.filename().string() >
-                     b.state_path.filename().string();
-            });
+  std::ranges::sort(savestate_entries_,
+                    [](const SavestateEntry &a, const SavestateEntry &b) {
+                      if (a.created_at != b.created_at)
+                        return a.created_at > b.created_at;
+                      return a.state_path.filename().string() >
+                        b.state_path.filename().string();
+                    });
 
   if (prev_selected.has_value()) {
     const auto it =
@@ -794,11 +871,11 @@ void SDL3Frontend::build_savestate_manager_window_locked() {
         }
       }
       if (entry.thumb_texture) {
-        const float max_w = 260.0f;
-        const float scale =
+        constexpr float max_w = 260.0f;
+        const float scale_ =
             std::min(max_w / static_cast<float>(entry.thumb_w), 4.0f);
         ImGui::Image(entry.thumb_texture,
-                     ImVec2(entry.thumb_w * scale, entry.thumb_h * scale));
+                     ImVec2(entry.thumb_w * scale_, entry.thumb_h * scale_));
       } else {
         ImGui::TextDisabled("No thumbnail available.");
       }
@@ -815,6 +892,13 @@ void SDL3Frontend::build_savestate_manager_window_locked() {
     std::filesystem::remove(*delete_path, ec);
     std::filesystem::remove(savestate_meta_path(*delete_path), ec);
     std::filesystem::remove(savestate_thumb_path(*delete_path), ec);
+    {
+      std::lock_guard lock(quick_savestate_cache_mutex_);
+      std::erase_if(quick_savestate_cache_,
+                    [&](const SavestateEntry &entry) {
+                      return entry.state_path == *delete_path;
+                    });
+    }
     savestate_list_dirty.store(true, std::memory_order_release);
     refresh_savestate_entries_locked(true);
   }

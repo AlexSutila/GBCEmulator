@@ -140,6 +140,9 @@ private:
   std::optional<std::filesystem::path> savestate_selected_path_;
   std::array<char, 96> savestate_manual_label_input_{};
   Clock::time_point next_savestate_scan_{Clock::now()};
+  std::mutex quick_savestate_cache_mutex_;
+  std::vector<SavestateEntry> quick_savestate_cache_;
+  bool quick_savestate_cache_valid_{false};
 
   // Resize/move redraw tuning
   std::atomic<std::int64_t> suppress_vsync_until_ns{0};

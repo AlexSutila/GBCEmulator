@@ -583,6 +583,18 @@ void GbcImGui::build_settings_window(UiState &state, SDLHost &host) {
     ImGui::TextDisabled(
         "Savestate folders: game-name - checksum");
   }
+  {
+    ImGui::SetNextItemWidth(120.0f * dpi_scale);
+    if (ImGui::InputInt("Max quicksaves", &settings.max_quicksaves)) {
+      if (settings.max_quicksaves < 0)
+        settings.max_quicksaves = 0;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Reset##max_quicksaves")) {
+      settings.max_quicksaves = Settings::default_max_quicksaves;
+    }
+    ImGui::TextDisabled("0 = unlimited");
+  }
   ImGui::SeparatorText("Audio");
   // Volume slider
   ImGui::SetNextItemWidth(200.0f * dpi_scale);
