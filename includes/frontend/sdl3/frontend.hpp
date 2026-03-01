@@ -189,6 +189,14 @@ private:
   std::optional<std::string> consume_manual_savestate_request();
   void queue_savestate_load_request(const std::filesystem::path &path);
   void queue_manual_savestate_request(std::string label);
+  void clear_quick_savestate_cache();
+  void sync_quick_savestate_cache_locked();
+  void upsert_quick_savestate_cache_locked(const std::filesystem::path &state_path,
+                                           const std::string &label,
+                                           std::time_t created_at);
+  void enforce_max_quicksaves_locked();
+  void erase_quick_savestate_cache_entry(const std::filesystem::path &state_path);
+  void remove_savestate_triplet(const std::filesystem::path &state_path);
   [[nodiscard]] std::optional<std::filesystem::path>
   write_savestate_bundle(const std::vector<byte_t> &blob, bool quick,
                          const std::string &label = {});
