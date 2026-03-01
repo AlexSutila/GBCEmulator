@@ -11,6 +11,8 @@ extern "C" {
 void irogb_retro_init(void);
 void irogb_retro_deinit(void);
 
+void irogb_retro_set_controller_port_device(unsigned port, unsigned device);
+
 void iorgb_retro_set_environment(retro_environment_t cb);
 void iorgb_retro_set_audio_sample(retro_audio_sample_t cb);
 void iorgb_retro_set_audio_sample_batch(retro_audio_sample_batch_t cb);

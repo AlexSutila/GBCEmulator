@@ -5,48 +5,94 @@
 #include "cart/cart.hpp"
 #include "emu_types.hpp"
 #include "libretro.h"
+#include "memory/mmio/dmg.hpp"
+#include "memory/mmio/mmio.hpp"
 
 // Standard includes
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <vector>
+
+struct ButtonMap {
+  unsigned retro_id;
+  std::uint8_t joypad_mask;
+};
+
+static constexpr ButtonMap btn_mapping[] = {
+    {RETRO_DEVICE_ID_JOYPAD_A,
+     static_cast<std::uint8_t>(Joypad::JoypadButton::A)},
+    {RETRO_DEVICE_ID_JOYPAD_B,
+     static_cast<std::uint8_t>(Joypad::JoypadButton::B)},
+    {RETRO_DEVICE_ID_JOYPAD_START,
+     static_cast<std::uint8_t>(Joypad::JoypadButton::START)},
+    {RETRO_DEVICE_ID_JOYPAD_SELECT,
+     static_cast<std::uint8_t>(Joypad::JoypadButton::SELECT)},
+    {RETRO_DEVICE_ID_JOYPAD_UP,
+     static_cast<std::uint8_t>(Joypad::JoypadButton::UP)},
+    {RETRO_DEVICE_ID_JOYPAD_DOWN,
+     static_cast<std::uint8_t>(Joypad::JoypadButton::DOWN)},
+    {RETRO_DEVICE_ID_JOYPAD_LEFT,
+     static_cast<std::uint8_t>(Joypad::JoypadButton::LEFT)},
+    {RETRO_DEVICE_ID_JOYPAD_RIGHT,
+     static_cast<std::uint8_t>(Joypad::JoypadButton::RIGHT)},
+};
+
+/* ======================================================================
+ * Start implementation of C-header (exposed directly to libretro)
+ * ====================================================================== */
 
 void irogb_retro_init(void) {}
 
 void irogb_retro_deinit(void) {}
 
+void irogb_retro_set_controller_port_device(unsigned port, unsigned device) {
+  auto &meta = LibretroFrontend::get_instance().get_meta();
+  if (port < 1)
+    meta.controller_device = device;
+}
+
 void iorgb_retro_set_environment(retro_environment_t cb) {
-  auto &meta = LibretroFrontend::getInstance().get_libretro_meta();
-  meta.environ_cb = cb;
+  auto &callbacks = LibretroFrontend::get_instance().get_callbacks();
+  callbacks.environ_cb = cb;
+
+  static const retro_controller_description port1[] = {
+      {"Game Boy Joypad", RETRO_DEVICE_JOYPAD}, {nullptr, 0}};
+  static const retro_controller_info ports[] = {{port1, 1}, {nullptr, 0}};
+  if (!callbacks.environ_cb(RETRO_ENVIRONMENT_SET_CONTROLLER_INFO,
+                            (void *)ports)) {
+    fprintf(stderr, "Failed to configure controller\n");
+  }
 
   enum retro_pixel_format fmt = RETRO_PIXEL_FORMAT_XRGB8888;
-  if (!meta.environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &fmt))
+  if (!callbacks.environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &fmt)) {
     fprintf(stderr, "Failed to set pixel format\n");
+  }
 }
 
 void iorgb_retro_set_audio_sample(retro_audio_sample_t cb) {
-  auto &meta = LibretroFrontend::getInstance().get_libretro_meta();
-  meta.audio_cb = cb;
+  auto &callbacks = LibretroFrontend::get_instance().get_callbacks();
+  callbacks.audio_cb = cb;
 }
 
 void iorgb_retro_set_audio_sample_batch(retro_audio_sample_batch_t cb) {
-  auto &meta = LibretroFrontend::getInstance().get_libretro_meta();
-  meta.audio_batch_cb = cb;
+  auto &callbacks = LibretroFrontend::get_instance().get_callbacks();
+  callbacks.audio_batch_cb = cb;
 }
 
 void iorgb_retro_set_input_poll(retro_input_poll_t cb) {
-  auto &meta = LibretroFrontend::getInstance().get_libretro_meta();
-  meta.input_poll_cb = cb;
+  auto &callbacks = LibretroFrontend::get_instance().get_callbacks();
+  callbacks.input_poll_cb = cb;
 }
 
 void iorgb_retro_set_input_state(retro_input_state_t cb) {
-  auto &meta = LibretroFrontend::getInstance().get_libretro_meta();
-  meta.input_state_cb = cb;
+  auto &callbacks = LibretroFrontend::get_instance().get_callbacks();
+  callbacks.input_state_cb = cb;
 }
 
 void iorgb_retro_set_video_refresh(retro_video_refresh_t cb) {
-  auto &meta = LibretroFrontend::getInstance().get_libretro_meta();
-  meta.video_cb = cb;
+  auto &callbacks = LibretroFrontend::get_instance().get_callbacks();
+  callbacks.video_cb = cb;
 }
 
 bool irogb_retro_load_game(const void *data, size_t size) {
@@ -56,7 +102,7 @@ bool irogb_retro_load_game(const void *data, size_t size) {
     return false;
 
   std::vector<byte_t> raw(data_ptr, data_ptr + size);
-  auto &gbc = LibretroFrontend::getInstance().get();
+  auto &gbc = LibretroFrontend::get_instance().get();
 
   try {
     cart c = load_cart_raw(raw);
@@ -64,28 +110,28 @@ bool irogb_retro_load_game(const void *data, size_t size) {
   } catch (...) {
     return false;
   }
-
   return true;
 }
 
 void irogb_retro_run(void) {
   constexpr std::size_t cycles_per_frame = 70224;
-  auto &instance = LibretroFrontend::getInstance();
-  auto &gbc = instance.get();
-
+  auto &instance = LibretroFrontend::get_instance();
   for (std::size_t i{0}; i < cycles_per_frame; i++)
-    gbc->step();
-  instance.present();
+    instance.get()->step(); // Step one 'frame'
 
-  // TODO: This is a hack to get the framerate right for now
-  constexpr auto fps = 60.0f;
-  constexpr auto sample_rate = 44100.0;
-  constexpr std::size_t samples_per_frame = sample_rate / fps;
-  static std::int16_t silence[samples_per_frame * 2] = {0};
-  instance.get_libretro_meta().audio_batch_cb(silence, samples_per_frame);
+  instance.try_show_frame();
+  instance.try_poll_input();
 }
 
-LibretroFrontend::LibretroFrontend() {}
+/* ======================================================================
+ * Start singleton LibretroFrontend implementation
+ * ====================================================================== */
+
+LibretroFrontend::LibretroFrontend() {
+  joyp = static_cast<Joypad::JOYP *>(
+      gbc->get_bus()->get_mmio(IORegisterMapping::MMIO_JOYPAD));
+  audio_buffer.reserve(4096);
+}
 
 LibretroFrontend::~LibretroFrontend() {}
 
@@ -113,16 +159,47 @@ void LibretroFrontend::clear(std::uint32_t c) {
   frame_ready = false;
 }
 
-void LibretroFrontend::present() {
+void LibretroFrontend::try_show_frame() {
   if (!frame_ready)
     return;
   frame_ready = false;
 
   const auto frame = get_frame();
-  libretro.video_cb(frame.data(), 160, 144, 160 * sizeof(std::uint32_t));
+  cb.video_cb(frame.data(), fb_width, fb_height,
+              fb_width * sizeof(std::uint32_t));
+}
+
+void LibretroFrontend::try_poll_input() {
+  std::uint8_t input_state{};
+  cb.input_poll_cb();
+
+  if (joyp && meta.controller_device == RETRO_DEVICE_JOYPAD) [[likely]] {
+    for (const auto &btn : btn_mapping)
+      input_state |= static_cast<std::uint8_t>(
+                         -static_cast<std::uint8_t>(test_input(btn.retro_id))) &
+                     btn.joypad_mask;
+    joyp->set_state(input_state);
+  }
 }
 
 void LibretroFrontend::queue_audio_samples(const float *samples,
-                                           std::size_t sample_count) {}
+                                           std::size_t sample_count) {
+  if (!samples || sample_count == 0 || sample_count % 2 != 0)
+    return;
+
+  const std::size_t frames = sample_count / 2;
+  audio_buffer.resize(sample_count);
+
+  for (std::size_t i{0}; i < sample_count; ++i) {
+    float s = samples[i];
+    s = std::clamp(s, -1.0f, 1.0f);
+    audio_buffer[i] = static_cast<std::int16_t>(s * 16383.0f);
+  }
+  cb.audio_batch_cb(audio_buffer.data(), frames);
+}
+
+bool LibretroFrontend::test_input(unsigned id) const {
+  return cb.input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, id);
+}
 
 void LibretroFrontend::start() { /* unused */ }

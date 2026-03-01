@@ -13,7 +13,9 @@ void retro_deinit(void) { irogb_retro_deinit(); }
 
 unsigned retro_api_version(void) { return RETRO_API_VERSION; }
 
-void retro_set_controller_port_device(unsigned port, unsigned device) {}
+void retro_set_controller_port_device(unsigned port, unsigned device) {
+  irogb_retro_set_controller_port_device(port, device);
+}
 
 void retro_get_system_info(struct retro_system_info *info) {
   memset(info, 0, sizeof(*info));
@@ -25,7 +27,7 @@ void retro_get_system_info(struct retro_system_info *info) {
 
 void retro_get_system_av_info(struct retro_system_av_info *info) {
   info->timing.fps = 60.0;
-  info->timing.sample_rate = 44100.0;
+  info->timing.sample_rate = 48000.0;
 
   info->geometry.base_height = 144;
   info->geometry.base_width = 160;
