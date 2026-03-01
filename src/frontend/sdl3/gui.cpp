@@ -1,10 +1,52 @@
 #include "frontend/sdl3/gui.hpp"
 #include "memory/boot.hpp"
+#include <algorithm>
+#include <ctime>
+#include <fstream>
+#include <iomanip>
 #include <ranges>
+#include <sstream>
 #include <sys/stat.h>
 #include <imgui_internal.h>
 
 namespace fs = std::filesystem;
+
+namespace {
+std::string format_timestamp_local_gui(const std::time_t t) {
+  if (t <= 0)
+    return "Unknown";
+  std::tm tm{};
+#if defined(_WIN32)
+  localtime_s(&tm, &t);
+#else
+  localtime_r(&t, &tm);
+#endif
+  std::ostringstream oss;
+  oss << std::put_time(&tm, "%Y-%m-%d %H:%M:%S");
+  return oss.str();
+}
+
+std::optional<std::vector<std::uint32_t>>
+read_thumb_raw_argb_gui(const std::filesystem::path &path, const int w,
+                        const int h) {
+  if (w <= 0 || h <= 0)
+    return std::nullopt;
+  const std::size_t pixel_count =
+      static_cast<std::size_t>(w) * static_cast<std::size_t>(h);
+  const std::size_t byte_count = pixel_count * sizeof(std::uint32_t);
+  std::ifstream f(path, std::ios::binary | std::ios::ate);
+  if (!f)
+    return std::nullopt;
+  if (const auto size = static_cast<std::size_t>(f.tellg()); size != byte_count)
+    return std::nullopt;
+  std::vector<std::uint32_t> out(pixel_count);
+  f.seekg(0, std::ios::beg);
+  if (!f.read(reinterpret_cast<char *>(out.data()),
+              static_cast<std::streamsize>(byte_count)))
+    return std::nullopt;
+  return out;
+}
+} // namespace
 
 void GbcImGui::init(const SDLHost &host) {
   settings = Settings::load();
@@ -637,6 +679,177 @@ void GbcImGui::build_settings_window(UiState &state, SDLHost &host) {
   ImGui::End();
 }
 
+void GbcImGui::build_savestate_manager_window(
+    UiState &state, const SDLHost &host, const bool emulator_ready,
+    const std::filesystem::path &savestate_dir,
+    std::array<char, 96> &manual_label_input,
+    std::vector<SavestateEntry> &savestate_entries,
+    std::optional<std::filesystem::path> &savestate_selected_path,
+    const SavestateManagerCallbacks &callbacks) {
+  if (!state.show_savestate_manager)
+    return;
+
+  ImGui::SetNextWindowSize(ImVec2(920, 560), ImGuiCond_FirstUseEver);
+  if (!ImGui::Begin("Save States", &state.show_savestate_manager)) {
+    ImGui::End();
+    return;
+  }
+
+  if (savestate_dir.empty()) {
+    ImGui::TextDisabled("Load a ROM to manage savestates.");
+    ImGui::End();
+    return;
+  }
+
+  ImGui::Text("Directory: %s", savestate_dir.string().c_str());
+  ImGui::InputText("Label", manual_label_input.data(), manual_label_input.size());
+
+  if (!emulator_ready)
+    ImGui::BeginDisabled();
+  if (ImGui::Button("Save") && callbacks.queue_manual_save) {
+    callbacks.queue_manual_save(manual_label_input.data());
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Load Most Recent") && callbacks.request_load_most_recent) {
+    callbacks.request_load_most_recent();
+  }
+  if (!emulator_ready)
+    ImGui::EndDisabled();
+
+  ImGui::SameLine();
+  if (ImGui::Button("Refresh") && callbacks.refresh) {
+    callbacks.refresh();
+  }
+
+  ImGui::Separator();
+
+  std::optional<std::filesystem::path> delete_path = std::nullopt;
+  std::optional<std::filesystem::path> load_path = std::nullopt;
+
+  if (ImGui::BeginTable("savestate_manager_layout", 2,
+                        ImGuiTableFlags_Resizable |
+                            ImGuiTableFlags_BordersInnerV)) {
+    ImGui::TableSetupColumn("List", ImGuiTableColumnFlags_WidthStretch, 0.62f);
+    ImGui::TableSetupColumn("Preview", ImGuiTableColumnFlags_WidthStretch,
+                            0.38f);
+    ImGui::TableNextRow();
+
+    ImGui::TableSetColumnIndex(0);
+    if (ImGui::BeginTable("savestate_table", 4,
+                          ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders |
+                              ImGuiTableFlags_SizingStretchProp |
+                              ImGuiTableFlags_ScrollY,
+                          ImVec2(0.0f, 0.0f))) {
+      ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 70.0f);
+      ImGui::TableSetupColumn("Taken", ImGuiTableColumnFlags_WidthFixed,
+                              170.0f);
+      ImGui::TableSetupColumn("Label");
+      ImGui::TableSetupColumn("Size", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+      ImGui::TableHeadersRow();
+
+      for (std::size_t i = 0; i < savestate_entries.size(); ++i) {
+        auto &entry = savestate_entries[i];
+        const bool selected = savestate_selected_path.has_value() &&
+                              *savestate_selected_path == entry.state_path;
+
+        ImGui::PushID(static_cast<int>(i));
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        if (ImGui::Selectable(entry.kind.c_str(), selected,
+                              ImGuiSelectableFlags_SpanAllColumns)) {
+          savestate_selected_path = entry.state_path;
+        }
+        ImGui::TableSetColumnIndex(1);
+        ImGui::TextUnformatted(
+            format_timestamp_local_gui(entry.created_at).c_str());
+        ImGui::TableSetColumnIndex(2);
+        ImGui::TextUnformatted(entry.label.c_str());
+        if (ImGui::IsItemHovered())
+          ImGui::SetTooltip("%s", entry.state_path.filename().string().c_str());
+        ImGui::TableSetColumnIndex(3);
+        ImGui::Text("%zu KB", static_cast<std::size_t>(
+                                  (entry.file_size + 1023u) / 1024u));
+        ImGui::PopID();
+      }
+      ImGui::EndTable();
+    }
+
+    ImGui::TableSetColumnIndex(1);
+    auto selected_it = savestate_entries.end();
+    if (savestate_selected_path.has_value()) {
+      selected_it =
+          std::ranges::find_if(savestate_entries, [&](const SavestateEntry &e) {
+            return e.state_path == *savestate_selected_path;
+          });
+    }
+
+    if (selected_it == savestate_entries.end()) {
+      ImGui::TextDisabled("No savestate selected.");
+    } else {
+      auto &entry = *selected_it;
+      ImGui::Text("Type: %s", entry.kind.c_str());
+      ImGui::Text("Taken: %s",
+                  format_timestamp_local_gui(entry.created_at).c_str());
+      ImGui::Text("File: %s", entry.state_path.filename().string().c_str());
+      ImGui::Text("Size: %zu bytes", static_cast<std::size_t>(entry.file_size));
+      ImGui::Spacing();
+
+      if (!emulator_ready)
+        ImGui::BeginDisabled();
+      if (ImGui::Button("Load")) {
+        load_path = entry.state_path;
+      }
+      if (!emulator_ready)
+        ImGui::EndDisabled();
+      ImGui::SameLine();
+      if (ImGui::Button("Delete")) {
+        delete_path = entry.state_path;
+      }
+
+      ImGui::SeparatorText("Thumbnail");
+      if (!entry.thumb_texture && !entry.thumb_texture_attempted) {
+        entry.thumb_texture_attempted = true;
+        if (std::filesystem::exists(entry.thumb_path)) {
+          if (const auto pixels = read_thumb_raw_argb_gui(
+                  entry.thumb_path, entry.thumb_w, entry.thumb_h);
+              pixels.has_value()) {
+            entry.thumb_texture = SDL_CreateTexture(
+                host.get_renderer(), SDL_PIXELFORMAT_ARGB8888,
+                SDL_TEXTUREACCESS_STATIC, entry.thumb_w, entry.thumb_h);
+            if (entry.thumb_texture) {
+              SDL_UpdateTexture(entry.thumb_texture, nullptr, pixels->data(),
+                                entry.thumb_w *
+                                    static_cast<int>(sizeof(std::uint32_t)));
+              SDL_SetTextureScaleMode(entry.thumb_texture,
+                                      SDL_SCALEMODE_NEAREST);
+            }
+          }
+        }
+      }
+      if (entry.thumb_texture) {
+        constexpr float max_w = 260.0f;
+        const float scale_ =
+            std::min(max_w / static_cast<float>(entry.thumb_w), 4.0f);
+        ImGui::Image(entry.thumb_texture,
+                     ImVec2(entry.thumb_w * scale_, entry.thumb_h * scale_));
+      } else {
+        ImGui::TextDisabled("No thumbnail available.");
+      }
+    }
+
+    ImGui::EndTable();
+  }
+
+  if (load_path.has_value() && callbacks.queue_load) {
+    callbacks.queue_load(*load_path);
+  }
+  if (delete_path.has_value() && callbacks.delete_state) {
+    callbacks.delete_state(*delete_path);
+  }
+
+  ImGui::End();
+}
+
 void GbcImGui::build_keybinds_window(UiState &state) {
   ImGui::Begin("Keybinds", &state.show_keybinds);
   ImGui::SeparatorText("Gameplay");
@@ -762,7 +975,7 @@ void GbcImGui::build_cart_info_window(UiState &state) {
   ImGui::SetNextWindowSize(ImVec2(600, 440), ImGuiCond_FirstUseEver);
   if (ImGui::Begin("Cartridge Info", &state.show_cart_info)) {
     if (state.cart_info.empty()) {
-      ImGui::TextDisabled("No cartridge info available.");
+      ImGui::TextDisabled("No cartridge info available");
     } else {
       ImGui::BeginChild("CartInfoScroll", ImVec2(0, 0), true);
       ImGui::TextUnformatted(state.cart_info.c_str());

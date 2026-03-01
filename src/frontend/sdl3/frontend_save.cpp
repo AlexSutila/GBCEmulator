@@ -168,20 +168,6 @@ std::string savestate_timestamp_slug(const std::time_t t) {
   return oss.str();
 }
 
-std::string format_timestamp_local(const std::time_t t) {
-  if (t <= 0)
-    return "Unknown";
-  std::tm tm{};
-#if defined(_WIN32)
-  localtime_s(&tm, &t);
-#else
-  localtime_r(&t, &tm);
-#endif
-  std::ostringstream oss;
-  oss << std::put_time(&tm, "%Y-%m-%d %H:%M:%S");
-  return oss.str();
-}
-
 bool write_thumb_raw_argb(const std::filesystem::path &path,
                           const std::vector<std::uint32_t> &pixels) {
   if (pixels.empty())
@@ -192,27 +178,6 @@ bool write_thumb_raw_argb(const std::filesystem::path &path,
   f.write(reinterpret_cast<const char *>(pixels.data()),
           static_cast<std::streamsize>(pixels.size() * sizeof(std::uint32_t)));
   return static_cast<bool>(f);
-}
-
-std::optional<std::vector<std::uint32_t>>
-read_thumb_raw_argb(const std::filesystem::path &path, const int w,
-                    const int h) {
-  if (w <= 0 || h <= 0)
-    return std::nullopt;
-  const std::size_t pixel_count =
-      static_cast<std::size_t>(w) * static_cast<std::size_t>(h);
-  const std::size_t byte_count = pixel_count * sizeof(std::uint32_t);
-  std::ifstream f(path, std::ios::binary | std::ios::ate);
-  if (!f)
-    return std::nullopt;
-  if (const auto size = static_cast<std::size_t>(f.tellg()); size != byte_count)
-    return std::nullopt;
-  std::vector<std::uint32_t> out(pixel_count);
-  f.seekg(0, std::ios::beg);
-  if (!f.read(reinterpret_cast<char *>(out.data()),
-              static_cast<std::streamsize>(byte_count)))
-    return std::nullopt;
-  return out;
 }
 
 bool is_savestate_file(const std::filesystem::directory_entry &de) {
@@ -731,178 +696,35 @@ void SDL3Frontend::refresh_savestate_entries_locked(const bool force_refresh) {
     savestate_selected_path_.reset();
 }
 
-// Temporary place, should be moved to gui code
 void SDL3Frontend::build_savestate_manager_window_locked() {
   if (!ui_state.show_savestate_manager)
     return;
-
   refresh_savestate_entries_locked(false);
-  ImGui::SetNextWindowSize(ImVec2(920, 560), ImGuiCond_FirstUseEver);
-  if (!ImGui::Begin("Save States", &ui_state.show_savestate_manager)) {
-    ImGui::End();
-    return;
-  }
-
-  const bool emulator_ready = static_cast<bool>(gbc);
-
-  if (savestate_dir_.empty()) {
-    ImGui::TextDisabled("Load a ROM to manage savestates.");
-    ImGui::End();
-    return;
-  }
-
-  ImGui::Text("Directory: %s", savestate_dir_.string().c_str());
-  ImGui::InputText("Label", savestate_manual_label_input_.data(),
-                   savestate_manual_label_input_.size());
-
-  if (!emulator_ready)
-    ImGui::BeginDisabled();
-  if (ImGui::Button("Save")) {
-    queue_manual_savestate_request(savestate_manual_label_input_.data());
-  }
-  ImGui::SameLine();
-  if (ImGui::Button("Load Most Recent")) {
+  GbcImGui::SavestateManagerCallbacks callbacks{};
+  callbacks.queue_manual_save = [this](const std::string &label) {
+    queue_manual_savestate_request(label);
+  };
+  callbacks.request_load_most_recent = [this]() {
     quickload_requested.store(true, std::memory_order_release);
-  }
-  if (!emulator_ready)
-    ImGui::EndDisabled();
-
-  ImGui::SameLine();
-  if (ImGui::Button("Refresh")) {
+  };
+  callbacks.refresh = [this]() {
     savestate_list_dirty.store(true, std::memory_order_release);
     refresh_savestate_entries_locked(true);
-  }
-
-  ImGui::Separator();
-
-  std::optional<std::filesystem::path> delete_path = std::nullopt;
-  std::optional<std::filesystem::path> load_path = std::nullopt;
-
-  if (ImGui::BeginTable("savestate_manager_layout", 2,
-                        ImGuiTableFlags_Resizable |
-                            ImGuiTableFlags_BordersInnerV)) {
-    ImGui::TableSetupColumn("List", ImGuiTableColumnFlags_WidthStretch, 0.62f);
-    ImGui::TableSetupColumn("Preview", ImGuiTableColumnFlags_WidthStretch,
-                            0.38f);
-    ImGui::TableNextRow();
-
-    ImGui::TableSetColumnIndex(0);
-    if (ImGui::BeginTable("savestate_table", 4,
-                          ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders |
-                              ImGuiTableFlags_SizingStretchProp |
-                              ImGuiTableFlags_ScrollY,
-                          ImVec2(0.0f, 0.0f))) {
-      ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 70.0f);
-      ImGui::TableSetupColumn("Taken", ImGuiTableColumnFlags_WidthFixed,
-                              170.0f);
-      ImGui::TableSetupColumn("Label");
-      ImGui::TableSetupColumn("Size", ImGuiTableColumnFlags_WidthFixed, 80.0f);
-      ImGui::TableHeadersRow();
-
-      for (std::size_t i = 0; i < savestate_entries_.size(); ++i) {
-        auto &entry = savestate_entries_[i];
-        const bool selected = savestate_selected_path_.has_value() &&
-                              *savestate_selected_path_ == entry.state_path;
-
-        ImGui::PushID(static_cast<int>(i));
-        ImGui::TableNextRow();
-        ImGui::TableSetColumnIndex(0);
-        if (ImGui::Selectable(entry.kind.c_str(), selected,
-                              ImGuiSelectableFlags_SpanAllColumns)) {
-          savestate_selected_path_ = entry.state_path;
-        }
-        ImGui::TableSetColumnIndex(1);
-        ImGui::TextUnformatted(
-            format_timestamp_local(entry.created_at).c_str());
-        ImGui::TableSetColumnIndex(2);
-        ImGui::TextUnformatted(entry.label.c_str());
-        if (ImGui::IsItemHovered())
-          ImGui::SetTooltip("%s", entry.state_path.filename().string().c_str());
-        ImGui::TableSetColumnIndex(3);
-        ImGui::Text("%zu KB", static_cast<std::size_t>(
-                                  (entry.file_size + 1023u) / 1024u));
-        ImGui::PopID();
-      }
-      ImGui::EndTable();
-    }
-
-    ImGui::TableSetColumnIndex(1);
-    auto selected_it = savestate_entries_.end();
-    if (savestate_selected_path_.has_value()) {
-      selected_it = std::ranges::find_if(
-          savestate_entries_, [&](const SavestateEntry &e) {
-            return e.state_path == *savestate_selected_path_;
-          });
-    }
-
-    if (selected_it == savestate_entries_.end()) {
-      ImGui::TextDisabled("No savestate selected.");
-    } else {
-      auto &entry = *selected_it;
-      ImGui::Text("Type: %s", entry.kind.c_str());
-      ImGui::Text("Taken: %s",
-                  format_timestamp_local(entry.created_at).c_str());
-      ImGui::Text("File: %s", entry.state_path.filename().string().c_str());
-      ImGui::Text("Size: %zu bytes", static_cast<std::size_t>(entry.file_size));
-      ImGui::Spacing();
-
-      if (!emulator_ready)
-        ImGui::BeginDisabled();
-      if (ImGui::Button("Load")) {
-        load_path = entry.state_path;
-      }
-      if (!emulator_ready)
-        ImGui::EndDisabled();
-      ImGui::SameLine();
-      if (ImGui::Button("Delete")) {
-        delete_path = entry.state_path;
-      }
-
-      ImGui::SeparatorText("Thumbnail");
-      if (!entry.thumb_texture && !entry.thumb_texture_attempted) {
-        entry.thumb_texture_attempted = true;
-        if (std::filesystem::exists(entry.thumb_path)) {
-          if (const auto pixels = read_thumb_raw_argb(
-                  entry.thumb_path, entry.thumb_w, entry.thumb_h);
-              pixels.has_value()) {
-            entry.thumb_texture = SDL_CreateTexture(
-                host.get_renderer(), SDL_PIXELFORMAT_ARGB8888,
-                SDL_TEXTUREACCESS_STATIC, entry.thumb_w, entry.thumb_h);
-            if (entry.thumb_texture) {
-              SDL_UpdateTexture(entry.thumb_texture, nullptr, pixels->data(),
-                                entry.thumb_w *
-                                    static_cast<int>(sizeof(std::uint32_t)));
-              SDL_SetTextureScaleMode(entry.thumb_texture,
-                                      SDL_SCALEMODE_NEAREST);
-            }
-          }
-        }
-      }
-      if (entry.thumb_texture) {
-        constexpr float max_w = 260.0f;
-        const float scale_ =
-            std::min(max_w / static_cast<float>(entry.thumb_w), 4.0f);
-        ImGui::Image(entry.thumb_texture,
-                     ImVec2(entry.thumb_w * scale_, entry.thumb_h * scale_));
-      } else {
-        ImGui::TextDisabled("No thumbnail available.");
-      }
-    }
-
-    ImGui::EndTable();
-  }
-
-  if (load_path.has_value()) {
-    queue_savestate_load_request(*load_path);
-  }
-  if (delete_path.has_value()) {
-    remove_savestate_triplet(*delete_path);
-    erase_quick_savestate_cache_entry(*delete_path);
+  };
+  callbacks.queue_load = [this](const std::filesystem::path &path) {
+    queue_savestate_load_request(path);
+  };
+  callbacks.delete_state = [this](const std::filesystem::path &path) {
+    remove_savestate_triplet(path);
+    erase_quick_savestate_cache_entry(path);
     savestate_list_dirty.store(true, std::memory_order_release);
     refresh_savestate_entries_locked(true);
-  }
+  };
 
-  ImGui::End();
+  gui.build_savestate_manager_window(
+      ui_state, host, static_cast<bool>(gbc), savestate_dir_,
+      savestate_manual_label_input_, savestate_entries_, savestate_selected_path_,
+      callbacks);
 }
 
 [[nodiscard]] bool SDL3Frontend::should_preempt_emu_loop() const {

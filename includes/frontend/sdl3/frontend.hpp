@@ -39,19 +39,6 @@ public:
   void clear(std::uint32_t c) override;
 
 private:
-  struct SavestateEntry {
-    std::filesystem::path state_path;
-    std::filesystem::path thumb_path;
-    std::string kind;
-    std::string label;
-    std::time_t created_at{};
-    std::uintmax_t file_size{};
-    int thumb_w{};
-    int thumb_h{};
-    SDL_Texture *thumb_texture{nullptr};
-    bool thumb_texture_attempted{false};
-  };
-
   // Subsystems
   SDLHost host;
   GbcImGui gui;

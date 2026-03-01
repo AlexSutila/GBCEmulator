@@ -5,8 +5,10 @@
 #include <SDL3/SDL.h>
 #include <array>
 #include <atomic>
+#include <filesystem>
 #include <fstream>
 #include <nlohmann/json.hpp>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -82,6 +84,19 @@ inline void Settings::add_recent_rom(const std::string &path) {
     recent_roms.resize(10);
   }
 }
+
+struct SavestateEntry {
+  std::filesystem::path state_path;
+  std::filesystem::path thumb_path;
+  std::string kind;
+  std::string label;
+  std::time_t created_at{};
+  std::uintmax_t file_size{};
+  int thumb_w{};
+  int thumb_h{};
+  SDL_Texture *thumb_texture{nullptr};
+  bool thumb_texture_attempted{false};
+};
 
 /* ---------- Input ---------- */
 static constexpr int KCount = 8;
