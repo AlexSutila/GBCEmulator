@@ -350,7 +350,7 @@ void RaylibFrontend::restore_web_save() {
     return;
 
   (void)web_load_active_save(ram.data(), static_cast<int>(ram.size()));
-  cart->consume_save_event();
+  cart->consume_sram_save();
 }
 
 void RaylibFrontend::flush_web_save_now() {
@@ -378,7 +378,7 @@ void RaylibFrontend::poll_web_save_persistence() {
     return;
 
   const double now_ms = emscripten_get_now();
-  if (cart->consume_save_event()) {
+  if (cart->consume_sram_save()) {
     web_save_pending_flush = true;
     web_save_flush_deadline_ms = now_ms + kWebSramFlushDebounceMs;
   }

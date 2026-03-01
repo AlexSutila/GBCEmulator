@@ -1,6 +1,8 @@
 # ===========================================================================
 # Dependencies
 # ===========================================================================
+include(FetchContent)
+
 if(EMSCRIPTEN)
     set(PLATFORM Web CACHE STRING "" FORCE)
 endif() # EMSCRIPTEN
