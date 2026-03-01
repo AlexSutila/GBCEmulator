@@ -75,9 +75,14 @@ void irogb_retro_run(void) {
 
   for (std::size_t i{0}; i < cycles_per_frame; i++)
     gbc->step();
-  auto frame = instance.get_frame();
-  instance.get_libretro_meta().video_cb(frame.data(), 160, 144,
-                                        160 * sizeof(std::uint32_t));
+  instance.present();
+
+  // TODO: This is a hack to get the framerate right for now
+  constexpr auto fps = 60.0f;
+  constexpr auto sample_rate = 44100.0;
+  constexpr std::size_t samples_per_frame = sample_rate / fps;
+  static std::int16_t silence[samples_per_frame * 2] = {0};
+  instance.get_libretro_meta().audio_batch_cb(silence, samples_per_frame);
 }
 
 LibretroFrontend::LibretroFrontend() {}
@@ -106,6 +111,15 @@ void LibretroFrontend::clear(std::uint32_t c) {
     buf.fill(c);
   write_idx = display_idx = 0;
   frame_ready = false;
+}
+
+void LibretroFrontend::present() {
+  if (!frame_ready)
+    return;
+  frame_ready = false;
+
+  const auto frame = get_frame();
+  libretro.video_cb(frame.data(), 160, 144, 160 * sizeof(std::uint32_t));
 }
 
 void LibretroFrontend::queue_audio_samples(const float *samples,

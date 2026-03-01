@@ -1,7 +1,6 @@
 #ifndef GBC_LIBRETRO_FRONTEND_HPP
 #define GBC_LIBRETRO_FRONTEND_HPP
 
-#include "cart/cart.hpp"
 #include "frontend/frontend.hpp"
 #include "libretro.h"
 #include <array>
@@ -32,6 +31,8 @@ public:
   void put_pixel(int x, int y, std::uint32_t c) override;
   void clear(std::uint32_t c) override;
   void start() override;
+
+  void present();
 
   void queue_audio_samples(const float *samples,
                            std::size_t sample_count) override;
