@@ -6,16 +6,6 @@
 
 #include "libretro.h"
 
-static uint32_t *frame_buf;
-static struct retro_log_callback logging;
-static retro_log_printf_t log_cb;
-static bool use_audio_cb;
-static float last_aspect;
-static float last_sample_rate;
-static bool analog_mouse = true;
-static bool analog_mouse_relative = false;
-static bool enable_audio = true;
-
 static void fallback_log(enum retro_log_level level, const char *fmt, ...) {}
 
 void retro_init(void) {}
