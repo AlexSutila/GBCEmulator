@@ -186,7 +186,6 @@ void LibretroFrontend::queue_audio_samples(const float *samples,
                                            std::size_t sample_count) {
   if (!samples || sample_count == 0 || sample_count % 2 != 0)
     return;
-
   const std::size_t frames = sample_count / 2;
   audio_buffer.resize(sample_count);
 

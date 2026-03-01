@@ -36,7 +36,9 @@ set_target_properties(gbc_libretro PROPERTIES
 )
 
 target_compile_options(gbc_libretro
-    PRIVATE ${GBC_COMPILE_OPTIONS}
+    PRIVATE
+        ${GBC_COMPILE_OPTIONS}
+        -fPIC
 )
 
 target_include_directories(gbc_libretro
