@@ -7,6 +7,30 @@
 #include <array>
 #include <cstddef>
 
+struct ButtonMap {
+  unsigned retro_id;
+  std::uint8_t joypad_mask;
+};
+
+static constexpr ButtonMap btn_mapping[] = {
+    {RETRO_DEVICE_ID_JOYPAD_A,
+     static_cast<std::uint8_t>(Joypad::JoypadButton::A)},
+    {RETRO_DEVICE_ID_JOYPAD_B,
+     static_cast<std::uint8_t>(Joypad::JoypadButton::B)},
+    {RETRO_DEVICE_ID_JOYPAD_START,
+     static_cast<std::uint8_t>(Joypad::JoypadButton::START)},
+    {RETRO_DEVICE_ID_JOYPAD_SELECT,
+     static_cast<std::uint8_t>(Joypad::JoypadButton::SELECT)},
+    {RETRO_DEVICE_ID_JOYPAD_UP,
+     static_cast<std::uint8_t>(Joypad::JoypadButton::UP)},
+    {RETRO_DEVICE_ID_JOYPAD_DOWN,
+     static_cast<std::uint8_t>(Joypad::JoypadButton::DOWN)},
+    {RETRO_DEVICE_ID_JOYPAD_LEFT,
+     static_cast<std::uint8_t>(Joypad::JoypadButton::LEFT)},
+    {RETRO_DEVICE_ID_JOYPAD_RIGHT,
+     static_cast<std::uint8_t>(Joypad::JoypadButton::RIGHT)},
+};
+
 class LibretroFrontend : public Frontend {
 public:
   LibretroFrontend(const LibretroFrontend &) = delete;

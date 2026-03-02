@@ -23,7 +23,7 @@ target_include_directories(libretro_api
 # ===========================================================================
 
 add_library(gbc_libretro SHARED
-    ${CMAKE_SOURCE_DIR}/src/frontend/libretro/libretro_host.c
+    ${CMAKE_SOURCE_DIR}/src/frontend/libretro/libretro_host.cpp
     ${CMAKE_SOURCE_DIR}/src/frontend/libretro/frontend.cpp
     ${GBC_CORE_SOURCES}
 )
