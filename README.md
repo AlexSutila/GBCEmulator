@@ -30,6 +30,9 @@ The web version is built on [raylib](https://github.com/raysan5/raylib) and aims
 
 The web version does not require compilation or installation, try it out [here](https://alexsutila.github.io/IroGB/)!
 
+### RetroArch Compatability
+We also expose our emulator core as a functional [libretro](https://www.libretro.com/#google_vignette) port, giving it compatability with [retroarch](https://www.retroarch.com/). As a result, with cross compilation our core runs on basically every platform that supports retroarch.
+
 ### Memory Bank Circuitry Support
 IroGB supports most official and unofficial memory bank controllers (MBCs) that were used in Game Boy cartridges. This includes the following:
 - No MBC
@@ -75,8 +78,10 @@ To build one or more desktop build targets in either `Release` or `Debug` mode, 
 # From repository root dir
 mkdir build/ && cd build/
 cmake .. -DCMAKE_BUILD_TYPE=Release \
-    -DBUILD_FULL=ON     \
+    -DBUILD_FULL=ON         \
+    -DBUILD_LIBRETRO=ON     \
     -DBUILD_SIMPLE=ON
+make -j$(nproc)
 ```
 
 This command builds all desktop build targets. To select one or more, simply exclude the corresponding `-DBUILD=...` argument. Building the WASM frontend follows a similar procedure but using the [emsdk](https://emscripten.org/docs/tools_reference/emsdk.html) rather than vanilla `cmake` and choice of C/C++ compiler.
@@ -100,11 +105,13 @@ We would like to thank the following open source projects for providing tools an
 - [Dear ImGUI](https://github.com/ocornut/imgui) - MIT license
 - [ImGUIFileDialog](https://github.com/aiekick/ImGuiFileDialog) - MIT license
 - [json](https://github.com/nlohmann/json) - MIT license
+- [libretro](https://github.com/libretro/libretro-common) - Permissively licensed
 - [mbedTLS](https://www.trustedfirmware.org/projects/mbed-tls) - Apache 2.0 OR GPL 2.0 or later license
 - [miniz](https://github.com/richgel999/miniz) - MIT license
 - [PicoSHA2](https://github.com/okdshin/PicoSHA2) - MIT license
 - [pybind11](https://github.com/pybind/pybind11) - BSD-like license
 - [raylib](https://www.raylib.com) - zlib license
+- [retroarch](https://github.com/libretro/RetroArch) - GPLv3 license
 - [SDL3](https://www.libsdl.org) - zlib license
 
 ## License
