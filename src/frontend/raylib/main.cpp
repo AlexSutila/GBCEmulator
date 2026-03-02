@@ -23,6 +23,16 @@ EMSCRIPTEN_KEEPALIVE void emscripten_flush_save() {
   if (g_frontend)
     g_frontend->flush_web_save_now();
 }
+
+EMSCRIPTEN_KEEPALIVE void emscripten_request_quicksave() {
+  if (g_frontend)
+    g_frontend->request_quicksave();
+}
+
+EMSCRIPTEN_KEEPALIVE void emscripten_request_quickload() {
+  if (g_frontend)
+    g_frontend->request_quickload();
+}
 }
 
 int main() { return 0; }

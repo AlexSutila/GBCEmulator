@@ -54,7 +54,7 @@ if(BUILD_SIMPLE)
             -sBINARYEN_ASYNC_COMPILATION=0
             -sMIN_WEBGL_VERSION=2
             -sMAX_WEBGL_VERSION=2
-            -sEXPORTED_FUNCTIONS=_emscripten_start,_malloc,_free
+            -sEXPORTED_FUNCTIONS=_emscripten_start,_emscripten_flush_save,_emscripten_request_quicksave,_emscripten_request_quickload,_emscripten_set_button,_emscripten_clear_buttons,_emscripten_set_master_volume,_malloc,_free
             -sEXPORTED_RUNTIME_METHODS=HEAPF32
             -sSTACK_OVERFLOW_CHECK=0
             -sFORCE_FILESYSTEM=1

@@ -3,10 +3,16 @@
 #include "memory/mmio/dmg.hpp"
 #include "memory/mmio/mmio.hpp"
 #include <algorithm>
-#include <cstdint>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
+#include <iomanip>
+#include <optional>
 #include <raylib.h>
+#include <sstream>
 #include <stdexcept>
+#include <string>
+#include <vector>
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
@@ -41,6 +47,43 @@ EM_JS(int, web_save_active_save, (const std::uint8_t * data_ptr, int len), {
     return api.saveActiveSram(bytes) ? 1 : 0;
   } catch (err) {
     console.warn("Failed to persist SRAM to localStorage:", err);
+    return -1;
+  }
+});
+
+EM_JS(int, web_load_active_state, (std::uint8_t * out_ptr, int out_cap), {
+  try {
+    const api = globalThis.IroGBSaves;
+    if (!api || typeof api.loadActiveState !== "function") return 0;
+
+    const bytes = api.loadActiveState();
+    if (!(bytes instanceof Uint8Array) || bytes.length === 0) return 0;
+
+    if (!out_ptr || out_cap <= 0) {
+      return bytes.length | 0;
+    }
+
+    const n = Math.min(bytes.length, out_cap | 0) | 0;
+    HEAPU8.set(bytes.subarray(0, n), out_ptr >>> 0);
+    return n;
+  } catch (err) {
+    console.warn("Failed to restore savestate from localStorage:", err);
+    return -1;
+  }
+});
+
+EM_JS(int, web_save_active_state, (const std::uint8_t * data_ptr, int len), {
+  try {
+    if (!data_ptr || len <= 0) return 0;
+    const api = globalThis.IroGBSaves;
+    if (!api || typeof api.saveActiveState !== "function") return 0;
+
+    const start = data_ptr >>> 0;
+    const end = (start + (len | 0)) >>> 0;
+    const bytes = new Uint8Array(HEAPU8.subarray(start, end));
+    return api.saveActiveState(bytes) ? 1 : 0;
+  } catch (err) {
+    console.warn("Failed to persist savestate to localStorage:", err);
     return -1;
   }
 });
@@ -101,12 +144,97 @@ static void frame_cb(void *user) {
 }
 #endif // __EMSCRIPTEN__
 
+namespace {
+std::string sanitize_label(std::string s, const std::size_t max_len = 32) {
+  for (char &c : s) {
+    const bool keep = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+                      (c >= '0' && c <= '9') || c == '-' || c == '_';
+    c = keep ? c : '_';
+  }
+
+  while (!s.empty() && s.front() == '_')
+    s.erase(s.begin());
+  while (!s.empty() && s.back() == '_')
+    s.pop_back();
+
+  if (s.size() > max_len)
+    s.resize(max_len);
+
+  if (s.empty())
+    s = "cartridge";
+  return s;
+}
+
+std::optional<std::vector<byte_t>>
+read_blob_file(const std::filesystem::path &path) {
+  std::ifstream f(path, std::ios::binary | std::ios::ate);
+  if (!f)
+    return std::nullopt;
+
+  const auto size = f.tellg();
+  if (size <= 0)
+    return std::nullopt;
+
+  std::vector<byte_t> out(static_cast<std::size_t>(size));
+  f.seekg(0, std::ios::beg);
+  if (!f.read(reinterpret_cast<char *>(out.data()), size))
+    return std::nullopt;
+  return out;
+}
+
+bool write_blob_file(const std::filesystem::path &path,
+                     const std::vector<byte_t> &data) {
+  if (path.empty() || data.empty())
+    return false;
+
+  if (const auto parent = path.parent_path(); !parent.empty()) {
+    std::error_code ec;
+    std::filesystem::create_directories(parent, ec);
+  }
+
+  std::ofstream f(path, std::ios::binary | std::ios::trunc);
+  if (!f)
+    return false;
+
+  f.write(reinterpret_cast<const char *>(data.data()),
+          static_cast<std::streamsize>(data.size()));
+  return static_cast<bool>(f);
+}
+} // namespace
+
 static std::uint32_t format_color(const std::uint32_t c) {
   return ((c & 0x00FF0000) >> 16) | ((c & 0x0000FF00)) |
          ((c & 0x000000FF) << 16) | 0xFF000000;
 }
 
-RaylibFrontend::RaylibFrontend(const cart &c) { gbc->insert_cartridge(c); }
+std::filesystem::path RaylibFrontend::build_desktop_savestate_path(
+    const cart &c) {
+  std::string stem = c.file_path.stem().string();
+  if (stem.empty())
+    stem = c.header.title();
+  stem = sanitize_label(std::move(stem));
+
+  std::ostringstream checksum_stream;
+  checksum_stream << std::hex << std::setfill('0') << std::setw(4)
+                  << static_cast<unsigned>(c.header.global_checksum);
+  const std::string checksum = checksum_stream.str();
+
+  std::filesystem::path root = "./savestates";
+  std::error_code ec;
+  if (root.is_relative()) {
+    if (const auto cwd = std::filesystem::current_path(ec); !ec)
+      root = cwd / root;
+  }
+
+  return (root / (stem + " - " + checksum + ".state")).lexically_normal();
+}
+
+RaylibFrontend::RaylibFrontend(const cart &c) {
+  gbc->insert_cartridge(c);
+#ifndef __EMSCRIPTEN__
+  quick_savestate_path_ = build_desktop_savestate_path(c);
+#endif
+}
 
 RaylibFrontend::~RaylibFrontend() {
 #ifdef __EMSCRIPTEN__
@@ -189,7 +317,7 @@ void RaylibFrontend::read_keyboard_inputs(std::uint8_t &input_state) const {
     input_state |= (std::uint8_t)Joypad::JoypadButton::START;
 }
 
-void RaylibFrontend::read_inputs() const {
+void RaylibFrontend::read_inputs() {
   std::uint8_t input_state{};
 
 #ifdef __EMSCRIPTEN__
@@ -198,6 +326,10 @@ void RaylibFrontend::read_inputs() const {
 #else
   read_keyboard_inputs(input_state);
 #endif
+  if (IsKeyPressed(KEY_F4))
+    request_quicksave();
+  if (IsKeyPressed(KEY_F8))
+    request_quickload();
 
   // Handle controller input, we casually let it overwrite keyboard for
   // the sake of simplicity and the fact that you cant really use both
@@ -213,10 +345,125 @@ void RaylibFrontend::read_inputs() const {
   joyp->set_state(input_state);
 }
 
-void RaylibFrontend::step_frame() const {
-  constexpr std::size_t cycles_per_frame = 70224;
-  for (std::size_t i{0}; i < cycles_per_frame; i++)
+void RaylibFrontend::request_quicksave() { quicksave_requested = true; }
+
+void RaylibFrontend::request_quickload() { quickload_requested = true; }
+
+bool RaylibFrontend::has_pending_savestate_request() const {
+  return quicksave_requested || quickload_requested;
+}
+
+void RaylibFrontend::process_quicksave_request() {
+  try {
+    const auto blob = gbc->serialize_savestate();
+    if (blob.empty()) {
+      TraceLog(LOG_WARNING, "Savestate save failed: empty blob");
+      return;
+    }
+
+#ifdef __EMSCRIPTEN__
+    const int rc =
+        web_save_active_state(blob.data(), static_cast<int>(blob.size()));
+    if (rc > 0) {
+      TraceLog(LOG_INFO, "Savestate quicksave created (web localStorage)");
+    } else {
+      TraceLog(LOG_WARNING,
+               "Savestate save failed: localStorage backend unavailable");
+    }
+#else
+    if (quick_savestate_path_.empty()) {
+      TraceLog(LOG_WARNING, "Savestate save failed: no destination path");
+      return;
+    }
+
+    if (write_blob_file(quick_savestate_path_, blob)) {
+      TraceLog(LOG_INFO, "Savestate quicksave created: %s",
+               quick_savestate_path_.string().c_str());
+    } else {
+      TraceLog(LOG_WARNING, "Savestate save failed: %s",
+               quick_savestate_path_.string().c_str());
+    }
+#endif
+  } catch (const std::exception &e) {
+    TraceLog(LOG_WARNING, "Savestate save failed: %s", e.what());
+  }
+}
+
+void RaylibFrontend::process_quickload_request() {
+  try {
+    std::vector<byte_t> blob{};
+
+#ifdef __EMSCRIPTEN__
+    const int size = web_load_active_state(nullptr, 0);
+    if (size <= 0) {
+      TraceLog(LOG_INFO, "Savestate quickload skipped: no state available");
+      return;
+    }
+
+    blob.resize(static_cast<std::size_t>(size));
+    const int copied =
+        web_load_active_state(blob.data(), static_cast<int>(blob.size()));
+    if (copied <= 0 || copied > size) {
+      TraceLog(LOG_WARNING, "Savestate quickload failed: invalid payload");
+      return;
+    }
+    blob.resize(static_cast<std::size_t>(copied));
+#else
+    if (quick_savestate_path_.empty()) {
+      TraceLog(LOG_WARNING, "Savestate quickload failed: no source path");
+      return;
+    }
+
+    const auto file_blob = read_blob_file(quick_savestate_path_);
+    if (!file_blob.has_value()) {
+      TraceLog(LOG_INFO, "Savestate quickload skipped: %s not found",
+               quick_savestate_path_.string().c_str());
+      return;
+    }
+    blob = std::move(*file_blob);
+#endif
+
+    gbc->deserialize_savestate(blob);
+    rb_head = 0;
+    rb_tail = 0;
+    rb_size = 0;
+    audio_prime = 2;
+    TraceLog(LOG_INFO, "Savestate quickload complete");
+  } catch (const std::exception &e) {
+    TraceLog(LOG_WARNING, "Savestate quickload failed: %s", e.what());
+  }
+}
+
+void RaylibFrontend::process_pending_savestate_request() {
+  if (quicksave_requested) {
+    quicksave_requested = false;
+    process_quicksave_request();
+  } else if (quickload_requested) {
+    quickload_requested = false;
+    process_quickload_request();
+  }
+}
+
+void RaylibFrontend::advance_cycles_with_preemption(std::size_t cycles) {
+  if (has_pending_savestate_request() && gbc->savestate_ready()) {
+    process_pending_savestate_request();
+    return;
+  }
+
+  while (cycles > 0) {
     gbc->step();
+    --cycles;
+
+    if (has_pending_savestate_request() && gbc->savestate_ready()) {
+      process_pending_savestate_request();
+      return;
+    }
+  }
+}
+
+void RaylibFrontend::step_frame() {
+  constexpr std::size_t cycles_per_frame = 70224;
+  advance_cycles_with_preemption(cycles_per_frame);
 }
 
 void RaylibFrontend::present() {
@@ -324,12 +571,13 @@ void RaylibFrontend::tick_common(double dt_ms) {
   cycle_accum -= static_cast<double>(cycles_to_run);
 
   read_inputs();
+  if (has_pending_savestate_request() && gbc->savestate_ready())
+    process_pending_savestate_request();
 
   while (cycles_to_run) {
     const std::size_t block =
         std::min<std::size_t>(cycles_to_run, cycles_per_frame);
-    for (std::size_t i = 0; i < block; i++)
-      gbc->step();
+    advance_cycles_with_preemption(block);
     cycles_to_run -= block;
     pump_audio();
   }

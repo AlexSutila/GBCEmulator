@@ -74,6 +74,7 @@ const ACTIONS = [
 const KEYMAP_KEY = "gbc_keymap_v1";
 const VOLUME_KEY = "gbc_volume_v1";
 const SRAM_KEY_PREFIX = "gbc_save_v1:";
+const STATE_KEY_PREFIX = "gbc_state_v1:";
 const saveRuntimeState = {
   activeRomId: "",
   activeRomName: "",
@@ -134,6 +135,11 @@ function getActiveSramStorageKey() {
   return `${SRAM_KEY_PREFIX}${saveRuntimeState.activeRomId}`;
 }
 
+function getActiveStateStorageKey() {
+  if (!saveRuntimeState.activeRomId) return "";
+  return `${STATE_KEY_PREFIX}${saveRuntimeState.activeRomId}`;
+}
+
 function setActiveRomSaveIdentity(romId, romName) {
   saveRuntimeState.activeRomId = String(romId || "");
   saveRuntimeState.activeRomName = String(romName || "");
@@ -143,6 +149,9 @@ globalThis.IroGBSaves = {
   setActiveRomSaveIdentity,
   getActiveSramKey() {
     return getActiveSramStorageKey();
+  },
+  getActiveStateKey() {
+    return getActiveStateStorageKey();
   },
   loadActiveSram() {
     try {
@@ -189,6 +198,53 @@ globalThis.IroGBSaves = {
       return true;
     } catch (err) {
       console.warn("Failed to write SRAM to localStorage:", err);
+      return false;
+    }
+  },
+  loadActiveState() {
+    try {
+      const key = getActiveStateStorageKey();
+      if (!key) return null;
+
+      const raw = localStorage.getItem(key);
+      if (!raw) return null;
+
+      let payload = null;
+      try {
+        payload = JSON.parse(raw);
+      } catch {
+      }
+
+      if (payload && typeof payload.b64 === "string") {
+        return base64ToBytes(payload.b64);
+      }
+      if (typeof raw === "string" && raw) {
+        return base64ToBytes(raw);
+      }
+      return null;
+    } catch (err) {
+      console.warn("Failed to read savestate from localStorage:", err);
+      return null;
+    }
+  },
+  saveActiveState(bytes) {
+    try {
+      if (!(bytes instanceof Uint8Array)) return false;
+      const key = getActiveStateStorageKey();
+      if (!key) return false;
+
+      const payload = {
+        v: 1,
+        romId: saveRuntimeState.activeRomId,
+        romName: saveRuntimeState.activeRomName,
+        len: bytes.length,
+        updatedAt: Date.now(),
+        b64: bytesToBase64(bytes),
+      };
+      localStorage.setItem(key, JSON.stringify(payload));
+      return true;
+    } catch (err) {
+      console.warn("Failed to write savestate to localStorage:", err);
       return false;
     }
   },
@@ -263,7 +319,8 @@ function updateHintFromKeymap(keymap) {
   const get = (id) => `<code>${prettyKey(keymap[id])}</code>`;
   hint.innerHTML =
     `Keyboard: ${get(2)} ${get(3)} ${get(1)} ${get(0)} ` +
-    `${get(4)}=A ${get(5)}=B ${get(7)}=Start ${get(6)}=Select`;
+    `${get(4)}=A ${get(5)}=B ${get(7)}=Start ${get(6)}=Select ` +
+    `<code>F5</code>=Quicksave <code>F8</code>=Quickload`;
 }
 
 function bindKeyboard(Module, getKeymap, opts) {
@@ -361,6 +418,34 @@ function bindTouchButtons(Module) {
   });
 
   return {clearAll};
+}
+
+function bindSavestateHotkeys(Module, opts) {
+  const callIfAvailable = (name) => {
+    try {
+      if (typeof Module[name] === "function") Module[name]();
+    } catch (err) {
+      console.warn(`Failed to call ${name}:`, err);
+    }
+  };
+
+  window.addEventListener(
+    "keydown",
+    (e) => {
+      if (opts?.isCapturing?.()) return;
+      if (isTextyTarget(e.target)) return;
+      if (e.repeat) return;
+
+      if (e.code === "F5") {
+        e.preventDefault();
+        callIfAvailable("_emscripten_request_quicksave");
+      } else if (e.code === "F8") {
+        e.preventDefault();
+        callIfAvailable("_emscripten_request_quickload");
+      }
+    },
+    {passive: false}
+  );
 }
 
 function setupFullscreen(canvas) {
@@ -651,6 +736,7 @@ var Module = {
     const isCapturing = () => capturing != null;
 
     const kb = bindKeyboard(Module, () => keymap, { isCapturing });
+    bindSavestateHotkeys(Module, { isCapturing });
     updateHintFromKeymap(keymap);
 
     const applyVolume = (v01) => {
