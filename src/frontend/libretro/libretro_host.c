@@ -26,14 +26,18 @@ void retro_get_system_info(struct retro_system_info *info) {
 }
 
 void retro_get_system_av_info(struct retro_system_av_info *info) {
-  info->timing.fps = 60.0;
-  info->timing.sample_rate = 48000.0;
-
-  info->geometry.base_height = 144;
-  info->geometry.base_width = 160;
-  info->geometry.max_height = 144;
-  info->geometry.max_width = 160;
-  info->geometry.aspect_ratio = 160.0f / 144.0f;
+  memset(info, 0, sizeof(*info));
+  info->timing = (struct retro_system_timing){
+      .fps = 60.0,
+      .sample_rate = 48000.0,
+  };
+  info->geometry = (struct retro_game_geometry){
+      .base_width = 160,
+      .base_height = 144,
+      .max_width = 160,
+      .max_height = 144,
+      .aspect_ratio = 160.0f / 144.0f,
+  };
 }
 
 void retro_set_environment(retro_environment_t cb) {
@@ -72,6 +76,7 @@ bool retro_load_game(const struct retro_game_info *info) {
 
 void retro_unload_game(void) {}
 
+/* Does not matter, GBC does not rely on such television standards */
 unsigned retro_get_region(void) { return RETRO_REGION_NTSC; }
 
 bool retro_load_game_special(unsigned type, const struct retro_game_info *info,
