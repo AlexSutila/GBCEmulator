@@ -1,4 +1,6 @@
 #include "frontend/libretro/frontend.hpp"
+#include "gbc.hpp"
+#include <memory>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -87,7 +89,7 @@ void retro_set_video_refresh(retro_video_refresh_t cb) {
   callbacks.video_cb = cb;
 }
 
-void retro_reset(void) {}
+void retro_reset(void) { LibretroFrontend::get_instance().reset(); }
 
 void retro_run(void) {
   constexpr std::size_t cycles_per_frame = 70224;

@@ -1,6 +1,7 @@
 #include "frontend/libretro/frontend.hpp"
 
 // Emulator core includes
+#include "cart/cart.hpp"
 #include "gbc.hpp"
 #include "libretro.h"
 #include "memory/mmio/dmg.hpp"
@@ -11,6 +12,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <stdexcept>
 #include <vector>
 
 /* ======================================================================
@@ -97,6 +99,30 @@ Joypad::JOYP *LibretroFrontend::get_joyp() const {
 
   auto joyp = bus->get_mmio(IORegisterMapping::MMIO_JOYPAD);
   return static_cast<Joypad::JOYP *>(joyp);
+}
+
+cart LibretroFrontend::get_image() const {
+  if (!gbc)
+    throw std::runtime_error(
+        "LibretroFrontend::get_image(): GameBoy core is null");
+
+  auto *bus = gbc->get_bus();
+  if (!bus)
+    throw std::runtime_error(
+        "LibretroFrontend::get_image(): AddressBus is null");
+
+  auto *cartridge = bus->get_cartridge();
+  if (!cartridge)
+    throw std::runtime_error(
+        "LibretroFrontend::get_image(): Cartridge is null");
+
+  return cartridge->image();
+}
+
+void LibretroFrontend::reset() {
+  const cart image = get_image(); // Intentionally copied
+  gbc = std::make_unique<GameBoyColor>(*this);
+  gbc->insert_cartridge(image);
 }
 
 void LibretroFrontend::start() { /* unused */ }
