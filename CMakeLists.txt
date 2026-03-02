@@ -148,6 +148,12 @@ if(NOT EMSCRIPTEN)
             )
         endif() # BUILD_SIMPLE
 
+        if(BUILD_LIBRETRO)
+            set_property(TARGET gbc_libretro
+                PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE
+            )
+        endif() # BUILD_SIMPLE
+
         if(BUILD_PYTHON)
             set_property(TARGET gbc_py
                 PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE

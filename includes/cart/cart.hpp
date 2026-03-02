@@ -6,7 +6,6 @@
 #include "mbc_creator.hpp"
 
 #include <array>
-#include <atomic>
 #include <filesystem>
 #include <memory>
 #include <span>
