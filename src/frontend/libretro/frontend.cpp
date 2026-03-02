@@ -65,7 +65,9 @@ void LibretroFrontend::try_show_frame() {
     return;
   frame_ready = false;
 
-  const auto frame = get_frame();
+  /* Note: Do not use `get_frame()`, we need to point to the framebuffer itself
+   * and NOT a copy otherwise we risk displaying use after free heap memory. */
+  const auto &frame = frame_buf.at(display_idx);
   cb.video_cb(frame.data(), fb_width, fb_height,
               fb_width * sizeof(std::uint32_t));
 }

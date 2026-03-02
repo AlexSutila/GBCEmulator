@@ -56,15 +56,10 @@ void retro_set_environment(retro_environment_t cb) {
   static const retro_controller_description port1[] = {
       {"Game Boy Joypad", RETRO_DEVICE_JOYPAD}, {nullptr, 0}};
   static const retro_controller_info ports[] = {{port1, 1}, {nullptr, 0}};
-  if (!callbacks.environ_cb(RETRO_ENVIRONMENT_SET_CONTROLLER_INFO,
-                            (void *)ports)) {
-    fprintf(stderr, "Failed to configure controller\n");
-  }
+  callbacks.environ_cb(RETRO_ENVIRONMENT_SET_CONTROLLER_INFO, (void *)ports);
 
   enum retro_pixel_format fmt = RETRO_PIXEL_FORMAT_XRGB8888;
-  if (!callbacks.environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &fmt)) {
-    fprintf(stderr, "Failed to set pixel format\n");
-  }
+  callbacks.environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &fmt);
 }
 
 void retro_set_audio_sample(retro_audio_sample_t cb) {
