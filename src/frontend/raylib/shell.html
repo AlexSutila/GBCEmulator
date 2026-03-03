@@ -22,6 +22,7 @@
 
     <div class="actions">
       <button class="btn primary" id="loadButton" type="button">Load ROM</button>
+      <button class="btn disabled" id="statesButton" type="button" disabled>Save States</button>
       <button class="btn" id="settingsButton" type="button">Settings</button>
       <button class="btn" id="fsButton" type="button">Fullscreen</button>
     </div>
@@ -124,6 +125,39 @@
   </div>
 </dialog>
 
+<dialog class="dlg" id="savestateDialog">
+  <form class="dlg-form savestate-form" id="savestateForm" method="dialog">
+    <div class="dlg-title">Save States</div>
+    <div class="dlg-sub" id="savestateSub">Load a ROM to manage save states</div>
+
+    <div class="savestate-create-row">
+      <input autocomplete="off" class="dlg-url" id="savestateLabelInput"
+             maxlength="48" placeholder="Manual label (optional)" spellcheck="false" type="text"/>
+      <button class="btn primary" id="savestateCreateBtn" type="button">Save</button>
+    </div>
+
+    <div class="savestate-layout">
+      <div aria-label="Savestate list" class="savestate-list" id="savestateList"></div>
+
+      <div class="savestate-detail" id="savestateDetail">
+        <div class="savestate-preview-wrap">
+          <img alt="Savestate screenshot preview" class="savestate-preview" id="savestatePreview"/>
+        </div>
+
+        <div class="savestate-actions">
+          <button class="btn primary" id="savestateLoadBtn" type="button">Load</button>
+          <button class="btn" id="savestateDeleteBtn" type="button">Delete</button>
+        </div>
+
+        <div class="savestate-meta" id="savestateMeta">No save state selected</div>
+      </div>
+    </div>
+    <menu class="dlg-actions">
+      <button class="btn" value="cancel">Close</button>
+    </menu>
+  </form>
+</dialog>
+
 <dialog class="dlg" id="settingsDialog">
   <form class="dlg-form" id="settingsDialogForm" method="dialog">
     <div class="dlg-title">Settings</div>
@@ -146,6 +180,17 @@
 
       <div aria-label="Keybind list" class="keybind-list" id="keybindList"></div>
       <div class="dlg-help">Click a binding, then press a key. Press <code>Escape</code> to cancel.</div>
+    </div>
+
+    <div class="dlg-section">
+      <div class="dlg-label" style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+        <span>Savestate</span>
+        <button class="btn" id="stateHotkeyReset"
+                style="padding:8px 10px; border-radius:10px; font-size:.86rem;"
+                type="button">Reset</button>
+      </div>
+
+      <div aria-label="Savestate hotkey list" class="keybind-list" id="stateHotkeyList"></div>
     </div>
 
     <menu class="dlg-actions">

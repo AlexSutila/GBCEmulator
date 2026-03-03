@@ -5,6 +5,7 @@
 #include <array>
 #include <filesystem>
 #include <raylib.h>
+#include <vector>
 
 struct cart;
 
@@ -47,8 +48,12 @@ private:
   void process_pending_savestate_request();
   void process_quicksave_request();
   void process_quickload_request();
+  [[nodiscard]] std::vector<std::uint8_t> capture_savestate_thumbnail_rgba() const;
   [[nodiscard]] static std::filesystem::path
   build_desktop_savestate_path(const cart &c);
+
+  static constexpr int savestate_thumb_w = 80;
+  static constexpr int savestate_thumb_h = 72;
 
   // We double buffer here, even though this is single threaded
   static constexpr auto nbuf = 2;

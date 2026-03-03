@@ -71,13 +71,25 @@ const ACTIONS = [
   {id: 7, name: "Start", def: "Enter"},
 ];
 
+const STATE_HOTKEY_ACTIONS = [
+  {id: "quicksave", name: "Quick Save", def: "F4"},
+  {id: "quickload", name: "Quick Load", def: "F8"},
+];
+
 const KEYMAP_KEY = "gbc_keymap_v1";
+const STATE_HOTKEYS_KEY = "gbc_state_hotkeys_v1";
 const VOLUME_KEY = "gbc_volume_v1";
 const SRAM_KEY_PREFIX = "gbc_save_v1:";
-const STATE_KEY_PREFIX = "gbc_state_v1:";
+const STATE_INDEX_KEY_PREFIX = "gbc_state_index_v1:";
+const STATE_ENTRY_KEY_PREFIX = "gbc_state_entry_v1:";
+const STATE_MAX_ENTRIES = 32;
+const STATE_MAX_QUICK_ENTRIES = 10;
 const saveRuntimeState = {
   activeRomId: "",
   activeRomName: "",
+  pendingSaveRequest: null,
+  pendingLoadStateId: "",
+  pendingStateThumb: "",
 };
 
 function bytesToHex(bytes) {
@@ -135,14 +147,205 @@ function getActiveSramStorageKey() {
   return `${SRAM_KEY_PREFIX}${saveRuntimeState.activeRomId}`;
 }
 
-function getActiveStateStorageKey() {
+function getStateIndexStorageKey() {
   if (!saveRuntimeState.activeRomId) return "";
-  return `${STATE_KEY_PREFIX}${saveRuntimeState.activeRomId}`;
+  return `${STATE_INDEX_KEY_PREFIX}${saveRuntimeState.activeRomId}`;
+}
+
+function getStateEntryStorageKey(id) {
+  if (!saveRuntimeState.activeRomId) return "";
+  return `${STATE_ENTRY_KEY_PREFIX}${saveRuntimeState.activeRomId}:${String(id || "")}`;
+}
+
+function parseJson(raw) {
+  if (!raw || typeof raw !== "string") return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function normalizeStateKind(kind) {
+  return kind === "manual" ? "manual" : "quick";
+}
+
+function sanitizeStateLabel(label, maxLen = 48) {
+  const text = String(label || "").trim().replace(/\s+/g, " ");
+  if (!text) return "";
+  return text.slice(0, maxLen);
+}
+
+function makeStateId() {
+  const t = Date.now().toString(36);
+  const r = Math.random().toString(36).slice(2, 8);
+  return `${t}${r}`;
+}
+
+function normalizeStateMeta(entry) {
+  if (!entry || typeof entry !== "object") return null;
+  const id = String(entry.id || "");
+  if (!id) return null;
+  const kind = normalizeStateKind(entry.kind);
+  const createdAt = Number(entry.createdAt);
+  const len = Number(entry.len);
+  return {
+    id,
+    kind,
+    label: sanitizeStateLabel(entry.label),
+    createdAt: Number.isFinite(createdAt) ? createdAt : Date.now(),
+    len: Number.isFinite(len) && len > 0 ? len : 0,
+    thumb: typeof entry.thumb === "string" ? entry.thumb : "",
+  };
+}
+
+function stateDisplayLabel(entry) {
+  if (entry?.label) return entry.label;
+  return entry?.kind === "manual" ? "Manual Save" : "Quick Save";
+}
+
+function listStateEntriesFromIndex(index) {
+  const arr = Array.isArray(index?.entries) ? index.entries : [];
+  const out = [];
+  for (const raw of arr) {
+    const meta = normalizeStateMeta(raw);
+    if (meta) out.push(meta);
+  }
+  out.sort((a, b) => b.createdAt - a.createdAt);
+  return out;
+}
+
+function readStateIndex() {
+  const key = getStateIndexStorageKey();
+  if (!key) return {v: 2, entries: []};
+  const obj = parseJson(localStorage.getItem(key));
+  if (!obj || typeof obj !== "object") return {v: 2, entries: []};
+  return {v: 2, entries: listStateEntriesFromIndex(obj)};
+}
+
+function writeStateIndex(index) {
+  const key = getStateIndexStorageKey();
+  if (!key) return false;
+  try {
+    const payload = {
+      v: 2,
+      entries: listStateEntriesFromIndex(index),
+    };
+    localStorage.setItem(key, JSON.stringify(payload));
+    return true;
+  } catch (err) {
+    console.warn("Failed to write savestate index:", err);
+    return false;
+  }
+}
+
+function readStatePayloadById(id) {
+  const key = getStateEntryStorageKey(id);
+  if (!key) return null;
+  const obj = parseJson(localStorage.getItem(key));
+  if (!obj || typeof obj !== "object" || typeof obj.b64 !== "string" || !obj.b64) {
+    return null;
+  }
+  try {
+    return base64ToBytes(obj.b64);
+  } catch {
+    return null;
+  }
+}
+
+function writeStatePayloadById(id, bytes) {
+  const key = getStateEntryStorageKey(id);
+  if (!key || !(bytes instanceof Uint8Array) || bytes.length === 0) return false;
+  try {
+    localStorage.setItem(key, JSON.stringify({
+      v: 2,
+      len: bytes.length,
+      b64: bytesToBase64(bytes),
+    }));
+    return true;
+  } catch (err) {
+    console.warn("Failed to write savestate payload:", err);
+    try {
+      localStorage.removeItem(key);
+    } catch {
+    }
+    return false;
+  }
+}
+
+function deleteStatePayloadById(id) {
+  const key = getStateEntryStorageKey(id);
+  if (!key) return;
+  try {
+    localStorage.removeItem(key);
+  } catch {
+  }
+}
+
+function pruneStateIndex(index) {
+  const out = [];
+  let quickCount = 0;
+  for (const entry of listStateEntriesFromIndex(index)) {
+    const isQuick = entry.kind === "quick";
+    if (isQuick && quickCount >= STATE_MAX_QUICK_ENTRIES) {
+      deleteStatePayloadById(entry.id);
+      continue;
+    }
+    if (out.length >= STATE_MAX_ENTRIES) {
+      deleteStatePayloadById(entry.id);
+      continue;
+    }
+    if (isQuick) quickCount += 1;
+    out.push(entry);
+  }
+  return {v: 2, entries: out};
+}
+
+function captureStateThumbnailDataUrl() {
+  const src = globalThis.Module?.canvas;
+  if (!src) return "";
+  try {
+    const w = 80;
+    const h = 72;
+    if (typeof src.toDataURL === "function") {
+      const c = document.createElement("canvas");
+      c.width = w;
+      c.height = h;
+      const ctx = c.getContext("2d");
+      if (!ctx) return "";
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(src, 0, 0, w, h);
+      return c.toDataURL("image/webp", 0.72);
+    }
+  } catch {
+    return "";
+  }
+  return "";
+}
+
+function rgbaThumbToDataUrl(bytes, w, h) {
+  if (!(bytes instanceof Uint8Array) || bytes.length !== w * h * 4) return "";
+  try {
+    const c = document.createElement("canvas");
+    c.width = w;
+    c.height = h;
+    const ctx = c.getContext("2d");
+    if (!ctx) return "";
+    const image = ctx.createImageData(w, h);
+    image.data.set(bytes);
+    ctx.putImageData(image, 0, 0);
+    return c.toDataURL("image/webp", 0.72);
+  } catch {
+    return "";
+  }
 }
 
 function setActiveRomSaveIdentity(romId, romName) {
   saveRuntimeState.activeRomId = String(romId || "");
   saveRuntimeState.activeRomName = String(romName || "");
+  saveRuntimeState.pendingSaveRequest = null;
+  saveRuntimeState.pendingLoadStateId = "";
+  saveRuntimeState.pendingStateThumb = "";
 }
 
 globalThis.IroGBSaves = {
@@ -150,8 +353,39 @@ globalThis.IroGBSaves = {
   getActiveSramKey() {
     return getActiveSramStorageKey();
   },
-  getActiveStateKey() {
-    return getActiveStateStorageKey();
+  getActiveStateIndexKey() {
+    return getStateIndexStorageKey();
+  },
+  setPendingStateSaveRequest(kind, label = "") {
+    saveRuntimeState.pendingSaveRequest = {
+      kind: normalizeStateKind(kind),
+      label: sanitizeStateLabel(label),
+    };
+  },
+  setPendingStateThumbnailRgba(bytes, width, height) {
+    const w = Number(width);
+    const h = Number(height);
+    if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) {
+      return false;
+    }
+    saveRuntimeState.pendingStateThumb = rgbaThumbToDataUrl(bytes, w | 0, h | 0);
+    return saveRuntimeState.pendingStateThumb.length > 0;
+  },
+  requestLoadStateById(id) {
+    saveRuntimeState.pendingLoadStateId = String(id || "");
+  },
+  listActiveStates() {
+    return listStateEntriesFromIndex(readStateIndex());
+  },
+  deleteStateById(id) {
+    const key = String(id || "");
+    if (!key) return false;
+    const index = readStateIndex();
+    const before = listStateEntriesFromIndex(index);
+    const after = before.filter((e) => e.id !== key);
+    if (after.length === before.length) return false;
+    deleteStatePayloadById(key);
+    return writeStateIndex({v: 2, entries: after});
   },
   loadActiveSram() {
     try {
@@ -202,57 +436,71 @@ globalThis.IroGBSaves = {
     }
   },
   loadActiveState() {
-    try {
-      const key = getActiveStateStorageKey();
-      if (!key) return null;
+    const list = listStateEntriesFromIndex(readStateIndex());
+    const requestedId = saveRuntimeState.pendingLoadStateId;
+    saveRuntimeState.pendingLoadStateId = "";
 
-      const raw = localStorage.getItem(key);
-      if (!raw) return null;
-
-      let payload = null;
-      try {
-        payload = JSON.parse(raw);
-      } catch {
+    if (requestedId) {
+      const payload = readStatePayloadById(requestedId);
+      if (payload instanceof Uint8Array && payload.length > 0) {
+        return payload;
       }
-
-      if (payload && typeof payload.b64 === "string") {
-        return base64ToBytes(payload.b64);
-      }
-      if (typeof raw === "string" && raw) {
-        return base64ToBytes(raw);
-      }
-      return null;
-    } catch (err) {
-      console.warn("Failed to read savestate from localStorage:", err);
-      return null;
     }
+
+    for (const entry of list) {
+      const payload = readStatePayloadById(entry.id);
+      if (payload instanceof Uint8Array && payload.length > 0) {
+        return payload;
+      }
+    }
+    return null;
   },
   saveActiveState(bytes) {
-    try {
-      if (!(bytes instanceof Uint8Array)) return false;
-      const key = getActiveStateStorageKey();
-      if (!key) return false;
+    if (!(bytes instanceof Uint8Array) || bytes.length === 0) return false;
+    if (!saveRuntimeState.activeRomId) return false;
 
-      const payload = {
-        v: 1,
-        romId: saveRuntimeState.activeRomId,
-        romName: saveRuntimeState.activeRomName,
-        len: bytes.length,
-        updatedAt: Date.now(),
-        b64: bytesToBase64(bytes),
-      };
-      localStorage.setItem(key, JSON.stringify(payload));
-      return true;
-    } catch (err) {
-      console.warn("Failed to write savestate to localStorage:", err);
+    const now = Date.now();
+    const req = saveRuntimeState.pendingSaveRequest || {kind: "quick", label: ""};
+    saveRuntimeState.pendingSaveRequest = null;
+
+    const kind = normalizeStateKind(req.kind);
+    const rawLabel = sanitizeStateLabel(req.label);
+    const label = rawLabel || (kind === "manual" ? "Manual Save" : "Quick Save");
+    const id = makeStateId();
+    const pendingThumb = saveRuntimeState.pendingStateThumb || captureStateThumbnailDataUrl();
+    saveRuntimeState.pendingStateThumb = "";
+
+    if (!writeStatePayloadById(id, bytes)) {
       return false;
     }
+
+    const index = readStateIndex();
+    index.entries.unshift({
+      id,
+      kind,
+      label,
+      createdAt: now,
+      len: bytes.length,
+      thumb: pendingThumb,
+    });
+    const pruned = pruneStateIndex(index);
+    if (!writeStateIndex(pruned)) {
+      deleteStatePayloadById(id);
+      return false;
+    }
+    return true;
   },
 };
 
 function defaultKeymap() {
   const m = {};
   for (const a of ACTIONS) m[a.id] = a.def;
+  return m;
+}
+
+function defaultStateHotkeys() {
+  const m = {};
+  for (const a of STATE_HOTKEY_ACTIONS) m[a.id] = a.def;
   return m;
 }
 
@@ -272,6 +520,24 @@ function loadKeymap() {
 
 function saveKeymap(map) {
   try { localStorage.setItem(KEYMAP_KEY, JSON.stringify(map)); } catch {}
+}
+
+function loadStateHotkeys() {
+  try {
+    const obj = JSON.parse(localStorage.getItem(STATE_HOTKEYS_KEY) || "{}");
+    const d = defaultStateHotkeys();
+    for (const a of STATE_HOTKEY_ACTIONS) {
+      const v = obj?.[String(a.id)] || obj?.[a.id];
+      d[a.id] = (typeof v === "string" && v) ? v : d[a.id];
+    }
+    return d;
+  } catch {
+    return defaultStateHotkeys();
+  }
+}
+
+function saveStateHotkeys(map) {
+  try { localStorage.setItem(STATE_HOTKEYS_KEY, JSON.stringify(map)); } catch {}
 }
 
 function loadVolume() {
@@ -313,14 +579,16 @@ function isTextyTarget(t) {
   return !!el.isContentEditable;
 }
 
-function updateHintFromKeymap(keymap) {
+function updateHintFromKeymap(keymap, stateHotkeys) {
   const hint = document.getElementById("hint");
   if (!hint) return;
   const get = (id) => `<code>${prettyKey(keymap[id])}</code>`;
+  const qsave = `<code>${prettyKey(stateHotkeys?.quicksave || "F4")}</code>`;
+  const qload = `<code>${prettyKey(stateHotkeys?.quickload || "F8")}</code>`;
   hint.innerHTML =
     `Keyboard: ${get(2)} ${get(3)} ${get(1)} ${get(0)} ` +
     `${get(4)}=A ${get(5)}=B ${get(7)}=Start ${get(6)}=Select ` +
-    `<code>F5</code>=Quicksave <code>F8</code>=Quickload`;
+    `${qsave}=Quicksave ${qload}=Quickload`;
 }
 
 function bindKeyboard(Module, getKeymap, opts) {
@@ -436,12 +704,24 @@ function bindSavestateHotkeys(Module, opts) {
       if (isTextyTarget(e.target)) return;
       if (e.repeat) return;
 
-      if (e.code === "F5") {
+      const hotkeys = opts?.getHotkeys?.() || defaultStateHotkeys();
+      const quicksaveKey = hotkeys.quicksave || "F4";
+      const quickloadKey = hotkeys.quickload || "F8";
+
+      if (e.code === quicksaveKey) {
         e.preventDefault();
-        callIfAvailable("_emscripten_request_quicksave");
-      } else if (e.code === "F8") {
+        if (typeof opts?.onQuickSave === "function") {
+          opts.onQuickSave();
+        } else {
+          callIfAvailable("_emscripten_request_quicksave");
+        }
+      } else if (e.code === quickloadKey) {
         e.preventDefault();
-        callIfAvailable("_emscripten_request_quickload");
+        if (typeof opts?.onQuickLoad === "function") {
+          opts.onQuickLoad();
+        } else {
+          callIfAvailable("_emscripten_request_quickload");
+        }
       }
     },
     {passive: false}
@@ -707,6 +987,16 @@ var Module = {
     const loadUrlGo = document.getElementById("loadUrlGo");
     const recentClear = document.getElementById("recentClear");
     const status = document.getElementById("status");
+    const statesButton = document.getElementById("statesButton");
+    const savestateDlg = document.getElementById("savestateDialog");
+    const savestateSub = document.getElementById("savestateSub");
+    const savestateList = document.getElementById("savestateList");
+    const savestateLabelInput = document.getElementById("savestateLabelInput");
+    const savestateCreateBtn = document.getElementById("savestateCreateBtn");
+    const savestateLoadBtn = document.getElementById("savestateLoadBtn");
+    const savestateDeleteBtn = document.getElementById("savestateDeleteBtn");
+    const savestatePreview = document.getElementById("savestatePreview");
+    const savestateMeta = document.getElementById("savestateMeta");
 
     const settingsButton = document.getElementById("settingsButton");
     const settingsDlg = document.getElementById("settingsDialog");
@@ -714,6 +1004,8 @@ var Module = {
     const volumeValue = document.getElementById("volumeValue");
     const keybindList = document.getElementById("keybindList");
     const keybindReset = document.getElementById("keybindReset");
+    const stateHotkeyList = document.getElementById("stateHotkeyList");
+    const stateHotkeyReset = document.getElementById("stateHotkeyReset");
     const flushSramNow = () => {
       try {
         if (typeof Module._emscripten_flush_save === "function") {
@@ -732,12 +1024,168 @@ var Module = {
     const touch = bindTouchButtons(Module);
 
     let keymap = loadKeymap();
-    let capturing = null;
+    let stateHotkeys = loadStateHotkeys();
+    let capturing = null; // {kind: "pad"|"state", id: number|string}
+    let romLoaded = false;
+    let selectedStateId = "";
     const isCapturing = () => capturing != null;
 
+    const formatStateTime = (ms) => {
+      if (!Number.isFinite(ms)) return "Unknown time";
+      try {
+        return new Date(ms).toLocaleString();
+      } catch {
+        return "Unknown time";
+      }
+    };
+
+    const scheduleSavestateRefresh = () => {
+      setTimeout(() => renderSavestateManager(), 140);
+      setTimeout(() => renderSavestateManager(), 380);
+    };
+
+    const requestQuicksave = (kind = "quick", label = "") => {
+      if (!romLoaded) {
+        status.textContent = "Load a ROM to save state";
+        return;
+      }
+      IroGBSaves.setPendingStateSaveRequest(kind, label);
+      if (typeof Module._emscripten_request_quicksave === "function") {
+        Module._emscripten_request_quicksave();
+        status.textContent = kind === "manual" ? "Saving manual state…" : "Saving quick state…";
+        scheduleSavestateRefresh();
+      }
+    };
+
+    const requestQuickload = (stateId = "") => {
+      if (!romLoaded) {
+        status.textContent = "Load a ROM to load state";
+        return;
+      }
+      if (stateId) IroGBSaves.requestLoadStateById(stateId);
+      if (typeof Module._emscripten_request_quickload === "function") {
+        Module._emscripten_request_quickload();
+        status.textContent = "Loading save state…";
+      }
+    };
+
+    const renderSavestateDetail = (entry) => {
+      if (!savestatePreview || !savestateMeta || !savestateLoadBtn || !savestateDeleteBtn) return;
+      if (!entry) {
+        savestatePreview.removeAttribute("src");
+        savestateMeta.textContent = "No save state selected.";
+        savestateLoadBtn.disabled = true;
+        savestateDeleteBtn.disabled = true;
+        return;
+      }
+
+      if (entry.thumb) {
+        savestatePreview.src = entry.thumb;
+      } else {
+        savestatePreview.removeAttribute("src");
+      }
+      const typeName = entry.kind === "manual" ? "Manual" : "Quick";
+      const info = [
+        `Label: ${stateDisplayLabel(entry)}`,
+        `Type: ${typeName}`,
+        `Time: ${formatStateTime(entry.createdAt)}`,
+        `Size: ${prettyBytes(entry.len)}`,
+      ];
+      savestateMeta.textContent = info.join("\n");
+      savestateLoadBtn.disabled = false;
+      savestateDeleteBtn.disabled = false;
+    };
+
+    function renderSavestateManager() {
+      if (!savestateList || !savestateSub) return;
+
+      if (!romLoaded) {
+        savestateSub.textContent = "Load a ROM to manage save states.";
+        savestateList.innerHTML = `<div class="savestate-empty">No ROM loaded.</div>`;
+        selectedStateId = "";
+        renderSavestateDetail(null);
+        if (savestateCreateBtn) savestateCreateBtn.disabled = true;
+        if (savestateLabelInput) savestateLabelInput.disabled = true;
+        return;
+      }
+
+      if (savestateCreateBtn) savestateCreateBtn.disabled = false;
+      if (savestateLabelInput) savestateLabelInput.disabled = false;
+
+      const states = IroGBSaves.listActiveStates();
+      savestateSub.textContent = `${states.length} save state${states.length === 1 ? "" : "s"} for ${saveRuntimeState.activeRomName || "ROM"}`;
+
+      if (!states.length) {
+        savestateList.innerHTML = `<div class="savestate-empty">No save states yet.</div>`;
+        selectedStateId = "";
+        renderSavestateDetail(null);
+        return;
+      }
+
+      if (!selectedStateId || !states.find((s) => s.id === selectedStateId)) {
+        selectedStateId = states[0].id;
+      }
+
+      savestateList.innerHTML = "";
+      for (const entry of states) {
+        const item = document.createElement("button");
+        item.type = "button";
+        item.className = "savestate-item" + (entry.id === selectedStateId ? " selected" : "");
+
+        const row = document.createElement("div");
+        row.className = "savestate-row";
+
+        const title = document.createElement("div");
+        title.className = "savestate-title";
+        title.textContent = stateDisplayLabel(entry);
+
+        const chip = document.createElement("span");
+        chip.className = "savestate-chip " + entry.kind;
+        chip.textContent = entry.kind === "manual" ? "Manual" : "Quick";
+
+        const line1 = document.createElement("div");
+        line1.className = "savestate-line";
+        line1.textContent = formatStateTime(entry.createdAt);
+
+        const line2 = document.createElement("div");
+        line2.className = "savestate-line";
+        line2.textContent = prettyBytes(entry.len);
+
+        row.appendChild(title);
+        row.appendChild(chip);
+        row.appendChild(line1);
+        row.appendChild(line2);
+
+        item.appendChild(row);
+
+        item.addEventListener("click", () => {
+          selectedStateId = entry.id;
+          renderSavestateManager();
+        });
+        item.addEventListener("dblclick", () => {
+          selectedStateId = entry.id;
+          requestQuickload(entry.id);
+        });
+
+        savestateList.appendChild(item);
+      }
+
+      const selected = states.find((s) => s.id === selectedStateId) || null;
+      renderSavestateDetail(selected);
+    }
+
     const kb = bindKeyboard(Module, () => keymap, { isCapturing });
-    bindSavestateHotkeys(Module, { isCapturing });
-    updateHintFromKeymap(keymap);
+    bindSavestateHotkeys(Module, {
+      isCapturing,
+      getHotkeys: () => stateHotkeys,
+      onQuickSave: () => requestQuicksave("quick"),
+      onQuickLoad: () => {
+        if (!romLoaded) return;
+        const states = IroGBSaves.listActiveStates();
+        if (states.length) requestQuickload(states[0].id);
+      },
+    });
+    updateHintFromKeymap(keymap, stateHotkeys);
 
     const applyVolume = (v01) => {
       const v = Math.min(1, Math.max(0, Number(v01)));
@@ -755,7 +1203,8 @@ var Module = {
       keybindList.innerHTML = "";
       for (const a of ACTIONS) {
         const row = document.createElement("div");
-        row.className = "keybind-item" + (capturing === a.id ? " capturing" : "");
+        const active = capturing?.kind === "pad" && capturing.id === a.id;
+        row.className = "keybind-item" + (active ? " capturing" : "");
 
         const act = document.createElement("div");
         act.className = "act";
@@ -768,10 +1217,11 @@ var Module = {
         const bind = document.createElement("button");
         bind.type = "button";
         bind.className = "btn bind";
-        bind.textContent = capturing === a.id ? "Press a key…" : "Rebind";
+        bind.textContent = active ? "Press a key…" : "Rebind";
         bind.addEventListener("click", () => {
-          capturing = a.id;
+          capturing = {kind: "pad", id: a.id};
           renderKeybinds();
+          renderStateHotkeys();
         });
 
         row.appendChild(act);
@@ -780,7 +1230,40 @@ var Module = {
         keybindList.appendChild(row);
       }
     }
+    function renderStateHotkeys() {
+      if (!stateHotkeyList) return;
+      stateHotkeyList.innerHTML = "";
+      for (const a of STATE_HOTKEY_ACTIONS) {
+        const row = document.createElement("div");
+        const active = capturing?.kind === "state" && capturing.id === a.id;
+        row.className = "keybind-item" + (active ? " capturing" : "");
+
+        const act = document.createElement("div");
+        act.className = "act";
+        act.textContent = a.name;
+
+        const key = document.createElement("div");
+        key.className = "key";
+        key.textContent = prettyKey(stateHotkeys[a.id]);
+
+        const bind = document.createElement("button");
+        bind.type = "button";
+        bind.className = "btn bind";
+        bind.textContent = active ? "Press a key…" : "Rebind";
+        bind.addEventListener("click", () => {
+          capturing = {kind: "state", id: a.id};
+          renderStateHotkeys();
+          renderKeybinds();
+        });
+
+        row.appendChild(act);
+        row.appendChild(key);
+        row.appendChild(bind);
+        stateHotkeyList.appendChild(row);
+      }
+    }
     renderKeybinds();
+    renderStateHotkeys();
 
     window.addEventListener("keydown", (e) => {
       if (!isCapturing()) return;
@@ -790,6 +1273,7 @@ var Module = {
         e.preventDefault();
         capturing = null;
         renderKeybinds();
+        renderStateHotkeys();
         return;
       }
 
@@ -797,24 +1281,43 @@ var Module = {
 
       e.preventDefault();
       const newCode = e.code;
-      const action = capturing;
+      if (capturing?.kind === "pad") {
+        const action = capturing.id;
+        const other = ACTIONS.find((x) => x.id !== action && keymap[x.id] === newCode)?.id;
+        const prev = keymap[action];
+        keymap[action] = newCode;
+        if (other != null) keymap[other] = prev;
+        saveKeymap(keymap);
+      } else if (capturing?.kind === "state") {
+        const action = capturing.id;
+        const other = STATE_HOTKEY_ACTIONS.find((x) => x.id !== action && stateHotkeys[x.id] === newCode)?.id;
+        const prev = stateHotkeys[action];
+        stateHotkeys[action] = newCode;
+        if (other != null) stateHotkeys[other] = prev;
+        saveStateHotkeys(stateHotkeys);
+      }
 
-      const other = ACTIONS.find((x) => x.id !== action && keymap[x.id] === newCode)?.id;
-      const prev = keymap[action];
-      keymap[action] = newCode;
-      if (other != null) keymap[other] = prev;
-
-      saveKeymap(keymap);
-      updateHintFromKeymap(keymap);
+      updateHintFromKeymap(keymap, stateHotkeys);
       capturing = null;
       renderKeybinds();
+      renderStateHotkeys();
     }, {passive: false});
 
     keybindReset?.addEventListener("click", () => {
       keymap = defaultKeymap();
       saveKeymap(keymap);
-      updateHintFromKeymap(keymap);
+      updateHintFromKeymap(keymap, stateHotkeys);
       capturing = null;
+      renderKeybinds();
+      renderStateHotkeys();
+    });
+
+    stateHotkeyReset?.addEventListener("click", () => {
+      stateHotkeys = defaultStateHotkeys();
+      saveStateHotkeys(stateHotkeys);
+      updateHintFromKeymap(keymap, stateHotkeys);
+      capturing = null;
+      renderStateHotkeys();
       renderKeybinds();
     });
 
@@ -828,7 +1331,48 @@ var Module = {
       kb.clearAll();
       capturing = null;
       renderKeybinds();
+      renderStateHotkeys();
       settingsDlg?.showModal?.();
+    });
+
+    statesButton?.addEventListener("click", () => {
+      if (!romLoaded) {
+        status.textContent = "Load a ROM to manage save states";
+        return;
+      }
+      touch.clearAll();
+      kb.clearAll();
+      renderSavestateManager();
+      savestateDlg?.showModal?.();
+      setTimeout(() => savestateLabelInput?.focus(), 0);
+    });
+
+    savestateCreateBtn?.addEventListener("click", () => {
+      const label = sanitizeStateLabel(savestateLabelInput?.value || "");
+      requestQuicksave("manual", label);
+      if (savestateLabelInput) savestateLabelInput.value = "";
+    });
+
+    savestateLoadBtn?.addEventListener("click", () => {
+      if (!selectedStateId) return;
+      requestQuickload(selectedStateId);
+    });
+
+    savestateDeleteBtn?.addEventListener("click", () => {
+      if (!selectedStateId) return;
+      const ok = IroGBSaves.deleteStateById(selectedStateId);
+      if (ok) {
+        status.textContent = "Save state deleted";
+        selectedStateId = "";
+        renderSavestateManager();
+      }
+    });
+
+    savestateLabelInput?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        savestateCreateBtn?.click();
+      }
     });
 
     const root = document.documentElement;
@@ -840,13 +1384,28 @@ var Module = {
       loadFileInput.disabled = disabled;
       loadUrlInput.disabled = disabled;
       loadUrlGo.disabled = disabled;
+      if (statesButton) {
+        const disableStates = disabled || !romLoaded;
+        statesButton.disabled = disableStates;
+        statesButton.classList.toggle("disabled", disableStates);
+      }
     };
 
     const setLoadedUI = (fileName) => {
-      setTempDisabled(true);
+      romLoaded = true;
+      loadButton.disabled = true;
+      loadButton.classList.add("disabled");
       loadButton.textContent = "Loaded";
+      if (statesButton) {
+        statesButton.disabled = false;
+        statesButton.classList.remove("disabled");
+      }
       status.textContent = fileName ? fileName : "Running";
+      renderSavestateManager();
     };
+
+    setTempDisabled(false);
+    renderSavestateManager();
 
     const loadRomBytes = async (bytes, nameForUi) => {
       touch.clearAll();
@@ -859,6 +1418,7 @@ var Module = {
       // Close any UI dialogs BEFORE entering wasm (prevents "unwind" from skipping close)
       closeDialogSafe("romPicker");
       closeDialogSafe("loadDialog");
+      closeDialogSafe("savestateDialog");
 
       // Start on next tick so the close renders first
       setTimeout(() => {

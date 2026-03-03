@@ -625,6 +625,181 @@ canvas {
   box-shadow: 0 10px 26px rgba(0,0,0,.35);
 }
 
+/* ---- Save state manager ---- */
+#savestateDialog {
+  width: min(
+    860px,
+    calc(100dvw - 36px - env(safe-area-inset-left) - env(safe-area-inset-right))
+  );
+  max-width: min(
+    860px,
+    calc(100dvw - 36px - env(safe-area-inset-left) - env(safe-area-inset-right))
+  );
+}
+
+.savestate-form {
+  max-height: min(82dvh, 760px);
+}
+
+.savestate-create-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.savestate-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr);
+  gap: 12px;
+  min-height: 0;
+  align-items: stretch;
+}
+
+.savestate-list {
+  border: 1px solid rgba(255, 255, 255, .12);
+  background: rgba(255, 255, 255, .04);
+  border-radius: 14px;
+  padding: 8px;
+  max-height: min(48dvh, 420px);
+  overflow: auto;
+  display: grid;
+  gap: 6px;
+}
+
+.savestate-empty {
+  color: var(--muted);
+  padding: 14px 10px;
+  font-size: .9rem;
+}
+
+.savestate-item {
+  border: 1px solid rgba(255, 255, 255, .10);
+  background: rgba(0, 0, 0, .12);
+  color: var(--text);
+  border-radius: 12px;
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  display: block;
+  cursor: pointer;
+}
+
+.savestate-item:hover {
+  border-color: rgba(255, 255, 255, .18);
+}
+
+.savestate-item.selected {
+  border-color: rgba(99, 102, 241, 0.55);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, .35);
+}
+
+.savestate-row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 12px;
+  row-gap: 3px;
+  align-items: center;
+}
+
+.savestate-title {
+  grid-column: 1;
+  font-weight: 760;
+  font-size: .92rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.savestate-line {
+  color: var(--muted);
+  font-size: .84rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.savestate-row .savestate-line:nth-of-type(1) {
+  grid-column: 1;
+}
+
+.savestate-row .savestate-line:nth-of-type(2) {
+  grid-column: 2;
+  text-align: right;
+}
+
+.savestate-chip {
+  grid-column: 2;
+  grid-row: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, .16);
+  padding: 2px 8px;
+  font-size: .76rem;
+  font-weight: 700;
+  width: fit-content;
+}
+
+.savestate-chip.quick {
+  border-color: rgba(99, 102, 241, .55);
+  background: rgba(99, 102, 241, .18);
+}
+
+.savestate-chip.manual {
+  border-color: rgba(34, 211, 238, .45);
+  background: rgba(34, 211, 238, .14);
+}
+
+.savestate-detail {
+  border: 1px solid rgba(255, 255, 255, .12);
+  background: rgba(255, 255, 255, .04);
+  border-radius: 14px;
+  padding: 10px;
+  max-height: min(48dvh, 420px);
+  overflow: auto;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 10px;
+  align-content: stretch;
+  min-height: 0;
+}
+
+.savestate-preview-wrap {
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, .12);
+  overflow: hidden;
+  background: #000;
+  aspect-ratio: 10 / 9;
+  max-height: clamp(140px, 30dvh, 260px);
+  min-height: 0;
+}
+
+.savestate-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  image-rendering: pixelated;
+  display: block;
+}
+
+.savestate-meta {
+  min-height: 0;
+  color: var(--muted);
+  font-size: .88rem;
+  line-height: 1.4;
+  white-space: pre-line;
+  overflow: auto;
+}
+
+.savestate-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
 /* Phone-ish tweaks (only when touch UI is actually enabled) */
 @media (max-width: 900px) {
   :root.touch-ui {
@@ -641,6 +816,21 @@ canvas {
   .touch-ui #touch-controls .cluster { padding: 8px; border-radius: 18px; }
   .touch-ui .touch-btn.pill { height: 38px; padding: 0 12px; font-size: 0.88rem; }
   .touch-ui .touch-btn.square { border-radius: 14px; }
+
+  #savestateDialog {
+    width: min(
+      860px,
+      calc(100dvw - 24px - env(safe-area-inset-left) - env(safe-area-inset-right))
+    );
+    max-width: min(
+      860px,
+      calc(100dvw - 24px - env(safe-area-inset-left) - env(safe-area-inset-right))
+    );
+  }
+
+  .savestate-layout {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Prevent mobile browsers from zooming in on the URL input */

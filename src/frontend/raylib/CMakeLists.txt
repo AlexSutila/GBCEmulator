@@ -96,6 +96,8 @@ if(BUILD_SIMPLE)
         )
         set_property(TARGET gbc_wasm
             APPEND PROPERTY LINK_DEPENDS "${SHELL_HTML}"
+            APPEND PROPERTY LINK_DEPENDS "${CMAKE_SOURCE_DIR}/src/frontend/raylib/app.css"
+            APPEND PROPERTY LINK_DEPENDS "${CMAKE_SOURCE_DIR}/src/frontend/raylib/app.js"
         )
 
     else() # EMSCRIPTEN

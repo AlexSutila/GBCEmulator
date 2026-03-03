@@ -88,6 +88,27 @@ EM_JS(int, web_save_active_state, (const std::uint8_t * data_ptr, int len), {
   }
 });
 
+EM_JS(int, web_set_pending_state_thumb_rgba,
+      (const std::uint8_t * data_ptr, int len, int width, int height), {
+        try {
+          if (!data_ptr || len <= 0 || width <= 0 || height <= 0)
+            return 0;
+          const api = globalThis.IroGBSaves;
+          if (!api || typeof api.setPendingStateThumbnailRgba !== "function")
+            return 0;
+
+          const start = data_ptr >>> 0;
+          const end = (start + (len | 0)) >>> 0;
+          const bytes = new Uint8Array(HEAPU8.subarray(start, end));
+          return api.setPendingStateThumbnailRgba(bytes, width | 0, height | 0)
+                     ? 1
+                     : 0;
+        } catch (err) {
+          console.warn("Failed to stage savestate thumbnail:", err);
+          return -1;
+        }
+      });
+
 constexpr double kWebSramFlushDebounceMs = 750.0;
 
 static std::uint8_t g_web_input_state = 0;
@@ -326,10 +347,12 @@ void RaylibFrontend::read_inputs() {
 #else
   read_keyboard_inputs(input_state);
 #endif
+#ifndef __EMSCRIPTEN__
   if (IsKeyPressed(KEY_F4))
     request_quicksave();
   if (IsKeyPressed(KEY_F8))
     request_quickload();
+#endif
 
   // Handle controller input, we casually let it overwrite keyboard for
   // the sake of simplicity and the fact that you cant really use both
@@ -353,6 +376,30 @@ bool RaylibFrontend::has_pending_savestate_request() const {
   return quicksave_requested || quickload_requested;
 }
 
+std::vector<std::uint8_t> RaylibFrontend::capture_savestate_thumbnail_rgba() const {
+  const auto &src = frame_buf.at(display_idx);
+  if (src.empty())
+    return {};
+
+  std::vector<std::uint8_t> out(
+      static_cast<std::size_t>(savestate_thumb_w * savestate_thumb_h * 4));
+  for (int y = 0; y < savestate_thumb_h; ++y) {
+    const int sy = (y * fb_height) / savestate_thumb_h;
+    for (int x = 0; x < savestate_thumb_w; ++x) {
+      const int sx = (x * fb_width) / savestate_thumb_w;
+      const std::uint32_t px =
+          src[static_cast<std::size_t>(sy) * fb_width + sx];
+      const std::size_t out_i =
+          static_cast<std::size_t>(y * savestate_thumb_w + x) * 4;
+      out[out_i + 0] = static_cast<std::uint8_t>(px & 0xFF);         // R
+      out[out_i + 1] = static_cast<std::uint8_t>((px >> 8) & 0xFF);  // G
+      out[out_i + 2] = static_cast<std::uint8_t>((px >> 16) & 0xFF); // B
+      out[out_i + 3] = static_cast<std::uint8_t>((px >> 24) & 0xFF); // A
+    }
+  }
+  return out;
+}
+
 void RaylibFrontend::process_quicksave_request() {
   try {
     const auto blob = gbc->serialize_savestate();
@@ -362,6 +409,11 @@ void RaylibFrontend::process_quicksave_request() {
     }
 
 #ifdef __EMSCRIPTEN__
+    if (const auto thumb = capture_savestate_thumbnail_rgba(); !thumb.empty()) {
+      (void)web_set_pending_state_thumb_rgba(
+          thumb.data(), static_cast<int>(thumb.size()), savestate_thumb_w,
+          savestate_thumb_h);
+    }
     const int rc =
         web_save_active_state(blob.data(), static_cast<int>(blob.size()));
     if (rc > 0) {
