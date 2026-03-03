@@ -1,11 +1,33 @@
 #include "frontend/libretro/frontend.hpp"
-#include "gbc.hpp"
 #include <memory>
 #include <stdarg.h>
+#include <stdexcept>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "emu_types.hpp"
+#include "gbc.hpp"
+
+static Cartridge *const get_cart(void) {
+  auto &gbc = LibretroFrontend::get_instance().get();
+  if (!gbc)
+    return nullptr;
+
+  auto bus = gbc->get_bus();
+  if (!bus)
+    return nullptr;
+
+  // Caller should check for `NULL` or `nullptr`
+  return bus->get_cartridge();
+}
+
+std::span<byte_t> get_sram_data() {
+  if (auto cart = get_cart(); cart)
+    return cart->ram();
+  throw std::runtime_error("Failed to acquire SRAM");
+}
 
 #ifdef __cplusplus
 extern "C" {
@@ -124,11 +146,14 @@ bool retro_load_game(const struct retro_game_info *info) {
   return true;
 }
 
+/* You technically should not remove a cartridge before completely powering off
+ * the system, so we ignore this. Nothing needs to happen within the core. */
 void retro_unload_game(void) {}
 
 /* Does not matter, GBC does not rely on such television standards */
 unsigned retro_get_region(void) { return RETRO_REGION_NTSC; }
 
+/* Not applicable */
 bool retro_load_game_special(unsigned type, const struct retro_game_info *info,
                              size_t num) {
   return false;
@@ -140,9 +165,29 @@ bool retro_serialize(void *data_, size_t size) { return false; }
 
 bool retro_unserialize(const void *data_, size_t size) { return false; }
 
-void *retro_get_memory_data(unsigned id) { return NULL; }
+void *retro_get_memory_data(unsigned id) {
+  if (id == RETRO_MEMORY_SAVE_RAM) {
+    if (auto cart = get_cart(); cart && cart->has_battery()) {
+      const auto sram = cart->ram();
+      return sram.data();
+    }
+  }
 
-size_t retro_get_memory_size(unsigned id) { return 0; }
+  // TODO: Restore RTC
+  return NULL;
+}
+
+size_t retro_get_memory_size(unsigned id) {
+  if (id == RETRO_MEMORY_SAVE_RAM) {
+    if (auto cart = get_cart(); cart && cart->has_battery()) {
+      const auto sram = cart->ram();
+      return sram.size_bytes();
+    }
+  }
+
+  // TODO: Restore RTC
+  return 0;
+}
 
 void retro_cheat_reset(void) {}
 
