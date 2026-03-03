@@ -12,7 +12,114 @@
 #include "timer.hpp"
 #include <memory>
 #include <optional>
+#include <string_view>
 #include <stdexcept>
+
+namespace {
+struct ParsedCheat {
+  addr_t addr{};
+  byte_t value{};
+};
+
+std::optional<unsigned> hex_nibble(const char c) {
+  if (c >= '0' && c <= '9')
+    return static_cast<unsigned>(c - '0');
+  if (c >= 'A' && c <= 'F')
+    return static_cast<unsigned>(c - 'A' + 10);
+  if (c >= 'a' && c <= 'f')
+    return static_cast<unsigned>(c - 'a' + 10);
+  return std::nullopt;
+}
+
+std::optional<byte_t> parse_hex_byte(const std::string_view sv) {
+  if (sv.size() != 2)
+    return std::nullopt;
+  const auto hi = hex_nibble(sv[0]);
+  const auto lo = hex_nibble(sv[1]);
+  if (!hi.has_value() || !lo.has_value())
+    return std::nullopt;
+  return static_cast<byte_t>((*hi << 4) | *lo);
+}
+
+std::optional<addr_t> parse_hex_addr(const std::string_view sv) {
+  if (sv.size() != 4)
+    return std::nullopt;
+  addr_t out = 0;
+  for (const char c : sv) {
+    const auto nib = hex_nibble(c);
+    if (!nib.has_value())
+      return std::nullopt;
+    out = static_cast<addr_t>((out << 4) | *nib);
+  }
+  return out;
+}
+
+std::string strip_non_hex(const std::string_view text) {
+  std::string out;
+  out.reserve(text.size());
+  for (const char c : text) {
+    if (std::isxdigit(static_cast<unsigned char>(c)) != 0)
+      out.push_back(static_cast<char>(std::toupper(static_cast<unsigned char>(c))));
+  }
+  return out;
+}
+
+bool is_cheat_writable_addr(const addr_t addr) {
+  if (addr <= 0x7FFF) // Cartridge ROM + mapper registers
+    return false;
+  if (addr >= 0xFEA0 && addr <= 0xFEFF) // Not usable area
+    return false;
+  if (addr == 0xFFFF) // IE register is often too destructive to freeze
+    return false;
+  return true;
+}
+
+std::optional<ParsedCheat> parse_raw_cheat(const std::string_view code) {
+  const auto hex = strip_non_hex(code);
+  if (hex.size() != 6)
+    return std::nullopt;
+
+  const auto addr = parse_hex_addr(std::string_view(hex).substr(0, 4));
+  const auto value = parse_hex_byte(std::string_view(hex).substr(4, 2));
+  if (!addr.has_value() || !value.has_value())
+    return std::nullopt;
+  if (!is_cheat_writable_addr(*addr))
+    return std::nullopt;
+
+  return ParsedCheat{
+      .addr = *addr,
+      .value = *value,
+  };
+}
+
+std::optional<ParsedCheat> parse_gameshark_cheat(const std::string_view code) {
+  // Common GB/GBC GameShark format: 01VVLLHH (address is little-endian LLHH)
+  const auto hex = strip_non_hex(code);
+  if (hex.size() != 8)
+    return std::nullopt;
+
+  const auto command = parse_hex_byte(std::string_view(hex).substr(0, 2));
+  const auto value = parse_hex_byte(std::string_view(hex).substr(2, 2));
+  const auto addr_lo = parse_hex_byte(std::string_view(hex).substr(4, 2));
+  const auto addr_hi = parse_hex_byte(std::string_view(hex).substr(6, 2));
+  if (!command.has_value() || !value.has_value() || !addr_lo.has_value() ||
+      !addr_hi.has_value())
+    return std::nullopt;
+
+  if (*command != 0x01)
+    return std::nullopt;
+
+  const auto addr =
+      static_cast<addr_t>((static_cast<addr_t>(*addr_hi) << 8) | *addr_lo);
+  if (!is_cheat_writable_addr(addr))
+    return std::nullopt;
+
+  return ParsedCheat{
+      .addr = addr,
+      .value = *value,
+  };
+}
+} // namespace
 
 GameBoyColor::GameBoyColor(Frontend &frontend, const std::string &bios_path)
     : Debuggable(debugger_), debugger_(std::nullopt), fe_(frontend) {
@@ -226,6 +333,10 @@ void GameBoyColor::step() {
 
   // System clocks are maintained in unit `t-cycles`
   ++sys_.elapsed_clocks;
+  if (!active_cheats_.empty() &&
+      (sys_.elapsed_clocks % cheat_apply_interval) == 0) {
+    apply_cheats();
+  }
 
   // If we are in double speed mode, step affected components again
   if (sys_.double_speed) {
@@ -233,6 +344,62 @@ void GameBoyColor::step() {
     step_dma(true);
     timer->step();
   }
+}
+
+void GameBoyColor::apply_cheats() const {
+  if (!bus)
+    return;
+  for (const auto &[addr, value] : active_cheats_)
+    bus->write_byte(addr, value);
+}
+
+GameBoyColor::CheatStats
+GameBoyColor::configure_cheats(const std::vector<CheatCode>& cheats) {
+  active_cheats_.clear();
+  cheat_stats_ = {};
+  cheat_stats_.total = cheats.size();
+
+  for (const auto & [enabled, code, format] : cheats) {
+    if (!enabled)
+      continue;
+    cheat_stats_.enabled += 1;
+
+    std::optional<ParsedCheat> compiled;
+    switch (static_cast<CheatFormat>(format)) {
+    case CHEAT_GAMESHARK:
+      compiled = parse_gameshark_cheat(code);
+      break;
+    case CHEAT_RAW:
+      compiled = parse_raw_cheat(code);
+      break;
+    case CHEAT_AUTO:
+      compiled = parse_gameshark_cheat(code);
+      if (!compiled.has_value())
+        compiled = parse_raw_cheat(code);
+      break;
+    case CHEAT_GAME_GENIE:
+      // TODO: Implement Game Genie support
+      compiled = std::nullopt;
+      break;
+    default:
+      compiled = parse_gameshark_cheat(code);
+      if (!compiled.has_value())
+        compiled = parse_raw_cheat(code);
+      break;
+    }
+
+    if (!compiled.has_value()) {
+      cheat_stats_.rejected += 1;
+      continue;
+    }
+    active_cheats_.push_back(CompiledCheat{
+        .addr = compiled->addr,
+        .value = compiled->value,
+    });
+  }
+
+  cheat_stats_.active = active_cheats_.size();
+  return cheat_stats_;
 }
 
 bool GameBoyColor::savestate_ready() const {

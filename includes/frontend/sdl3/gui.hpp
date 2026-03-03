@@ -91,6 +91,7 @@ private:
   void build_status_bar(UiState &state) const;
   void build_file_dialogs(UiState& state) const;
   void build_settings_window(UiState& state, SDLHost& host);
+  void build_cheats_window(UiState& state);
   void build_keybinds_window(UiState& state);
   static void build_about_window(UiState& state);
   static void build_cart_info_window(UiState& state);

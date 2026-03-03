@@ -51,6 +51,7 @@ private:
   std::atomic<bool> running{true};
   std::atomic<bool> is_cgb{false};
   std::atomic<bool> fast_forward{true};
+  std::atomic<std::uint64_t> cheats_revision_{1};
 
   // FPS calculation
   std::atomic<uint64_t> emulated_frame_count{0};
@@ -148,12 +149,14 @@ private:
   build_emulator_instance(
       const cart &cart, const std::optional<std::string> &bios,
       const std::optional<std::filesystem::path> &initial_save_path);
-  std::vector<byte_t> prime_sram_saves(
+  static std::vector<byte_t> prime_sram_saves(
       const std::optional<std::filesystem::path> &initial_save_path,
-      Cartridge *const cart_ptr);
-  void process_sram_save_events(const std::vector<byte_t> save_snapshot,
-                                Cartridge *const cart_ptr);
+      Cartridge *cart_ptr);
+  void process_sram_save_events(std::vector<byte_t> save_snapshot,
+                                Cartridge *cart_ptr);
   void process_save_state_events();
+  std::vector<GameBoyColor::CheatCode> snapshot_cheats_locked() const;
+  void sync_cheats_to_core(std::uint64_t &last_revision) const;
   void emulation_thread_fn(
       const std::stop_token &st, const cart &cart,
       const std::optional<std::string> &bios,

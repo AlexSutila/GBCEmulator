@@ -38,10 +38,20 @@ struct Settings {
   std::array<SDL_Keycode, 7> general_keybinds{
       SDLK_G, SDLK_F, SDLK_EQUALS, SDLK_MINUS, SDLK_M, SDLK_F5, SDLK_F8};
   std::vector<std::string> recent_roms;
+  struct CheatEntry {
+    bool enabled{true};
+    std::string name;
+    std::string code;
+    std::string notes;
+    int format{}; // 0=Auto, 1=GameShark, 2=Game Genie, 3=Raw
+  };
+  std::vector<CheatEntry> cheats;
   static Settings load(const std::string &filename = ".gbc.config.json");
   void save(const std::string &filename = ".gbc.config.json") const;
   void add_recent_rom(const std::string &path);
 };
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Settings::CheatEntry, enabled,
+                                                name, code, notes, format)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Settings, volume,
                                                 force_mono_dmg,
                                                 keybind_preset_index, rom_dir,
@@ -50,7 +60,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Settings, volume,
                                                 savestate_root_dir,
                                                 max_quicksaves,
                                                 keybinds, general_keybinds,
-                                                recent_roms)
+                                                recent_roms, cheats)
 
 inline Settings Settings::load(const std::string &filename) {
   Settings s;
@@ -149,6 +159,7 @@ struct Notification {
 /* ---------- UI State ---------- */
 struct UiState {
   bool show_settings{false};
+  bool show_cheats{false};
   bool show_main_debug_viewer{false};
   bool show_breakpoints{false};
   bool show_ppu_viewer{false};
@@ -157,6 +168,7 @@ struct UiState {
   bool show_cart_info{false};
   bool show_savestate_manager{false};
   bool fast_forward{false};
+  bool cheats_dirty{false};
 
   // Hex memory reader specific
   bool show_memory_viewer{false};
@@ -209,6 +221,7 @@ struct UiState {
 
   // Miscellaneous
   std::optional<std::size_t> waiting_for_bind{};
+  int selected_cheat_idx{-1};
   std::string cart_info{"No ROM loaded"};
 };
 
