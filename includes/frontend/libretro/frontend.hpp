@@ -67,6 +67,12 @@ public:
   void try_show_frame();
   void try_poll_input();
 
+  /* CGB models do not have soft reset buttons, so we resort to hard reset only.
+   * To support this, we have to pull the original image back down, recreate the
+   * emulator instance, and re-insert the cartridge. */
+  cart get_image() const; // Contains original raw data bytes
+  void reset();
+
 private:
   static constexpr auto fb_height = 144;
   static constexpr auto fb_width = 160;
