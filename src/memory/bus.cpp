@@ -159,8 +159,8 @@ byte_t &AddressBus::hram_byte(const addr_t addr) const {
 byte_t AddressBus::read_byte_safe(const addr_t addr) const {
   if (io_registers.contains(addr)) {
     assert((addr >= 0xFF00 && addr <= 0xFF7F) || addr == 0xFFFF);
-    const auto &mmio = io_registers.at(addr);
-    return mmio.reg->peek(); // Const
+    const auto & [reg, savestate_policy] = io_registers.at(addr);
+    return reg->peek(); // Const
   }
   return read_byte(addr, false);
 }
@@ -169,6 +169,8 @@ byte_t AddressBus::read_byte(const addr_t addr, bool debug) const {
   try_brk(addr, Debug::BRK_ADDRESS_READ);
   if (is_conflicting(addr)) [[unlikely]]
     return open_bus();
+  if (has_cheat_overrides_ && cheat_mask_[addr]) [[unlikely]]
+    return cheat_values_[addr];
 
   /* Read from boot ROM if it is mapped (boot ROM overrides reads only) */
   if (is_boot_rom_range(addr))
@@ -284,6 +286,27 @@ void AddressBus::acquire(const BusConflictTypes conflict_mask) {
 
 void AddressBus::release(const BusConflictTypes conflict_mask) {
   bus_conflicts = bus_conflicts & ~conflict_mask;
+}
+
+void AddressBus::clear_cheat_overrides() {
+  for (const addr_t addr : cheat_touched_addrs_)
+    cheat_mask_[addr] = false;
+  cheat_touched_addrs_.clear();
+  has_cheat_overrides_ = false;
+}
+
+void AddressBus::set_cheat_overrides(std::span<const CheatOverride> overrides) {
+  clear_cheat_overrides();
+  cheat_touched_addrs_.reserve(overrides.size());
+
+  for (const auto & [addr, value] : overrides) {
+    const auto idx = static_cast<std::size_t>(addr);
+    if (!cheat_mask_[idx])
+      cheat_touched_addrs_.push_back(addr);
+    cheat_mask_[idx] = true;
+    cheat_values_[idx] = value;
+  }
+  has_cheat_overrides_ = !cheat_touched_addrs_.empty();
 }
 
 enum : std::uint16_t {

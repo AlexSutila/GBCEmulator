@@ -14,6 +14,8 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <span>
+#include <vector>
 
 struct runtime_sys_info;
 class BootROM;
@@ -63,6 +65,11 @@ constexpr BusConflictTypes operator~(const BusConflictTypes a) {
  */
 class AddressBus final : Debug::Debuggable {
 public:
+  struct CheatOverride {
+    addr_t addr{};
+    byte_t value{};
+  };
+
   void write_byte(addr_t addr, byte_t value) const;
   [[nodiscard]] byte_t read_byte(addr_t addr, bool debug = true) const;
   ObjAttrDMA &get_oam_dma() { return oam_dma; };
@@ -86,6 +93,10 @@ public:
   [[nodiscard]] bool is_acquired(BusConflictTypes conflict_mask) const;
   void acquire(BusConflictTypes conflict_mask);
   void release(BusConflictTypes conflict_mask);
+
+  /* Read-time cheat overrides */
+  void clear_cheat_overrides();
+  void set_cheat_overrides(std::span<const CheatOverride> overrides);
 
   /* Cartridge connections */
   void insert_cartridge(cart c);
@@ -140,6 +151,10 @@ private:
     MMIOSavestatePolicy savestate_policy{MMIOSavestatePolicy::OwnerManaged};
   };
   std::map<addr_t, ConnectedMMIO> io_registers{};
+  std::array<byte_t, 0x10000> cheat_values_{};
+  std::array<bool, 0x10000> cheat_mask_{};
+  std::vector<addr_t> cheat_touched_addrs_{};
+  bool has_cheat_overrides_{false};
   [[nodiscard]] bool is_boot_rom_range(addr_t a) const;
   std::optional<BootROM> &bios_;
   [[maybe_unused]] runtime_sys_info &sys_;

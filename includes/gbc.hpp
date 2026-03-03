@@ -98,14 +98,6 @@ private:
   void step_dma(bool fast_cycle) const;
   [[nodiscard]] bool vdma_enabled() const;
   void step_processor() const;
-  void apply_cheats() const;
-
-  struct CompiledCheat {
-    addr_t addr{};
-    byte_t value{};
-  };
-  static constexpr std::uint64_t cheat_apply_interval = 64;
-  std::vector<CompiledCheat> active_cheats_{};
   CheatStats cheat_stats_{};
 
   std::optional<Debug::Debugger> debugger_{};

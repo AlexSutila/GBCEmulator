@@ -317,8 +317,7 @@ void GameBoyColor::step_dma(const bool fast_cycle) const {
 bool GameBoyColor::vdma_enabled() const { return bus->get_vdma().enabled(); }
 
 void GameBoyColor::step_processor() const {
-  const auto &vdma = bus->get_vdma();
-  if (!vdma.enabled()) // CPU is halted until VDMA is complete
+  if (const auto &vdma = bus->get_vdma(); !vdma.enabled()) // CPU is halted until VDMA is complete
     cpu->step();
 }
 
@@ -333,10 +332,6 @@ void GameBoyColor::step() {
 
   // System clocks are maintained in unit `t-cycles`
   ++sys_.elapsed_clocks;
-  if (!active_cheats_.empty() &&
-      (sys_.elapsed_clocks % cheat_apply_interval) == 0) {
-    apply_cheats();
-  }
 
   // If we are in double speed mode, step affected components again
   if (sys_.double_speed) {
@@ -346,16 +341,10 @@ void GameBoyColor::step() {
   }
 }
 
-void GameBoyColor::apply_cheats() const {
-  if (!bus)
-    return;
-  for (const auto &[addr, value] : active_cheats_)
-    bus->write_byte(addr, value);
-}
-
 GameBoyColor::CheatStats
 GameBoyColor::configure_cheats(const std::vector<CheatCode>& cheats) {
-  active_cheats_.clear();
+  std::vector<AddressBus::CheatOverride> overrides{};
+  overrides.reserve(cheats.size());
   cheat_stats_ = {};
   cheat_stats_.total = cheats.size();
 
@@ -392,13 +381,16 @@ GameBoyColor::configure_cheats(const std::vector<CheatCode>& cheats) {
       cheat_stats_.rejected += 1;
       continue;
     }
-    active_cheats_.push_back(CompiledCheat{
+    overrides.push_back(AddressBus::CheatOverride{
         .addr = compiled->addr,
         .value = compiled->value,
     });
   }
 
-  cheat_stats_.active = active_cheats_.size();
+  if (bus)
+    bus->set_cheat_overrides(overrides);
+
+  cheat_stats_.active = overrides.size();
   return cheat_stats_;
 }
 
