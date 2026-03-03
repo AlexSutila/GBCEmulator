@@ -4,6 +4,7 @@
 
 #include "common.hpp"
 #include "sdl_host.hpp"
+#include <functional>
 #include <imgui.h>
 #include <ImGuiFileDialog.h>
 #include <backends/imgui_impl_sdlrenderer3.h>
@@ -43,6 +44,14 @@ class GbcImGui {
   }};
 
 public:
+  struct SavestateManagerCallbacks {
+    std::function<void(const std::string &label)> queue_manual_save;
+    std::function<void()> request_load_most_recent;
+    std::function<void()> refresh;
+    std::function<void(const std::filesystem::path &path)> queue_load;
+    std::function<void(const std::filesystem::path &path)> delete_state;
+  };
+
   void init(const SDLHost& host);
   void shutdown() const;
 
@@ -59,9 +68,16 @@ public:
   void update_bios_path(const std::string& bios_path);
   void clear_bios_path();
   bool process_event(const SDL_Event& e, UiState& ui_state);
+  void build_savestate_manager_window(
+      UiState &state, const SDLHost &host, bool emulator_ready,
+      const std::filesystem::path &savestate_dir,
+      std::array<char, 96> &manual_label_input,
+      std::vector<SavestateEntry> &savestate_entries,
+      std::optional<std::filesystem::path> &savestate_selected_path,
+      const SavestateManagerCallbacks &callbacks);
 
   static void push_notification(UiState& state, LogLevel level, const std::string& type, const std::string& summary,
-                                        const std::string& details = "", time_t timestamp= std::time(nullptr));
+                                         const std::string& details = "", time_t timestamp= std::time(nullptr));
 
   // Accessors
   [[nodiscard]] const Settings& get_settings_c() const { return settings; }

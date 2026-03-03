@@ -39,19 +39,6 @@ public:
   void clear(std::uint32_t c) override;
 
 private:
-  struct SavestateEntry {
-    std::filesystem::path state_path;
-    std::filesystem::path thumb_path;
-    std::string kind;
-    std::string label;
-    std::time_t created_at{};
-    std::uintmax_t file_size{};
-    int thumb_w{};
-    int thumb_h{};
-    SDL_Texture *thumb_texture{nullptr};
-    bool thumb_texture_attempted{false};
-  };
-
   // Subsystems
   SDLHost host;
   GbcImGui gui;
@@ -140,6 +127,9 @@ private:
   std::optional<std::filesystem::path> savestate_selected_path_;
   std::array<char, 96> savestate_manual_label_input_{};
   Clock::time_point next_savestate_scan_{Clock::now()};
+  std::mutex quick_savestate_cache_mutex_;
+  std::vector<SavestateEntry> quick_savestate_cache_;
+  bool quick_savestate_cache_valid_{false};
 
   // Resize/move redraw tuning
   std::atomic<std::int64_t> suppress_vsync_until_ns{0};
@@ -186,6 +176,14 @@ private:
   std::optional<std::string> consume_manual_savestate_request();
   void queue_savestate_load_request(const std::filesystem::path &path);
   void queue_manual_savestate_request(std::string label);
+  void clear_quick_savestate_cache();
+  void sync_quick_savestate_cache_locked();
+  void upsert_quick_savestate_cache_locked(const std::filesystem::path &state_path,
+                                           const std::string &label,
+                                           std::time_t created_at);
+  void enforce_max_quicksaves_locked();
+  void erase_quick_savestate_cache_entry(const std::filesystem::path &state_path);
+  void remove_savestate_triplet(const std::filesystem::path &state_path);
   [[nodiscard]] std::optional<std::filesystem::path>
   write_savestate_bundle(const std::vector<byte_t> &blob, bool quick,
                          const std::string &label = {});

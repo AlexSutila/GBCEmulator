@@ -1,10 +1,10 @@
 #include "frontend/sdl3/frontend.hpp"
 #include <algorithm>
 #include <atomic>
-#include <cctype>
 #include <ctime>
 #include <fstream>
 #include <iomanip>
+#include <unordered_set>
 #include <sstream>
 
 namespace {
@@ -24,7 +24,6 @@ std::string normalize_hex_lower(std::string text) {
 
 constexpr int kSavestateThumbWidth = 80;
 constexpr int kSavestateThumbHeight = 72;
-constexpr int kMaxQuickSavestates = 10;
 constexpr std::size_t kSavestateGameDirNameMaxChars = 25;
 constexpr std::size_t kSavestateChecksumShortChars = 12;
 
@@ -105,7 +104,7 @@ std::string sanitize_savestate_label(std::string s,
                       (c >= '0' && c <= '9') || c == '-' || c == '_';
     c = keep ? c : '_';
   }
-  s.erase(std::remove(s.begin(), s.end(), '\0'), s.end());
+  std::erase(s, '\0');
   while (!s.empty() && s.front() == '_')
     s.erase(s.begin());
   if (s.size() > max_len)
@@ -169,20 +168,6 @@ std::string savestate_timestamp_slug(const std::time_t t) {
   return oss.str();
 }
 
-std::string format_timestamp_local(const std::time_t t) {
-  if (t <= 0)
-    return "Unknown";
-  std::tm tm{};
-#if defined(_WIN32)
-  localtime_s(&tm, &t);
-#else
-  localtime_r(&t, &tm);
-#endif
-  std::ostringstream oss;
-  oss << std::put_time(&tm, "%Y-%m-%d %H:%M:%S");
-  return oss.str();
-}
-
 bool write_thumb_raw_argb(const std::filesystem::path &path,
                           const std::vector<std::uint32_t> &pixels) {
   if (pixels.empty())
@@ -193,28 +178,6 @@ bool write_thumb_raw_argb(const std::filesystem::path &path,
   f.write(reinterpret_cast<const char *>(pixels.data()),
           static_cast<std::streamsize>(pixels.size() * sizeof(std::uint32_t)));
   return static_cast<bool>(f);
-}
-
-std::optional<std::vector<std::uint32_t>>
-read_thumb_raw_argb(const std::filesystem::path &path, const int w,
-                    const int h) {
-  if (w <= 0 || h <= 0)
-    return std::nullopt;
-  const std::size_t pixel_count =
-      static_cast<std::size_t>(w) * static_cast<std::size_t>(h);
-  const std::size_t byte_count = pixel_count * sizeof(std::uint32_t);
-  std::ifstream f(path, std::ios::binary | std::ios::ate);
-  if (!f)
-    return std::nullopt;
-  const auto size = static_cast<std::size_t>(f.tellg());
-  if (size != byte_count)
-    return std::nullopt;
-  std::vector<std::uint32_t> out(pixel_count);
-  f.seekg(0, std::ios::beg);
-  if (!f.read(reinterpret_cast<char *>(out.data()),
-              static_cast<std::streamsize>(byte_count)))
-    return std::nullopt;
-  return out;
 }
 
 bool is_savestate_file(const std::filesystem::directory_entry &de) {
@@ -284,23 +247,6 @@ void SDL3Frontend::process_pending_save() {
   if (!deferred_save_pending)
     return;
 
-  const auto write_snapshot = [](const std::filesystem::path &path,
-                                 const std::vector<byte_t> &data) -> bool {
-    if (path.empty() || data.empty())
-      return false;
-    const auto parent = path.parent_path();
-    if (!parent.empty()) {
-      std::error_code ec;
-      std::filesystem::create_directories(parent, ec);
-    }
-    std::ofstream f(path, std::ios::binary | std::ios::trunc);
-    if (!f)
-      return false;
-    f.write(reinterpret_cast<const char *>(data.data()),
-            static_cast<std::streamsize>(data.size()));
-    return static_cast<bool>(f);
-  };
-
   if (!active_save_path.has_value()) {
     Logger::push(LogLevel::Warning, "Save", "Missing save path",
                  "Could not resolve the save destination.");
@@ -309,7 +255,7 @@ void SDL3Frontend::process_pending_save() {
     return;
   }
 
-  if (write_snapshot(*active_save_path, deferred_save_data)) {
+  if (write_blob_file(*active_save_path, deferred_save_data)) {
     deferred_save_pending = false;
     deferred_save_data.clear();
   } else {
@@ -334,6 +280,7 @@ void SDL3Frontend::reset_savestate_context() {
   savestate_entries_.clear();
   savestate_selected_path_.reset();
   savestate_dir_.clear();
+  clear_quick_savestate_cache();
   savestate_manual_label_input_.fill('\0');
   {
     std::lock_guard lock(savestate_request_mutex);
@@ -374,6 +321,7 @@ void SDL3Frontend::setup_savestate_context(const cart &c,
     savestate_dir_ = root_dir / (stem + " - " + checksum_short);
   else
     savestate_dir_ = root_dir / stem;
+  clear_quick_savestate_cache();
 
   savestate_manual_label_input_.fill('\0');
   {
@@ -425,6 +373,138 @@ std::optional<std::string> SDL3Frontend::consume_manual_savestate_request() {
   return label;
 }
 
+void SDL3Frontend::clear_quick_savestate_cache() {
+  std::lock_guard lock(quick_savestate_cache_mutex_);
+  quick_savestate_cache_.clear();
+  quick_savestate_cache_valid_ = false;
+}
+
+void SDL3Frontend::remove_savestate_triplet(
+    const std::filesystem::path &state_path) {
+  std::error_code ec;
+  std::filesystem::remove(state_path, ec);
+  std::filesystem::remove(savestate_meta_path(state_path), ec);
+  std::filesystem::remove(savestate_thumb_path(state_path), ec);
+}
+
+void SDL3Frontend::sync_quick_savestate_cache_locked() {
+  if (savestate_dir_.empty()) {
+    quick_savestate_cache_.clear();
+    quick_savestate_cache_valid_ = true;
+    return;
+  }
+
+  std::error_code exists_ec;
+  if (!std::filesystem::exists(savestate_dir_, exists_ec)) {
+    quick_savestate_cache_.clear();
+    quick_savestate_cache_valid_ = true;
+    return;
+  }
+
+  if (!quick_savestate_cache_valid_)
+    quick_savestate_cache_.clear();
+
+  std::unordered_set<std::filesystem::path> on_disk;
+
+  std::error_code iter_ec;
+  for (const auto &de : std::filesystem::directory_iterator(savestate_dir_, iter_ec)) {
+    if (!is_savestate_file(de))
+      continue;
+
+    const auto &p = de.path();
+    if (p.stem().string().rfind("quick_", 0) != 0)
+      continue;
+
+    on_disk.insert(p);
+
+    const auto it = std::ranges::find_if(
+        quick_savestate_cache_, [&](const SavestateEntry &e) {
+          return e.state_path == p;
+        });
+    if (it != quick_savestate_cache_.end())
+      continue;
+
+    SavestateEntry entry{};
+    entry.state_path = p;
+    entry.thumb_path = savestate_thumb_path(p);
+    entry.kind = "Quick";
+    entry.label = p.stem().string();
+
+    std::error_code time_ec;
+    entry.created_at = file_time_to_time_t(de.last_write_time(time_ec));
+
+    if (const auto meta = read_savestate_meta(savestate_meta_path(p));
+        meta.has_value()) {
+      if (meta->kind != "quick")
+        continue;
+      entry.label = meta->label.empty() ? entry.label : meta->label;
+      if (meta->created_unix > 0)
+        entry.created_at = static_cast<std::time_t>(meta->created_unix);
+    }
+
+    quick_savestate_cache_.push_back(std::move(entry));
+  }
+
+  std::erase_if(quick_savestate_cache_, [&](const SavestateEntry &e) {
+    return !on_disk.contains(e.state_path);
+  });
+
+  quick_savestate_cache_valid_ = true;
+}
+
+void SDL3Frontend::upsert_quick_savestate_cache_locked(
+    const std::filesystem::path &state_path, const std::string &label,
+    const std::time_t created_at) {
+  const auto it = std::ranges::find_if(
+      quick_savestate_cache_,
+      [&](const SavestateEntry &e) { return e.state_path == state_path; });
+
+  const std::string resolved_label =
+      label.empty() ? state_path.stem().string() : label;
+  if (it == quick_savestate_cache_.end()) {
+    SavestateEntry entry{};
+    entry.state_path = state_path;
+    entry.thumb_path = savestate_thumb_path(state_path);
+    entry.kind = "Quick";
+    entry.label = resolved_label;
+    entry.created_at = created_at;
+    quick_savestate_cache_.push_back(std::move(entry));
+    return;
+  }
+
+  it->thumb_path = savestate_thumb_path(state_path);
+  it->label = resolved_label;
+  it->created_at = created_at;
+}
+
+void SDL3Frontend::enforce_max_quicksaves_locked() {
+  const int configured_max = gui.get_settings_c().max_quicksaves;
+  if (configured_max <= 0)
+    return;
+
+  const auto max_quick = static_cast<std::size_t>(configured_max);
+  std::ranges::sort(quick_savestate_cache_,
+                    [](const SavestateEntry &a, const SavestateEntry &b) {
+                      if (a.created_at != b.created_at)
+                        return a.created_at < b.created_at;
+                      return a.state_path.filename().string() <
+                             b.state_path.filename().string();
+                    });
+
+  while (quick_savestate_cache_.size() > max_quick) {
+    remove_savestate_triplet(quick_savestate_cache_.front().state_path);
+    quick_savestate_cache_.erase(quick_savestate_cache_.begin());
+  }
+}
+
+void SDL3Frontend::erase_quick_savestate_cache_entry(
+    const std::filesystem::path &state_path) {
+  std::lock_guard lock(quick_savestate_cache_mutex_);
+  std::erase_if(quick_savestate_cache_, [&](const SavestateEntry &entry) {
+    return entry.state_path == state_path;
+  });
+}
+
 std::vector<std::uint32_t> SDL3Frontend::capture_savestate_thumbnail() const {
   constexpr int src_w = framebuf_width;
   constexpr int src_h = framebuf_height;
@@ -453,6 +533,7 @@ SDL3Frontend::write_savestate_bundle(const std::vector<byte_t> &blob,
   std::error_code ec;
   std::filesystem::create_directories(savestate_dir_, ec);
 
+  // ----- Pick output file name -----
   const std::time_t now = std::time(nullptr);
   const std::string prefix = quick ? "quick" : "manual";
   const std::string ts = savestate_timestamp_slug(now);
@@ -460,11 +541,13 @@ SDL3Frontend::write_savestate_bundle(const std::vector<byte_t> &blob,
 
   std::filesystem::path state_path;
   for (int attempt = 0; attempt < 1000; ++attempt) {
-    std::string stem = prefix + "_" + ts;
+    std::string stem = prefix + "_";
+    stem.append(ts);
     if (!sanitized_label.empty())
       stem += "_" + sanitized_label;
     if (attempt > 0)
       stem += "_" + std::to_string(attempt);
+
     const auto candidate = savestate_dir_ / (stem + ".state");
     if (!std::filesystem::exists(candidate, ec)) {
       state_path = candidate;
@@ -474,13 +557,12 @@ SDL3Frontend::write_savestate_bundle(const std::vector<byte_t> &blob,
   if (state_path.empty())
     return std::nullopt;
 
+  // ----- Write files (no deletions before success) -----
   if (!write_blob_file(state_path, blob))
     return std::nullopt;
 
-  const auto thumb_pixels = capture_savestate_thumbnail();
-  if (!thumb_pixels.empty()) {
+  if (const auto thumb_pixels = capture_savestate_thumbnail(); !thumb_pixels.empty())
     write_thumb_raw_argb(savestate_thumb_path(state_path), thumb_pixels);
-  }
 
   SavestateMeta meta{};
   meta.kind = quick ? "quick" : "manual";
@@ -490,44 +572,12 @@ SDL3Frontend::write_savestate_bundle(const std::vector<byte_t> &blob,
   meta.thumb_h = kSavestateThumbHeight;
   write_savestate_meta(savestate_meta_path(state_path), meta);
 
+  // ----- Update quick cache + enforce limit once -----
   if (quick) {
-    struct QuickCandidate {
-      std::filesystem::path state_path;
-      std::time_t created_at{};
-    };
-    std::vector<QuickCandidate> quick_entries;
-    for (const auto &de :
-         std::filesystem::directory_iterator(savestate_dir_, ec)) {
-      if (!is_savestate_file(de))
-        continue;
-      const auto p = de.path();
-      auto meta_opt = read_savestate_meta(savestate_meta_path(p));
-      const bool is_quick = meta_opt.has_value()
-                                ? (meta_opt->kind == "quick")
-                                : (p.stem().string().rfind("quick_", 0) == 0);
-      if (!is_quick)
-        continue;
-      std::time_t created_at = 0;
-      if (meta_opt.has_value() && meta_opt->created_unix > 0)
-        created_at = static_cast<std::time_t>(meta_opt->created_unix);
-      else
-        created_at = file_time_to_time_t(de.last_write_time(ec));
-      quick_entries.push_back({p, created_at});
-    }
-    std::sort(quick_entries.begin(), quick_entries.end(),
-              [](const QuickCandidate &a, const QuickCandidate &b) {
-                if (a.created_at != b.created_at)
-                  return a.created_at > b.created_at;
-                return a.state_path.filename().string() >
-                       b.state_path.filename().string();
-              });
-    for (std::size_t i = kMaxQuickSavestates; i < quick_entries.size(); ++i) {
-      std::filesystem::remove(quick_entries[i].state_path, ec);
-      std::filesystem::remove(savestate_meta_path(quick_entries[i].state_path),
-                              ec);
-      std::filesystem::remove(savestate_thumb_path(quick_entries[i].state_path),
-                              ec);
-    }
+    std::lock_guard lock(quick_savestate_cache_mutex_);
+    sync_quick_savestate_cache_locked();
+    upsert_quick_savestate_cache_locked(state_path, label, now);
+    enforce_max_quicksaves_locked();
   }
 
   savestate_list_dirty.store(true, std::memory_order_release);
@@ -622,13 +672,13 @@ void SDL3Frontend::refresh_savestate_entries_locked(const bool force_refresh) {
     savestate_entries_.push_back(std::move(entry));
   }
 
-  std::sort(savestate_entries_.begin(), savestate_entries_.end(),
-            [](const SavestateEntry &a, const SavestateEntry &b) {
-              if (a.created_at != b.created_at)
-                return a.created_at > b.created_at;
-              return a.state_path.filename().string() >
-                     b.state_path.filename().string();
-            });
+  std::ranges::sort(savestate_entries_,
+                    [](const SavestateEntry &a, const SavestateEntry &b) {
+                      if (a.created_at != b.created_at)
+                        return a.created_at > b.created_at;
+                      return a.state_path.filename().string() >
+                        b.state_path.filename().string();
+                    });
 
   if (prev_selected.has_value()) {
     const auto it =
@@ -646,180 +696,35 @@ void SDL3Frontend::refresh_savestate_entries_locked(const bool force_refresh) {
     savestate_selected_path_.reset();
 }
 
-// Temporary place, should be moved to gui code
 void SDL3Frontend::build_savestate_manager_window_locked() {
   if (!ui_state.show_savestate_manager)
     return;
-
   refresh_savestate_entries_locked(false);
-  ImGui::SetNextWindowSize(ImVec2(920, 560), ImGuiCond_FirstUseEver);
-  if (!ImGui::Begin("Save States", &ui_state.show_savestate_manager)) {
-    ImGui::End();
-    return;
-  }
-
-  const bool emulator_ready = static_cast<bool>(gbc);
-
-  if (savestate_dir_.empty()) {
-    ImGui::TextDisabled("Load a ROM to manage savestates.");
-    ImGui::End();
-    return;
-  }
-
-  ImGui::Text("Directory: %s", savestate_dir_.string().c_str());
-  ImGui::InputText("Label", savestate_manual_label_input_.data(),
-                   savestate_manual_label_input_.size());
-
-  if (!emulator_ready)
-    ImGui::BeginDisabled();
-  if (ImGui::Button("Save")) {
-    queue_manual_savestate_request(savestate_manual_label_input_.data());
-  }
-  ImGui::SameLine();
-  if (ImGui::Button("Load Most Recent")) {
+  GbcImGui::SavestateManagerCallbacks callbacks{};
+  callbacks.queue_manual_save = [this](const std::string &label) {
+    queue_manual_savestate_request(label);
+  };
+  callbacks.request_load_most_recent = [this]() {
     quickload_requested.store(true, std::memory_order_release);
-  }
-  if (!emulator_ready)
-    ImGui::EndDisabled();
-
-  ImGui::SameLine();
-  if (ImGui::Button("Refresh")) {
+  };
+  callbacks.refresh = [this]() {
     savestate_list_dirty.store(true, std::memory_order_release);
     refresh_savestate_entries_locked(true);
-  }
-
-  ImGui::Separator();
-
-  std::optional<std::filesystem::path> delete_path = std::nullopt;
-  std::optional<std::filesystem::path> load_path = std::nullopt;
-
-  if (ImGui::BeginTable("savestate_manager_layout", 2,
-                        ImGuiTableFlags_Resizable |
-                            ImGuiTableFlags_BordersInnerV)) {
-    ImGui::TableSetupColumn("List", ImGuiTableColumnFlags_WidthStretch, 0.62f);
-    ImGui::TableSetupColumn("Preview", ImGuiTableColumnFlags_WidthStretch,
-                            0.38f);
-    ImGui::TableNextRow();
-
-    ImGui::TableSetColumnIndex(0);
-    if (ImGui::BeginTable("savestate_table", 4,
-                          ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders |
-                              ImGuiTableFlags_SizingStretchProp |
-                              ImGuiTableFlags_ScrollY,
-                          ImVec2(0.0f, 0.0f))) {
-      ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 70.0f);
-      ImGui::TableSetupColumn("Taken", ImGuiTableColumnFlags_WidthFixed,
-                              170.0f);
-      ImGui::TableSetupColumn("Label");
-      ImGui::TableSetupColumn("Size", ImGuiTableColumnFlags_WidthFixed, 80.0f);
-      ImGui::TableHeadersRow();
-
-      for (std::size_t i = 0; i < savestate_entries_.size(); ++i) {
-        auto &entry = savestate_entries_[i];
-        const bool selected = savestate_selected_path_.has_value() &&
-                              *savestate_selected_path_ == entry.state_path;
-
-        ImGui::PushID(static_cast<int>(i));
-        ImGui::TableNextRow();
-        ImGui::TableSetColumnIndex(0);
-        if (ImGui::Selectable(entry.kind.c_str(), selected,
-                              ImGuiSelectableFlags_SpanAllColumns)) {
-          savestate_selected_path_ = entry.state_path;
-        }
-        ImGui::TableSetColumnIndex(1);
-        ImGui::TextUnformatted(
-            format_timestamp_local(entry.created_at).c_str());
-        ImGui::TableSetColumnIndex(2);
-        ImGui::TextUnformatted(entry.label.c_str());
-        if (ImGui::IsItemHovered())
-          ImGui::SetTooltip("%s", entry.state_path.filename().string().c_str());
-        ImGui::TableSetColumnIndex(3);
-        ImGui::Text("%zu KB", static_cast<std::size_t>(
-                                  (entry.file_size + 1023u) / 1024u));
-        ImGui::PopID();
-      }
-      ImGui::EndTable();
-    }
-
-    ImGui::TableSetColumnIndex(1);
-    auto selected_it = savestate_entries_.end();
-    if (savestate_selected_path_.has_value()) {
-      selected_it = std::ranges::find_if(
-          savestate_entries_, [&](const SavestateEntry &e) {
-            return e.state_path == *savestate_selected_path_;
-          });
-    }
-
-    if (selected_it == savestate_entries_.end()) {
-      ImGui::TextDisabled("No savestate selected.");
-    } else {
-      auto &entry = *selected_it;
-      ImGui::Text("Type: %s", entry.kind.c_str());
-      ImGui::Text("Taken: %s",
-                  format_timestamp_local(entry.created_at).c_str());
-      ImGui::Text("File: %s", entry.state_path.filename().string().c_str());
-      ImGui::Text("Size: %zu bytes", static_cast<std::size_t>(entry.file_size));
-      ImGui::Spacing();
-
-      if (!emulator_ready)
-        ImGui::BeginDisabled();
-      if (ImGui::Button("Load")) {
-        load_path = entry.state_path;
-      }
-      if (!emulator_ready)
-        ImGui::EndDisabled();
-      ImGui::SameLine();
-      if (ImGui::Button("Delete")) {
-        delete_path = entry.state_path;
-      }
-
-      ImGui::SeparatorText("Thumbnail");
-      if (!entry.thumb_texture && !entry.thumb_texture_attempted) {
-        entry.thumb_texture_attempted = true;
-        if (std::filesystem::exists(entry.thumb_path)) {
-          if (const auto pixels = read_thumb_raw_argb(
-                  entry.thumb_path, entry.thumb_w, entry.thumb_h);
-              pixels.has_value()) {
-            entry.thumb_texture = SDL_CreateTexture(
-                host.get_renderer(), SDL_PIXELFORMAT_ARGB8888,
-                SDL_TEXTUREACCESS_STATIC, entry.thumb_w, entry.thumb_h);
-            if (entry.thumb_texture) {
-              SDL_UpdateTexture(entry.thumb_texture, nullptr, pixels->data(),
-                                entry.thumb_w *
-                                    static_cast<int>(sizeof(std::uint32_t)));
-              SDL_SetTextureScaleMode(entry.thumb_texture,
-                                      SDL_SCALEMODE_NEAREST);
-            }
-          }
-        }
-      }
-      if (entry.thumb_texture) {
-        const float max_w = 260.0f;
-        const float scale =
-            std::min(max_w / static_cast<float>(entry.thumb_w), 4.0f);
-        ImGui::Image(entry.thumb_texture,
-                     ImVec2(entry.thumb_w * scale, entry.thumb_h * scale));
-      } else {
-        ImGui::TextDisabled("No thumbnail available.");
-      }
-    }
-
-    ImGui::EndTable();
-  }
-
-  if (load_path.has_value()) {
-    queue_savestate_load_request(*load_path);
-  }
-  if (delete_path.has_value()) {
-    std::error_code ec;
-    std::filesystem::remove(*delete_path, ec);
-    std::filesystem::remove(savestate_meta_path(*delete_path), ec);
-    std::filesystem::remove(savestate_thumb_path(*delete_path), ec);
+  };
+  callbacks.queue_load = [this](const std::filesystem::path &path) {
+    queue_savestate_load_request(path);
+  };
+  callbacks.delete_state = [this](const std::filesystem::path &path) {
+    remove_savestate_triplet(path);
+    erase_quick_savestate_cache_entry(path);
     savestate_list_dirty.store(true, std::memory_order_release);
     refresh_savestate_entries_locked(true);
-  }
+  };
 
-  ImGui::End();
+  gui.build_savestate_manager_window(
+      ui_state, host, static_cast<bool>(gbc), savestate_dir_,
+      savestate_manual_label_input_, savestate_entries_, savestate_selected_path_,
+      callbacks);
 }
 
 [[nodiscard]] bool SDL3Frontend::should_preempt_emu_loop() const {

@@ -5,8 +5,10 @@
 #include <SDL3/SDL.h>
 #include <array>
 #include <atomic>
+#include <filesystem>
 #include <fstream>
 #include <nlohmann/json.hpp>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -20,6 +22,7 @@
  * 2. Update the macro below
  */
 struct Settings {
+  static constexpr int default_max_quicksaves = 10;
   float volume{0.5f};
   bool force_mono_dmg{false};
   int keybind_preset_index{};
@@ -28,6 +31,7 @@ struct Settings {
   std::string bios_dir{"."};
   std::string save_root_dir{"./saves"};
   std::string savestate_root_dir{"./savestates"};
+  int max_quicksaves{default_max_quicksaves};
   std::array<SDL_Keycode, 8> keybinds{SDLK_D,         SDLK_A,     SDLK_W,
                                       SDLK_S,         SDLK_J,     SDLK_K,
                                       SDLK_BACKSPACE, SDLK_RETURN};
@@ -44,6 +48,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Settings, volume,
                                                 prev_bios_path, bios_dir,
                                                 save_root_dir,
                                                 savestate_root_dir,
+                                                max_quicksaves,
                                                 keybinds, general_keybinds,
                                                 recent_roms)
 
@@ -57,6 +62,8 @@ inline Settings Settings::load(const std::string &filename) {
     } catch (...) { /* Fallback to defaults on corrupt file */
     }
   }
+  if (s.max_quicksaves < 0)
+    s.max_quicksaves = default_max_quicksaves;
   return s;
 }
 
@@ -77,6 +84,19 @@ inline void Settings::add_recent_rom(const std::string &path) {
     recent_roms.resize(10);
   }
 }
+
+struct SavestateEntry {
+  std::filesystem::path state_path;
+  std::filesystem::path thumb_path;
+  std::string kind;
+  std::string label;
+  std::time_t created_at{};
+  std::uintmax_t file_size{};
+  int thumb_w{};
+  int thumb_h{};
+  SDL_Texture *thumb_texture{nullptr};
+  bool thumb_texture_attempted{false};
+};
 
 /* ---------- Input ---------- */
 static constexpr int KCount = 8;
