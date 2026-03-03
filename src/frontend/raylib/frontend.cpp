@@ -295,47 +295,47 @@ void RaylibFrontend::clear(const std::uint32_t c) {
   display_idx = 0;
 }
 
-void RaylibFrontend::read_controller_inputs(std::uint8_t &input_state) const {
+void RaylibFrontend::read_controller_inputs(std::uint8_t &input_state) {
   if (IsGamepadButtonDown(0, GAMEPAD_BUTTON_LEFT_FACE_UP))
-    input_state |= (std::uint8_t)Joypad::JoypadButton::UP;
+    input_state |= static_cast<std::uint8_t>(Joypad::JoypadButton::UP);
   if (IsGamepadButtonDown(0, GAMEPAD_BUTTON_LEFT_FACE_DOWN))
-    input_state |= (std::uint8_t)Joypad::JoypadButton::DOWN;
+    input_state |= static_cast<std::uint8_t>(Joypad::JoypadButton::DOWN);
   if (IsGamepadButtonDown(0, GAMEPAD_BUTTON_LEFT_FACE_LEFT))
-    input_state |= (std::uint8_t)Joypad::JoypadButton::LEFT;
+    input_state |= static_cast<std::uint8_t>(Joypad::JoypadButton::LEFT);
   if (IsGamepadButtonDown(0, GAMEPAD_BUTTON_LEFT_FACE_RIGHT))
-    input_state |= (std::uint8_t)Joypad::JoypadButton::RIGHT;
+    input_state |= static_cast<std::uint8_t>(Joypad::JoypadButton::RIGHT);
   if (IsGamepadButtonDown(0, GAMEPAD_BUTTON_MIDDLE_RIGHT))
-    input_state |= (std::uint8_t)Joypad::JoypadButton::START;
+    input_state |= static_cast<std::uint8_t>(Joypad::JoypadButton::START);
   if (IsGamepadButtonDown(0, GAMEPAD_BUTTON_MIDDLE_LEFT))
-    input_state |= (std::uint8_t)Joypad::JoypadButton::SELECT;
+    input_state |= static_cast<std::uint8_t>(Joypad::JoypadButton::SELECT);
 
   // Since the right face may have multiple buttons, bind multiple to a single
   // virtual key. Better to have options.
   if (IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_FACE_DOWN) ||
       IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_FACE_LEFT))
-    input_state |= (std::uint8_t)Joypad::JoypadButton::B;
+    input_state |= static_cast<std::uint8_t>(Joypad::JoypadButton::B);
   if (IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT) ||
       IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_FACE_UP))
-    input_state |= (std::uint8_t)Joypad::JoypadButton::A;
+    input_state |= static_cast<std::uint8_t>(Joypad::JoypadButton::A);
 }
 
-void RaylibFrontend::read_keyboard_inputs(std::uint8_t &input_state) const {
+void RaylibFrontend::read_keyboard_inputs(std::uint8_t &input_state) {
   if (IsKeyDown(KEY_UP))
-    input_state |= (std::uint8_t)Joypad::JoypadButton::UP;
+    input_state |= static_cast<std::uint8_t>(Joypad::JoypadButton::UP);
   if (IsKeyDown(KEY_DOWN))
-    input_state |= (std::uint8_t)Joypad::JoypadButton::DOWN;
+    input_state |= static_cast<std::uint8_t>(Joypad::JoypadButton::DOWN);
   if (IsKeyDown(KEY_LEFT))
-    input_state |= (std::uint8_t)Joypad::JoypadButton::LEFT;
+    input_state |= static_cast<std::uint8_t>(Joypad::JoypadButton::LEFT);
   if (IsKeyDown(KEY_RIGHT))
-    input_state |= (std::uint8_t)Joypad::JoypadButton::RIGHT;
+    input_state |= static_cast<std::uint8_t>(Joypad::JoypadButton::RIGHT);
   if (IsKeyDown(KEY_Z))
-    input_state |= (std::uint8_t)Joypad::JoypadButton::A;
+    input_state |= static_cast<std::uint8_t>(Joypad::JoypadButton::A);
   if (IsKeyDown(KEY_X))
-    input_state |= (std::uint8_t)Joypad::JoypadButton::B;
+    input_state |= static_cast<std::uint8_t>(Joypad::JoypadButton::B);
   if (IsKeyDown(KEY_BACKSPACE))
-    input_state |= (std::uint8_t)Joypad::JoypadButton::SELECT;
+    input_state |= static_cast<std::uint8_t>(Joypad::JoypadButton::SELECT);
   if (IsKeyDown(KEY_ENTER))
-    input_state |= (std::uint8_t)Joypad::JoypadButton::START;
+    input_state |= static_cast<std::uint8_t>(Joypad::JoypadButton::START);
 }
 
 void RaylibFrontend::read_inputs() {
@@ -381,8 +381,7 @@ std::vector<std::uint8_t> RaylibFrontend::capture_savestate_thumbnail_rgba() con
   if (src.empty())
     return {};
 
-  std::vector<std::uint8_t> out(
-      static_cast<std::size_t>(savestate_thumb_w * savestate_thumb_h * 4));
+  std::vector<std::uint8_t> out(savestate_thumb_w * savestate_thumb_h * 4);
   for (int y = 0; y < savestate_thumb_h; ++y) {
     const int sy = (y * fb_height) / savestate_thumb_h;
     for (int x = 0; x < savestate_thumb_w; ++x) {

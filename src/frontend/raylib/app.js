@@ -772,6 +772,19 @@ function prettyBytes(n) {
   return `${v.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
 }
 
+function extractRomTitle(bytes) {
+  if (!(bytes instanceof Uint8Array) || bytes.length < 0x144) return "";
+  const start = 0x134;
+  const end = Math.min(bytes.length, start + 16);
+  let out = "";
+  for (let i = start; i < end; i++) {
+    const b = bytes[i];
+    if (b === 0x00) break;
+    if (b >= 0x20 && b <= 0x7e) out += String.fromCharCode(b);
+  }
+  return out.replace(/\s+/g, " ").trim();
+}
+
 function guessNameFromUrl(u) {
   try {
     const url = new URL(u, window.location.href);
@@ -1029,6 +1042,37 @@ var Module = {
     let romLoaded = false;
     let selectedStateId = "";
     const isCapturing = () => capturing != null;
+    let statusBaseText = status?.textContent?.trim?.() || "Load a ROM to begin";
+    let statusRestoreTimer = 0;
+
+    const clearStatusRestoreTimer = () => {
+      if (statusRestoreTimer) {
+        clearTimeout(statusRestoreTimer);
+        statusRestoreTimer = 0;
+      }
+    };
+
+    const setStatusText = (text) => {
+      if (!status) return;
+      clearStatusRestoreTimer();
+      status.textContent = String(text || "");
+    };
+
+    const setBaseStatus = (text) => {
+      statusBaseText = String(text || "").trim() || "Running";
+      clearStatusRestoreTimer();
+      setStatusText(statusBaseText);
+    };
+
+    const setTemporaryStatus = (text, durationMs = 1200) => {
+      clearStatusRestoreTimer();
+      setStatusText(text);
+      if (!romLoaded || durationMs <= 0) return;
+      statusRestoreTimer = setTimeout(() => {
+        setStatusText(statusBaseText);
+        statusRestoreTimer = 0;
+      }, durationMs);
+    };
 
     const formatStateTime = (ms) => {
       if (!Number.isFinite(ms)) return "Unknown time";
@@ -1046,26 +1090,26 @@ var Module = {
 
     const requestQuicksave = (kind = "quick", label = "") => {
       if (!romLoaded) {
-        status.textContent = "Load a ROM to save state";
+        setStatusText("Load a ROM to save state");
         return;
       }
       IroGBSaves.setPendingStateSaveRequest(kind, label);
       if (typeof Module._emscripten_request_quicksave === "function") {
         Module._emscripten_request_quicksave();
-        status.textContent = kind === "manual" ? "Saving manual state…" : "Saving quick state…";
+        setTemporaryStatus(kind === "manual" ? "Saving manual state…" : "Saving quick state…");
         scheduleSavestateRefresh();
       }
     };
 
     const requestQuickload = (stateId = "") => {
       if (!romLoaded) {
-        status.textContent = "Load a ROM to load state";
+        setStatusText("Load a ROM to load state");
         return;
       }
       if (stateId) IroGBSaves.requestLoadStateById(stateId);
       if (typeof Module._emscripten_request_quickload === "function") {
         Module._emscripten_request_quickload();
-        status.textContent = "Loading save state…";
+        setTemporaryStatus("Loading save state…");
       }
     };
 
@@ -1196,7 +1240,10 @@ var Module = {
       if (volumeSlider) volumeSlider.value = String(Math.round(v * 100));
       if (volumeValue) volumeValue.textContent = `${Math.round(v * 100)}%`;
     };
-    applyVolume(loadVolume());
+    const applySavedVolume = () => {
+      applyVolume(loadVolume());
+    };
+    applySavedVolume();
 
     function renderKeybinds() {
       if (!keybindList) return;
@@ -1337,7 +1384,7 @@ var Module = {
 
     statesButton?.addEventListener("click", () => {
       if (!romLoaded) {
-        status.textContent = "Load a ROM to manage save states";
+        setStatusText("Load a ROM to manage save states");
         return;
       }
       touch.clearAll();
@@ -1362,7 +1409,7 @@ var Module = {
       if (!selectedStateId) return;
       const ok = IroGBSaves.deleteStateById(selectedStateId);
       if (ok) {
-        status.textContent = "Save state deleted";
+        setTemporaryStatus("Save state deleted");
         selectedStateId = "";
         renderSavestateManager();
       }
@@ -1391,7 +1438,7 @@ var Module = {
       }
     };
 
-    const setLoadedUI = (fileName) => {
+    const setLoadedUI = (romTitle) => {
       romLoaded = true;
       loadButton.disabled = true;
       loadButton.classList.add("disabled");
@@ -1400,7 +1447,7 @@ var Module = {
         statesButton.disabled = false;
         statesButton.classList.remove("disabled");
       }
-      status.textContent = fileName ? fileName : "Running";
+      setBaseStatus(romTitle || "Running");
       renderSavestateManager();
     };
 
@@ -1409,10 +1456,13 @@ var Module = {
 
     const loadRomBytes = async (bytes, nameForUi) => {
       touch.clearAll();
-      status.textContent = "Hashing ROM…";
+      setStatusText("Hashing ROM…");
       const romId = await computeRomContentId(bytes);
-      setActiveRomSaveIdentity(romId, nameForUi || "ROM");
-      setLoadedUI(nameForUi);
+      const headerTitle = extractRomTitle(bytes);
+      const fallbackTitle = basename(nameForUi || "ROM").replace(/\.(gb|gbc)$/i, "").trim();
+      const romTitle = headerTitle || fallbackTitle || "ROM";
+      setActiveRomSaveIdentity(romId, romTitle);
+      setLoadedUI(romTitle);
       FS.writeFile("/rom.bin", bytes);
 
       // Close any UI dialogs BEFORE entering wasm (prevents "unwind" from skipping close)
@@ -1422,13 +1472,24 @@ var Module = {
 
       // Start on next tick so the close renders first
       setTimeout(() => {
+        const reapplyVolumeAfterStart = () => {
+          // Audio is initialized during emulator start; reapply persisted volume
+          // after startup so the first run honors the saved setting.
+          applySavedVolume();
+          setTimeout(() => applySavedVolume(), 120);
+        };
         try {
           Module._emscripten_start();
         } catch (e) {
           // Ignore Emscripten's internal unwind signal
-          if (isEmscriptenUnwind(e)) return;
+          if (isEmscriptenUnwind(e)) {
+            reapplyVolumeAfterStart();
+            return;
+          }
+          reapplyVolumeAfterStart();
           throw e;
         }
+        reapplyVolumeAfterStart();
       }, 0);
     };
     const handleBlobOrFile = async (blob, displayName) => {
@@ -1436,7 +1497,7 @@ var Module = {
       const bytes = new Uint8Array(await blob.arrayBuffer());
 
       if (ZIP_RE.test(name)) {
-        status.textContent = "Unzipping…";
+        setStatusText("Unzipping…");
         const picked = await unzipAndSelectRom(bytes);
         await loadRomBytes(picked.bytes, picked.name);
         return;
@@ -1452,7 +1513,7 @@ var Module = {
 
     const fetchRemote = async (url) => {
       const name = guessNameFromUrl(url);
-      status.textContent = "Downloading…";
+      setStatusText("Downloading…");
 
       // NOTE: Remote hosting must allow CORS for this to work.
       const resp = await fetch(url, {mode: "cors"});
@@ -1466,7 +1527,7 @@ var Module = {
       const looksZip = ZIP_RE.test(name) || ct.includes("zip");
 
       if (looksZip) {
-        status.textContent = "Unzipping…";
+        setStatusText("Unzipping…");
         const picked = await unzipAndSelectRom(bytes);
         addRecentUrl(url);
         await loadRomBytes(picked.bytes, picked.name);
@@ -1516,11 +1577,11 @@ var Module = {
 
       try {
         setTempDisabled(true);
-        status.textContent = "Loading…";
+        setStatusText("Loading…");
         await handleBlobOrFile(file, file.name);
       } catch (err) {
         console.warn(err);
-        status.textContent = (err && err.message) ? err.message : "Failed to load file";
+        setStatusText((err && err.message) ? err.message : "Failed to load file");
         setTempDisabled(false);
       }
     });
@@ -1535,7 +1596,7 @@ var Module = {
         await fetchRemote(url);
       } catch (err) {
         console.warn(err);
-        status.textContent = (err && err.message) ? err.message : "Failed to load URL";
+        setStatusText((err && err.message) ? err.message : "Failed to load URL");
         setTempDisabled(false);
       }
     });
@@ -1564,7 +1625,7 @@ var Module = {
         await handleBlobOrFile(file, file.name);
       } catch (err) {
         console.warn(err);
-        status.textContent = (err && err.message) ? err.message : "Failed to load file";
+        setStatusText((err && err.message) ? err.message : "Failed to load file");
         setTempDisabled(false);
       }
     });
@@ -1580,7 +1641,7 @@ var Module = {
             await fetchRemote(auto);
           } catch (err) {
             console.warn(err);
-            status.textContent = (err && err.message) ? err.message : "Failed to auto-load URL";
+            setStatusText((err && err.message) ? err.message : "Failed to auto-load URL");
             setTempDisabled(false);
           }
         })();

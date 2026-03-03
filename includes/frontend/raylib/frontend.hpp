@@ -41,8 +41,8 @@ private:
   static constexpr auto fb_width = 160;
 
   // Both invoked from the overridden read_inputs method
-  void read_controller_inputs(std::uint8_t &input_state) const;
-  void read_keyboard_inputs(std::uint8_t &input_state) const;
+  static void read_controller_inputs(std::uint8_t &input_state);
+  static void read_keyboard_inputs(std::uint8_t &input_state);
   void advance_cycles_with_preemption(std::size_t cycles);
   [[nodiscard]] bool has_pending_savestate_request() const;
   void process_pending_savestate_request();
