@@ -3,7 +3,9 @@
 
 #include "frontend/frontend.hpp"
 #include <array>
+#include <filesystem>
 #include <raylib.h>
+#include <vector>
 
 struct cart;
 
@@ -17,10 +19,12 @@ public:
   void clear(std::uint32_t c) override;
   void start() override;
 
-  void read_inputs() const;
-  void step_frame() const;
+  void read_inputs();
+  void step_frame();
   void present();
   void pump_audio();
+  void request_quicksave();
+  void request_quickload();
 
 #ifdef __EMSCRIPTEN__
   void tick_web();
@@ -37,8 +41,19 @@ private:
   static constexpr auto fb_width = 160;
 
   // Both invoked from the overridden read_inputs method
-  void read_controller_inputs(std::uint8_t &input_state) const;
-  void read_keyboard_inputs(std::uint8_t &input_state) const;
+  static void read_controller_inputs(std::uint8_t &input_state);
+  static void read_keyboard_inputs(std::uint8_t &input_state);
+  void advance_cycles_with_preemption(std::size_t cycles);
+  [[nodiscard]] bool has_pending_savestate_request() const;
+  void process_pending_savestate_request();
+  void process_quicksave_request();
+  void process_quickload_request();
+  [[nodiscard]] std::vector<std::uint8_t> capture_savestate_thumbnail_rgba() const;
+  [[nodiscard]] static std::filesystem::path
+  build_desktop_savestate_path(const cart &c);
+
+  static constexpr int savestate_thumb_w = 80;
+  static constexpr int savestate_thumb_h = 72;
 
   // We double buffer here, even though this is single threaded
   static constexpr auto nbuf = 2;
@@ -102,6 +117,11 @@ private:
   std::size_t rb_head{0}, rb_tail{0}, rb_size{0}; // rb_size in floats
 
   std::array<float, audio_chunk_frames * audio_channels> audio_tmp{};
+  bool quicksave_requested{false};
+  bool quickload_requested{false};
+#ifndef __EMSCRIPTEN__
+  std::filesystem::path quick_savestate_path_{};
+#endif
 };
 
 #endif // GBC_RAYLIB_FRONTEND_HPP
