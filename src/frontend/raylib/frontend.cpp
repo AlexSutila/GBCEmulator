@@ -22,11 +22,11 @@ EM_JS(int, web_load_active_save, (std::uint8_t *out_ptr, int out_cap), {
     if (!out_ptr || out_cap <= 0)
       return 0;
     const api = globalThis.IroGBSaves;
-    if (!api || typeof api.loadActiveSram != = "function")
+    if (!api || typeof api.loadActiveSram !== "function")
       return 0;
 
     const bytes = api.loadActiveSram();
-    if (!(bytes instanceof Uint8Array) || bytes.length == = 0)
+    if (!(bytes instanceof Uint8Array) || bytes.length === 0)
       return 0;
 
     const n = Math.min(bytes.length, out_cap | 0) | 0;
@@ -43,7 +43,7 @@ EM_JS(int, web_save_active_save, (const std::uint8_t *data_ptr, int len), {
     if (!data_ptr || len <= 0)
       return 0;
     const api = globalThis.IroGBSaves;
-    if (!api || typeof api.saveActiveSram != = "function")
+    if (!api || typeof api.saveActiveSram !== "function")
       return 0;
 
     const start = data_ptr >>> 0;
