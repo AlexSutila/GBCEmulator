@@ -73,6 +73,10 @@ private:
   void sync_io_status_to_ui();
   void setup_save_context(const cart &c, const std::string &display_label,
                           const std::string &rom_hash);
+  void setup_cheat_context(const cart &c, const std::string &display_label,
+                           const std::string &rom_hash);
+  void reset_cheat_context();
+  void save_active_cheats_locked() const;
   void process_pending_save();
   void enqueue_save_snapshot(std::vector<byte_t> snapshot);
 
@@ -111,6 +115,7 @@ private:
   std::vector<byte_t> deferred_save_data;
   bool deferred_save_pending{false};
   std::string active_rom_hash;
+  std::filesystem::path cheat_file_path_;
 
   // Savestate hotkeys (handled on emulation thread at safe points)
   std::atomic<bool> quicksave_requested{false};
@@ -186,7 +191,7 @@ private:
                                            std::time_t created_at);
   void enforce_max_quicksaves_locked();
   void erase_quick_savestate_cache_entry(const std::filesystem::path &state_path);
-  void remove_savestate_triplet(const std::filesystem::path &state_path);
+  static void remove_savestate_triplet(const std::filesystem::path &state_path);
   [[nodiscard]] std::optional<std::filesystem::path>
   write_savestate_bundle(const std::vector<byte_t> &blob, bool quick,
                          const std::string &label = {});

@@ -645,6 +645,30 @@ void GbcImGui::build_settings_window(UiState &state, SDLHost &host) {
         "Savestate folders: game-name - checksum");
   }
   {
+    static std::array<char, 512> cheat_root_input{};
+    static std::string last_cheat_root;
+    if (last_cheat_root != settings.cheat_root_dir) {
+      snprintf(cheat_root_input.data(), cheat_root_input.size(), "%s",
+               settings.cheat_root_dir.c_str());
+      last_cheat_root = settings.cheat_root_dir;
+    }
+
+    ImGui::SetNextItemWidth(320.0f * dpi_scale);
+    if (ImGui::InputText("Cheat dir", cheat_root_input.data(),
+                         cheat_root_input.size())) {
+      settings.cheat_root_dir = cheat_root_input.data();
+      last_cheat_root = settings.cheat_root_dir;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Reset##cheat_root")) {
+      settings.cheat_root_dir = "./cheats";
+      snprintf(cheat_root_input.data(), cheat_root_input.size(), "%s",
+               settings.cheat_root_dir.c_str());
+      last_cheat_root = settings.cheat_root_dir;
+    }
+    ImGui::TextDisabled("Cheats: game-name - checksum.cht");
+  }
+  {
     ImGui::SetNextItemWidth(120.0f * dpi_scale);
     if (ImGui::InputInt("Max quicksaves", &settings.max_quicksaves)) {
       if (settings.max_quicksaves < 0)
@@ -819,7 +843,7 @@ void GbcImGui::build_cheats_window(UiState &state) {
         state.selected_cheat_idx >= 0 &&
         state.selected_cheat_idx < static_cast<int>(cheats.size());
     if (!has_selection) {
-      ImGui::TextDisabled("Select a cheat from the list to edit");
+      ImGui::TextDisabled("Select a cheat from the list to edit.\nCheat codes are tied to ROMs.");
     } else {
       auto &entry = cheats[static_cast<std::size_t>(state.selected_cheat_idx)];
 
@@ -827,11 +851,6 @@ void GbcImGui::build_cheats_window(UiState &state) {
         settings_dirty = true;
       if (ImGui::InputText("Code", &entry.code))
         settings_dirty = true;
-      if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip(
-            "Examples: 01FF7CC1 (GameShark), 00A-17B-3B6 (Game Genie), "
-            "00C8E0-63 (CodeBreaker), C000?0C:00 (Raw compare)");
-      }
 
       int format =
           std::clamp(entry.format, 0, static_cast<int>(kCheatFormatLabels.size()) - 1);
@@ -859,10 +878,9 @@ void GbcImGui::build_cheats_window(UiState &state) {
     ImGui::EndTable();
   }
 
-  if (settings_dirty)
-  {
-    settings.save();
+  if (settings_dirty) {
     state.cheats_dirty = true;
+    state.cheats_file_dirty = true;
   }
   ImGui::End();
 }

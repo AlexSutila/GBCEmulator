@@ -4,8 +4,10 @@
 #include <ctime>
 #include <fstream>
 #include <iomanip>
-#include <unordered_set>
 #include <sstream>
+#include <string_view>
+#include <unordered_map>
+#include <unordered_set>
 
 namespace {
 std::string strip_colons(const std::string &path) {
@@ -143,7 +145,7 @@ std::filesystem::path resolve_savestate_root_dir(std::string dir_text) {
   if (dir_text.empty())
     dir_text = "./savestates";
 
-  std::filesystem::path root = std::move(dir_text);
+  std::filesystem::path root = dir_text;
   if (root.empty())
     root = "./savestates";
 
@@ -154,6 +156,295 @@ std::filesystem::path resolve_savestate_root_dir(std::string dir_text) {
     }
   }
   return root.lexically_normal();
+}
+
+std::filesystem::path resolve_cheat_root_dir(std::string dir_text) {
+  if (dir_text.empty())
+    dir_text = "./cheats";
+
+  std::filesystem::path root = dir_text;
+  if (root.empty())
+    root = "./cheats";
+
+  if (root.is_relative()) {
+    std::error_code ec;
+    if (const auto cwd = std::filesystem::current_path(ec); !ec) {
+      root = cwd / root;
+    }
+  }
+  return root.lexically_normal();
+}
+
+std::string trim_ascii(std::string_view text) {
+  std::size_t begin = 0;
+  std::size_t end = text.size();
+
+  while (begin < end &&
+         std::isspace(static_cast<unsigned char>(text[begin])) != 0) {
+    ++begin;
+  }
+  while (end > begin &&
+         std::isspace(static_cast<unsigned char>(text[end - 1])) != 0) {
+    --end;
+  }
+  return std::string(text.substr(begin, end - begin));
+}
+
+std::string to_ascii_lower(std::string text) {
+  for (char &c : text) {
+    c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+  }
+  return text;
+}
+
+std::string unescape_libretro_value(std::string value) {
+  value = trim_ascii(value);
+  if (value.size() >= 2 && value.front() == '"' && value.back() == '"') {
+    std::string out;
+    out.reserve(value.size() - 2);
+    for (std::size_t i = 1; i + 1 < value.size(); ++i) {
+      char c = value[i];
+      if (c == '\\' && i + 2 < value.size()) {
+        switch (const char esc = value[++i]) {
+        case 'n':
+          out.push_back('\n');
+          break;
+        case 'r':
+          out.push_back('\r');
+          break;
+        case 't':
+          out.push_back('\t');
+          break;
+        default:
+          out.push_back(esc);
+          break;
+        }
+      } else {
+        out.push_back(c);
+      }
+    }
+    return out;
+  }
+  return value;
+}
+
+std::string escape_libretro_value(const std::string_view value) {
+  std::string out;
+  out.reserve(value.size() + 8);
+  for (const char c : value) {
+    switch (c) {
+    case '\\':
+      out += "\\\\";
+      break;
+    case '"':
+      out += "\\\"";
+      break;
+    case '\n':
+      out += "\\n";
+      break;
+    case '\r':
+      out += "\\r";
+      break;
+    case '\t':
+      out += "\\t";
+      break;
+    default:
+      out.push_back(c);
+      break;
+    }
+  }
+  return out;
+}
+
+bool parse_bool_value(const std::string &text, const bool fallback) {
+  const std::string lower = to_ascii_lower(trim_ascii(text));
+  if (lower == "1" || lower == "true" || lower == "yes" || lower == "on")
+    return true;
+  if (lower == "0" || lower == "false" || lower == "no" || lower == "off")
+    return false;
+  return fallback;
+}
+
+std::optional<int> parse_int_value(const std::string &text) {
+  const std::string trimmed = trim_ascii(text);
+  if (trimmed.empty())
+    return std::nullopt;
+  try {
+    std::size_t consumed = 0;
+    const int parsed = std::stoi(trimmed, &consumed, 10);
+    if (consumed != trimmed.size())
+      return std::nullopt;
+    return parsed;
+  } catch (...) {
+    return std::nullopt;
+  }
+}
+
+std::optional<int> parse_cheat_index(std::string_view key) {
+  if (!key.starts_with("cheat"))
+    return std::nullopt;
+  std::size_t pos = 5;
+  if (pos >= key.size() ||
+      std::isdigit(static_cast<unsigned char>(key[pos])) == 0) {
+    return std::nullopt;
+  }
+  const std::size_t begin = pos;
+  while (pos < key.size() &&
+         std::isdigit(static_cast<unsigned char>(key[pos])) != 0) {
+    ++pos;
+  }
+  if (pos >= key.size() || key[pos] != '_')
+    return std::nullopt;
+  try {
+    return std::stoi(std::string(key.substr(begin, pos - begin)));
+  } catch (...) {
+    return std::nullopt;
+  }
+}
+
+bool load_libretro_cheat_file(const std::filesystem::path &path,
+                              std::vector<Settings::CheatEntry> &out) {
+  out.clear();
+  std::ifstream f(path);
+  if (!f)
+    return false;
+
+  std::unordered_map<std::string, std::string> kv;
+  std::string line;
+  bool first_line = true;
+  while (std::getline(f, line)) {
+    if (first_line && line.size() >= 3 &&
+        static_cast<unsigned char>(line[0]) == 0xEF &&
+        static_cast<unsigned char>(line[1]) == 0xBB &&
+        static_cast<unsigned char>(line[2]) == 0xBF) {
+      line.erase(0, 3);
+    }
+    first_line = false;
+
+    std::string trimmed = trim_ascii(line);
+    if (trimmed.empty())
+      continue;
+    if (trimmed.front() == '#' || trimmed.front() == ';')
+      continue;
+
+    const auto eq = trimmed.find('=');
+    if (eq == std::string::npos)
+      continue;
+
+    std::string key = to_ascii_lower(trim_ascii(trimmed.substr(0, eq)));
+    if (key.empty())
+      continue;
+    std::string value = unescape_libretro_value(trimmed.substr(eq + 1));
+    kv[std::move(key)] = std::move(value);
+  }
+
+  int declared_count = -1;
+  if (const auto it = kv.find("cheats"); it != kv.end()) {
+    if (const auto parsed = parse_int_value(it->second); parsed.has_value() &&
+                                                       *parsed >= 0) {
+      declared_count = *parsed;
+    }
+  }
+
+  int max_seen_index = -1;
+  for (const auto & [key, value] : kv) {
+    static_cast<void>(value);
+    if (const auto idx = parse_cheat_index(key);
+        idx.has_value() && *idx > max_seen_index) {
+      max_seen_index = *idx;
+    }
+  }
+
+  const int total_slots = declared_count >= 0 ? declared_count : max_seen_index + 1;
+  if (total_slots <= 0)
+    return true;
+
+  out.reserve(static_cast<std::size_t>(total_slots));
+  constexpr int format_min = GameBoyColor::CHEAT_AUTO;
+  constexpr int format_max = GameBoyColor::CHEAT_CODEBREAKER;
+
+  for (int i = 0; i < total_slots; ++i) {
+    const std::string prefix = "cheat" + std::to_string(i) + "_";
+    const auto desc_it = kv.find(prefix + "desc");
+    const auto code_it = kv.find(prefix + "code");
+    const auto enabled_it = kv.find(prefix + "enable");
+    const auto notes_it = kv.find(prefix + "note");
+    const auto format_it = kv.find(prefix + "gbc_format");
+    const auto format_fallback_it = kv.find(prefix + "format");
+
+    const bool has_any_field =
+        desc_it != kv.end() || code_it != kv.end() || enabled_it != kv.end() ||
+        notes_it != kv.end() || format_it != kv.end() ||
+        format_fallback_it != kv.end();
+    if (!has_any_field)
+      continue;
+
+    Settings::CheatEntry entry{};
+    if (desc_it != kv.end())
+      entry.name = desc_it->second;
+    if (code_it != kv.end())
+      entry.code = code_it->second;
+    if (enabled_it != kv.end())
+      entry.enabled = parse_bool_value(enabled_it->second, true);
+    if (notes_it != kv.end())
+      entry.notes = notes_it->second;
+
+    int format = static_cast<int>(GameBoyColor::CHEAT_AUTO);
+    if (format_it != kv.end()) {
+      if (const auto parsed = parse_int_value(format_it->second); parsed.has_value()) {
+        format = *parsed;
+      }
+    } else if (format_fallback_it != kv.end()) {
+      if (const auto parsed =
+              parse_int_value(format_fallback_it->second); parsed.has_value()) {
+        format = *parsed;
+      }
+    }
+    if (format < format_min || format > format_max)
+      format = static_cast<int>(GameBoyColor::CHEAT_AUTO);
+    entry.format = format;
+
+    out.push_back(std::move(entry));
+  }
+
+  return true;
+}
+
+bool save_libretro_cheat_file(const std::filesystem::path &path,
+                              const std::vector<Settings::CheatEntry> &cheats) {
+  if (path.empty())
+    return false;
+
+  if (const auto parent = path.parent_path(); !parent.empty()) {
+    std::error_code ec;
+    std::filesystem::create_directories(parent, ec);
+  }
+
+  std::ofstream f(path, std::ios::trunc);
+  if (!f)
+    return false;
+
+  constexpr int format_min = GameBoyColor::CHEAT_AUTO;
+  constexpr int format_max = GameBoyColor::CHEAT_CODEBREAKER;
+
+  f << "cheats = " << cheats.size() << '\n';
+  for (std::size_t i = 0; i < cheats.size(); ++i) {
+    const auto &entry = cheats[i];
+    const int format = std::clamp(entry.format, format_min, format_max);
+    f << '\n';
+    f << "cheat" << i << "_desc = \""
+      << escape_libretro_value(entry.name) << "\"\n";
+    f << "cheat" << i << "_code = \""
+      << escape_libretro_value(entry.code) << "\"\n";
+    f << "cheat" << i << "_enable = " << (entry.enabled ? "true" : "false")
+      << '\n';
+    if (!entry.notes.empty()) {
+      f << "cheat" << i << "_note = \""
+        << escape_libretro_value(entry.notes) << "\"\n";
+    }
+    f << "cheat" << i << "_gbc_format = " << format << '\n';
+  }
+  return static_cast<bool>(f);
 }
 
 std::string savestate_timestamp_slug(const std::time_t t) {
@@ -221,6 +512,73 @@ void SDL3Frontend::setup_save_context(const cart &c,
   }
   deferred_save_data.clear();
   deferred_save_pending = false;
+}
+
+void SDL3Frontend::setup_cheat_context(const cart &c,
+                                       const std::string &display_label,
+                                       const std::string &rom_hash) {
+  std::string stem = c.file_path.stem().string();
+  if (stem.empty())
+    stem = std::filesystem::path(strip_colons(display_label)).stem().string();
+  if (stem.empty())
+    stem = c.header.title();
+  if (stem.empty())
+    stem = "cartridge";
+  stem = sanitize_savestate_label(stem, kSavestateGameDirNameMaxChars);
+  if (stem.empty())
+    stem = "cartridge";
+
+  const std::string checksum_short = shorten_checksum(
+      normalize_hex_lower(rom_hash), kSavestateChecksumShortChars);
+  const std::filesystem::path cheat_root =
+      resolve_cheat_root_dir(gui.get_settings_c().cheat_root_dir);
+  std::error_code ec;
+  std::filesystem::create_directories(cheat_root, ec);
+
+  std::filesystem::path cheat_file_path;
+  if (checksum_short.empty()) {
+    cheat_file_path = cheat_root / (stem + ".cht");
+  } else {
+    cheat_file_path = cheat_root / (stem + " - " + checksum_short + ".cht");
+  }
+
+  std::vector<Settings::CheatEntry> loaded;
+  std::error_code exists_ec;
+  if (std::filesystem::exists(cheat_file_path, exists_ec) &&
+      !load_libretro_cheat_file(cheat_file_path, loaded)) {
+    Logger::push(LogLevel::Warning, "Cheats", "Failed to load cheat file",
+                 "Could not read cheats from: " + cheat_file_path.string());
+  }
+
+  std::lock_guard lock(ui_mutex);
+  cheat_file_path_ = std::move(cheat_file_path);
+  auto &cheats = gui.get_settings().cheats;
+  cheats = std::move(loaded);
+  ui_state.selected_cheat_idx = cheats.empty() ? -1 : 0;
+  ui_state.cheats_dirty = true;
+  ui_state.cheats_file_dirty = false;
+}
+
+void SDL3Frontend::reset_cheat_context() {
+  std::lock_guard lock(ui_mutex);
+  cheat_file_path_.clear();
+  auto &cheats = gui.get_settings().cheats;
+  const bool had_cheats = !cheats.empty();
+  cheats.clear();
+  ui_state.selected_cheat_idx = -1;
+  ui_state.cheats_file_dirty = false;
+  if (had_cheats)
+    ui_state.cheats_dirty = true;
+}
+
+void SDL3Frontend::save_active_cheats_locked() const {
+  if (cheat_file_path_.empty())
+    return;
+
+  if (!save_libretro_cheat_file(cheat_file_path_, gui.get_settings_c().cheats)) {
+    Logger::push(LogLevel::Warning, "Cheats", "Failed to save cheat file",
+                 "Could not write cheats to: " + cheat_file_path_.string());
+  }
 }
 
 void SDL3Frontend::enqueue_save_snapshot(std::vector<byte_t> snapshot) {

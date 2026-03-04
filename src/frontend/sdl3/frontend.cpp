@@ -139,6 +139,7 @@ void SDL3Frontend::start() {
     if (consume_load_rom_request(rom_source)) {
       join_emu_thread_if_running();
       reset_savestate_context();
+      reset_cheat_context();
       process_pending_save();
       active_rom_hash.clear();
       start_rom_io_job(rom_source);
@@ -150,6 +151,7 @@ void SDL3Frontend::start() {
         cart cart_ctx = load_cart_fs(rom_on_disk.c_str());
         const std::string rom_hash = sha256_hex(cart_ctx.rom_span());
         setup_save_context(cart_ctx, display_label, rom_hash);
+        setup_cheat_context(cart_ctx, display_label, rom_hash);
         start_emulation(cart_ctx, display_label, rom_hash, bios_path,
                         active_save_path);
       } catch (std::exception &e) {
@@ -279,6 +281,10 @@ void SDL3Frontend::render_frame() {
     if (ui_state.cheats_dirty) {
       ui_state.cheats_dirty = false;
       cheats_revision_.fetch_add(1, std::memory_order_release);
+    }
+    if (ui_state.cheats_file_dirty) {
+      ui_state.cheats_file_dirty = false;
+      save_active_cheats_locked();
     }
     build_savestate_manager_window_locked();
     poll_zip_choice_response();

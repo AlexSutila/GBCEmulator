@@ -10,7 +10,6 @@
 #include "ppu/ppu.hpp"
 #include "savestate/codec.hpp"
 #include "timer.hpp"
-#include <cctype>
 #include <initializer_list>
 #include <memory>
 #include <optional>
