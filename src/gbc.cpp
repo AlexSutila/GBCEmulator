@@ -10,6 +10,7 @@
 #include "ppu/ppu.hpp"
 #include "savestate/codec.hpp"
 #include "timer.hpp"
+#include <cctype>
 #include <initializer_list>
 #include <memory>
 #include <optional>
@@ -79,6 +80,14 @@ bool is_cheat_writable_addr(const addr_t addr) {
   return true;
 }
 
+bool is_cheat_overridable_addr(const addr_t addr) {
+  if (addr >= 0xFEA0 && addr <= 0xFEFF) // Not usable area
+    return false;
+  if (addr == 0xFFFF) // IE register is often too destructive to freeze
+    return false;
+  return true;
+}
+
 bool is_game_genie_addr(const addr_t addr) {
   return addr <= 0x7FFF;
 }
@@ -117,6 +126,44 @@ std::optional<ParsedCheat> parse_gameshark_cheat(const std::string_view code) {
     return std::nullopt;
 
   if (*command != 0x01 && *command != 0x0D)
+    return std::nullopt;
+
+  const auto addr =
+      static_cast<addr_t>((static_cast<addr_t>(*addr_hi) << 8) | *addr_lo);
+  if (!is_cheat_writable_addr(addr))
+    return std::nullopt;
+
+  return ParsedCheat{
+      .addr = addr,
+      .value = *value,
+  };
+}
+
+std::optional<ParsedCheat> parse_codebreaker_cheat(const std::string_view code) {
+  // mGBA-style GB CodeBreaker parsing:
+  //   XXXXXX-YY
+  // where XXXXXX = command/address bytes and YY = value byte.
+  // The high command byte is accepted but ignored for now.
+  std::string normalized;
+  normalized.reserve(code.size());
+  for (const char c : code) {
+    if (std::isspace(static_cast<unsigned char>(c)) != 0)
+      continue;
+    normalized.push_back(c);
+  }
+
+  if (normalized.size() != 9 || normalized[6] != '-')
+    return std::nullopt;
+
+  const auto cmd = parse_hex_byte(std::string_view(normalized).substr(0, 2));
+  const auto addr_hi =
+      parse_hex_byte(std::string_view(normalized).substr(2, 2));
+  const auto addr_lo =
+      parse_hex_byte(std::string_view(normalized).substr(4, 2));
+  const auto value =
+      parse_hex_byte(std::string_view(normalized).substr(7, 2));
+  if (!cmd.has_value() || !addr_hi.has_value() || !addr_lo.has_value() ||
+      !value.has_value())
     return std::nullopt;
 
   const auto addr =
@@ -199,7 +246,43 @@ parse_gameshark_override(const std::string_view code) {
 
 std::optional<AddressBus::CheatOverride>
 parse_raw_override(const std::string_view code) {
+  // Extended raw compare format:
+  //   AAAA?CC:VV
+  // Applies VV only when the original byte at AAAA equals CC.
+  if (const auto qmark = code.find('?'); qmark != std::string_view::npos) {
+    const auto colon = code.find(':', qmark + 1);
+    if (colon == std::string_view::npos)
+      return std::nullopt;
+
+    const auto addr_hex = strip_non_hex(code.substr(0, qmark));
+    const auto cmp_hex =
+        strip_non_hex(code.substr(qmark + 1, colon - (qmark + 1)));
+    const auto value_hex = strip_non_hex(code.substr(colon + 1));
+    if (addr_hex.size() != 4 || cmp_hex.size() != 2 || value_hex.size() != 2)
+      return std::nullopt;
+
+    const auto addr = parse_hex_addr(addr_hex);
+    const auto compare = parse_hex_byte(cmp_hex);
+    const auto value = parse_hex_byte(value_hex);
+    if (!addr.has_value() || !compare.has_value() || !value.has_value())
+      return std::nullopt;
+    if (!is_cheat_overridable_addr(*addr))
+      return std::nullopt;
+
+    return AddressBus::CheatOverride{
+        .addr = *addr,
+        .value = *value,
+        .has_compare = true,
+        .compare = *compare,
+    };
+  }
+
   return to_override(parse_raw_cheat(code));
+}
+
+std::optional<AddressBus::CheatOverride>
+parse_codebreaker_override(const std::string_view code) {
+  return to_override(parse_codebreaker_cheat(code));
 }
 
 using CheatParser =
@@ -224,6 +307,8 @@ compile_cheat(const std::string_view code,
     return parse_gameshark_override(code);
   case fmt::CHEAT_RAW:
     return parse_raw_override(code);
+  case fmt::CHEAT_CODEBREAKER:
+    return parse_codebreaker_override(code);
   case fmt::CHEAT_GAME_GENIE:
     return parse_gamegenie_cheat(code);
   case fmt::CHEAT_AUTO:
@@ -231,12 +316,11 @@ compile_cheat(const std::string_view code,
       if (const auto gg = parse_gamegenie_cheat(code); gg.has_value())
         return gg;
     }
-    return first_match(
-        code, {parse_gameshark_override, parse_raw_override,
-               parse_gamegenie_cheat});
+    return first_match(code, {parse_codebreaker_override, parse_gameshark_override,
+                              parse_raw_override, parse_gamegenie_cheat});
   default:
     return first_match(code, {parse_gameshark_override, parse_raw_override,
-                              parse_gamegenie_cheat});
+                              parse_codebreaker_override, parse_gamegenie_cheat});
   }
 }
 } // namespace

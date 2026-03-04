@@ -43,7 +43,7 @@ struct Settings {
     std::string name;
     std::string code;
     std::string notes;
-    int format{}; // 0=Auto, 1=GameShark, 2=Game Genie, 3=Raw
+    int format{}; // 0=Auto, 1=GameShark/Xploder, 2=Game Genie, 3=Raw (+AAAA?CC:VV), 4=CodeBreaker
   };
   std::vector<CheatEntry> cheats;
   static Settings load(const std::string &filename = ".gbc.config.json");

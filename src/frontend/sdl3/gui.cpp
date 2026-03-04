@@ -48,8 +48,10 @@ read_thumb_raw_argb_gui(const std::filesystem::path &path, const int w,
   return out;
 }
 
-constexpr std::array<const char *, 4> kCheatFormatLabels{
-    "Auto detect", "GameShark/Xploder", "Game Genie", "Raw (addr:value)"};
+constexpr std::array<const char *, 5> kCheatFormatLabels{
+    "Auto detect", "GameShark/Xploder",
+    "Game Genie", "Raw (addr:value, addr?cmp:value)",
+    "CodeBreaker"};
 
 std::string cheat_display_name(const Settings::CheatEntry &entry,
                                const std::size_t index) {
@@ -827,7 +829,8 @@ void GbcImGui::build_cheats_window(UiState &state) {
         settings_dirty = true;
       if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip(
-            "Examples: 01FF7CC1 (GameShark), 00A-17B-3B6 (Game Genie)");
+            "Examples: 01FF7CC1 (GameShark), 00A-17B-3B6 (Game Genie), "
+            "00C8E0-63 (CodeBreaker), C000?0C:00 (Raw compare)");
       }
 
       int format =
@@ -837,7 +840,7 @@ void GbcImGui::build_cheats_window(UiState &state) {
         settings_dirty = true;
       }
       if (ImGui::Combo("Format", &format, kCheatFormatLabels.data(),
-                       static_cast<int>(kCheatFormatLabels.size()))) {
+                       kCheatFormatLabels.size())) {
         entry.format = format;
         settings_dirty = true;
       }
@@ -850,7 +853,7 @@ void GbcImGui::build_cheats_window(UiState &state) {
         settings_dirty = true;
 
       ImGui::TextDisabled(
-          "Game Genie compare byte is honored when present.");
+          "Compare is supported in Game Genie and Raw (AAAA?CC:VV).");
     }
 
     ImGui::EndTable();

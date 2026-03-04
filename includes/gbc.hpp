@@ -40,6 +40,7 @@ public:
     CHEAT_GAMESHARK = 1,
     CHEAT_GAME_GENIE = 2,
     CHEAT_RAW = 3,
+    CHEAT_CODEBREAKER = 4,
   };
   struct CheatCode {
     bool enabled{true};
