@@ -54,6 +54,10 @@ std::optional<addr_t> parse_hex_addr(const std::string_view sv) {
   return out;
 }
 
+std::optional<unsigned> parse_hex_nibble(const char c) {
+  return hex_nibble(c);
+}
+
 std::string strip_non_hex(const std::string_view text) {
   std::string out;
   out.reserve(text.size());
@@ -72,6 +76,10 @@ bool is_cheat_writable_addr(const addr_t addr) {
   if (addr == 0xFFFF) // IE register is often too destructive to freeze
     return false;
   return true;
+}
+
+bool is_game_genie_addr(const addr_t addr) {
+  return addr <= 0x7FFF;
 }
 
 std::optional<ParsedCheat> parse_raw_cheat(const std::string_view code) {
@@ -118,6 +126,58 @@ std::optional<ParsedCheat> parse_gameshark_cheat(const std::string_view code) {
       .addr = addr,
       .value = *value,
   };
+}
+
+std::optional<AddressBus::CheatOverride>
+parse_gamegenie_cheat(const std::string_view code) {
+  // Game Boy Game Genie:
+  // - 6 digits:  ABC-DEF
+  //   value=AB, addr=(F xor F)CDE
+  // - 9 digits:  ABC-DEF-GHI
+  //   optional compare byte: ROR2(GI) xor BA (middle H nibble is ignored)
+  const auto hex = strip_non_hex(code);
+  if (hex.size() != 6 && hex.size() != 9)
+    return std::nullopt;
+
+  const auto value = parse_hex_byte(std::string_view(hex).substr(0, 2));
+  const auto c = parse_hex_nibble(hex[2]);
+  const auto d = parse_hex_nibble(hex[3]);
+  const auto e = parse_hex_nibble(hex[4]);
+  const auto f = parse_hex_nibble(hex[5]);
+  if (!value.has_value() || !c.has_value() || !d.has_value() ||
+      !e.has_value() || !f.has_value())
+    return std::nullopt;
+
+  const auto addr_hi = *f ^ 0xF;
+  const auto addr = static_cast<addr_t>((addr_hi << 12) | (*c << 8) |
+                                          (*d << 4) | *e);
+  if (!is_game_genie_addr(addr))
+    return std::nullopt;
+
+  AddressBus::CheatOverride out{
+      .addr = addr,
+      .value = *value,
+      .has_compare = false,
+      .compare = 0,
+  };
+
+  if (hex.size() == 9) {
+    const auto g = parse_hex_nibble(hex[6]);
+    const auto i = parse_hex_nibble(hex[8]);
+    if (!g.has_value() || !i.has_value())
+      return std::nullopt;
+    const auto encoded = static_cast<byte_t>((*g << 4) | *i);
+    const auto ror2 = static_cast<byte_t>((encoded >> 2) | (encoded << 6));
+    out.has_compare = true;
+    out.compare = static_cast<byte_t>(ror2 ^ 0xBA);
+  }
+
+  return out;
+}
+
+bool looks_like_gamegenie(const std::string_view code) {
+  // Keep this lenient; explicit format selection still exists in UI.
+  return code.find('-') != std::string_view::npos;
 }
 } // namespace
 
@@ -353,27 +413,66 @@ GameBoyColor::configure_cheats(const std::vector<CheatCode>& cheats) {
       continue;
     cheat_stats_.enabled += 1;
 
-    std::optional<ParsedCheat> compiled;
+    std::optional<AddressBus::CheatOverride> compiled;
     switch (static_cast<CheatFormat>(format)) {
     case CHEAT_GAMESHARK:
-      compiled = parse_gameshark_cheat(code);
+      if (const auto gs = parse_gameshark_cheat(code); gs.has_value()) {
+        compiled = AddressBus::CheatOverride{
+            .addr = gs->addr,
+            .value = gs->value,
+        };
+      }
       break;
     case CHEAT_RAW:
-      compiled = parse_raw_cheat(code);
+      if (const auto raw = parse_raw_cheat(code); raw.has_value()) {
+        compiled = AddressBus::CheatOverride{
+            .addr = raw->addr,
+            .value = raw->value,
+        };
+      }
       break;
     case CHEAT_AUTO:
-      compiled = parse_gameshark_cheat(code);
+      if (looks_like_gamegenie(code))
+        compiled = parse_gamegenie_cheat(code);
+      if (!compiled.has_value()) {
+        if (const auto gs = parse_gameshark_cheat(code); gs.has_value()) {
+          compiled = AddressBus::CheatOverride{
+              .addr = gs->addr,
+              .value = gs->value,
+          };
+        }
+      }
+      if (!compiled.has_value()) {
+        if (const auto raw = parse_raw_cheat(code); raw.has_value()) {
+          compiled = AddressBus::CheatOverride{
+              .addr = raw->addr,
+              .value = raw->value,
+          };
+        }
+      }
       if (!compiled.has_value())
-        compiled = parse_raw_cheat(code);
+        compiled = parse_gamegenie_cheat(code);
       break;
     case CHEAT_GAME_GENIE:
-      // TODO: Implement Game Genie support
-      compiled = std::nullopt;
+      compiled = parse_gamegenie_cheat(code);
       break;
     default:
-      compiled = parse_gameshark_cheat(code);
+      if (const auto gs = parse_gameshark_cheat(code); gs.has_value()) {
+        compiled = AddressBus::CheatOverride{
+            .addr = gs->addr,
+            .value = gs->value,
+        };
+      }
+      if (!compiled.has_value()) {
+        if (const auto raw = parse_raw_cheat(code); raw.has_value()) {
+          compiled = AddressBus::CheatOverride{
+              .addr = raw->addr,
+              .value = raw->value,
+          };
+        }
+      }
       if (!compiled.has_value())
-        compiled = parse_raw_cheat(code);
+        compiled = parse_gamegenie_cheat(code);
       break;
     }
 
@@ -381,10 +480,7 @@ GameBoyColor::configure_cheats(const std::vector<CheatCode>& cheats) {
       cheat_stats_.rejected += 1;
       continue;
     }
-    overrides.push_back(AddressBus::CheatOverride{
-        .addr = compiled->addr,
-        .value = compiled->value,
-    });
+    overrides.push_back(*compiled);
   }
 
   if (bus)

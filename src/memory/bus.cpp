@@ -156,22 +156,7 @@ byte_t &AddressBus::hram_byte(const addr_t addr) const {
   return hram[(addr - 0xFF80) & HRAM_MASK];
 }
 
-byte_t AddressBus::read_byte_safe(const addr_t addr) const {
-  if (io_registers.contains(addr)) {
-    assert((addr >= 0xFF00 && addr <= 0xFF7F) || addr == 0xFFFF);
-    const auto & [reg, savestate_policy] = io_registers.at(addr);
-    return reg->peek(); // Const
-  }
-  return read_byte(addr, false);
-}
-
-byte_t AddressBus::read_byte(const addr_t addr, bool debug) const {
-  try_brk(addr, Debug::BRK_ADDRESS_READ);
-  if (is_conflicting(addr)) [[unlikely]]
-    return open_bus();
-  if (has_cheat_overrides_ && cheat_mask_[addr]) [[unlikely]]
-    return cheat_values_[addr];
-
+byte_t AddressBus::read_byte_no_cheat(const addr_t addr, const bool safe) const {
   /* Read from boot ROM if it is mapped (boot ROM overrides reads only) */
   if (is_boot_rom_range(addr))
     return bios_->read_byte(addr);
@@ -199,15 +184,50 @@ byte_t AddressBus::read_byte(const addr_t addr, bool debug) const {
   /* Read from memory mapped IO register */
   if (io_registers.contains(addr)) {
     assert((addr >= 0xFF00 && addr <= 0xFF7F) || addr == 0xFFFF);
-    const auto & [reg, savestate_policy] = io_registers.at(addr);
-    return reg->read();
+    const auto &[reg, savestate_policy] = io_registers.at(addr);
+    (void)savestate_policy;
+    return safe ? reg->peek() : reg->read();
   }
 
-  /* Read from to High RAM */
+  /* Read from High RAM */
   if (is_hram_range(addr))
     return hram_byte(addr);
 
   return open_bus();
+}
+
+byte_t AddressBus::read_byte_safe(const addr_t addr) const {
+  if (is_conflicting(addr)) [[unlikely]]
+    return open_bus();
+
+  if (has_cheat_overrides_) [[unlikely]] {
+    const auto & [enabled, value, has_compare, compare] = cheat_overrides_[addr];
+    if (enabled) {
+      if (!has_compare)
+        return value;
+      const auto original = read_byte_no_cheat(addr, true);
+      return original == compare ? value : original;
+    }
+  }
+  return read_byte_no_cheat(addr, true);
+}
+
+byte_t AddressBus::read_byte(const addr_t addr, const bool debug) const {
+  if (debug)
+    try_brk(addr, Debug::BRK_ADDRESS_READ);
+  if (is_conflicting(addr)) [[unlikely]]
+    return open_bus();
+
+  if (has_cheat_overrides_) [[unlikely]] {
+    const auto & [enabled, value, has_compare, compare] = cheat_overrides_[addr];
+    if (enabled) {
+      if (!has_compare)
+        return value;
+      const auto original = read_byte_no_cheat(addr, false);
+      return original == compare ? value : original;
+    }
+  }
+  return read_byte_no_cheat(addr, false);
 }
 
 void AddressBus::write_byte(const addr_t addr, const byte_t value) const {
@@ -290,7 +310,7 @@ void AddressBus::release(const BusConflictTypes conflict_mask) {
 
 void AddressBus::clear_cheat_overrides() {
   for (const addr_t addr : cheat_touched_addrs_)
-    cheat_mask_[addr] = false;
+    cheat_overrides_[addr].enabled = false;
   cheat_touched_addrs_.clear();
   has_cheat_overrides_ = false;
 }
@@ -299,12 +319,16 @@ void AddressBus::set_cheat_overrides(std::span<const CheatOverride> overrides) {
   clear_cheat_overrides();
   cheat_touched_addrs_.reserve(overrides.size());
 
-  for (const auto & [addr, value] : overrides) {
+  for (const auto &[addr, value, has_compare, compare] : overrides) {
     const auto idx = static_cast<std::size_t>(addr);
-    if (!cheat_mask_[idx])
+    if (!cheat_overrides_[idx].enabled)
       cheat_touched_addrs_.push_back(addr);
-    cheat_mask_[idx] = true;
-    cheat_values_[idx] = value;
+    cheat_overrides_[idx] = CheatReadOverride{
+        .enabled = true,
+        .value = value,
+        .has_compare = has_compare,
+        .compare = compare,
+    };
   }
   has_cheat_overrides_ = !cheat_touched_addrs_.empty();
 }

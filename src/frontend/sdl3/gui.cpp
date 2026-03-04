@@ -844,12 +844,13 @@ void GbcImGui::build_cheats_window(UiState &state) {
 
       if (ImGui::Checkbox("Enabled##editor", &entry.enabled))
         settings_dirty = true;
+      ImGui::Text("Notes");
       if (ImGui::InputTextMultiline("Notes", &entry.notes,
                                     ImVec2(-1.0f, 180.0f * dpi_scale)))
         settings_dirty = true;
 
       ImGui::TextDisabled(
-          "Game Genie decoding is not implemented yet.");
+          "Game Genie compare byte is honored when present.");
     }
 
     ImGui::EndTable();

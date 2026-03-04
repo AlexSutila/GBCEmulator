@@ -68,6 +68,8 @@ public:
   struct CheatOverride {
     addr_t addr{};
     byte_t value{};
+    bool has_compare{false};
+    byte_t compare{};
   };
 
   void write_byte(addr_t addr, byte_t value) const;
@@ -112,6 +114,13 @@ public:
   std::unique_ptr<byte_t[]> &get_oam() { return oam; }
 
 private:
+  struct CheatReadOverride {
+    bool enabled{false};
+    byte_t value{};
+    bool has_compare{false};
+    byte_t compare{};
+  };
+
   std::array<std::unique_ptr<byte_t[]>, 2> vram{};
   std::array<std::unique_ptr<byte_t[]>, 8> wram{};
   std::unique_ptr<byte_t[]> hram{};
@@ -151,10 +160,10 @@ private:
     MMIOSavestatePolicy savestate_policy{MMIOSavestatePolicy::OwnerManaged};
   };
   std::map<addr_t, ConnectedMMIO> io_registers{};
-  std::array<byte_t, 0x10000> cheat_values_{};
-  std::array<bool, 0x10000> cheat_mask_{};
+  std::array<CheatReadOverride, 0x10000> cheat_overrides_{};
   std::vector<addr_t> cheat_touched_addrs_{};
   bool has_cheat_overrides_{false};
+  [[nodiscard]] byte_t read_byte_no_cheat(addr_t addr, bool safe) const;
   [[nodiscard]] bool is_boot_rom_range(addr_t a) const;
   std::optional<BootROM> &bios_;
   [[maybe_unused]] runtime_sys_info &sys_;
