@@ -49,7 +49,7 @@ read_thumb_raw_argb_gui(const std::filesystem::path &path, const int w,
 }
 
 constexpr std::array<const char *, 4> kCheatFormatLabels{
-    "Auto detect", "GameShark", "Game Genie", "Raw (addr:value)"};
+    "Auto detect", "GameShark/Xploder", "Game Genie", "Raw (addr:value)"};
 
 std::string cheat_display_name(const Settings::CheatEntry &entry,
                                const std::size_t index) {
