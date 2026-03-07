@@ -442,7 +442,7 @@ void SDL3Frontend::process_save_state_events() {
 
   if (quick_save) [[unlikely]] {
     try {
-      const auto blob = gbc->serialize_savestate();
+      const auto blob = gbc->savestate_serialize();
       if (const auto path = write_savestate_bundle(blob, true);
           !path.has_value()) {
         Logger::push(LogLevel::Warning, "Savestate", "Failed to create",
@@ -469,7 +469,7 @@ void SDL3Frontend::process_save_state_events() {
                      "Could not read savestate from: " + latest_path->string() +
                          ". It may have been moved or deleted.");
       } else {
-        gbc->deserialize_savestate(*blob);
+        gbc->savestate_deserialize(*blob);
         host.clear_audio_stream();
         video_dirty.store(true, std::memory_order_release);
         Logger::push(LogLevel::Status, "Savestate", "Savestate loaded",
@@ -491,7 +491,7 @@ void SDL3Frontend::process_save_state_events() {
     if (manual_save_label.has_value()) {
       const auto &lab = manual_save_label.value();
       try {
-        const auto blob = gbc->serialize_savestate();
+        const auto blob = gbc->savestate_serialize();
         if (const auto path = write_savestate_bundle(blob, false, lab);
             !path.has_value()) {
           Logger::push(LogLevel::Warning, "Savestate", "Failed to create",
@@ -512,7 +512,7 @@ void SDL3Frontend::process_save_state_events() {
           Logger::push(LogLevel::Warning, "Savestate", "File not found",
                        "Could not read savestate from: " + path.string());
         } else {
-          gbc->deserialize_savestate(*blob);
+          gbc->savestate_deserialize(*blob);
           host.clear_audio_stream();
           video_dirty.store(true, std::memory_order_release);
           Logger::push(LogLevel::Status, "Savestate", "Savestate loaded",

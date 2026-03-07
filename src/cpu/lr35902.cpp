@@ -6,6 +6,7 @@
 #include "debugger/debugger.hpp"
 #include "gbc.hpp"
 #include "memory/mmio/mmio.hpp"
+#include "savestate/codec.hpp"
 
 #include <iomanip>
 #include <ios>
@@ -13,6 +14,57 @@
 #include <optional>
 #include <sstream>
 #include <stdexcept>
+
+/* We do not save the CPU state (fetch/decode/exec/halt) because we always align
+ * save states with instruction fetches. */
+enum : std::uint16_t {
+  F_PC = 1,
+  F_SP,
+  F_A,
+  F_B,
+  F_C,
+  F_D,
+  F_E,
+  F_F,
+  F_H,
+  F_L,
+  F_IME_RAW,
+  F_HALT_BUG,
+  F_INS_BASE,
+};
+
+template <typename T> void LR35902::parse_savestate(T &t) {
+  constexpr auto version = 1; // Schema revision
+  t.chunk(version, Savestate::C_CPU);
+
+  ProcessorState state{};
+  if (t.op() == Savestate::OP_WRITE)
+    state = get_state();
+
+  // Exploiting public API exposed to pybindings here
+  t.field_u16(F_PC, state.pc);
+  t.field_u16(F_SP, state.sp);
+  t.field_u8(F_A, state.a);
+  t.field_u8(F_B, state.b);
+  t.field_u8(F_C, state.c);
+  t.field_u8(F_D, state.d);
+  t.field_u8(F_E, state.e);
+  t.field_u8(F_F, state.f);
+  t.field_u8(F_H, state.h);
+  t.field_u8(F_L, state.l);
+  t.field_boolean(F_IME_RAW, state.ime_enabled);
+
+  if (t.op() == Savestate::OP_READ)
+    load_state(state);
+
+  // These are not manipulated by the data exposed via public API
+  t.field_boolean(F_HALT_BUG, reg_file.halt_bug_triggered);
+  t.field_u16(F_INS_BASE, ins_base_addr);
+}
+
+template void LR35902::parse_savestate<Savestate::Writer>(Savestate::Writer &);
+template void LR35902::parse_savestate<Savestate::Reader>(Savestate::Reader &);
+template void LR35902::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
 
 LR35902::LR35902(AddressBus *bus_ptr, std::optional<Debug::Debugger> &debugger,
                  runtime_sys_info &sys)

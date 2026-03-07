@@ -63,8 +63,9 @@ public:
   CheatStats configure_cheats(const std::vector<CheatCode>& cheats);
   [[nodiscard]] CheatStats get_cheat_stats() const { return cheat_stats_; }
   [[nodiscard]] bool savestate_ready() const;
-  [[nodiscard]] std::vector<byte_t> serialize_savestate() const;
-  void deserialize_savestate(std::span<const byte_t> data);
+  [[nodiscard]] std::vector<byte_t> savestate_serialize() const;
+  void savestate_deserialize(std::span<const byte_t> data);
+  [[nodiscard]] std::size_t savestate_size() const;
 
   /* Optional debugger configurable by frontend */
   void configure_debugger(Debug::Debugger debugger) {

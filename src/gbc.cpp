@@ -8,7 +8,9 @@
 #include "memory/mmio/mmio.hpp"
 #include "ppu/palette.hpp"
 #include "ppu/ppu.hpp"
+#include "savestate/codec.hpp"
 #include "timer.hpp"
+
 #include <initializer_list>
 #include <memory>
 #include <optional>
@@ -575,8 +577,19 @@ bool GameBoyColor::savestate_ready() const {
   return cpu && cpu->savestate_ready();
 }
 
-std::vector<byte_t> GameBoyColor::serialize_savestate() const {
-  return {};
+std::vector<byte_t> GameBoyColor::savestate_serialize() const {
+  Savestate::Writer out{};
+  cpu->parse_savestate(out);
+  return out.get();
 }
 
-void GameBoyColor::deserialize_savestate(const std::span<const byte_t> data) {}
+void GameBoyColor::savestate_deserialize(const std::span<const byte_t> data) {
+  Savestate::Reader in{};
+  cpu->parse_savestate(in);
+}
+
+std::size_t GameBoyColor::savestate_size() const {
+  Savestate::Sizer sz{};
+  cpu->parse_savestate(sz);
+  return sz.get();
+}

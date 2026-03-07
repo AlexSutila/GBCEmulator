@@ -51,6 +51,8 @@ public:
   };
   void load_state(ProcessorState state_);
   [[nodiscard]] ProcessorState get_state() const;
+
+  template <typename T> void parse_savestate(T &t);
   [[nodiscard]] bool savestate_ready() const;
 
 private:
