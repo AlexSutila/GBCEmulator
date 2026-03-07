@@ -156,20 +156,8 @@ byte_t &AddressBus::hram_byte(const addr_t addr) const {
   return hram[(addr - 0xFF80) & HRAM_MASK];
 }
 
-byte_t AddressBus::read_byte_safe(const addr_t addr) const {
-  if (io_registers.contains(addr)) {
-    assert((addr >= 0xFF00 && addr <= 0xFF7F) || addr == 0xFFFF);
-    const auto &mmio = io_registers.at(addr);
-    return mmio.reg->peek(); // Const
-  }
-  return read_byte(addr, false);
-}
-
-byte_t AddressBus::read_byte(const addr_t addr, bool debug) const {
-  try_brk(addr, Debug::BRK_ADDRESS_READ);
-  if (is_conflicting(addr)) [[unlikely]]
-    return open_bus();
-
+byte_t AddressBus::read_byte_no_cheat(const addr_t addr,
+                                      const bool safe) const {
   /* Read from boot ROM if it is mapped (boot ROM overrides reads only) */
   if (is_boot_rom_range(addr))
     return bios_->read_byte(addr);
@@ -197,15 +185,50 @@ byte_t AddressBus::read_byte(const addr_t addr, bool debug) const {
   /* Read from memory mapped IO register */
   if (io_registers.contains(addr)) {
     assert((addr >= 0xFF00 && addr <= 0xFF7F) || addr == 0xFFFF);
-    const auto & [reg, savestate_policy] = io_registers.at(addr);
-    return reg->read();
+    const auto &[reg, savestate_policy] = io_registers.at(addr);
+    (void)savestate_policy;
+    return safe ? reg->peek() : reg->read();
   }
 
-  /* Read from to High RAM */
+  /* Read from High RAM */
   if (is_hram_range(addr))
     return hram_byte(addr);
 
   return open_bus();
+}
+
+byte_t AddressBus::read_byte_safe(const addr_t addr) const {
+  if (is_conflicting(addr)) [[unlikely]]
+    return open_bus();
+
+  if (has_cheat_overrides_) {
+    const auto &[enabled, value, has_compare, compare] = cheat_overrides_[addr];
+    if (enabled) {
+      if (!has_compare)
+        return value;
+      const auto original = read_byte_no_cheat(addr, true);
+      return original == compare ? value : original;
+    }
+  }
+  return read_byte_no_cheat(addr, true);
+}
+
+byte_t AddressBus::read_byte(const addr_t addr, const bool debug) const {
+  if (debug)
+    try_brk(addr, Debug::BRK_ADDRESS_READ);
+  if (is_conflicting(addr)) [[unlikely]]
+    return open_bus();
+
+  if (has_cheat_overrides_) {
+    const auto &[enabled, value, has_compare, compare] = cheat_overrides_[addr];
+    if (enabled) {
+      if (!has_compare)
+        return value;
+      const auto original = read_byte_no_cheat(addr, false);
+      return original == compare ? value : original;
+    }
+  }
+  return read_byte_no_cheat(addr, false);
 }
 
 void AddressBus::write_byte(const addr_t addr, const byte_t value) const {
@@ -286,6 +309,31 @@ void AddressBus::release(const BusConflictTypes conflict_mask) {
   bus_conflicts = bus_conflicts & ~conflict_mask;
 }
 
+void AddressBus::clear_cheat_overrides() {
+  for (const addr_t addr : cheat_touched_addrs_)
+    cheat_overrides_[addr].enabled = false;
+  cheat_touched_addrs_.clear();
+  has_cheat_overrides_ = false;
+}
+
+void AddressBus::set_cheat_overrides(std::span<const CheatOverride> overrides) {
+  clear_cheat_overrides();
+  cheat_touched_addrs_.reserve(overrides.size());
+
+  for (const auto &[addr, value, has_compare, compare] : overrides) {
+    const auto idx = static_cast<std::size_t>(addr);
+    if (!cheat_overrides_[idx].enabled)
+      cheat_touched_addrs_.push_back(addr);
+    cheat_overrides_[idx] = CheatReadOverride{
+        .enabled = true,
+        .value = value,
+        .has_compare = has_compare,
+        .compare = compare,
+    };
+  }
+  has_cheat_overrides_ = !cheat_touched_addrs_.empty();
+}
+
 enum : std::uint16_t {
   F_VRAM = 1,
   F_WRAM,
@@ -313,26 +361,29 @@ void AddressBus::savestate_serialize(Savestate::Writer &out) const {
     for (const auto &bank : wram)
       w.bytes({bank.get(), wram_bank_size});
   });
-  out.field(F_HRAM, [&](Savestate::Writer &w) { w.bytes({hram.get(), hram_size}); });
-  out.field(F_OAM, [&](Savestate::Writer &w) { w.bytes({oam.get(), oam_size}); });
+  out.field(F_HRAM,
+            [&](Savestate::Writer &w) { w.bytes({hram.get(), hram_size}); });
+  out.field(F_OAM,
+            [&](Savestate::Writer &w) { w.bytes({oam.get(), oam_size}); });
   out.field(F_MMIO_REGS, [&](Savestate::Writer &w) {
     for (const auto &[addr, mmio] : io_registers) {
       if (mmio.savestate_policy != MMIOSavestatePolicy::BusAuto)
         continue;
-      w.field(addr,
-              [&](Savestate::Writer &mmio_w) {
-                mmio.reg->savestate_serialize(mmio_w);
-              });
+      w.field(addr, [&](Savestate::Writer &mmio_w) {
+        mmio.reg->savestate_serialize(mmio_w);
+      });
     }
   });
   out.field_u32(F_BUS_CONFLICTS, bus_conflicts);
 
-  out.field(F_OAM_DMA, [&](Savestate::Writer &w) { oam_dma.savestate_serialize(w); });
+  out.field(F_OAM_DMA,
+            [&](Savestate::Writer &w) { oam_dma.savestate_serialize(w); });
   out.field(F_VDMA, [&](Savestate::Writer &w) { vdma.savestate_serialize(w); });
 
   out.field_bool(F_HAS_CART, cart_ != nullptr);
   if (cart_)
-    out.field(F_CART, [&](Savestate::Writer &w) { cart_->savestate_serialize(w); });
+    out.field(F_CART,
+              [&](Savestate::Writer &w) { cart_->savestate_serialize(w); });
 }
 
 void AddressBus::savestate_deserialize(Savestate::Reader &in) {
@@ -342,52 +393,52 @@ void AddressBus::savestate_deserialize(Savestate::Reader &in) {
   constexpr std::size_t oam_size = 0xA0;
   std::optional<bool> has_cart = std::nullopt;
   GBC_SS_DESERIALIZE_BEGIN(in)
-  case F_VRAM:
-    for (auto &bank : vram)
-      payload.bytes({bank.get(), vram_bank_size});
-    break;
-  case F_WRAM:
-    for (auto &bank : wram)
-      payload.bytes({bank.get(), wram_bank_size});
-    break;
-  case F_HRAM:
-    if (payload.remaining() != hram_size)
-      throw std::runtime_error("AddressBus::savestate_deserialize() hram");
-    payload.bytes({hram.get(), hram_size});
-    break;
-  case F_OAM:
-    if (payload.remaining() != oam_size)
-      throw std::runtime_error("AddressBus::savestate_deserialize() oam");
-    payload.bytes({oam.get(), oam_size});
-    break;
-  case F_MMIO_REGS:
-    while (const auto mmio_field = payload.next_field()) {
-      auto [mmio_addr, mmio_payload] = *mmio_field;
-      const auto it = io_registers.find(static_cast<addr_t>(mmio_addr));
-      if (it != io_registers.end() &&
-          it->second.savestate_policy == MMIOSavestatePolicy::BusAuto) {
-        it->second.reg->savestate_deserialize(mmio_payload);
-      } else {
-        mmio_payload.skip(mmio_payload.remaining());
-      }
-      mmio_payload.expect_eof();
+case F_VRAM:
+  for (auto &bank : vram)
+    payload.bytes({bank.get(), vram_bank_size});
+  break;
+case F_WRAM:
+  for (auto &bank : wram)
+    payload.bytes({bank.get(), wram_bank_size});
+  break;
+case F_HRAM:
+  if (payload.remaining() != hram_size)
+    throw std::runtime_error("AddressBus::savestate_deserialize() hram");
+  payload.bytes({hram.get(), hram_size});
+  break;
+case F_OAM:
+  if (payload.remaining() != oam_size)
+    throw std::runtime_error("AddressBus::savestate_deserialize() oam");
+  payload.bytes({oam.get(), oam_size});
+  break;
+case F_MMIO_REGS:
+  while (const auto mmio_field = payload.next_field()) {
+    auto [mmio_addr, mmio_payload] = *mmio_field;
+    const auto it = io_registers.find(static_cast<addr_t>(mmio_addr));
+    if (it != io_registers.end() &&
+        it->second.savestate_policy == MMIOSavestatePolicy::BusAuto) {
+      it->second.reg->savestate_deserialize(mmio_payload);
+    } else {
+      mmio_payload.skip(mmio_payload.remaining());
     }
-    break;
-  case F_BUS_CONFLICTS:
-    bus_conflicts = static_cast<BusConflictTypes>(payload.u32());
-    break;
-  case F_OAM_DMA:
-    oam_dma.savestate_deserialize(payload);
-    break;
-  case F_VDMA:
-    vdma.savestate_deserialize(payload);
-    break;
+    mmio_payload.expect_eof();
+  }
+  break;
+case F_BUS_CONFLICTS:
+  bus_conflicts = static_cast<BusConflictTypes>(payload.u32());
+  break;
+case F_OAM_DMA:
+  oam_dma.savestate_deserialize(payload);
+  break;
+case F_VDMA:
+  vdma.savestate_deserialize(payload);
+  break;
   GBC_SS_CASE_BOOL(F_HAS_CART, has_cart);
-  case F_CART:
-    if (!cart_)
-      throw std::runtime_error("AddressBus::savestate_deserialize() no cart");
-    cart_->savestate_deserialize(payload);
-    break;
+case F_CART:
+  if (!cart_)
+    throw std::runtime_error("AddressBus::savestate_deserialize() no cart");
+  cart_->savestate_deserialize(payload);
+  break;
   GBC_SS_DESERIALIZE_END();
 
   if (has_cart.has_value()) {
@@ -395,7 +446,8 @@ void AddressBus::savestate_deserialize(Savestate::Reader &in) {
       if (!cart_)
         throw std::runtime_error("AddressBus::savestate_deserialize() no cart");
     } else if (cart_) {
-      throw std::runtime_error("AddressBus::savestate_deserialize() cart mismatch");
+      throw std::runtime_error(
+          "AddressBus::savestate_deserialize() cart mismatch");
     }
   }
 }

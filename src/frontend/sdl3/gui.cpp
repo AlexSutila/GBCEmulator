@@ -8,6 +8,7 @@
 #include <sstream>
 #include <sys/stat.h>
 #include <imgui_internal.h>
+#include <misc/cpp/imgui_stdlib.h>
 
 namespace fs = std::filesystem;
 
@@ -45,6 +46,20 @@ read_thumb_raw_argb_gui(const std::filesystem::path &path, const int w,
               static_cast<std::streamsize>(byte_count)))
     return std::nullopt;
   return out;
+}
+
+constexpr std::array<const char *, 5> kCheatFormatLabels{
+    "Auto detect", "GameShark/Xploder",
+    "Game Genie", "Raw (addr:value, addr?cmp:value)",
+    "CodeBreaker"};
+
+std::string cheat_display_name(const Settings::CheatEntry &entry,
+                               const std::size_t index) {
+  if (!entry.name.empty())
+    return entry.name;
+  if (!entry.code.empty())
+    return entry.code;
+  return "Cheat " + std::to_string(index + 1);
 }
 } // namespace
 
@@ -107,6 +122,8 @@ void GbcImGui::render(UiState &state, SDLHost &host) {
   build_rom_source_window(state);
   if (state.show_settings)
     build_settings_window(state, host);
+  if (state.show_cheats)
+    build_cheats_window(state);
   if (state.show_keybinds)
     build_keybinds_window(state);
   if (state.show_notifications)
@@ -302,6 +319,8 @@ void GbcImGui::build_main_menu_bar(UiState &state) const {
     if (ImGui::BeginMenu("Options")) {
       if (ImGui::MenuItem("Settings"))
         state.show_settings = true;
+      if (ImGui::MenuItem("Cheats"))
+        state.show_cheats = true;
       if (ImGui::MenuItem("Keybinds"))
         state.show_keybinds = true;
       if (ImGui::MenuItem("Save States"))
@@ -626,6 +645,30 @@ void GbcImGui::build_settings_window(UiState &state, SDLHost &host) {
         "Savestate folders: game-name - checksum");
   }
   {
+    static std::array<char, 512> cheat_root_input{};
+    static std::string last_cheat_root;
+    if (last_cheat_root != settings.cheat_root_dir) {
+      snprintf(cheat_root_input.data(), cheat_root_input.size(), "%s",
+               settings.cheat_root_dir.c_str());
+      last_cheat_root = settings.cheat_root_dir;
+    }
+
+    ImGui::SetNextItemWidth(320.0f * dpi_scale);
+    if (ImGui::InputText("Cheat dir", cheat_root_input.data(),
+                         cheat_root_input.size())) {
+      settings.cheat_root_dir = cheat_root_input.data();
+      last_cheat_root = settings.cheat_root_dir;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Reset##cheat_root")) {
+      settings.cheat_root_dir = "./cheats";
+      snprintf(cheat_root_input.data(), cheat_root_input.size(), "%s",
+               settings.cheat_root_dir.c_str());
+      last_cheat_root = settings.cheat_root_dir;
+    }
+    ImGui::TextDisabled("Cheats: game-name - checksum.cht");
+  }
+  {
     ImGui::SetNextItemWidth(120.0f * dpi_scale);
     if (ImGui::InputInt("Max quicksaves", &settings.max_quicksaves)) {
       if (settings.max_quicksaves < 0)
@@ -675,6 +718,169 @@ void GbcImGui::build_settings_window(UiState &state, SDLHost &host) {
     state.current_audio_dev_idx =
         std::min(state.current_audio_dev_idx,
                  static_cast<int>(state.audio_device_names.size()) - 1);
+  }
+  ImGui::End();
+}
+
+void GbcImGui::build_cheats_window(UiState &state) {
+  ImGui::SetNextWindowSize(ImVec2(860.0f * dpi_scale, 520.0f * dpi_scale),
+                           ImGuiCond_FirstUseEver);
+  if (!ImGui::Begin("Cheats", &state.show_cheats)) {
+    ImGui::End();
+    return;
+  }
+
+  bool settings_dirty = false;
+  auto &cheats = settings.cheats;
+  if (state.selected_cheat_idx >= static_cast<int>(cheats.size()))
+    state.selected_cheat_idx =
+        cheats.empty() ? -1 : static_cast<int>(cheats.size()) - 1;
+
+  ImGui::Separator();
+
+  if (ImGui::Button("Add")) {
+    Settings::CheatEntry entry;
+    entry.name = "Cheat " + std::to_string(cheats.size() + 1);
+    cheats.push_back(std::move(entry));
+    state.selected_cheat_idx = static_cast<int>(cheats.size()) - 1;
+    settings_dirty = true;
+  }
+
+  ImGui::SameLine();
+  const bool can_edit_selected =
+      state.selected_cheat_idx >= 0 &&
+      state.selected_cheat_idx < static_cast<int>(cheats.size());
+  if (!can_edit_selected)
+    ImGui::BeginDisabled();
+  if (ImGui::Button("Duplicate")) {
+    cheats.push_back(cheats[static_cast<std::size_t>(state.selected_cheat_idx)]);
+    state.selected_cheat_idx = static_cast<int>(cheats.size()) - 1;
+    settings_dirty = true;
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Delete")) {
+    cheats.erase(cheats.begin() + state.selected_cheat_idx);
+    if (cheats.empty()) {
+      state.selected_cheat_idx = -1;
+    } else if (state.selected_cheat_idx >= static_cast<int>(cheats.size())) {
+      state.selected_cheat_idx = static_cast<int>(cheats.size()) - 1;
+    }
+    settings_dirty = true;
+  }
+  if (!can_edit_selected)
+    ImGui::EndDisabled();
+
+  ImGui::SameLine();
+  if (ImGui::Button("Enable All")) {
+    for (auto &entry : cheats)
+      entry.enabled = true;
+    settings_dirty = !cheats.empty();
+  }
+
+  ImGui::SameLine();
+  if (ImGui::Button("Disable All")) {
+    for (auto &entry : cheats)
+      entry.enabled = false;
+    settings_dirty = !cheats.empty();
+  }
+
+  ImGui::Spacing();
+
+  if (ImGui::BeginTable("cheat_layout", 2,
+                        ImGuiTableFlags_Resizable |
+                            ImGuiTableFlags_BordersInnerV)) {
+    ImGui::TableSetupColumn("Cheat List", ImGuiTableColumnFlags_WidthStretch,
+                            0.43f);
+    ImGui::TableSetupColumn("Editor", ImGuiTableColumnFlags_WidthStretch,
+                            0.57f);
+    ImGui::TableNextRow();
+
+    ImGui::TableSetColumnIndex(0);
+    if (ImGui::BeginTable("cheat_entries", 2,
+                          ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders |
+                              ImGuiTableFlags_SizingStretchProp |
+                              ImGuiTableFlags_ScrollY,
+                          ImVec2(0.0f, 0.0f))) {
+      ImGui::TableSetupColumn("On", ImGuiTableColumnFlags_WidthFixed,
+                              40.0f * dpi_scale);
+      ImGui::TableSetupColumn("Cheat", ImGuiTableColumnFlags_WidthStretch);
+      ImGui::TableHeadersRow();
+
+      for (std::size_t i = 0; i < cheats.size(); ++i) {
+        auto &entry = cheats[i];
+        const bool selected = state.selected_cheat_idx == static_cast<int>(i);
+
+        ImGui::PushID(static_cast<int>(i));
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        if (ImGui::Checkbox("##enabled", &entry.enabled))
+          settings_dirty = true;
+
+        ImGui::TableSetColumnIndex(1);
+        if (const auto label = cheat_display_name(entry, i);
+            ImGui::Selectable(label.c_str(), selected,
+                              ImGuiSelectableFlags_SpanAllColumns)) {
+          state.selected_cheat_idx = static_cast<int>(i);
+        }
+        if (ImGui::IsItemHovered() && !entry.code.empty()) {
+          ImGui::SetTooltip("%s", entry.code.c_str());
+        }
+        ImGui::PopID();
+      }
+
+      if (cheats.empty()) {
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        ImGui::TextDisabled("-");
+        ImGui::TableSetColumnIndex(1);
+        ImGui::TextDisabled("No cheats added");
+      }
+      ImGui::EndTable();
+    }
+
+    ImGui::TableSetColumnIndex(1);
+    const bool has_selection =
+        state.selected_cheat_idx >= 0 &&
+        state.selected_cheat_idx < static_cast<int>(cheats.size());
+    if (!has_selection) {
+      ImGui::TextDisabled("Select a cheat from the list to edit.\nCheat codes are tied to ROMs.");
+    } else {
+      auto &entry = cheats[static_cast<std::size_t>(state.selected_cheat_idx)];
+
+      if (ImGui::InputText("Name", &entry.name))
+        settings_dirty = true;
+      if (ImGui::InputText("Code", &entry.code))
+        settings_dirty = true;
+
+      int format =
+          std::clamp(entry.format, 0, static_cast<int>(kCheatFormatLabels.size()) - 1);
+      if (format != entry.format) {
+        entry.format = format;
+        settings_dirty = true;
+      }
+      if (ImGui::Combo("Format", &format, kCheatFormatLabels.data(),
+                       kCheatFormatLabels.size())) {
+        entry.format = format;
+        settings_dirty = true;
+      }
+
+      if (ImGui::Checkbox("Enabled##editor", &entry.enabled))
+        settings_dirty = true;
+      ImGui::Text("Notes");
+      if (ImGui::InputTextMultiline("Notes", &entry.notes,
+                                    ImVec2(-1.0f, 180.0f * dpi_scale)))
+        settings_dirty = true;
+
+      ImGui::TextDisabled(
+          "Compare is supported in Game Genie and Raw (AAAA?CC:VV).");
+    }
+
+    ImGui::EndTable();
+  }
+
+  if (settings_dirty) {
+    state.cheats_dirty = true;
+    state.cheats_file_dirty = true;
   }
   ImGui::End();
 }

@@ -14,13 +14,15 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <span>
+#include <vector>
 
 struct runtime_sys_info;
 class BootROM;
 namespace Savestate {
 class Reader;
 class Writer;
-}
+} // namespace Savestate
 
 enum BusConflictTypes : std::uint32_t {
   BUS_CONFLICT_NONE = 0,
@@ -63,6 +65,13 @@ constexpr BusConflictTypes operator~(const BusConflictTypes a) {
  */
 class AddressBus final : Debug::Debuggable {
 public:
+  struct CheatOverride {
+    addr_t addr{};
+    byte_t value{};
+    bool has_compare{false};
+    byte_t compare{};
+  };
+
   void write_byte(addr_t addr, byte_t value) const;
   [[nodiscard]] byte_t read_byte(addr_t addr, bool debug = true) const;
   ObjAttrDMA &get_oam_dma() { return oam_dma; };
@@ -78,8 +87,9 @@ public:
              std::optional<BootROM> &bios);
 
   /* For attaching MMIO component interface registers */
-  void connect_mmio(addr_t addr, MMIORegister *reg,
-                    MMIOSavestatePolicy policy = MMIOSavestatePolicy::OwnerManaged);
+  void
+  connect_mmio(addr_t addr, MMIORegister *reg,
+               MMIOSavestatePolicy policy = MMIOSavestatePolicy::OwnerManaged);
   [[nodiscard]] MMIORegister *get_mmio(IORegisterMapping mapping) const;
 
   /* Bus conflict management */
@@ -87,12 +97,18 @@ public:
   void acquire(BusConflictTypes conflict_mask);
   void release(BusConflictTypes conflict_mask);
 
+  /* Read-time cheat overrides */
+  void clear_cheat_overrides();
+  void set_cheat_overrides(std::span<const CheatOverride> overrides);
+
   /* Cartridge connections */
   void insert_cartridge(cart c);
   void eject_cartridge();
   void init_test_bed();
   [[nodiscard]] Cartridge *get_cartridge() noexcept { return cart_.get(); }
-  [[nodiscard]] const Cartridge *get_cartridge() const noexcept { return cart_.get(); }
+  [[nodiscard]] const Cartridge *get_cartridge() const noexcept {
+    return cart_.get();
+  }
   void savestate_serialize(Savestate::Writer &out) const;
   void savestate_deserialize(Savestate::Reader &in);
 
@@ -101,6 +117,13 @@ public:
   std::unique_ptr<byte_t[]> &get_oam() { return oam; }
 
 private:
+  struct CheatReadOverride {
+    bool enabled{false};
+    byte_t value{};
+    bool has_compare{false};
+    byte_t compare{};
+  };
+
   std::array<std::unique_ptr<byte_t[]>, 2> vram{};
   std::array<std::unique_ptr<byte_t[]>, 8> wram{};
   std::unique_ptr<byte_t[]> hram{};
@@ -140,6 +163,10 @@ private:
     MMIOSavestatePolicy savestate_policy{MMIOSavestatePolicy::OwnerManaged};
   };
   std::map<addr_t, ConnectedMMIO> io_registers{};
+  std::array<CheatReadOverride, 0x10000> cheat_overrides_{};
+  std::vector<addr_t> cheat_touched_addrs_{};
+  bool has_cheat_overrides_{false};
+  [[nodiscard]] byte_t read_byte_no_cheat(addr_t addr, bool safe) const;
   [[nodiscard]] bool is_boot_rom_range(addr_t a) const;
   std::optional<BootROM> &bios_;
   [[maybe_unused]] runtime_sys_info &sys_;

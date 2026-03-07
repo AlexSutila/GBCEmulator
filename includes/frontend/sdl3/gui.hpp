@@ -68,7 +68,7 @@ public:
   void update_bios_path(const std::string& bios_path);
   void clear_bios_path();
   bool process_event(const SDL_Event& e, UiState& ui_state);
-  void build_savestate_manager_window(
+  static void build_savestate_manager_window(
       UiState &state, const SDLHost &host, bool emulator_ready,
       const std::filesystem::path &savestate_dir,
       std::array<char, 96> &manual_label_input,
@@ -91,6 +91,7 @@ private:
   void build_status_bar(UiState &state) const;
   void build_file_dialogs(UiState& state) const;
   void build_settings_window(UiState& state, SDLHost& host);
+  void build_cheats_window(UiState& state);
   void build_keybinds_window(UiState& state);
   static void build_about_window(UiState& state);
   static void build_cart_info_window(UiState& state);

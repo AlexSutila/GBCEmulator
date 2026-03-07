@@ -15,6 +15,7 @@
 #include <memory>
 #include <optional>
 #include <span>
+#include <string>
 #include <vector>
 
 class Frontend;
@@ -34,12 +35,33 @@ struct runtime_sys_info {
 
 class GameBoyColor final : Debug::Debuggable {
 public:
+  enum CheatFormat : int {
+    CHEAT_AUTO = 0,
+    CHEAT_GAMESHARK = 1,
+    CHEAT_GAME_GENIE = 2,
+    CHEAT_RAW = 3,
+    CHEAT_CODEBREAKER = 4,
+  };
+  struct CheatCode {
+    bool enabled{true};
+    std::string code;
+    int format{CHEAT_AUTO};
+  };
+  struct CheatStats {
+    std::size_t total{};
+    std::size_t enabled{};
+    std::size_t active{};
+    std::size_t rejected{};
+  };
+
   GameBoyColor(Frontend &frontend, const std::string &bios_path);
   GameBoyColor(Frontend &frontend, const BootROM &rom);
   explicit GameBoyColor(Frontend &frontend);
   void insert_cartridge(const cart& c);
   void init_test_bed() const;
   void step();
+  CheatStats configure_cheats(const std::vector<CheatCode>& cheats);
+  [[nodiscard]] CheatStats get_cheat_stats() const { return cheat_stats_; }
   [[nodiscard]] bool savestate_ready() const;
   [[nodiscard]] std::vector<byte_t> serialize_savestate() const;
   void deserialize_savestate(std::span<const byte_t> data);
@@ -77,6 +99,7 @@ private:
   void step_dma(bool fast_cycle) const;
   [[nodiscard]] bool vdma_enabled() const;
   void step_processor() const;
+  CheatStats cheat_stats_{};
 
   std::optional<Debug::Debugger> debugger_{};
   std::optional<BootROM> bios_{};

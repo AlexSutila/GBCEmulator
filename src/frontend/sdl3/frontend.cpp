@@ -111,7 +111,7 @@ void SDL3Frontend::queue_audio_samples(const float *samples,
 
 void SDL3Frontend::start() {
   auto start_emulation =
-      [this](cart cart_ctx, const std::string &display_label,
+      [this](const cart& cart_ctx, const std::string &display_label,
              const std::string &rom_hash,
              const std::optional<std::string> &bios_path,
              const std::optional<std::filesystem::path> &initial_save_path) {
@@ -139,6 +139,7 @@ void SDL3Frontend::start() {
     if (consume_load_rom_request(rom_source)) {
       join_emu_thread_if_running();
       reset_savestate_context();
+      reset_cheat_context();
       process_pending_save();
       active_rom_hash.clear();
       start_rom_io_job(rom_source);
@@ -150,7 +151,8 @@ void SDL3Frontend::start() {
         cart cart_ctx = load_cart_fs(rom_on_disk.c_str());
         const std::string rom_hash = sha256_hex(cart_ctx.rom_span());
         setup_save_context(cart_ctx, display_label, rom_hash);
-        start_emulation(std::move(cart_ctx), display_label, rom_hash, bios_path,
+        setup_cheat_context(cart_ctx, display_label, rom_hash);
+        start_emulation(cart_ctx, display_label, rom_hash, bios_path,
                         active_save_path);
       } catch (std::exception &e) {
         Logger::push(LogLevel::Warning, "ROM", "Failed to load ROM", e.what());
@@ -276,6 +278,14 @@ void SDL3Frontend::render_frame() {
     std::lock_guard lock(ui_mutex);
     sync_io_status_to_ui();
     gui.render(ui_state, host);
+    if (ui_state.cheats_dirty) {
+      ui_state.cheats_dirty = false;
+      cheats_revision_.fetch_add(1, std::memory_order_release);
+    }
+    if (ui_state.cheats_file_dirty) {
+      ui_state.cheats_file_dirty = false;
+      save_active_cheats_locked();
+    }
     build_savestate_manager_window_locked();
     poll_zip_choice_response();
     request_quit = ui_state.request_quit;
@@ -515,11 +525,43 @@ void SDL3Frontend::process_save_state_events() {
   }
 }
 
+std::vector<GameBoyColor::CheatCode> SDL3Frontend::snapshot_cheats_locked() const {
+  std::vector<GameBoyColor::CheatCode> out;
+  const auto &src = gui.get_settings_c().cheats;
+  out.reserve(src.size());
+  for (const auto &entry : src) {
+    out.push_back(GameBoyColor::CheatCode{
+        .enabled = entry.enabled,
+        .code = entry.code,
+        .format = entry.format,
+    });
+  }
+  return out;
+}
+
+void SDL3Frontend::sync_cheats_to_core(std::uint64_t &last_revision) const {
+  if (!gbc)
+    return;
+
+  const auto revision = cheats_revision_.load(std::memory_order_acquire);
+  if (revision == last_revision)
+    return;
+
+  std::vector<GameBoyColor::CheatCode> snapshot;
+  {
+    std::lock_guard lock(ui_mutex);
+    snapshot = snapshot_cheats_locked();
+  }
+  gbc->configure_cheats(snapshot);
+  last_revision = revision;
+}
+
 void SDL3Frontend::emulation_thread_fn(
     const std::stop_token &st, const cart &cart,
     const std::optional<std::string> &bios,
     const std::optional<std::filesystem::path> &initial_save_path) {
   auto next_save_poll = Clock::now();
+  std::uint64_t cheat_revision_seen = 0;
   bool ff = false;
   clear(black);
 
@@ -538,6 +580,7 @@ void SDL3Frontend::emulation_thread_fn(
   gbc->configure_debugger(Debug::Debugger([this, st]() -> Debug::BreakReason {
     return debugger.on_breakpoint(st, gbc);
   }));
+  sync_cheats_to_core(cheat_revision_seen);
 
   /* Restore previous SRAM content (i.e., emulate battery backed save data) */
   std::vector<byte_t> last_saved_snapshot =
@@ -545,6 +588,8 @@ void SDL3Frontend::emulation_thread_fn(
 
   /* Run emulation in real-time */
   while (!st.stop_requested()) [[likely]] {
+    sync_cheats_to_core(cheat_revision_seen);
+
     // Audio sync logic, check how much audio is currently buffered
     const int queued_bytes = host.get_queued_audio_bytes();
 
