@@ -10,6 +10,7 @@ struct runtime_sys_info;
 class TimerUnit {
 public:
   explicit TimerUnit(AddressBus *bus);
+  template <typename T> void parse_savestate(T &t);
   void reset() noexcept;
   void step() noexcept;
 

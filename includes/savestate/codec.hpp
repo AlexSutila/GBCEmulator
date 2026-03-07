@@ -14,7 +14,10 @@ enum SavestateOps {
   OP_SIZE,
 };
 
-enum ChunkTags { C_CPU };
+enum ChunkTags {
+  C_CPU,
+  C_TIMER,
+};
 
 enum FieldTypes {
   U8,

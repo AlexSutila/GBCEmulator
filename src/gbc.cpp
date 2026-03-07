@@ -580,16 +580,19 @@ bool GameBoyColor::savestate_ready() const {
 std::vector<byte_t> GameBoyColor::savestate_serialize() const {
   Savestate::Writer out{};
   cpu->parse_savestate(out);
+  timer->parse_savestate(out);
   return out.get();
 }
 
 void GameBoyColor::savestate_deserialize(const std::span<const byte_t> data) {
   Savestate::Reader in{};
   cpu->parse_savestate(in);
+  timer->parse_savestate(in);
 }
 
 std::size_t GameBoyColor::savestate_size() const {
   Savestate::Sizer sz{};
   cpu->parse_savestate(sz);
+  timer->parse_savestate(sz);
   return sz.get();
 }
