@@ -1,7 +1,6 @@
 #include "cart/cart.hpp"
 #include "cart/mbc.hpp"
 #include "cart/mbc_creator.hpp"
-#include "savestate/codec.hpp"
 
 // ---------------------------
 // MBC3 (ROM/RAM + RTC)
@@ -110,102 +109,8 @@ public:
     return ram_;
   }
   std::span<byte_t> ram() noexcept override { return ram_; }
-  enum : std::uint16_t {
-    F_RAM_RTC_ENABLED = 1,
-    F_ROM_BANK,
-    F_SEL,
-    F_LATCH_PREV,
-    F_LATCHED_VALID,
-    F_RTC,
-    F_LATCHED_RTC
-  };
   [[nodiscard]] const char *savestate_tag() const noexcept override {
     return "MBC3";
-  }
-  void savestate_serialize(Savestate::Writer &out) const override {
-
-    out.field_bool(F_RAM_RTC_ENABLED, ram_rtc_enabled_);
-    out.field_u8(F_ROM_BANK, rom_bank_);
-    out.field_u8(F_SEL, sel_);
-    out.field_u8(F_LATCH_PREV, latch_prev_);
-    out.field_bool(F_LATCHED_VALID, latched_valid_);
-
-    const auto write_rtc = [&out](const std::uint16_t id, const RtcRegs &r) {
-      out.field(id, [&](Savestate::Writer &w) {
-        w.field_u8(1, r.sec);
-        w.field_u8(2, r.min);
-        w.field_u8(3, r.hour);
-        w.field_u16(4, r.day);
-        w.field_bool(5, r.halt);
-        w.field_bool(6, r.carry);
-      });
-    };
-    write_rtc(F_RTC, rtc_);
-    write_rtc(F_LATCHED_RTC, latched_);
-  }
-  void savestate_deserialize(Savestate::Reader &in) override {
-    const auto read_rtc = [](Savestate::Reader &payload, RtcRegs &r) {
-      while (const auto field = payload.next_field()) {
-        auto [id, payload_inner] = *field;
-        switch (id) {
-        case 1:
-          r.sec = payload_inner.u8();
-          break;
-        case 2:
-          r.min = payload_inner.u8();
-          break;
-        case 3:
-          r.hour = payload_inner.u8();
-          break;
-        case 4:
-          r.day = static_cast<std::uint16_t>(payload_inner.u16() & 0x01FFu);
-          break;
-        case 5:
-          r.halt = payload_inner.boolean();
-          break;
-        case 6:
-          r.carry = payload_inner.boolean();
-          break;
-        default:
-          payload_inner.skip(payload_inner.remaining());
-          break;
-        }
-        payload_inner.expect_eof();
-      }
-    };
-
-    while (const auto field = in.next_field()) {
-      auto [id, payload] = *field;
-      switch (id) {
-      case F_RAM_RTC_ENABLED:
-        ram_rtc_enabled_ = payload.boolean();
-        break;
-      case F_ROM_BANK:
-        rom_bank_ = payload.u8();
-        if (rom_bank_ == 0)
-          rom_bank_ = 1;
-        break;
-      case F_SEL:
-        sel_ = payload.u8();
-        break;
-      case F_LATCH_PREV:
-        latch_prev_ = payload.u8();
-        break;
-      case F_LATCHED_VALID:
-        latched_valid_ = payload.boolean();
-        break;
-      case F_RTC:
-        read_rtc(payload, rtc_);
-        break;
-      case F_LATCHED_RTC:
-        read_rtc(payload, latched_);
-        break;
-      default:
-        payload.skip(payload.remaining());
-        break;
-      }
-      payload.expect_eof();
-    }
   }
 
 private:

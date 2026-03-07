@@ -10,10 +10,6 @@
 
 struct runtime_sys_info;
 class AddressBus;
-namespace Savestate {
-class Reader;
-class Writer;
-}
 
 [[nodiscard]] inline byte_t vdma_bytes_to_blks(std::size_t bytes);
 [[nodiscard]] inline std::size_t vdma_blks_to_bytes(byte_t blks);
@@ -32,8 +28,6 @@ public:
     bool active;
   };
   [[nodiscard]] DMAState get_state() const;
-  void savestate_serialize(Savestate::Writer &out) const;
-  void savestate_deserialize(Savestate::Reader &in);
 
   void start(byte_t addr_high); // Begins the actual data transfer
   void step();
@@ -78,8 +72,6 @@ public:
     bool gdma_active;
   };
   [[nodiscard]] DMAState get_state() const;
-  void savestate_serialize(Savestate::Writer &out) const;
-  void savestate_deserialize(Savestate::Reader &in);
 
   /* The initialization phase of DMA is impacted by double speed mode, but the
    * actual transfer itself is not. Hence, `step_fast_cycle()` exists to run the

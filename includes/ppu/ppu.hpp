@@ -21,10 +21,6 @@
 
 struct runtime_sys_info;
 class Frontend;
-namespace Savestate {
-class Reader;
-class Writer;
-}
 
 class PixelProcessingUnit : Debug::Debuggable {
 public:
@@ -47,8 +43,6 @@ public:
     std::size_t dots;
   };
   [[nodiscard]] PPUState get_state() const;
-  void savestate_serialize(Savestate::Writer &out) const;
-  void savestate_deserialize(Savestate::Reader &in);
 
 private:
   InterruptBits *if_reg{};

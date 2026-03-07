@@ -5,16 +5,10 @@
 #include "memory/mmio/mmio.hpp"
 
 class AddressBus;
-namespace Savestate {
-class Reader;
-class Writer;
-}
 
 class SerialUnit {
 public:
   explicit SerialUnit(AddressBus *bus);
-  static void savestate_serialize(Savestate::Writer &out);
-  static void savestate_deserialize(Savestate::Reader &in);
 
 private:
   MMIORegister serial_data;

@@ -1,7 +1,6 @@
 #include "cart/cart.hpp"
 #include "cart/mbc.hpp"
 #include "cart/mbc_creator.hpp"
-#include "savestate/codec.hpp"
 
 #include <algorithm>
 #include <array>
@@ -120,96 +119,6 @@ public:
   std::span<byte_t> ram() noexcept override { return ram_; }
   [[nodiscard]] const char *savestate_tag() const noexcept override {
     return "MBC6";
-  }
-  enum : std::uint16_t {
-    F_RAM_ENABLED = 1,
-    F_RAM_BANK_A,
-    F_RAM_BANK_B,
-    F_FLASH_CE,
-    F_FLASH_WP,
-    F_A_FLASH,
-    F_B_FLASH,
-    F_A_BANK,
-    F_B_BANK,
-    F_FLASH_MODE,
-    F_SEQ,
-    F_SECTOR0_PROTECTED,
-    F_FLASH_DATA,
-    F_HIDDEN_DATA,
-    F_PROG_STATE,
-    F_HIDDEN_PROG_STATE,
-  };
-  void savestate_serialize(Savestate::Writer &out) const override {
-    out.field_bool(F_RAM_ENABLED, ram_enabled_);
-    out.field_u8(F_RAM_BANK_A, ram_bank_a_);
-    out.field_u8(F_RAM_BANK_B, ram_bank_b_);
-    out.field_bool(F_FLASH_CE, flash_ce_);
-    out.field_bool(F_FLASH_WP, flash_wp_);
-    out.field_bool(F_A_FLASH, a_flash_);
-    out.field_bool(F_B_FLASH, b_flash_);
-    out.field_u8(F_A_BANK, a_bank_);
-    out.field_u8(F_B_BANK, b_bank_);
-    out.field_u8(F_FLASH_MODE, flash_mode_to_raw_(flash_mode_));
-    out.field_u8(F_SEQ, seq_to_raw_(seq_));
-    out.field_bool(F_SECTOR0_PROTECTED, sector0_protected_);
-    out.field(F_FLASH_DATA, [&](Savestate::Writer &w) {
-      w.u32(static_cast<std::uint32_t>(flash_.size()));
-      w.bytes({flash_.data(), flash_.size()});
-    });
-    out.field(F_HIDDEN_DATA, [&](Savestate::Writer &w) {
-      w.u32(static_cast<std::uint32_t>(hidden_.size()));
-      w.bytes({hidden_.data(), hidden_.size()});
-    });
-    serialize_program_latch_(out, F_PROG_STATE, prog_);
-    serialize_program_latch_(out, F_HIDDEN_PROG_STATE, hidden_prog_);
-  }
-  void savestate_deserialize(Savestate::Reader &in) override {
-    GBC_SS_DESERIALIZE_BEGIN(in)
-    GBC_SS_CASE_BOOL(F_RAM_ENABLED, ram_enabled_);
-    case F_RAM_BANK_A:
-      ram_bank_a_ = static_cast<byte_t>(payload.u8() & 0x07);
-      break;
-    case F_RAM_BANK_B:
-      ram_bank_b_ = static_cast<byte_t>(payload.u8() & 0x07);
-      break;
-    GBC_SS_CASE_BOOL(F_FLASH_CE, flash_ce_);
-    GBC_SS_CASE_BOOL(F_FLASH_WP, flash_wp_);
-    GBC_SS_CASE_BOOL(F_A_FLASH, a_flash_);
-    GBC_SS_CASE_BOOL(F_B_FLASH, b_flash_);
-    case F_A_BANK:
-      a_bank_ = static_cast<byte_t>(payload.u8() & 0x7F);
-      break;
-    case F_B_BANK:
-      b_bank_ = static_cast<byte_t>(payload.u8() & 0x7F);
-      break;
-    case F_FLASH_MODE:
-      flash_mode_ = flash_mode_from_raw_(payload.u8());
-      break;
-    case F_SEQ:
-      seq_ = seq_from_raw_(payload.u8());
-      break;
-    GBC_SS_CASE_BOOL(F_SECTOR0_PROTECTED, sector0_protected_);
-    case F_FLASH_DATA: {
-      if (const auto sz = static_cast<std::size_t>(payload.u32());
-          sz != flash_.size())
-        throw std::runtime_error("Mbc6::savestate_deserialize() flash size");
-      payload.bytes({flash_.data(), flash_.size()});
-      break;
-    }
-    case F_HIDDEN_DATA: {
-      if (const auto sz = static_cast<std::size_t>(payload.u32());
-          sz != hidden_.size())
-        throw std::runtime_error("Mbc6::savestate_deserialize() hidden size");
-      payload.bytes({hidden_.data(), hidden_.size()});
-      break;
-    }
-    case F_PROG_STATE:
-      deserialize_program_latch_(payload, prog_);
-      break;
-    case F_HIDDEN_PROG_STATE:
-      deserialize_program_latch_(payload, hidden_prog_);
-      break;
-    GBC_SS_DESERIALIZE_END();
   }
 
 private:
@@ -374,55 +283,6 @@ private:
       if (on)
         bits.set(i);
     }
-  }
-
-  static void serialize_program_latch_(Savestate::Writer &out,
-                                       const std::uint16_t id,
-                                       const ProgramLatch &latch) {
-    out.field(id, [&](Savestate::Writer &w) {
-      w.field_bool(1, latch.active);
-      w.field_bool(2, latch.filled);
-      w.field_u32(3, static_cast<std::uint32_t>(latch.base));
-      w.field(4, [&](Savestate::Writer &buf_w) {
-        buf_w.bytes({latch.buf.data(), latch.buf.size()});
-      });
-      const auto packed = pack_written_(latch.written);
-      w.field(5, [&](Savestate::Writer &bits_w) {
-        bits_w.bytes({packed.data(), packed.size()});
-      });
-    });
-  }
-
-  static void deserialize_program_latch_(Savestate::Reader &in,
-                                         ProgramLatch &latch) {
-    enum : std::uint16_t {
-      F_ACTIVE = 1,
-      F_FILLED,
-      F_BASE,
-      F_BUF,
-      F_WRITTEN_BITS,
-    };
-    latch.reset();
-    GBC_SS_DESERIALIZE_BEGIN(in)
-    GBC_SS_CASE_BOOL(F_ACTIVE, latch.active);
-    GBC_SS_CASE_BOOL(F_FILLED, latch.filled);
-    case F_BASE:
-      latch.base = static_cast<std::size_t>(payload.u32());
-      break;
-    case F_BUF:
-      if (payload.remaining() != latch.buf.size())
-        throw std::runtime_error("Mbc6::savestate_deserialize() program buffer");
-      payload.bytes({latch.buf.data(), latch.buf.size()});
-      break;
-    case F_WRITTEN_BITS: {
-      if (payload.remaining() != kProgMaskBytes)
-        throw std::runtime_error("Mbc6::savestate_deserialize() program bits");
-      std::array<byte_t, kProgMaskBytes> packed{};
-      payload.bytes({packed.data(), packed.size()});
-      unpack_written_(packed, latch.written);
-      break;
-    }
-    GBC_SS_DESERIALIZE_END();
   }
 
   // ---------- ROM helpers ----------

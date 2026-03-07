@@ -19,10 +19,6 @@
 
 struct runtime_sys_info;
 class BootROM;
-namespace Savestate {
-class Reader;
-class Writer;
-} // namespace Savestate
 
 enum BusConflictTypes : std::uint32_t {
   BUS_CONFLICT_NONE = 0,
@@ -109,8 +105,6 @@ public:
   [[nodiscard]] const Cartridge *get_cartridge() const noexcept {
     return cart_.get();
   }
-  void savestate_serialize(Savestate::Writer &out) const;
-  void savestate_deserialize(Savestate::Reader &in);
 
   /* Convenience getters for PixelProcessor */
   std::array<std::unique_ptr<byte_t[]>, 2> &get_vram() { return vram; }

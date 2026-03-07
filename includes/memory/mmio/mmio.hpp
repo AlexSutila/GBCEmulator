@@ -3,11 +3,6 @@
 
 #include "emu_types.hpp"
 
-namespace Savestate {
-class Reader;
-class Writer;
-}
-
 /*
  * Game Boy I/O Register Map (FF00–FF7F)
  *
@@ -101,8 +96,6 @@ public:
    * Although it may be useless for this emulator, which strictly emulates a
    * GameBoy color, we leave the option here regardless. */
   virtual constexpr bool cgb() { return false; }
-  virtual void savestate_serialize(Savestate::Writer &out) const;
-  virtual void savestate_deserialize(Savestate::Reader &in);
 
 protected:
   [[nodiscard]] const byte_t &raw_state() const noexcept { return state_; }

@@ -1,7 +1,6 @@
 #include "cart/cart.hpp"
 #include "cart/mbc.hpp"
 #include "cart/mbc_creator.hpp"
-#include "savestate/codec.hpp"
 
 #include <algorithm>
 #include <cstddef>
@@ -38,15 +37,6 @@ public:
 
   [[nodiscard]] const char *savestate_tag() const noexcept override {
     return "WTRE";
-  }
-  enum : std::uint16_t { F_BANK = 1 };
-  void savestate_serialize(Savestate::Writer &out) const override {
-    out.field_u8(F_BANK, bank_);
-  }
-  void savestate_deserialize(Savestate::Reader &in) override {
-    GBC_SS_DESERIALIZE_BEGIN(in)
-    GBC_SS_CASE_U8(F_BANK, bank_);
-    GBC_SS_DESERIALIZE_END();
   }
 
 private:

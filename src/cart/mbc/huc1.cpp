@@ -1,7 +1,6 @@
 #include "cart/cart.hpp"
 #include "cart/mbc.hpp"
 #include "cart/mbc_creator.hpp"
-#include "savestate/codec.hpp"
 
 // ---------------------------
 // HuC1 (ROM + RAM + IR)
@@ -85,33 +84,6 @@ public:
   std::span<byte_t> ram() noexcept override { return ram_; }
   [[nodiscard]] const char *savestate_tag() const noexcept override {
     return "HUC1";
-  }
-  enum : std::uint16_t {
-    F_ROM_BANK = 1,
-    F_RAM_BANK,
-    F_IR_MODE,
-    F_IR_TX_ON,
-    F_IR_LIGHT
-  };
-  void savestate_serialize(Savestate::Writer &out) const override {
-    out.field_u8(F_ROM_BANK, rom_bank_);
-    out.field_u8(F_RAM_BANK, ram_bank_);
-    out.field_bool(F_IR_MODE, ir_mode_);
-    out.field_bool(F_IR_TX_ON, ir_tx_on_);
-    out.field_bool(F_IR_LIGHT, ir_light_);
-  }
-  void savestate_deserialize(Savestate::Reader &in) override {
-    GBC_SS_DESERIALIZE_BEGIN(in)
-    case F_ROM_BANK:
-      rom_bank_ = static_cast<byte_t>(payload.u8() & 0x7F);
-      break;
-    case F_RAM_BANK:
-      ram_bank_ = static_cast<byte_t>(payload.u8() & 0x03);
-      break;
-    GBC_SS_CASE_BOOL(F_IR_MODE, ir_mode_);
-    GBC_SS_CASE_BOOL(F_IR_TX_ON, ir_tx_on_);
-    GBC_SS_CASE_BOOL(F_IR_LIGHT, ir_light_);
-    GBC_SS_DESERIALIZE_END();
   }
 
 private:

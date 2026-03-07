@@ -2,7 +2,6 @@
 #include "cpu/interrupts.hpp"
 #include "memory/bus.hpp"
 #include "memory/mmio/dmg.hpp"
-#include "savestate/codec.hpp"
 
 template <typename T>
 T* init_mmio(AddressBus* bus, const IORegisterMapping reg_id) {
@@ -175,37 +174,3 @@ void TimerUnit::step() noexcept {
   }
 }
 
-enum : std::uint16_t {
-  F_SYS_COUNTER = 1,
-  F_TIMA,
-  F_TMA,
-  F_TAC,
-  F_OVERFLOW_PENDING,
-  F_OVERFLOW_DELAY,
-  F_RELOAD_LATCH,
-  F_RELOAD_DELAY,
-};
-
-void TimerUnit::savestate_serialize(Savestate::Writer &out) const {
-  out.field_u16(F_SYS_COUNTER, sys_counter_);
-  out.field_u8(F_TIMA, tima_);
-  out.field_u8(F_TMA, tma_);
-  out.field_u8(F_TAC, tac_);
-  out.field_bool(F_OVERFLOW_PENDING, overflow_pending_);
-  out.field_u8(F_OVERFLOW_DELAY, overflow_delay_);
-  out.field_bool(F_RELOAD_LATCH, reload_latch_);
-  out.field_u8(F_RELOAD_DELAY, reload_delay_);
-}
-
-void TimerUnit::savestate_deserialize(Savestate::Reader &in) {
-  GBC_SS_DESERIALIZE_BEGIN(in)
-  GBC_SS_CASE_U16(F_SYS_COUNTER, sys_counter_);
-  GBC_SS_CASE_U8(F_TIMA, tima_);
-  GBC_SS_CASE_U8(F_TMA, tma_);
-  GBC_SS_CASE_U8_MASK(F_TAC, tac_, 0x07);
-  GBC_SS_CASE_BOOL(F_OVERFLOW_PENDING, overflow_pending_);
-  GBC_SS_CASE_U8(F_OVERFLOW_DELAY, overflow_delay_);
-  GBC_SS_CASE_BOOL(F_RELOAD_LATCH, reload_latch_);
-  GBC_SS_CASE_U8(F_RELOAD_DELAY, reload_delay_);
-  GBC_SS_DESERIALIZE_END();
-}

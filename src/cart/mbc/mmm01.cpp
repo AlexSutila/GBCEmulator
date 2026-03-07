@@ -1,7 +1,6 @@
 #include "cart/cart.hpp"
 #include "cart/mbc.hpp"
 #include "cart/mbc_creator.hpp"
-#include "savestate/codec.hpp"
 
 // ---------------------------
 // MMM01 (multi-game compilation mapper; MBC1-like with "unmapped" menu mode)
@@ -129,64 +128,6 @@ public:
   std::span<byte_t> ram() noexcept override { return ram_; }
   [[nodiscard]] const char *savestate_tag() const noexcept override {
     return "MMM1";
-  }
-  enum : std::uint16_t {
-    F_MAPPED = 1,
-    F_RAM_ENABLED,
-    F_MULTIPLEX,
-    F_MBC1_MODE,
-    F_MODE_WRITE_LOCK,
-    F_RAM_BANK_MASK,
-    F_ROM_BANK_MASK,
-    F_ROM_BANK_LOW,
-    F_ROM_BANK_MID,
-    F_ROM_BANK_HIGH,
-    F_RAM_BANK_LOW,
-    F_RAM_BANK_HIGH,
-  };
-  void savestate_serialize(Savestate::Writer &out) const override {
-    out.field_bool(F_MAPPED, mapped_);
-    out.field_bool(F_RAM_ENABLED, ram_enabled_);
-    out.field_bool(F_MULTIPLEX, multiplex_);
-    out.field_bool(F_MBC1_MODE, mbc1_mode_);
-    out.field_bool(F_MODE_WRITE_LOCK, mode_write_lock_);
-    out.field_u8(F_RAM_BANK_MASK, ram_bank_mask_);
-    out.field_u8(F_ROM_BANK_MASK, rom_bank_mask_);
-    out.field_u8(F_ROM_BANK_LOW, rom_bank_low_);
-    out.field_u8(F_ROM_BANK_MID, rom_bank_mid_);
-    out.field_u8(F_ROM_BANK_HIGH, rom_bank_high_);
-    out.field_u8(F_RAM_BANK_LOW, ram_bank_low_);
-    out.field_u8(F_RAM_BANK_HIGH, ram_bank_high_);
-  }
-  void savestate_deserialize(Savestate::Reader &in) override {
-    GBC_SS_DESERIALIZE_BEGIN(in)
-    GBC_SS_CASE_BOOL(F_MAPPED, mapped_);
-    GBC_SS_CASE_BOOL(F_RAM_ENABLED, ram_enabled_);
-    GBC_SS_CASE_BOOL(F_MULTIPLEX, multiplex_);
-    GBC_SS_CASE_BOOL(F_MBC1_MODE, mbc1_mode_);
-    GBC_SS_CASE_BOOL(F_MODE_WRITE_LOCK, mode_write_lock_);
-    case F_RAM_BANK_MASK:
-      ram_bank_mask_ = static_cast<byte_t>(payload.u8() & 0x03);
-      break;
-    case F_ROM_BANK_MASK:
-      rom_bank_mask_ = static_cast<byte_t>(payload.u8() & 0x1E);
-      break;
-    case F_ROM_BANK_LOW:
-      rom_bank_low_ = static_cast<byte_t>(payload.u8() & 0x1F);
-      break;
-    case F_ROM_BANK_MID:
-      rom_bank_mid_ = static_cast<byte_t>(payload.u8() & 0x03);
-      break;
-    case F_ROM_BANK_HIGH:
-      rom_bank_high_ = static_cast<byte_t>(payload.u8() & 0x03);
-      break;
-    case F_RAM_BANK_LOW:
-      ram_bank_low_ = static_cast<byte_t>(payload.u8() & 0x03);
-      break;
-    case F_RAM_BANK_HIGH:
-      ram_bank_high_ = static_cast<byte_t>(payload.u8() & 0x03);
-      break;
-    GBC_SS_DESERIALIZE_END();
   }
 
 private:

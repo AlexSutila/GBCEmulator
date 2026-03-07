@@ -3,7 +3,6 @@
 #include "memory/bus.hpp"
 #include "memory/mmio/dmg.hpp"
 #include "memory/mmio/mmio.hpp"
-#include "savestate/codec.hpp"
 #include <stdexcept>
 
 /*
@@ -33,6 +32,3 @@ SerialUnit::SerialUnit(AddressBus *const bus)
   serial_ctrl.set_interrupt_reg(if_reg);
 }
 
-void SerialUnit::savestate_serialize(Savestate::Writer &) {}
-
-void SerialUnit::savestate_deserialize(Savestate::Reader &) {}

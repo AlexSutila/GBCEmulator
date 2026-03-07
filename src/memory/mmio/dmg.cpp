@@ -1,7 +1,6 @@
 #include "memory/mmio/dmg.hpp"
 #include "cpu/interrupts.hpp"
 #include "emu_types.hpp"
-#include "savestate/codec.hpp"
 #include "timer.hpp"
 #include <cassert>
 
@@ -129,29 +128,6 @@ BootROMCtrl::BootROMCtrl() : MMIORegister() { map_boot_rom = true; }
 void BootROMCtrl::write(const byte_t value) {
   MMIORegister::write(value);
   map_boot_rom = false;
-}
-
-void BootROMCtrl::savestate_serialize(Savestate::Writer &out) const {
-  MMIORegister::savestate_serialize(out);
-  out.field_bool(2, map_boot_rom);
-}
-
-void BootROMCtrl::savestate_deserialize(Savestate::Reader &in) {
-  while (const auto field = in.next_field()) {
-    auto [id, payload] = *field;
-    switch (id) {
-    case 1:
-      raw_state_set(payload.u8());
-      break;
-    case 2:
-      map_boot_rom = payload.boolean();
-      break;
-    default:
-      payload.skip(payload.remaining());
-      break;
-    }
-    payload.expect_eof();
-  }
 }
 
 bool BootROMCtrl::boot_rom_enabled() const { return map_boot_rom; }

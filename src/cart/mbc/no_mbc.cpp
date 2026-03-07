@@ -42,8 +42,6 @@ public:
   [[nodiscard]] const char *savestate_tag() const noexcept override {
     return "NOMB";
   }
-  void savestate_serialize(Savestate::Writer &) const override {}
-  void savestate_deserialize(Savestate::Reader &) override {}
 
 private:
   std::span<const byte_t> rom_;

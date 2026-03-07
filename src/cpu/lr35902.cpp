@@ -6,7 +6,6 @@
 #include "debugger/debugger.hpp"
 #include "gbc.hpp"
 #include "memory/mmio/mmio.hpp"
-#include "savestate/codec.hpp"
 
 #include <iomanip>
 #include <ios>
@@ -94,80 +93,6 @@ LR35902::ProcessorState LR35902::get_state() const {
 
 bool LR35902::savestate_ready() const {
   return state == STATE_FETCH || state == STATE_HALTED;
-}
-
-enum : std::uint16_t {
-  F_PC = 1,
-  F_SP,
-  F_A,
-  F_B,
-  F_C,
-  F_D,
-  F_E,
-  F_F,
-  F_H,
-  F_L,
-  F_IME_RAW,
-  F_HALT_BUG,
-  F_CPU_STATE,
-  F_INS_BASE,
-};
-
-void LR35902::savestate_serialize(Savestate::Writer &out) const {
-  if (!savestate_ready()) [[unlikely]]
-    throw std::runtime_error("LR35902::savestate_serialize() not at boundary");
-  const auto regs = get_state();
-  out.field_u16(F_PC, regs.pc);
-  out.field_u16(F_SP, regs.sp);
-  out.field_u8(F_A, regs.a);
-  out.field_u8(F_B, regs.b);
-  out.field_u8(F_C, regs.c);
-  out.field_u8(F_D, regs.d);
-  out.field_u8(F_E, regs.e);
-  out.field_u8(F_F, regs.f);
-  out.field_u8(F_H, regs.h);
-  out.field_u8(F_L, regs.l);
-  out.field_u8(F_IME_RAW, ime.raw_state());
-  out.field_bool(F_HALT_BUG, reg_file.halt_bug_triggered);
-  out.field_u8(F_CPU_STATE, static_cast<byte_t>(state));
-  out.field_u16(F_INS_BASE, ins_base_addr);
-}
-
-void LR35902::savestate_deserialize(Savestate::Reader &in) {
-  ProcessorState regs = get_state();
-  byte_t ime_state = ime.raw_state();
-  reg_file.halt_bug_triggered = false;
-  auto cpu_state = static_cast<byte_t>(state);
-
-  GBC_SS_DESERIALIZE_BEGIN(in)
-  GBC_SS_CASE_U16(F_PC, regs.pc);
-  GBC_SS_CASE_U16(F_SP, regs.sp);
-  GBC_SS_CASE_U8(F_A, regs.a);
-  GBC_SS_CASE_U8(F_B, regs.b);
-  GBC_SS_CASE_U8(F_C, regs.c);
-  GBC_SS_CASE_U8(F_D, regs.d);
-  GBC_SS_CASE_U8(F_E, regs.e);
-  GBC_SS_CASE_U8(F_F, regs.f);
-  GBC_SS_CASE_U8(F_H, regs.h);
-  GBC_SS_CASE_U8(F_L, regs.l);
-  GBC_SS_CASE_U8(F_IME_RAW, ime_state);
-  GBC_SS_CASE_BOOL(F_HALT_BUG, reg_file.halt_bug_triggered);
-  GBC_SS_CASE_U8(F_CPU_STATE, cpu_state);
-  GBC_SS_CASE_U16(F_INS_BASE, ins_base_addr);
-  GBC_SS_DESERIALIZE_END();
-
-  if (cpu_state != STATE_FETCH && cpu_state != STATE_HALTED)
-    throw std::runtime_error(
-        "LR35902::savestate_deserialize() invalid pipeline state");
-
-  regs.ime_enabled = false;
-  load_state(regs);
-  ime.load_raw_state(ime_state);
-
-  state = static_cast<CpuStates>(cpu_state);
-  ins_ = nullptr;
-  total_ins_clks.reset();
-  cur_ins_clks = 0;
 }
 
 // Lower bits get higher priority, return true if interrupted

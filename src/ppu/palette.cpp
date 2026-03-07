@@ -1,7 +1,6 @@
 #include "ppu/palette.hpp"
 #include "emu_types.hpp"
 #include "memory/mmio/cgb.hpp"
-#include "savestate/codec.hpp"
 
 #include <cstdint>
 #include <stdexcept>
@@ -39,30 +38,6 @@ std::uint32_t rgb555_to_argb8888(const std::uint8_t lo, const std::uint8_t hi) {
 ColorRam::ColorRam() : mem_{}, idx_reg(), data_reg(mem_, idx_reg) {}
 PPU::PaletteData *ColorRam::get_data_reg() { return &data_reg; }
 PPU::PaletteIdx *ColorRam::get_idx_reg() { return &idx_reg; }
-void ColorRam::savestate_serialize(Savestate::Writer &out) const {
-  out.field_u8(1, idx_reg.peek());
-  out.field(2, [&](Savestate::Writer &w) { w.bytes(mem_); });
-}
-
-void ColorRam::savestate_deserialize(Savestate::Reader &in) {
-  while (const auto field = in.next_field()) {
-    auto [id, payload] = *field;
-    switch (id) {
-    case 1:
-      idx_reg.MMIORegister::write(payload.u8());
-      break;
-    case 2:
-      if (payload.remaining() != mem_.size())
-        throw std::runtime_error("ColorRam::savestate_deserialize()");
-      payload.bytes(mem_);
-      break;
-    default:
-      payload.skip(payload.remaining());
-      break;
-    }
-    payload.expect_eof();
-  }
-}
 
 /*
  * Each palette color is stored as a 16-bit little-endian RGB555 value:

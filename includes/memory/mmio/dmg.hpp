@@ -34,8 +34,6 @@ public:
   void write(byte_t value) override;
   [[nodiscard]] byte_t peek() const override;
   byte_t read() override;
-  void savestate_serialize(Savestate::Writer &out) const override;
-  void savestate_deserialize(Savestate::Reader &in) override;
 
   void set_button(JoypadButton button, bool pressed);
   void set_state(byte_t mask);
@@ -355,8 +353,6 @@ private:
 class BootROMCtrl final : public MMIORegister {
 public:
   void write(byte_t value) override;
-  void savestate_serialize(Savestate::Writer &out) const override;
-  void savestate_deserialize(Savestate::Reader &in) override;
 
   /* Determine if the boot ROM is currently mapped */
   [[nodiscard]] bool boot_rom_enabled() const;

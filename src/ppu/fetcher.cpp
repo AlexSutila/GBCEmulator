@@ -4,7 +4,6 @@
 #include "memory/mmio/cgb.hpp"
 #include "memory/mmio/dmg.hpp"
 #include "memory/mmio/mmio.hpp"
-#include "savestate/codec.hpp"
 #include "ppu/attributes.hpp"
 #include "ppu/fifo.hpp"
 #include "ppu/pixel.hpp"
@@ -444,67 +443,3 @@ void Fetcher::step() {
   }
 }
 
-enum : std::uint16_t {
-  F_STATE = 1,
-  F_PIXELS_DISCARDED,
-  F_COARSE_SCROLL_X,
-  F_FINE_SCROLL_X,
-  F_FINE_SCROLL_Y,
-  F_WIN_INTERNAL_LY,
-  F_WIN_ENABLE_SAMPLE,
-  F_WIN_STARTED,
-  F_TILE_IDX,
-  F_TILE_ATTR,
-  F_DATA_LO,
-  F_DATA_HI,
-  F_X_COOR,
-  F_TOTAL_CLKS,
-  F_CUR_CLKS,
-};
-
-void Fetcher::savestate_serialize(Savestate::Writer &out) const {
-  out.field_u8(F_STATE, static_cast<byte_t>(state));
-  out.field_u8(F_PIXELS_DISCARDED, pixels_discarded);
-  out.field_u8(F_COARSE_SCROLL_X, coarse_scroll_x);
-  out.field_u8(F_FINE_SCROLL_X, fine_scroll_x);
-  out.field_u8(F_FINE_SCROLL_Y, fine_scroll_y);
-  out.field_u8(F_WIN_INTERNAL_LY, win_internal_ly);
-  out.field_bool(F_WIN_ENABLE_SAMPLE, win_enable_sample);
-  out.field_bool(F_WIN_STARTED, win_started);
-
-  out.field_u32(F_TILE_IDX, static_cast<std::uint32_t>(data.tile_idx));
-  out.field_u8(F_TILE_ATTR, data.tile_attr);
-  out.field_u8(F_DATA_LO, data.data_lo);
-  out.field_u8(F_DATA_HI, data.data_hi);
-  out.field_u32(F_X_COOR, static_cast<std::uint32_t>(data.x_coor));
-  if (total_clks.has_value())
-    out.field_u32(F_TOTAL_CLKS, static_cast<std::uint32_t>(total_clks.value()));
-  out.field_u32(F_CUR_CLKS, static_cast<std::uint32_t>(cur_clks));
-}
-
-void Fetcher::savestate_deserialize(Savestate::Reader &in) {
-  total_clks.reset();
-  GBC_SS_DESERIALIZE_BEGIN(in)
-  case F_STATE: {
-    const auto raw_state = payload.u8();
-    if (raw_state > STATE_SPRITE_FETCH)
-      throw std::runtime_error("Fetcher::savestate_deserialize() bad state");
-    state = static_cast<FetcherState>(raw_state);
-    break;
-  }
-  GBC_SS_CASE_U8(F_PIXELS_DISCARDED, pixels_discarded);
-  GBC_SS_CASE_U8(F_COARSE_SCROLL_X, coarse_scroll_x);
-  GBC_SS_CASE_U8(F_FINE_SCROLL_X, fine_scroll_x);
-  GBC_SS_CASE_U8(F_FINE_SCROLL_Y, fine_scroll_y);
-  GBC_SS_CASE_U8(F_WIN_INTERNAL_LY, win_internal_ly);
-  GBC_SS_CASE_BOOL(F_WIN_ENABLE_SAMPLE, win_enable_sample);
-  GBC_SS_CASE_BOOL(F_WIN_STARTED, win_started);
-  GBC_SS_CASE_U32(F_TILE_IDX, data.tile_idx);
-  GBC_SS_CASE_U8(F_TILE_ATTR, data.tile_attr);
-  GBC_SS_CASE_U8(F_DATA_LO, data.data_lo);
-  GBC_SS_CASE_U8(F_DATA_HI, data.data_hi);
-  GBC_SS_CASE_U32(F_X_COOR, data.x_coor);
-  GBC_SS_CASE_U32(F_TOTAL_CLKS, total_clks);
-  GBC_SS_CASE_U32(F_CUR_CLKS, cur_clks);
-  GBC_SS_DESERIALIZE_END();
-}

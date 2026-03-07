@@ -1,7 +1,6 @@
 #include "cart/cart.hpp"
 #include "cart/mbc.hpp"
 #include "cart/mbc_creator.hpp"
-#include "savestate/codec.hpp"
 
 // ---------------------------
 // HuC-3 (ROM + RAM + RTC/IR mailbox MCU)
@@ -135,86 +134,6 @@ public:
   std::span<byte_t> ram() noexcept override { return ram_; }
   [[nodiscard]] const char *savestate_tag() const noexcept override {
     return "HUC3";
-  }
-  enum : std::uint16_t {
-    F_SEL = 1,
-    F_ROM_BANK,
-    F_RAM_BANK,
-    F_IR_TX_ON,
-    F_IR_LIGHT,
-    F_MCU,
-    F_MCU_ADDR,
-    F_LAST_CMD,
-    F_LAST_ARG,
-    F_LAST_RES,
-    F_MCU_READY,
-    F_MINUTE_OF_DAY,
-    F_DAY_COUNTER,
-    F_SEC_ACC,
-  };
-  void savestate_serialize(Savestate::Writer &out) const override {
-    out.field_u8(F_SEL, sel_);
-    out.field_u8(F_ROM_BANK, rom_bank_);
-    out.field_u8(F_RAM_BANK, ram_bank_);
-    out.field_bool(F_IR_TX_ON, ir_tx_on_);
-    out.field_bool(F_IR_LIGHT, ir_light_);
-    out.field(F_MCU, [&](Savestate::Writer &w) {
-      w.bytes({mcu_.data(), mcu_.size()});
-    });
-    out.field_u8(F_MCU_ADDR, mcu_addr_);
-    out.field_u8(F_LAST_CMD, last_cmd_);
-    out.field_u8(F_LAST_ARG, last_arg_);
-    out.field_u8(F_LAST_RES, last_res_);
-    out.field_bool(F_MCU_READY, mcu_ready_);
-    out.field_u16(F_MINUTE_OF_DAY, minute_of_day_);
-    out.field_u16(F_DAY_COUNTER, day_counter_);
-    out.field_u64(F_SEC_ACC, sec_acc_);
-  }
-  void savestate_deserialize(Savestate::Reader &in) override {
-    bool minute_present = false;
-    bool day_present = false;
-    GBC_SS_DESERIALIZE_BEGIN(in)
-    case F_SEL:
-      sel_ = static_cast<byte_t>(payload.u8() & 0x0F);
-      break;
-    case F_ROM_BANK:
-      rom_bank_ = static_cast<byte_t>(payload.u8() & 0x7F);
-      break;
-    case F_RAM_BANK:
-      ram_bank_ = static_cast<byte_t>(payload.u8() & 0x03);
-      break;
-    GBC_SS_CASE_BOOL(F_IR_TX_ON, ir_tx_on_);
-    GBC_SS_CASE_BOOL(F_IR_LIGHT, ir_light_);
-    case F_MCU:
-      if (payload.remaining() != mcu_.size())
-        throw std::runtime_error("HuC3::savestate_deserialize() mcu");
-      payload.bytes({mcu_.data(), mcu_.size()});
-      for (auto &v : mcu_)
-        v = static_cast<byte_t>(v & 0x0F);
-      break;
-    GBC_SS_CASE_U8(F_MCU_ADDR, mcu_addr_);
-    case F_LAST_CMD:
-      last_cmd_ = static_cast<byte_t>(payload.u8() & 0x07);
-      break;
-    case F_LAST_ARG:
-      last_arg_ = static_cast<byte_t>(payload.u8() & 0x0F);
-      break;
-    case F_LAST_RES:
-      last_res_ = static_cast<byte_t>(payload.u8() & 0x0F);
-      break;
-    GBC_SS_CASE_BOOL(F_MCU_READY, mcu_ready_);
-    case F_MINUTE_OF_DAY:
-      minute_of_day_ = static_cast<std::uint16_t>(payload.u16() % 1440u);
-      minute_present = true;
-      break;
-    case F_DAY_COUNTER:
-      day_counter_ = static_cast<std::uint16_t>(payload.u16() & 0x0FFFu);
-      day_present = true;
-      break;
-    GBC_SS_CASE_U64(F_SEC_ACC, sec_acc_);
-    GBC_SS_DESERIALIZE_END();
-    if (!minute_present || !day_present)
-      sync_time_from_mcu();
   }
 
 private:

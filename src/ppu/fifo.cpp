@@ -46,18 +46,3 @@ const pixel &ObjPixelFifo::at(const std::size_t index) const {
 }
 pixel &ObjPixelFifo::at(const std::size_t index) { return fifo.at(index); }
 
-void BgPixelFifo::savestate_serialize(Savestate::Writer &out) const {
-  fifo.savestate_serialize(out);
-}
-
-void BgPixelFifo::savestate_deserialize(Savestate::Reader &in) {
-  fifo.savestate_deserialize(in);
-}
-
-void ObjPixelFifo::savestate_serialize(Savestate::Writer &out) const {
-  fifo.savestate_serialize(out);
-}
-
-void ObjPixelFifo::savestate_deserialize(Savestate::Reader &in) {
-  fifo.savestate_deserialize(in);
-}
