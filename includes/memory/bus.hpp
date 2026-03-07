@@ -22,7 +22,7 @@ class BootROM;
 namespace Savestate {
 class Reader;
 class Writer;
-}
+} // namespace Savestate
 
 enum BusConflictTypes : std::uint32_t {
   BUS_CONFLICT_NONE = 0,
@@ -87,8 +87,9 @@ public:
              std::optional<BootROM> &bios);
 
   /* For attaching MMIO component interface registers */
-  void connect_mmio(addr_t addr, MMIORegister *reg,
-                    MMIOSavestatePolicy policy = MMIOSavestatePolicy::OwnerManaged);
+  void
+  connect_mmio(addr_t addr, MMIORegister *reg,
+               MMIOSavestatePolicy policy = MMIOSavestatePolicy::OwnerManaged);
   [[nodiscard]] MMIORegister *get_mmio(IORegisterMapping mapping) const;
 
   /* Bus conflict management */
@@ -105,7 +106,9 @@ public:
   void eject_cartridge();
   void init_test_bed();
   [[nodiscard]] Cartridge *get_cartridge() noexcept { return cart_.get(); }
-  [[nodiscard]] const Cartridge *get_cartridge() const noexcept { return cart_.get(); }
+  [[nodiscard]] const Cartridge *get_cartridge() const noexcept {
+    return cart_.get();
+  }
   void savestate_serialize(Savestate::Writer &out) const;
   void savestate_deserialize(Savestate::Reader &in);
 

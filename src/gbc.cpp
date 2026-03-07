@@ -13,8 +13,8 @@
 #include <initializer_list>
 #include <memory>
 #include <optional>
-#include <string_view>
 #include <stdexcept>
+#include <string_view>
 
 namespace {
 struct ParsedCheat {
@@ -55,16 +55,15 @@ std::optional<addr_t> parse_hex_addr(const std::string_view sv) {
   return out;
 }
 
-std::optional<unsigned> parse_hex_nibble(const char c) {
-  return hex_nibble(c);
-}
+std::optional<unsigned> parse_hex_nibble(const char c) { return hex_nibble(c); }
 
 std::string strip_non_hex(const std::string_view text) {
   std::string out;
   out.reserve(text.size());
   for (const char c : text) {
     if (std::isxdigit(static_cast<unsigned char>(c)) != 0)
-      out.push_back(static_cast<char>(std::toupper(static_cast<unsigned char>(c))));
+      out.push_back(
+          static_cast<char>(std::toupper(static_cast<unsigned char>(c))));
   }
   return out;
 }
@@ -87,9 +86,7 @@ bool is_cheat_overridable_addr(const addr_t addr) {
   return true;
 }
 
-bool is_game_genie_addr(const addr_t addr) {
-  return addr <= 0x7FFF;
-}
+bool is_game_genie_addr(const addr_t addr) { return addr <= 0x7FFF; }
 
 std::optional<ParsedCheat> parse_raw_cheat(const std::string_view code) {
   const auto hex = strip_non_hex(code);
@@ -138,7 +135,8 @@ std::optional<ParsedCheat> parse_gameshark_cheat(const std::string_view code) {
   };
 }
 
-std::optional<ParsedCheat> parse_codebreaker_cheat(const std::string_view code) {
+std::optional<ParsedCheat>
+parse_codebreaker_cheat(const std::string_view code) {
   // mGBA-style GB CodeBreaker parsing:
   //   XXXXXX-YY
   // where XXXXXX = command/address bytes and YY = value byte.
@@ -159,8 +157,7 @@ std::optional<ParsedCheat> parse_codebreaker_cheat(const std::string_view code) 
       parse_hex_byte(std::string_view(normalized).substr(2, 2));
   const auto addr_lo =
       parse_hex_byte(std::string_view(normalized).substr(4, 2));
-  const auto value =
-      parse_hex_byte(std::string_view(normalized).substr(7, 2));
+  const auto value = parse_hex_byte(std::string_view(normalized).substr(7, 2));
   if (!cmd.has_value() || !addr_hi.has_value() || !addr_lo.has_value() ||
       !value.has_value())
     return std::nullopt;
@@ -197,8 +194,8 @@ parse_gamegenie_cheat(const std::string_view code) {
     return std::nullopt;
 
   const auto addr_hi = *f ^ 0xF;
-  const auto addr = static_cast<addr_t>((addr_hi << 12) | (*c << 8) |
-                                          (*d << 4) | *e);
+  const auto addr =
+      static_cast<addr_t>((addr_hi << 12) | (*c << 8) | (*d << 4) | *e);
   if (!is_game_genie_addr(addr))
     return std::nullopt;
 
@@ -315,11 +312,13 @@ compile_cheat(const std::string_view code,
       if (const auto gg = parse_gamegenie_cheat(code); gg.has_value())
         return gg;
     }
-    return first_match(code, {parse_codebreaker_override, parse_gameshark_override,
-                              parse_raw_override, parse_gamegenie_cheat});
+    return first_match(code,
+                       {parse_codebreaker_override, parse_gameshark_override,
+                        parse_raw_override, parse_gamegenie_cheat});
   default:
-    return first_match(code, {parse_gameshark_override, parse_raw_override,
-                              parse_codebreaker_override, parse_gamegenie_cheat});
+    return first_match(code,
+                       {parse_gameshark_override, parse_raw_override,
+                        parse_codebreaker_override, parse_gamegenie_cheat});
   }
 }
 } // namespace
@@ -355,8 +354,8 @@ GameBoyColor::GameBoyColor(Frontend &frontend, const BootROM &rom)
 }
 
 GameBoyColor::GameBoyColor(Frontend &frontend)
-    : Debuggable(debugger_), debugger_(std::nullopt),
-      bios_(std::nullopt), fe_(frontend) {
+    : Debuggable(debugger_), debugger_(std::nullopt), bios_(std::nullopt),
+      fe_(frontend) {
   system_init(); // Connects all system components
   skip_bios();   // BIOS is left unconfigured
   /* We still kind of have to do this here in case we run DMG games. Will likely
@@ -482,7 +481,7 @@ void GameBoyColor::cram_init_mono(IORegisterMapping index,
   }
 }
 
-void GameBoyColor::insert_cartridge(const cart& c) {
+void GameBoyColor::insert_cartridge(const cart &c) {
   const byte_t &cgb_flag = c.header.cgb_flag();
   if (!bus)
     throw std::logic_error("Bus not initialized");
@@ -520,7 +519,8 @@ void GameBoyColor::step_dma(const bool fast_cycle) const {
 bool GameBoyColor::vdma_enabled() const { return bus->get_vdma().enabled(); }
 
 void GameBoyColor::step_processor() const {
-  if (const auto &vdma = bus->get_vdma(); !vdma.enabled()) // CPU is halted until VDMA is complete
+  if (const auto &vdma = bus->get_vdma();
+      !vdma.enabled()) // CPU is halted until VDMA is complete
     cpu->step();
 }
 
@@ -545,13 +545,13 @@ void GameBoyColor::step() {
 }
 
 GameBoyColor::CheatStats
-GameBoyColor::configure_cheats(const std::vector<CheatCode>& cheats) {
+GameBoyColor::configure_cheats(const std::vector<CheatCode> &cheats) {
   std::vector<AddressBus::CheatOverride> overrides{};
   overrides.reserve(cheats.size());
   cheat_stats_ = {};
   cheat_stats_.total = cheats.size();
 
-  for (const auto & [enabled, code, format] : cheats) {
+  for (const auto &[enabled, code, format] : cheats) {
     if (!enabled)
       continue;
     cheat_stats_.enabled += 1;
@@ -578,9 +578,11 @@ bool GameBoyColor::savestate_ready() const {
 
 std::vector<byte_t> GameBoyColor::serialize_savestate() const {
   if (!bus || !cpu || !ppu || !timer || !serial)
-    throw std::runtime_error("GameBoyColor::serialize_savestate() uninitialized");
+    throw std::runtime_error(
+        "GameBoyColor::serialize_savestate() uninitialized");
   if (!savestate_ready())
-    throw std::runtime_error("GameBoyColor::serialize_savestate() unsafe point");
+    throw std::runtime_error(
+        "GameBoyColor::serialize_savestate() unsafe point");
 
   Savestate::Writer out;
   out.tag("GBCS");
@@ -593,18 +595,24 @@ std::vector<byte_t> GameBoyColor::serialize_savestate() const {
     w.field_bool(4, sys_.speed_switch_armed);
     w.field_bool(5, sys_.double_speed);
   });
-  out.chunk("BUS ", 1, [&](Savestate::Writer &w) { bus->savestate_serialize(w); });
-  out.chunk("CPU ", 1, [&](Savestate::Writer &w) { cpu->savestate_serialize(w); });
-  out.chunk("TIMR", 1, [&](Savestate::Writer &w) { timer->savestate_serialize(w); });
-  out.chunk("SERL", 1, [&](Savestate::Writer &w) { serial->savestate_serialize(w); });
-  out.chunk("PPU ", 1, [&](Savestate::Writer &w) { ppu->savestate_serialize(w); });
+  out.chunk("BUS ", 1,
+            [&](Savestate::Writer &w) { bus->savestate_serialize(w); });
+  out.chunk("CPU ", 1,
+            [&](Savestate::Writer &w) { cpu->savestate_serialize(w); });
+  out.chunk("TIMR", 1,
+            [&](Savestate::Writer &w) { timer->savestate_serialize(w); });
+  out.chunk("SERL", 1,
+            [&](Savestate::Writer &w) { serial->savestate_serialize(w); });
+  out.chunk("PPU ", 1,
+            [&](Savestate::Writer &w) { ppu->savestate_serialize(w); });
 
   return std::move(out).take();
 }
 
 void GameBoyColor::deserialize_savestate(const std::span<const byte_t> data) {
   if (!bus || !cpu || !ppu || !timer || !serial)
-    throw std::runtime_error("GameBoyColor::deserialize_savestate() uninitialized");
+    throw std::runtime_error(
+        "GameBoyColor::deserialize_savestate() uninitialized");
 
   Savestate::Reader in(data);
   in.expect_tag("GBCS");
@@ -615,7 +623,7 @@ void GameBoyColor::deserialize_savestate(const std::span<const byte_t> data) {
 
   while (const auto chunk = in.next_chunk()) {
     auto [tag_arr, version, payload] = *chunk;
-    const auto tag =  std::string_view (tag_arr.data(), tag_arr.size());
+    const auto tag = std::string_view(tag_arr.data(), tag_arr.size());
     if (tag == "SYS ") {
       if (version != 1)
         throw std::runtime_error("Savestate: unsupported SYS chunk version");
@@ -691,6 +699,7 @@ void GameBoyColor::deserialize_savestate(const std::span<const byte_t> data) {
     payload.expect_eof();
   }
 
-  if (!(seen_sys && seen_bus && seen_cpu && seen_timer && seen_serial && seen_ppu))
+  if (!(seen_sys && seen_bus && seen_cpu && seen_timer && seen_serial &&
+        seen_ppu))
     throw std::runtime_error("Savestate: missing required chunks");
 }
