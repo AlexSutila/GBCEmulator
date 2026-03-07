@@ -17,7 +17,7 @@ enum : std::uint16_t {
 
 template <typename T> void TimerUnit::parse_savestate(T &t) {
   constexpr auto version = 1; // Schema revision
-  t.chunk(version, Savestate::C_TIMER);
+  t.chunk_header(version, Savestate::C_TIMER);
 
   t.field_u16(F_SYS_COUNTER, sys_counter_);
   t.field_u8(F_TIMA, tima_);

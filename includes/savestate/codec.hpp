@@ -2,6 +2,7 @@
 #define GBC_SCHEMA_HPP
 
 #include <cstdint>
+#include <optional>
 #include <span>
 #include <stdexcept>
 #include <vector>
@@ -29,67 +30,50 @@ enum FieldTypes {
   CHUNK,
 };
 
-struct field {
-  FieldTypes type{};
-
-  /**
-   * Per chunk field identifier, allowing flexibility with field ordering.
-   * Tags do not need to be listed in any particular order within a savestate
-   * file.
-   */
-  std::uint16_t tag{};
-
-  /**
-   * Denotes how many `instances` of this field can occur. This should always
-   * reflect the maximum value possible to make buffer allocation to load save
-   * states into memory deterministic and not variable with internal state.
-   */
-  std::size_t count{};
-
-  /**
-   * For stateful `std::optional` types, which may or may not have a value. If
-   * any field was not seen within the chunk, it should be reset.
-   */
-  bool optional{};
-};
-
-struct chunk {
-  std::uint16_t version{}; // Compatability indicator
-
-  /**
-   * Identifies a chunk (correlating to hardware component) by giving it a
-   * recognizable name. Indicates which object to invoke the parser method on.
-   */
-  std::uint16_t tag{};
-
-  /**
-   * A list of fields that are to be set during the parse method of the
-   * corresponding component.
-   */
-  std::vector<field> fields{};
-};
-
 // Serialize
 class Writer {
 public:
   constexpr SavestateOps op() const { return OP_WRITE; }
 
-  void field_u8(const std::uint16_t tag, const std::uint8_t val) {
+  template <typename Fn> void field(const std::uint16_t tag, Fn &&fn) {
     u16(tag);
-    u8(val);
+    fn(*this);
+  }
+
+  template <typename Fn>
+  void opt_field(const std::uint16_t tag, bool present, Fn &&fn) {
+    u16(tag);
+    if (present) {
+      boolean(true);
+      fn(*this);
+    } else
+      boolean(false);
+  }
+
+  void field_u8(const std::uint16_t tag, const std::uint8_t val) {
+    field(tag, [&](Writer &w) { w.u8(val); });
+  }
+  void field_u8(const std::uint16_t tag,
+                const std::optional<std::uint8_t> val) {
+    opt_field(tag, val.has_value(), [&](Writer &w) { w.u8(val.value()); });
   }
 
   void field_boolean(const std::uint16_t tag, const bool val) {
-    u16(tag);
-    boolean(val);
+    field(tag, [&](Writer &w) { w.boolean(val); });
+  }
+  void field_boolean(const std::uint16_t tag, const std::optional<bool> val) {
+    opt_field(tag, val.has_value(), [&](Writer &w) { w.boolean(val.value()); });
   }
 
   void field_u16(const std::uint16_t tag, const std::uint16_t val) {
-    u16(tag);
-    u16(val);
+    field(tag, [&](Writer &w) { w.u16(val); });
+  }
+  void field_u16(const std::uint16_t tag,
+                 const std::optional<std::uint16_t> val) {
+    opt_field(tag, val.has_value(), [&](Writer &w) { w.u16(val.value()); });
   }
 
-  void chunk(const std::uint16_t version, const std::uint16_t tag) {
+  void chunk_header(const std::uint16_t version, const std::uint16_t tag) {
     u16(version);
     u16(tag);
   }
@@ -113,22 +97,41 @@ class Reader {
 public:
   constexpr SavestateOps op() const { return OP_READ; }
 
-  void field_u8(const std::uint16_t tag, std::uint8_t &val) {
+  template <typename Fn> void field(const std::uint16_t tag, Fn &&fn) {
     check_tag(tag);
-    val = u8();
+    fn(*this);
+  }
+  template <typename Fn, typename Opt>
+  void opt_field(const std::uint16_t tag, std::optional<Opt> &val, Fn &&fn) {
+    check_tag(tag);
+    if (boolean()) {
+      fn(*this);
+    } else
+      val.reset();
+  }
+
+  void field_u8(const std::uint16_t tag, std::uint8_t &val) {
+    field(tag, [&](Reader &r) { val = r.u8(); });
+  }
+  void field_u8(const std::uint16_t tag, std::optional<std::uint8_t> &val) {
+    opt_field(tag, val, [&](Reader &r) { val = r.u8(); });
   }
 
   void field_boolean(const std::uint16_t tag, bool &val) {
-    check_tag(tag);
-    val = boolean();
+    field(tag, [&](Reader &r) { val = r.boolean(); });
+  }
+  void field_bool(const std::uint16_t tag, std::optional<bool> &val) {
+    opt_field(tag, val, [&](Reader &r) { val = r.boolean(); });
   }
 
   void field_u16(const std::uint16_t tag, std::uint16_t &val) {
-    check_tag(tag);
-    val = u16();
+    field(tag, [&](Reader &r) { val = r.u16(); });
+  }
+  void field_u16(const std::uint16_t tag, std::optional<std::uint16_t> &val) {
+    opt_field(tag, val, [&](Reader &r) { val = r.u16(); });
   }
 
-  void chunk(const std::uint16_t version, const std::uint16_t tag) {
+  void chunk_header(const std::uint16_t version, const std::uint16_t tag) {
     const auto read_version = static_cast<std::uint16_t>(buf_[pos_++]);
     const auto read_tag = static_cast<std::uint16_t>(buf_[pos_++]);
     if (version != read_version)
@@ -175,22 +178,38 @@ class Sizer {
 public:
   constexpr SavestateOps op() const { return OP_SIZE; }
 
-  void field_u8(const std::uint16_t tag, const std::uint8_t val) {
+  template <typename Fn> void field(Fn &&fn) {
     u16();
-    u8();
+    fn(*this);
+  }
+  template <typename Fn> void opt_field(Fn &&fn) {
+    u16();
+    boolean();
+    fn(*this);
+  }
+
+  void field_u8(const std::uint16_t tag, const std::uint8_t val) {
+    field([&](Sizer &sz) { sz.u8(); });
+  }
+  void field_u8(const std::uint16_t tag, std::optional<std::uint8_t> val) {
+    opt_field([&](Sizer &sz) { sz.u8(); });
   }
 
   void field_boolean(const std::uint16_t tag, const bool val) {
-    u16();
-    boolean();
+    field([&](Sizer &sz) { sz.boolean(); });
+  }
+  void field_boolean(const std::uint16_t tag, std::optional<bool> val) {
+    opt_field([&](Sizer &sz) { sz.boolean(); });
   }
 
   void field_u16(const std::uint16_t tag, const std::uint16_t val) {
-    u16();
-    u16();
+    field([&](Sizer &sz) { sz.u16(); });
+  }
+  void field_u16(const std::uint16_t tag, std::optional<std::uint16_t> val) {
+    opt_field([&](Sizer &sz) { sz.u16(); });
   }
 
-  void chunk(const std::uint16_t version, const std::uint16_t tag) {
+  void chunk_header(const std::uint16_t version, const std::uint16_t tag) {
     u16();
     u16();
   }

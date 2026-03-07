@@ -35,7 +35,7 @@ enum : std::uint16_t {
 
 template <typename T> void LR35902::parse_savestate(T &t) {
   constexpr auto version = 1; // Schema revision
-  t.chunk(version, Savestate::C_CPU);
+  t.chunk_header(version, Savestate::C_CPU);
 
   ProcessorState state{};
   if (t.op() == Savestate::OP_WRITE)
