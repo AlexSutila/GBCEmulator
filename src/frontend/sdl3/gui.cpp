@@ -61,31 +61,94 @@ std::string cheat_display_name(const Settings::CheatEntry &entry,
     return entry.code;
   return "Cheat " + std::to_string(index + 1);
 }
+
+constexpr int kToolWindowWidth = 1280;
+constexpr int kToolWindowHeight = 900;
 } // namespace
+
+void GbcImGui::activate_context(ImGuiContextState &ctx) {
+  if (!ctx.context)
+    return;
+  ImGui::SetCurrentContext(ctx.context);
+  dpi_scale = ctx.dpi_scale;
+}
+
+void GbcImGui::init_context(ImGuiContextState &ctx, SDL_Window *window,
+                            SDL_Renderer *renderer, const bool owns_window) {
+  ctx.window = window;
+  ctx.renderer = renderer;
+  ctx.owns_window = owns_window;
+  ctx.context = ImGui::CreateContext();
+  activate_context(ctx);
+  ImGui::StyleColorsDark();
+
+  if (!ImGui_ImplSDL3_InitForSDLRenderer(window, renderer)) {
+    ImGui::DestroyContext(ctx.context);
+    ctx = {};
+    throw std::runtime_error("Failed to initialize ImGui SDL3 backend");
+  }
+  if (!ImGui_ImplSDLRenderer3_Init(renderer)) {
+    ImGui_ImplSDL3_Shutdown();
+    ImGui::DestroyContext(ctx.context);
+    ctx = {};
+    throw std::runtime_error("Failed to initialize ImGui SDL renderer backend");
+  }
+
+  ctx.dpi_scale = 1.0f;
+  update_dpi_scale(ctx, SDL_GetWindowDisplayScale(window));
+
+  ImGuiIO &io = ImGui::GetIO();
+  if (fs::exists(font))
+    io.Fonts->AddFontFromFileTTF(font.c_str(), base_font_size);
+}
+
+void GbcImGui::shutdown_context(ImGuiContextState &ctx) {
+  if (!ctx.context)
+    return;
+
+  activate_context(ctx);
+  ImGui_ImplSDLRenderer3_Shutdown();
+  ImGui_ImplSDL3_Shutdown();
+  ImGui::DestroyContext(ctx.context);
+
+  ctx.context = nullptr;
+  if (ctx.owns_window) {
+    if (ctx.renderer)
+      SDL_DestroyRenderer(ctx.renderer);
+    if (ctx.window)
+      SDL_DestroyWindow(ctx.window);
+  }
+  ctx.window = nullptr;
+  ctx.renderer = nullptr;
+  ctx.dpi_scale = 1.0f;
+  ctx.owns_window = false;
+}
 
 void GbcImGui::init(const SDLHost &host) {
   settings = Settings::load();
 
-  /* ImGui initialization */
   IMGUI_CHECKVERSION();
-  ImGui::CreateContext();
-  ImGui::StyleColorsDark();
+  init_context(main_context_, host.get_window(), host.get_renderer(), false);
 
-  if (!ImGui_ImplSDL3_InitForSDLRenderer(host.get_window(),
-                                         host.get_renderer()))
-    throw std::runtime_error("Failed to initialize ImGui SDL3 backend");
-  if (!ImGui_ImplSDLRenderer3_Init(host.get_renderer()))
-    throw std::runtime_error("Failed to initialize ImGui SDL renderer backend");
-
-  const ImGuiIO &io = ImGui::GetIO();
-
-  dpi_scale = SDL_GetWindowDisplayScale(host.get_window());
-  update_dpi_scale(dpi_scale);
-
-  // HiDPI scaling
-  if (fs::exists(font)) {
-    io.Fonts->AddFontFromFileTTF(font.c_str(), base_font_size);
+  if (SDL_Window *tool_window =
+          SDL_CreateWindow("IroGB Tools", kToolWindowWidth, kToolWindowHeight,
+                           SDL_WINDOW_HIDDEN | SDL_WINDOW_RESIZABLE |
+                               SDL_WINDOW_HIGH_PIXEL_DENSITY)) {
+    if (SDL_Renderer *tool_renderer = SDL_CreateRenderer(tool_window, nullptr)) {
+      SDL_SetRenderVSync(tool_renderer, 0);
+      try {
+        init_context(tool_context_, tool_window, tool_renderer, true);
+      } catch (...) {
+        SDL_DestroyRenderer(tool_renderer);
+        SDL_DestroyWindow(tool_window);
+        tool_context_ = {};
+      }
+    } else {
+      SDL_DestroyWindow(tool_window);
+    }
   }
+
+  use_main_context();
 
   rom_sel_conf.path = settings.rom_dir;
   rom_sel_conf.flags =
@@ -99,11 +162,44 @@ void GbcImGui::init(const SDLHost &host) {
   }
 }
 
-void GbcImGui::shutdown() const {
+void GbcImGui::shutdown() {
   settings.save();
-  ImGui_ImplSDLRenderer3_Shutdown();
-  ImGui_ImplSDL3_Shutdown();
-  ImGui::DestroyContext();
+  shutdown_context(tool_context_);
+  shutdown_context(main_context_);
+}
+
+void GbcImGui::use_main_context() { activate_context(main_context_); }
+
+void GbcImGui::use_tool_context() {
+  if (tool_context_.context) {
+    activate_context(tool_context_);
+  } else {
+    activate_context(main_context_);
+  }
+}
+
+bool GbcImGui::wants_detached_tool_window(const UiState &state) const {
+  return has_tool_window() &&
+         (state.show_settings || state.show_cheats || state.show_keybinds ||
+          state.show_savestate_manager || state.show_main_debug_viewer ||
+          state.show_breakpoints || state.show_ppu_viewer ||
+          state.show_memory_viewer);
+}
+
+bool GbcImGui::sync_tool_window(UiState &state) {
+  if (!has_tool_window())
+    return false;
+
+  const bool should_show = wants_detached_tool_window(state);
+  if (should_show && !tool_window_visible_) {
+    SDL_ShowWindow(tool_context_.window);
+    SDL_RaiseWindow(tool_context_.window);
+    tool_window_visible_ = true;
+  } else if (!should_show && tool_window_visible_) {
+    SDL_HideWindow(tool_context_.window);
+    tool_window_visible_ = false;
+  }
+  return should_show;
 }
 
 void GbcImGui::render(UiState &state, SDLHost &host) {
@@ -120,11 +216,11 @@ void GbcImGui::render(UiState &state, SDLHost &host) {
   build_status_bar(state);
   build_file_dialogs(state);
   build_rom_source_window(state);
-  if (state.show_settings)
+  if (!has_tool_window() && state.show_settings)
     build_settings_window(state, host);
-  if (state.show_cheats)
+  if (!has_tool_window() && state.show_cheats)
     build_cheats_window(state);
-  if (state.show_keybinds)
+  if (!has_tool_window() && state.show_keybinds)
     build_keybinds_window(state);
   if (state.show_notifications)
     build_notification_window(state);
@@ -134,18 +230,80 @@ void GbcImGui::render(UiState &state, SDLHost &host) {
     build_cart_info_window(state);
 }
 
+void GbcImGui::render_tool_windows(UiState &state, SDLHost &host) {
+  if (!has_tool_window())
+    return;
+
+  if (state.show_settings)
+    build_settings_window(state, host);
+  if (state.show_cheats)
+    build_cheats_window(state);
+  if (state.show_keybinds)
+    build_keybinds_window(state);
+}
+
+void GbcImGui::render_tool_window_frame() const {
+  if (!tool_window_visible_ || !tool_context_.context || !tool_context_.renderer)
+    return;
+
+  ImGui::SetCurrentContext(tool_context_.context);
+  SDL_SetRenderDrawColor(tool_context_.renderer, 18, 18, 18, 255);
+  SDL_RenderClear(tool_context_.renderer);
+  ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(),
+                                        tool_context_.renderer);
+  SDL_RenderPresent(tool_context_.renderer);
+}
+
+void GbcImGui::close_tool_windows(UiState &state) {
+  state.show_settings = false;
+  state.show_cheats = false;
+  state.show_keybinds = false;
+  state.show_savestate_manager = false;
+  state.show_main_debug_viewer = false;
+  state.show_breakpoints = false;
+  state.show_ppu_viewer = false;
+  state.show_memory_viewer = false;
+}
+
 // Returns true if the event was handled by the GUI and should be ignored by the
 // game
 bool GbcImGui::process_event(const SDL_Event &e, UiState &ui_state) {
+  if (tool_context_.window &&
+      e.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED &&
+      e.window.windowID == SDL_GetWindowID(tool_context_.window)) {
+    close_tool_windows(ui_state);
+    SDL_HideWindow(tool_context_.window);
+    tool_window_visible_ = false;
+    use_main_context();
+    return true;
+  }
+
+  use_main_context();
   ImGui_ImplSDL3_ProcessEvent(&e);
+  if (tool_context_.context) {
+    use_tool_context();
+    ImGui_ImplSDL3_ProcessEvent(&e);
+  }
 
   // Handle DPI changes
   if (e.type == SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED) {
+    ImGuiContextState *ctx = nullptr;
+    if (e.window.windowID == SDL_GetWindowID(main_context_.window)) {
+      ctx = &main_context_;
+    } else if (tool_context_.window &&
+               e.window.windowID == SDL_GetWindowID(tool_context_.window)) {
+      ctx = &tool_context_;
+    }
+
     // The event data contains the new scale, but it's safer to query the window
     // because SDL validates it against the specific display
-    if (SDL_Window *window = SDL_GetWindowFromID(e.window.windowID)) {
+    SDL_Window *window = nullptr;
+    if (ctx)
+      window = SDL_GetWindowFromID(e.window.windowID);
+    if (ctx && window) {
+      activate_context(*ctx);
       if (const float new_scale = SDL_GetWindowDisplayScale(window);
-          std::abs(new_scale - dpi_scale) > 0.001f) {
+          std::abs(new_scale - ctx->dpi_scale) > 0.001f) {
         // We also want to resize the window to maintain physical size
         if (const Uint32 flags = SDL_GetWindowFlags(window);
             !(flags & (SDL_WINDOW_MAXIMIZED | SDL_WINDOW_FULLSCREEN))) {
@@ -154,14 +312,15 @@ bool GbcImGui::process_event(const SDL_Event &e, UiState &ui_state) {
 
           // If moving 2.0x -> 1.0x, ratio is 0.5.
           // Window should shrink by half to look the same physical size.
-          const float ratio = new_scale / dpi_scale;
+          const float ratio = new_scale / ctx->dpi_scale;
           SDL_SetWindowSize(window,
                             static_cast<int>(static_cast<float>(w) * ratio),
                             static_cast<int>(static_cast<float>(h) * ratio));
         }
-        update_dpi_scale(new_scale);
+        update_dpi_scale(*ctx, new_scale);
       }
     }
+    use_main_context();
     return false; // Pass this event to the game (SDLHost might need it too)
   }
 
@@ -180,13 +339,23 @@ bool GbcImGui::process_event(const SDL_Event &e, UiState &ui_state) {
         }
       }
       ui_state.waiting_for_bind.reset();
+      use_main_context();
       return true; // CONSUMED: this keypress won't press a button in-game
     }
     // Handle ImGui capture (e.g. typing in a file dialog)
-    if (ImGui::GetIO().WantCaptureKeyboard) {
+    bool wants_keyboard = false;
+    use_main_context();
+    wants_keyboard = ImGui::GetIO().WantCaptureKeyboard;
+    if (!wants_keyboard && tool_context_.context) {
+      use_tool_context();
+      wants_keyboard = ImGui::GetIO().WantCaptureKeyboard;
+    }
+    use_main_context();
+    if (wants_keyboard) {
       return true; // CONSUMED
     }
   }
+  use_main_context();
   return false; // NOT CONSUMED: pass to game loop
 }
 
@@ -886,7 +1055,7 @@ void GbcImGui::build_cheats_window(UiState &state) {
 }
 
 void GbcImGui::build_savestate_manager_window(
-    UiState &state, const SDLHost &host, const bool emulator_ready,
+    UiState &state, SDL_Renderer *renderer, const bool emulator_ready,
     const std::filesystem::path &savestate_dir,
     std::array<char, 96> &manual_label_input,
     std::vector<SavestateEntry> &savestate_entries,
@@ -1013,15 +1182,15 @@ void GbcImGui::build_savestate_manager_window(
       }
 
       ImGui::SeparatorText("Thumbnail");
-      if (!entry.thumb_texture && !entry.thumb_texture_attempted) {
+      if (renderer && !entry.thumb_texture && !entry.thumb_texture_attempted) {
         entry.thumb_texture_attempted = true;
         if (std::filesystem::exists(entry.thumb_path)) {
           if (const auto pixels = read_thumb_raw_argb_gui(
                   entry.thumb_path, entry.thumb_w, entry.thumb_h);
               pixels.has_value()) {
             entry.thumb_texture = SDL_CreateTexture(
-                host.get_renderer(), SDL_PIXELFORMAT_ARGB8888,
-                SDL_TEXTUREACCESS_STATIC, entry.thumb_w, entry.thumb_h);
+                renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC,
+                entry.thumb_w, entry.thumb_h);
             if (entry.thumb_texture) {
               SDL_UpdateTexture(entry.thumb_texture, nullptr, pixels->data(),
                                 entry.thumb_w *
@@ -1116,14 +1285,14 @@ void GbcImGui::build_keybinds_window(UiState &state) {
   ImGui::End();
 }
 
-void GbcImGui::update_dpi_scale(const float new_scale) {
+void GbcImGui::update_dpi_scale(ImGuiContextState &ctx, const float new_scale) {
   ImGui::GetStyle() = ImGuiStyle();
   ImGui::StyleColorsDark();
   ImGuiStyle &style = ImGui::GetStyle();
 
   style.FontScaleDpi = new_scale;
   // Calculate relative change (e.g., moving 1.0 -> 2.0 means factor 2.0)
-  const float relative_scale = new_scale / dpi_scale;
+  const float relative_scale = new_scale / ctx.dpi_scale;
 
   // Scale all padding, rounding, and spacing
   style.ScaleAllSizes(relative_scale);
@@ -1142,6 +1311,7 @@ void GbcImGui::update_dpi_scale(const float new_scale) {
     }
   }
 
+  ctx.dpi_scale = new_scale;
   dpi_scale = new_scale;
 }
 

@@ -36,7 +36,7 @@ struct BreakpointPrompt {
 
 class DebuggerImGui {
 public:
-  void init(const SDLHost &host);
+  void init(SDL_Renderer *renderer);
   void render(UiState &state, const std::unique_ptr<GameBoyColor> &core);
   Debug::BreakReason on_breakpoint(const std::stop_token &st,
                                    const std::unique_ptr<GameBoyColor> &core);

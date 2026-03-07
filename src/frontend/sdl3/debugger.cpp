@@ -20,11 +20,14 @@ constexpr auto tile_data_height_px = tile_data_height_tiles * 8;
 constexpr auto tile_data_width_px = tile_data_width_tiles * 8;
 constexpr auto black = 0xFF000000;
 
-void DebuggerImGui::init(const SDLHost &host) {
+void DebuggerImGui::init(SDL_Renderer *renderer) {
+  if (!renderer)
+    throw std::runtime_error("Failed to initialize debugger renderer");
+
   for (auto &texture : ctx.tile_data_texture) {
-    texture = SDL_CreateTexture(host.get_renderer(), SDL_PIXELFORMAT_ARGB8888,
-                                SDL_TEXTUREACCESS_STREAMING, tile_data_width_px,
-                                tile_data_height_px);
+    texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
+                                SDL_TEXTUREACCESS_STREAMING,
+                                tile_data_width_px, tile_data_height_px);
     if (!texture)
       throw std::runtime_error("Failed to initialize debug textures");
   }

@@ -114,5 +114,8 @@ set_target_properties(gbc_full PROPERTIES
 )
 
 install(TARGETS gbc_full
-    RUNTIME DESTINATION bin
+        RUNTIME_DEPENDENCIES
+        PRE_EXCLUDE_REGEXES "api-ms-" "ext-ms-"
+        POST_EXCLUDE_REGEXES ".*/System32/.*\\.dll"
+        RUNTIME DESTINATION bin
 )

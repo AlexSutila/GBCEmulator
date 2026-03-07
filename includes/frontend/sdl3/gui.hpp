@@ -53,7 +53,7 @@ public:
   };
 
   void init(const SDLHost& host);
-  void shutdown() const;
+  void shutdown();
 
   // The main render pass for UI
   static void new_frame() {
@@ -61,7 +61,14 @@ public:
     ImGui_ImplSDL3_NewFrame();
     ImGui::NewFrame();
   }
+  void use_main_context();
+  void use_tool_context();
+  [[nodiscard]] bool has_tool_window() const { return tool_context_.context != nullptr; }
+  [[nodiscard]] SDL_Renderer *get_tool_renderer() const { return tool_context_.renderer; }
+  [[nodiscard]] bool sync_tool_window(UiState &state);
   void render(UiState& state, SDLHost& host);
+  void render_tool_windows(UiState &state, SDLHost &host);
+  void render_tool_window_frame() const;
   static void end_frame() {ImGui::Render();}
 
   void update_rom_path(const std::string& rom_path);
@@ -69,7 +76,7 @@ public:
   void clear_bios_path();
   bool process_event(const SDL_Event& e, UiState& ui_state);
   static void build_savestate_manager_window(
-      UiState &state, const SDLHost &host, bool emulator_ready,
+      UiState &state, SDL_Renderer *renderer, bool emulator_ready,
       const std::filesystem::path &savestate_dir,
       std::array<char, 96> &manual_label_input,
       std::vector<SavestateEntry> &savestate_entries,
@@ -84,8 +91,27 @@ public:
   [[nodiscard]] Settings& get_settings() { return settings; }
 
 private:
+  struct ImGuiContextState {
+    ImGuiContext *context{nullptr};
+    SDL_Window *window{nullptr};
+    SDL_Renderer *renderer{nullptr};
+    float dpi_scale{1.0f};
+    bool owns_window{false};
+  };
+
   Settings settings;
   float dpi_scale{1.0f};
+  ImGuiContextState main_context_{};
+  ImGuiContextState tool_context_{};
+  bool tool_window_visible_{false};
+
+  void init_context(ImGuiContextState &ctx, SDL_Window *window,
+                    SDL_Renderer *renderer, bool owns_window);
+  void shutdown_context(ImGuiContextState &ctx);
+  void activate_context(ImGuiContextState &ctx);
+  void update_dpi_scale(ImGuiContextState &ctx, float new_scale);
+  static void close_tool_windows(UiState &state);
+  [[nodiscard]] bool wants_detached_tool_window(const UiState &state) const;
 
   void build_main_menu_bar(UiState& state) const;
   void build_status_bar(UiState &state) const;
@@ -101,7 +127,6 @@ private:
   // Helpers
   IGFD::FileDialogConfig rom_sel_conf;
   IGFD::FileDialogConfig bios_sel_conf;
-  void update_dpi_scale(float new_scale);
   [[nodiscard]] std::tuple<ImVec2, ImVec2> get_min_dialog_size() const ;
   static ImVec4 get_darkened_color(ImVec4 color, float factor);
   static void apply_keybind_preset(std::array<SDL_Keycode, 8>& array, int keybind_preset_index);

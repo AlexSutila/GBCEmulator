@@ -42,7 +42,8 @@ SDL3Frontend::SDL3Frontend() : host(framebuf_width, framebuf_height, scale) {
       static_cast<int>(std::ceil(ImGui::GetFrameHeight()));
   SDL_SetWindowSize(host.get_window(), framebuf_width * scale,
                     framebuf_height * scale + bar_height_px * 2);
-  debugger.init(host);
+  debugger.init(gui.get_tool_renderer() ? gui.get_tool_renderer()
+                                        : host.get_renderer());
   SDL_AddEventWatch(reinterpret_cast<SDL_EventFilter>(event_watcher), this);
   framebuffers[0] =
       std::make_unique<std::uint32_t[]>(framebuf_height * framebuf_width);
@@ -268,7 +269,9 @@ void SDL3Frontend::render_frame() {
 
   // --- PHASE 2: UI COMPOSITION ---
   // 1. Start the ImGui frame
+  gui.use_main_context();
   GbcImGui::new_frame();
+  const bool detached_tool_window = gui.has_tool_window();
   // 2. Build the UI Windows
   bool request_quit = false;
   bool ff_local = false;
@@ -286,7 +289,8 @@ void SDL3Frontend::render_frame() {
       ui_state.cheats_file_dirty = false;
       save_active_cheats_locked();
     }
-    build_savestate_manager_window_locked();
+    if (!detached_tool_window)
+      build_savestate_manager_window_locked();
     poll_zip_choice_response();
     request_quit = ui_state.request_quit;
     if (request_quit)
@@ -320,9 +324,11 @@ void SDL3Frontend::render_frame() {
   }
 
   // 3. Build debugger windows (if active)
-  if (ui_state.show_main_debug_viewer || ui_state.show_breakpoints ||
-      ui_state.show_ppu_viewer || ui_state.show_memory_viewer)
+  if (!detached_tool_window &&
+      (ui_state.show_main_debug_viewer || ui_state.show_breakpoints ||
+       ui_state.show_ppu_viewer || ui_state.show_memory_viewer)) {
     debugger.render(ui_state, gbc);
+  }
 
   // 4. Finalize ImGui frame
   GbcImGui::end_frame();
@@ -336,6 +342,32 @@ void SDL3Frontend::render_frame() {
   host.draw_overlay(ImGui::GetDrawData());
   // 4. Swap buffers
   host.present();
+
+  if (detached_tool_window) {
+    bool show_tools = false;
+    {
+      std::lock_guard lock(ui_mutex);
+      show_tools = gui.sync_tool_window(ui_state);
+    }
+
+    if (show_tools) {
+      gui.use_tool_context();
+      GbcImGui::new_frame();
+      {
+        std::lock_guard lock(ui_mutex);
+        gui.render_tool_windows(ui_state, host);
+        build_savestate_manager_window_locked();
+        if (ui_state.show_main_debug_viewer || ui_state.show_breakpoints ||
+            ui_state.show_ppu_viewer || ui_state.show_memory_viewer) {
+          debugger.render(ui_state, gbc);
+        }
+      }
+      GbcImGui::end_frame();
+      gui.render_tool_window_frame();
+    }
+  }
+
+  gui.use_main_context();
 }
 
 std::tuple<AddressBus *const, Cartridge *const, Joypad::JOYP *const>
