@@ -83,9 +83,7 @@ public:
              std::optional<BootROM> &bios);
 
   /* For attaching MMIO component interface registers */
-  void
-  connect_mmio(addr_t addr, MMIORegister *reg,
-               MMIOSavestatePolicy policy = MMIOSavestatePolicy::OwnerManaged);
+  void connect_mmio(addr_t addr, MMIORegister *reg);
   [[nodiscard]] MMIORegister *get_mmio(IORegisterMapping mapping) const;
 
   /* Bus conflict management */
@@ -152,11 +150,7 @@ private:
   [[nodiscard]] bool is_conflicting(addr_t addr) const;
   BusConflictTypes bus_conflicts{};
 
-  struct ConnectedMMIO {
-    MMIORegister *reg{};
-    MMIOSavestatePolicy savestate_policy{MMIOSavestatePolicy::OwnerManaged};
-  };
-  std::map<addr_t, ConnectedMMIO> io_registers{};
+  std::map<addr_t, MMIORegister *> io_registers{};
   std::array<CheatReadOverride, 0x10000> cheat_overrides_{};
   std::vector<addr_t> cheat_touched_addrs_{};
   bool has_cheat_overrides_{false};

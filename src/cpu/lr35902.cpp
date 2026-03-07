@@ -101,10 +101,8 @@ LR35902::LR35902(AddressBus *bus_ptr, std::optional<Debug::Debugger> &debugger,
   /* Configure interrupts */
   if (!bus)
     throw std::logic_error("LR35902::LR35902() bus_ptr is `nullptr`");
-  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_INT_FLAGS), &if_reg,
-                    MMIOSavestatePolicy::BusAuto);
-  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_INT_ENABLE), &ie_reg,
-                    MMIOSavestatePolicy::BusAuto);
+  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_INT_FLAGS), &if_reg);
+  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_INT_ENABLE), &ie_reg);
 }
 
 void LR35902::load_state(const ProcessorState state_) {

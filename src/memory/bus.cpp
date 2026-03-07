@@ -81,41 +81,26 @@ AddressBus::AddressBus(runtime_sys_info &sys,
   bus_conflicts = BUS_CONFLICT_NONE;
 
   /* Connect memory mapped IO owned by address bus */
-  connect_mmio(static_cast<addr_t>(mmio::MMIO_JOYPAD), &joypad_,
-               MMIOSavestatePolicy::BusAuto);
-  connect_mmio(static_cast<addr_t>(mmio::MMIO_BOOT_ROM_CTRL), &boot_rom_ctrl,
-               MMIOSavestatePolicy::BusAuto);
-  connect_mmio(static_cast<addr_t>(mmio::MMIO_WRAM_BANK), &wram_bank_ctrl,
-               MMIOSavestatePolicy::BusAuto);
-  connect_mmio(static_cast<addr_t>(mmio::MMIO_VRAM_BANK), &vram_bank_ctrl,
-               MMIOSavestatePolicy::BusAuto);
-  connect_mmio(static_cast<addr_t>(mmio::MMIO_SPD_KEY0), &key0,
-               MMIOSavestatePolicy::BusAuto);
-  connect_mmio(static_cast<addr_t>(mmio::MMIO_SPD_KEY1), &key1,
-               MMIOSavestatePolicy::BusAuto);
+  connect_mmio(static_cast<addr_t>(mmio::MMIO_JOYPAD), &joypad_);
+  connect_mmio(static_cast<addr_t>(mmio::MMIO_BOOT_ROM_CTRL), &boot_rom_ctrl);
+  connect_mmio(static_cast<addr_t>(mmio::MMIO_WRAM_BANK), &wram_bank_ctrl);
+  connect_mmio(static_cast<addr_t>(mmio::MMIO_VRAM_BANK), &vram_bank_ctrl);
+  connect_mmio(static_cast<addr_t>(mmio::MMIO_SPD_KEY0), &key0);
+  connect_mmio(static_cast<addr_t>(mmio::MMIO_SPD_KEY1), &key1);
 
   /* Connect memory mapped IO owned by DMA modules */
-  connect_mmio(static_cast<addr_t>(mmio::MMIO_OAM_DMA), oam_dma.get_dma_reg(),
-               MMIOSavestatePolicy::BusAuto);
-  connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA1), vdma.get_vdma1(),
-               MMIOSavestatePolicy::BusAuto);
-  connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA2), vdma.get_vdma2(),
-               MMIOSavestatePolicy::BusAuto);
-  connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA3), vdma.get_vdma3(),
-               MMIOSavestatePolicy::BusAuto);
-  connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA4), vdma.get_vdma4(),
-               MMIOSavestatePolicy::BusAuto);
+  connect_mmio(static_cast<addr_t>(mmio::MMIO_OAM_DMA), oam_dma.get_dma_reg());
+  connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA1), vdma.get_vdma1());
+  connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA2), vdma.get_vdma2());
+  connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA3), vdma.get_vdma3());
+  connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA4), vdma.get_vdma4());
   connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA5), vdma.get_vdma5());
 }
 
-void AddressBus::connect_mmio(const addr_t addr, MMIORegister *const reg,
-                              const MMIOSavestatePolicy policy) {
+void AddressBus::connect_mmio(const addr_t addr, MMIORegister *const reg) {
   if (!reg)
     throw std::logic_error("AddressBus::connect_mmio() connected `nullptr`");
-  io_registers[addr] = ConnectedMMIO{
-      .reg = reg,
-      .savestate_policy = policy,
-  };
+  io_registers[addr] = reg;
 }
 
 void AddressBus::insert_cartridge(cart c) {
@@ -184,8 +169,7 @@ byte_t AddressBus::read_byte_no_cheat(const addr_t addr,
   /* Read from memory mapped IO register */
   if (io_registers.contains(addr)) {
     assert((addr >= 0xFF00 && addr <= 0xFF7F) || addr == 0xFFFF);
-    const auto &[reg, savestate_policy] = io_registers.at(addr);
-    (void)savestate_policy;
+    const auto reg = io_registers.at(addr);
     return safe ? reg->peek() : reg->read();
   }
 
@@ -258,7 +242,7 @@ void AddressBus::write_byte(const addr_t addr, const byte_t value) const {
   else if (io_registers.contains(addr)) {
     assert((addr >= 0xFF00 && addr <= 0xFF7F) || addr == 0xFFFF);
     auto const &mmio = io_registers.at(addr);
-    mmio.reg->write(value);
+    mmio->write(value);
   }
 
   /* Write to High RAM */
@@ -274,7 +258,7 @@ MMIORegister *AddressBus::get_mmio(IORegisterMapping mapping) const {
   const auto addr = static_cast<addr_t>(mapping);
   assert(io_registers.contains(addr));
   /* The address bus maintains ownership, so raw pointers are fine. */
-  return io_registers.at(addr).reg;
+  return io_registers.at(addr);
 }
 
 /**
@@ -332,4 +316,3 @@ void AddressBus::set_cheat_overrides(std::span<const CheatOverride> overrides) {
   }
   has_cheat_overrides_ = !cheat_touched_addrs_.empty();
 }
-

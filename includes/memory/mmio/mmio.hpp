@@ -67,12 +67,6 @@ enum class IORegisterMapping : addr_t {
   MMIO_INT_ENABLE = 0xFFFF,
 };
 
-enum class MMIOSavestatePolicy {
-  BusAuto,
-  OwnerManaged,
-  Skip,
-};
-
 /*
  * General purpose MMIO Register and abstract class for more complicated IO
  * registers that actually interact with other hardware components.
