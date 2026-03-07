@@ -60,6 +60,14 @@ enum : std::uint16_t {
   F_OPRI,
 };
 
+enum : std::uint16_t {
+  F_SPRITE_Y = 1,
+  F_SPRITE_X,
+  F_SPRITE_TILE_IDX,
+  F_SPRITE_TILE_ATTR,
+  F_SPRITE_OBJ_NO,
+};
+
 template <typename T> void PixelProcessingUnit::parse_savestate(T &t) {
   constexpr auto version = 1; // Schema revision
   t.chunk_header(version, Savestate::C_PPU);
@@ -75,6 +83,15 @@ template <typename T> void PixelProcessingUnit::parse_savestate(T &t) {
   t.field_generic(F_CUR_MODE_CLKS, cur_mode_clks);
   t.field_optional(F_TOTAL_MODE_CLKS, total_mode_clks);
   t.field_enum(F_STATE, state);
+
+  t.field_vector(F_OAM_DATA, oam_data, max_oam_sprite_count,
+                 [&](T &t, auto &s) {
+                   t.field_generic(F_SPRITE_Y, s.y_pos);
+                   t.field_generic(F_SPRITE_X, s.x_pos);
+                   t.field_generic(F_SPRITE_TILE_IDX, s.tile_idx);
+                   t.field_generic(F_SPRITE_TILE_ATTR, s.tile_attr);
+                   t.field_generic(F_SPRITE_OBJ_NO, s.obj_no);
+                 });
 
   t.field_complex(F_LCDC, [&](T &t) { lcdc_.parse_savestate(t); });
   t.field_complex(F_STAT, [&](T &t) { stat_.parse_savestate(t); });
@@ -162,7 +179,6 @@ PixelProcessingUnit::PixelProcessingUnit(
   );
 
   /* Initialize OAM search metadata */
-  constexpr auto max_oam_sprite_count = 10;
   oam_data.reserve(max_oam_sprite_count);
 
   /* Configure PPU to initial state, doesn't technically happen until PPU is

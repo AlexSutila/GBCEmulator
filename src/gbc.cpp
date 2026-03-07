@@ -591,7 +591,7 @@ std::vector<byte_t> GameBoyColor::savestate_serialize() const {
 }
 
 void GameBoyColor::savestate_deserialize(const std::span<const byte_t> data) {
-  Savestate::Reader in{};
+  Savestate::Reader in(data);
   SS_WALK(in);
 }
 

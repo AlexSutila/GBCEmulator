@@ -86,6 +86,7 @@ private:
   PPU::LY ly_{};
 
   /* For tracking locational data for sprites during OAM search */
+  static constexpr auto max_oam_sprite_count = 10;
   std::size_t sprites_searched{};
   std::vector<Sprite> oam_data{};
   /* For the first frame upon the PPU being enabled, the first scanline has

@@ -45,10 +45,21 @@ public:
     write<std::uint8_t>(as_byte);
   }
 
-  template <typename Fn>
-  void field_complex(const std::uint16_t tag, Fn &&fn) {
+  template <typename Fn> void field_complex(const std::uint16_t tag, Fn &&fn) {
     write<std::uint16_t>(tag);
     fn(*this);
+    eof();
+  }
+
+  template <typename T, typename Fn>
+  void field_vector(const std::uint16_t tag, std::vector<T> &vec,
+                    const std::size_t max_size, Fn &&fn) {
+    write<std::uint16_t>(tag);
+    write<std::size_t>(vec.size());
+
+    for (T &e : vec)
+      fn(*this, e); // Should not manipulate, only write out
+
     eof();
   }
 
@@ -83,6 +94,8 @@ private:
 // Deserialize
 class Reader {
 public:
+  Reader() = default;
+  explicit Reader(const std::span<const std::uint8_t> bytes) : buf_(bytes) {}
   constexpr SavestateOps op() const { return OP_READ; }
 
   template <typename T> void field_generic(const std::uint16_t tag, T &val) {
@@ -96,10 +109,27 @@ public:
     val = static_cast<T>(as_byte);
   }
 
-  template <typename Fn>
-  void field_complex(const std::uint16_t tag, Fn &&fn) {
+  template <typename Fn> void field_complex(const std::uint16_t tag, Fn &&fn) {
     check_tag(tag);
     fn(*this);
+    eof();
+  }
+
+  template <typename T, typename Fn>
+  void field_vector(const std::uint16_t tag, std::vector<T> &vec,
+                    const std::size_t max_size, Fn &&fn) {
+    check_tag(tag);
+
+    const std::size_t size = read<std::size_t>();
+    if (size > max_size)
+      throw std::runtime_error("Savestate: Exceeded vector capacity");
+
+    vec.clear();
+    vec.resize(size);
+
+    for (T &e : vec)
+      fn(*this, e); // Should populate this structure
+
     eof();
   }
 
@@ -115,8 +145,8 @@ public:
   void eof() { check_tag(C_EOF); }
 
   void chunk_header(const std::uint16_t version, const std::uint16_t tag) {
-    const auto read_version = static_cast<std::uint16_t>(buf_[pos_++]);
-    const auto read_tag = static_cast<std::uint16_t>(buf_[pos_++]);
+    const auto read_version = read<std::uint16_t>();
+    const auto read_tag = read<std::uint16_t>();
     if (version != read_version)
       throw std::runtime_error("Savestate: bad version");
     if (tag != read_tag)
@@ -132,7 +162,7 @@ private:
   void check_tag(const std::uint16_t tag) {
     std::uint16_t read_tag = read<std::uint16_t>();
     if (tag != read_tag)
-      throw std::runtime_error("Savestate: chunk tag");
+      throw std::runtime_error("Savestate: bad chunk tag");
   }
 
   template <typename T> T read() {
@@ -140,7 +170,7 @@ private:
 
     T val{0};
     for (std::size_t i{0}; i < sizeof(T); ++i)
-      val |= static_cast<std::uint8_t>(buf_[pos_++] << (i * 8));
+      val |= static_cast<T>(buf_[pos_++] << (i * 8));
     return val;
   }
 
@@ -164,10 +194,21 @@ public:
     parse<std::uint8_t>(); // Always assume 8 bit
   }
 
-  template <typename Fn>
-  void field_complex(const std::uint16_t tag, Fn &&fn) {
+  template <typename Fn> void field_complex(const std::uint16_t tag, Fn &&fn) {
     parse<std::uint16_t>();
     fn(*this);
+    eof();
+  }
+
+  template <typename T, typename Fn>
+  void field_vector(const std::uint16_t tag, std::vector<T> &vec,
+                    const std::size_t max_size, Fn &&fn) {
+    const T dummy{}; // Need this to have some object to pass, otherwise unused
+    parse<std::uint16_t>();
+    parse<std::size_t>();
+
+    for (std::size_t i{0}; i < max_size; ++i)
+      fn(*this, dummy); // Manipulate if you want, doesn't matter
     eof();
   }
 
