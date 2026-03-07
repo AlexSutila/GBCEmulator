@@ -577,22 +577,28 @@ bool GameBoyColor::savestate_ready() const {
   return cpu && cpu->savestate_ready();
 }
 
+#define SS_WALK(t)                                                             \
+  do {                                                                         \
+    cpu->parse_savestate(t);                                                   \
+    timer->parse_savestate(t);                                                 \
+    ppu->parse_savestate(t);                                                   \
+  } while (0)
+
 std::vector<byte_t> GameBoyColor::savestate_serialize() const {
   Savestate::Writer out{};
-  cpu->parse_savestate(out);
-  timer->parse_savestate(out);
+  SS_WALK(out);
   return out.get();
 }
 
 void GameBoyColor::savestate_deserialize(const std::span<const byte_t> data) {
   Savestate::Reader in{};
-  cpu->parse_savestate(in);
-  timer->parse_savestate(in);
+  SS_WALK(in);
 }
 
 std::size_t GameBoyColor::savestate_size() const {
   Savestate::Sizer sz{};
-  cpu->parse_savestate(sz);
-  timer->parse_savestate(sz);
+  SS_WALK(sz);
   return sz.get();
 }
+
+#undef SS_WALK

@@ -11,6 +11,7 @@
 #include "ppu/palette.hpp"
 #include "ppu/pixel.hpp"
 #include "ppu/sprites.hpp"
+#include "savestate/codec.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -21,6 +22,69 @@
 
 // Store DMG color index in alpha bits bc we're just based like that lmao
 #define DMG_COLOR_PRESERVE_HACK(rgb, idx) ((rgb & 0x00FFFFFF) | (idx << 24))
+
+enum : std::uint16_t {
+  F_FLUSH_ON_DISABLE = 1,
+  F_ROW_PIXELS_RENDERED,
+  F_SPRITES_FETCHED,
+  F_SPRITES_SEARCHED,
+  F_SCANLINE_153_BUG,
+  F_PPU_ENABLE_OAM_BUG,
+  F_STAT_IRQ_EDGE,
+  F_TOTAL_MODE_CLKS,
+  F_CUR_SCANLINE_CLKS,
+  F_CUR_MODE_CLKS,
+  F_STATE,
+
+  // Complex types, leverage recursive descent
+  F_FETCHER,
+  F_OBJ_FIFO,
+  F_BG_FIFO,
+  F_OBJ_CRAM,
+  F_BG_CRAM,
+  F_STAT_DELAY,
+  F_OAM_DATA,
+
+  // MMIO registers
+  F_LCDC,
+  F_STAT,
+  F_LYC,
+  F_SCY,
+  F_SCX,
+  F_WY,
+  F_WX,
+  F_LY,
+  F_BGP,
+  F_OBP0,
+  F_OBP1,
+  F_OPRI,
+};
+
+template <typename T> void PixelProcessingUnit::parse_savestate(T &t) {
+  constexpr auto version = 1; // Schema revision
+  t.chunk_header(version, Savestate::C_PPU);
+
+  t.field_generic(F_FLUSH_ON_DISABLE, flush_on_disable);
+  t.field_generic(F_ROW_PIXELS_RENDERED, row_pixels_rendered);
+  t.field_generic(F_SPRITES_FETCHED, sprites_fetched);
+  t.field_generic(F_SPRITES_SEARCHED, sprites_searched);
+  t.field_generic(F_SCANLINE_153_BUG, scanline_153_bug);
+  t.field_generic(F_PPU_ENABLE_OAM_BUG, ppu_enable_oam_bug);
+  t.field_generic(F_STAT_IRQ_EDGE, stat_irq_signal_edge);
+  t.field_generic(F_CUR_SCANLINE_CLKS, cur_scanline_clks);
+  t.field_generic(F_CUR_MODE_CLKS, cur_mode_clks);
+  t.field_optional(F_TOTAL_MODE_CLKS, total_mode_clks);
+  t.field_enum(F_STATE, state);
+
+  t.eof();
+}
+
+template void
+PixelProcessingUnit::parse_savestate<Savestate::Writer>(Savestate::Writer &);
+template void
+PixelProcessingUnit::parse_savestate<Savestate::Reader>(Savestate::Reader &);
+template void
+PixelProcessingUnit::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
 
 template <typename T>
 T *init_mmio(AddressBus *bus, const IORegisterMapping reg_id) {

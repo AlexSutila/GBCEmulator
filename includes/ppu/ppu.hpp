@@ -27,6 +27,7 @@ public:
   PixelProcessingUnit(AddressBus *bus, Frontend &fe,
                       std::optional<Debug::Debugger> &debugger,
                       runtime_sys_info &sys);
+  template <typename T> void parse_savestate(T &t);
   void reset();
   void step();
 
