@@ -74,14 +74,6 @@ class Writer {
 public:
   constexpr SavestateOps op() const { return OP_WRITE; }
 
-  void u8(const std::uint8_t val) { buf_.push_back(val); }
-  void boolean(const bool val) { u8(val ? 1 : 0); }
-
-  void u16(const std::uint16_t val) {
-    u8(static_cast<std::uint8_t>(val & 0xFF));
-    u8(static_cast<std::uint8_t>((val >> 8) & 0xFF));
-  }
-
   void field_u8(const std::uint16_t tag, const std::uint8_t val) {
     u16(tag);
     u8(val);
@@ -105,6 +97,14 @@ public:
   std::vector<std::uint8_t> get() const { return buf_; }
 
 private:
+  void u8(const std::uint8_t val) { buf_.push_back(val); }
+  void boolean(const bool val) { u8(val ? 1 : 0); }
+
+  void u16(const std::uint16_t val) {
+    u8(static_cast<std::uint8_t>(val & 0xFF));
+    u8(static_cast<std::uint8_t>((val >> 8) & 0xFF));
+  }
+
   std::vector<std::uint8_t> buf_{};
 };
 
@@ -113,35 +113,19 @@ class Reader {
 public:
   constexpr SavestateOps op() const { return OP_READ; }
 
-  void u8(std::uint8_t &val) {
-    require(1);
-    val = buf_[pos_++];
-  }
-  void boolean(bool &val) {
-    std::uint8_t read_val{};
-    u8(read_val);
-    val = static_cast<bool>(read_val);
-  }
-  void u16(std::uint16_t &val) {
-    require(2);
-    const auto b0 = static_cast<std::uint16_t>(buf_[pos_++]);
-    const auto b1 = static_cast<std::uint16_t>(buf_[pos_++]);
-    val = static_cast<std::uint16_t>(b0 | (b1 << 8));
-  }
-
   void field_u8(const std::uint16_t tag, std::uint8_t &val) {
     check_tag(tag);
-    u8(val);
+    val = u8();
   }
 
   void field_boolean(const std::uint16_t tag, bool &val) {
     check_tag(tag);
-    boolean(val);
+    val = boolean();
   }
 
   void field_u16(const std::uint16_t tag, std::uint16_t &val) {
     check_tag(tag);
-    u16(val);
+    val = u16();
   }
 
   void chunk(const std::uint16_t version, const std::uint16_t tag) {
@@ -160,11 +144,26 @@ private:
   }
 
   void check_tag(const std::uint16_t tag) {
-    std::uint16_t read_tag{};
-    u16(read_tag);
-
+    std::uint16_t read_tag = u16();
     if (tag != read_tag)
       throw std::runtime_error("Savestate: chunk tag");
+  }
+
+  std::uint8_t u8() {
+    require(1);
+    return buf_[pos_++];
+  }
+
+  bool boolean() {
+    std::uint8_t read_val = u8();
+    return static_cast<bool>(read_val);
+  }
+
+  std::uint16_t u16() {
+    require(2);
+    const auto b0 = static_cast<std::uint16_t>(buf_[pos_++]);
+    const auto b1 = static_cast<std::uint16_t>(buf_[pos_++]);
+    return static_cast<std::uint16_t>(b0 | (b1 << 8));
   }
 
   std::span<const std::uint8_t> buf_;
@@ -176,33 +175,33 @@ class Sizer {
 public:
   constexpr SavestateOps op() const { return OP_SIZE; }
 
-  void u8(std::uint8_t) { max_size_ += 1; }
-  void boolean(bool) { max_size_ += 1; }
-  void u16(std::uint16_t) { max_size_ += 2; }
-
   void field_u8(const std::uint16_t tag, const std::uint8_t val) {
-    u16(tag);
-    u8(val);
+    u16();
+    u8();
   }
 
   void field_boolean(const std::uint16_t tag, const bool val) {
-    u16(tag);
-    boolean(val);
+    u16();
+    boolean();
   }
 
   void field_u16(const std::uint16_t tag, const std::uint16_t val) {
-    u16(tag);
-    u16(val);
+    u16();
+    u16();
   }
 
   void chunk(const std::uint16_t version, const std::uint16_t tag) {
-    u16(version);
-    u16(tag);
+    u16();
+    u16();
   }
 
   const std::size_t get() const { return max_size_; }
 
 private:
+  void u8() { max_size_ += 1; }
+  void boolean() { max_size_ += 1; }
+  void u16() { max_size_ += 2; }
+
   std::size_t max_size_{0};
 };
 
