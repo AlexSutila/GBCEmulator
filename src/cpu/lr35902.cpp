@@ -42,24 +42,25 @@ template <typename T> void LR35902::parse_savestate(T &t) {
     state = get_state();
 
   // Exploiting public API exposed to pybindings here
-  t.field_u16(F_PC, state.pc);
-  t.field_u16(F_SP, state.sp);
-  t.field_u8(F_A, state.a);
-  t.field_u8(F_B, state.b);
-  t.field_u8(F_C, state.c);
-  t.field_u8(F_D, state.d);
-  t.field_u8(F_E, state.e);
-  t.field_u8(F_F, state.f);
-  t.field_u8(F_H, state.h);
-  t.field_u8(F_L, state.l);
-  t.field_boolean(F_IME_RAW, state.ime_enabled);
+  t.field_generic(F_PC, state.pc);
+  t.field_generic(F_SP, state.sp);
+  t.field_generic(F_A, state.a);
+  t.field_generic(F_B, state.b);
+  t.field_generic(F_C, state.c);
+  t.field_generic(F_D, state.d);
+  t.field_generic(F_E, state.e);
+  t.field_generic(F_F, state.f);
+  t.field_generic(F_H, state.h);
+  t.field_generic(F_L, state.l);
+  t.field_generic(F_IME_RAW, state.ime_enabled);
 
   if (t.op() == Savestate::OP_READ)
     load_state(state);
 
   // These are not manipulated by the data exposed via public API
-  t.field_boolean(F_HALT_BUG, reg_file.halt_bug_triggered);
-  t.field_u16(F_INS_BASE, ins_base_addr);
+  t.field_generic(F_HALT_BUG, reg_file.halt_bug_triggered);
+  t.field_generic(F_INS_BASE, ins_base_addr);
+  t.eof();
 }
 
 template void LR35902::parse_savestate<Savestate::Writer>(Savestate::Writer &);

@@ -21,6 +21,7 @@ class ObjAttrDMA {
 public:
   DMA::DMA *get_dma_reg();
   explicit ObjAttrDMA(AddressBus &bus);
+  template <typename T> void parse_savestate(T &t);
 
   struct DMAState {
     addr_t src_base_address;
@@ -57,6 +58,8 @@ private:
 class VDMA {
 public:
   explicit VDMA(AddressBus &bus, runtime_sys_info &sys);
+  template <typename T> void parse_savestate(T &t);
+
   MMIORegister *get_vdma1() { return &vdma1_; }
   MMIORegister *get_vdma2() { return &vdma2_; }
   MMIORegister *get_vdma3() { return &vdma3_; }

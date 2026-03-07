@@ -3,9 +3,9 @@
 #include "memory/bus.hpp"
 #include "memory/mmio/cgb.hpp"
 #include "memory/mmio/dmg.hpp"
+#include "savestate/codec.hpp"
 #include <cassert>
 #include <optional>
-#include <stdexcept>
 
 inline byte_t vdma_bytes_to_blks(const std::size_t bytes) {
   constexpr auto blk_size_bytes = 0x10;
@@ -20,6 +20,31 @@ inline std::size_t vdma_blks_to_bytes(const byte_t blks) {
 /* ======================================================================
  * OAM DMA Transfer, applicable to both DMG and CGB
  * ====================================================================== */
+
+enum : std::uint16_t {
+  F_OAM_DMA_SRC_BASE = 1,
+  F_OAM_DMA_DATA_OFFSET,
+  F_OAM_DMA_STATE,
+  F_OAM_DMA_CLOCKS_REMAINING,
+};
+
+template <typename T> void ObjAttrDMA::parse_savestate(T &t) {
+  constexpr auto version = 1; // Schema revision
+  t.chunk_header(version, Savestate::C_OAM_DMA);
+
+  t.field_generic(F_OAM_DMA_SRC_BASE, src_base_addr);
+  t.field_generic(F_OAM_DMA_DATA_OFFSET, data_offset);
+  t.field_enum(F_OAM_DMA_STATE, state);
+  t.field_optional(F_OAM_DMA_CLOCKS_REMAINING, clocks_remaining);
+
+  t.eof();
+}
+
+template void
+ObjAttrDMA::parse_savestate<Savestate::Writer>(Savestate::Writer &);
+template void
+ObjAttrDMA::parse_savestate<Savestate::Reader>(Savestate::Reader &);
+template void ObjAttrDMA::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
 
 ObjAttrDMA::ObjAttrDMA(AddressBus &bus) : dma_(*this), bus_(bus) {
   src_base_addr = data_offset = 0;
@@ -109,6 +134,35 @@ void ObjAttrDMA::step() {
 /* ======================================================================
  * VRAM DMA Transfer, applicable to only CGB
  * ====================================================================== */
+
+enum : std::uint16_t {
+  F_VDMA_SRC_BASE = 1,
+  F_VDMA_DEST_BASE,
+  F_VDMA_DATA_OFFSET,
+  F_VDMA_TRANSFER_SIZE,
+  F_VDMA_CAN_START_HDMA,
+  F_VDMA_STATE,
+  F_VDMA_CLOCKS_REMAINING,
+};
+
+template <typename T> void VDMA::parse_savestate(T &t) {
+  constexpr auto version = 1; // Schema revision
+  t.chunk_header(version, Savestate::C_CPU);
+
+  t.field_generic(F_VDMA_SRC_BASE, src_base_addr);
+  t.field_generic(F_VDMA_DEST_BASE, dest_base_addr);
+  t.field_generic(F_VDMA_DATA_OFFSET, data_offset);
+  t.field_generic(F_VDMA_TRANSFER_SIZE, transfer_size);
+  t.field_generic(F_VDMA_CAN_START_HDMA, can_start_hdma);
+  t.field_enum(F_VDMA_STATE, state);
+  t.field_optional(F_VDMA_CLOCKS_REMAINING, clocks_remaining);
+
+  t.eof();
+}
+
+template void VDMA::parse_savestate<Savestate::Writer>(Savestate::Writer &);
+template void VDMA::parse_savestate<Savestate::Reader>(Savestate::Reader &);
+template void VDMA::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
 
 VDMA::VDMA(AddressBus &bus, runtime_sys_info &sys)
     : vdma1_(), vdma2_(), // Source low and high registers
@@ -328,4 +382,3 @@ void VDMA::step() {
     break;
   }
 }
-

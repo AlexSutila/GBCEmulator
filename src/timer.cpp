@@ -19,14 +19,16 @@ template <typename T> void TimerUnit::parse_savestate(T &t) {
   constexpr auto version = 1; // Schema revision
   t.chunk_header(version, Savestate::C_TIMER);
 
-  t.field_u16(F_SYS_COUNTER, sys_counter_);
-  t.field_u8(F_TIMA, tima_);
-  t.field_u8(F_TMA, tma_);
-  t.field_u8(F_TAC, tac_);
-  t.field_boolean(F_OVERFLOW_PENDING, overflow_pending_);
-  t.field_u8(F_OVERFLOW_DELAY, overflow_delay_);
-  t.field_boolean(F_RELOAD_LATCH, reload_latch_);
-  t.field_u8(F_RELOAD_DELAY, reload_delay_);
+  t.field_generic(F_SYS_COUNTER, sys_counter_);
+  t.field_generic(F_TIMA, tima_);
+  t.field_generic(F_TMA, tma_);
+  t.field_generic(F_TAC, tac_);
+  t.field_generic(F_OVERFLOW_PENDING, overflow_pending_);
+  t.field_generic(F_OVERFLOW_DELAY, overflow_delay_);
+  t.field_generic(F_RELOAD_LATCH, reload_latch_);
+  t.field_generic(F_RELOAD_DELAY, reload_delay_);
+
+  t.eof();
 }
 
 template void
