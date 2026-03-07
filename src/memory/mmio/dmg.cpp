@@ -11,15 +11,15 @@ SerialCtrl::SerialCtrl(MMIORegister &serial_data) : sd(serial_data) {}
 /* We completely ignore clock speed because we just straight up assume that the
  * transfer completes instantly, then we don't actually transfer anything. */
 void SerialCtrl::write(const byte_t value) {
-  if ((value & 0x81) == 0x81) {   // Use internal clk and transfer in progress
-    raw_state_set((value & 0x3) | 0x7C); // Clear transfer in progress bit
-    sd.write(0xFF);               // No connection, so read ones
+  if ((value & 0x81) == 0x81) {    // Use internal clk and transfer in progress
+    state_ = (value & 0x3) | 0x7C; // Clear transfer in progress bit
+    sd.write(0xFF);                // No connection, so read ones
     // This is hacky and inaccurate, just shoot the interrupt out instantly
     if_reg->put_flag(InterruptFlagMask::INT_FLAG_SERIAL, true);
   }
 }
 void SerialCtrl::set_interrupt_reg(InterruptBits *reg) { if_reg = reg; }
-byte_t SerialCtrl::peek() const { return raw_state() | 0x7C; }
+byte_t SerialCtrl::peek() const { return state_ | 0x7C; }
 byte_t SerialCtrl::read() { return peek(); }
 
 } // namespace Serial
@@ -27,39 +27,39 @@ byte_t SerialCtrl::read() { return peek(); }
 namespace PPU {
 
 /* LCD Control helpers */
-bool LCDCtrl::lcd_enabled() const { return (raw_state() & 0x80) != 0; }
+bool LCDCtrl::lcd_enabled() const { return (state_ & 0x80) != 0; }
 TileMapArea LCDCtrl::win_tilemap_base() const {
-  return (raw_state() & 0x40) != 0 ? TileMapArea::HI_TILEMAP_BASE
-                                   : TileMapArea::LO_TILEMAP_BASE;
+  return (state_ & 0x40) != 0 ? TileMapArea::HI_TILEMAP_BASE
+                              : TileMapArea::LO_TILEMAP_BASE;
 }
 
-bool LCDCtrl::win_enabled() const { return (raw_state() & 0x20) != 0; }
+bool LCDCtrl::win_enabled() const { return (state_ & 0x20) != 0; }
 TileDataArea LCDCtrl::bg_win_data_area() const {
-  return (raw_state() & 0x10) != 0 ? TileDataArea::HI_TILEDATA_BASE
-                                   : TileDataArea::LO_TILEDATA_BASE;
+  return (state_ & 0x10) != 0 ? TileDataArea::HI_TILEDATA_BASE
+                              : TileDataArea::LO_TILEDATA_BASE;
 }
 TileMapArea LCDCtrl::bg_tilemap_base() const {
-  return (raw_state() & 0x08) != 0 ? TileMapArea::HI_TILEMAP_BASE
-                                   : TileMapArea::LO_TILEMAP_BASE;
+  return (state_ & 0x08) != 0 ? TileMapArea::HI_TILEMAP_BASE
+                              : TileMapArea::LO_TILEMAP_BASE;
 }
-bool LCDCtrl::bg_win_en_priority() const { return (raw_state() & 0x1) != 0; }
+bool LCDCtrl::bg_win_en_priority() const { return (state_ & 0x1) != 0; }
 
 /* The return value here will always be in reference to the height (pixels) of
  * the sprites. Sprites will never not be 8 pixels wide. */
 SpriteHeight LCDCtrl::obj_size() const {
-  return (raw_state() & 0x04) != 0 ? SpriteHeight::TALL_SPRITES
-                                   : SpriteHeight::SHORT_SPRITES;
+  return (state_ & 0x04) != 0 ? SpriteHeight::TALL_SPRITES
+                              : SpriteHeight::SHORT_SPRITES;
 }
-bool LCDCtrl::obj_enable() const { return (raw_state() & 0x02) != 0; }
+bool LCDCtrl::obj_enable() const { return (state_ & 0x02) != 0; }
 
 void STAT::write(const byte_t value) {
   // Most significant bit is un-mapped, preserve mode bits
-  raw_state_set((raw_state() & 0x03) | (value & 0x7C) | 0x80);
+  state_ = ((state_ & 0x03) | (value & 0x7C) | 0x80);
 }
 
 byte_t STAT::peek() const {
   // Most significant bit is un-mapped
-  return raw_state() | 0x80;
+  return state_ | 0x80;
 }
 
 byte_t STAT::read() { return peek(); }
@@ -68,46 +68,46 @@ byte_t STAT::read() { return peek(); }
  * does not have visibility into the values of LY and LYC to perform the updates
  * itself. */
 void STAT::set_ly_eq_lyc(bool value) {
-  raw_state() = (raw_state() & ~0x04);
+  state_ = (state_ & ~0x04);
   if (value)
-    raw_state() |= 0x04;
+    state_ |= 0x04;
 }
-bool STAT::get_ly_eq_lyc() const { return (raw_state() & 0x04) != 0; }
+bool STAT::get_ly_eq_lyc() const { return (state_ & 0x04) != 0; }
 
 StatModes STAT::get_mode() const {
   constexpr byte_t mode_mask = 0x03;
-  const auto mode = static_cast<StatModes>(raw_state() & mode_mask);
+  const auto mode = static_cast<StatModes>(state_ & mode_mask);
   return mode;
 }
 
 void STAT::set_mode(StatModes mode) {
   constexpr byte_t mode_mask = 0x03;
   const auto mode_bits = static_cast<byte_t>(mode);
-  raw_state() = raw_state() & ~mode_mask;
-  raw_state() |= mode_bits;
+  state_ = state_ & ~mode_mask;
+  state_ |= mode_bits;
 }
 
 void LY::write(byte_t) { /* Read only */ }
 
 byte_t LY::peek() const {
-  assert(raw_state() >= 0 && raw_state() <= max_ly());
-  return raw_state();
+  assert(state_ >= 0 && state_ <= max_ly());
+  return state_;
 }
 
 byte_t LY::read() { return peek(); }
 
 bool LY::inc() {
-  if (raw_state() == max_ly()) {
-    raw_state_set(0);
+  if (state_ == max_ly()) {
+    state_ = 0;
     return true;
   }
-  ++raw_state();
+  ++state_;
   return false;
 }
 
 byte_t DMGPalette::get_color_idx(const byte_t idx) const {
   // Each color index in the register uses two bits
-  return (raw_state() >> (idx * 2)) & 0x3;
+  return (state_ >> (idx * 2)) & 0x3;
 }
 
 }; // namespace PPU
@@ -116,7 +116,7 @@ namespace DMA {
 
 void DMA::write(const byte_t value) {
   dma_.start(value);
-  raw_state_set(value);
+  state_ = value;
 }
 
 } // namespace DMA

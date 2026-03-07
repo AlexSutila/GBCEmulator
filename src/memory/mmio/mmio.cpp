@@ -1,8 +1,27 @@
 #include "memory/mmio/mmio.hpp"
+#include "savestate/codec.hpp"
 
-void MMIORegister::write(const byte_t value) { raw_state_set(value); }
+enum : std::uint16_t {
+  F_STATE = 1,
+};
 
-byte_t MMIORegister::peek() const { return raw_state(); }
+/**
+ * We do not consider each MMIO Register its own chunk, as this will likely end
+ * up resulting in very polluted and bloated `chunk tag` enumeration namespace.
+ */
+template <typename T> void MMIORegister::parse_savestate(T &t) {
+  t.field_generic(F_STATE, state_);
+}
 
-byte_t MMIORegister::read() { return raw_state(); }
+template void
+MMIORegister::parse_savestate<Savestate::Writer>(Savestate::Writer &);
+template void
+MMIORegister::parse_savestate<Savestate::Reader>(Savestate::Reader &);
+template void
+MMIORegister::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
 
+void MMIORegister::write(const byte_t value) { state_ = value; }
+
+byte_t MMIORegister::peek() const { return state_; }
+
+byte_t MMIORegister::read() { return state_; }

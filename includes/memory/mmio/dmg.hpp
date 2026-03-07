@@ -67,7 +67,7 @@ private:
   MMIORegister &sd;
 };
 
-};
+}; // namespace Serial
 
 namespace Audio {
 
@@ -216,7 +216,7 @@ public:
   /* PPU needs to check these flags to generate interrupts, but does not set
    * them itself afaik. Hence, we don't need a setter. */
   [[nodiscard]] bool int_enabled(StatIntFlags flag) const {
-    return (raw_state() & static_cast<byte_t>(flag)) != 0;
+    return (state_ & static_cast<byte_t>(flag)) != 0;
   }
   [[nodiscard]] bool get_ly_eq_lyc() const;
   void set_ly_eq_lyc(bool value);
@@ -243,10 +243,10 @@ public:
   byte_t read() override;
   LY() : MMIORegister(0) {}
 
-  [[nodiscard]] bool is_visible() const { return raw_state() <= 143; }
-  [[nodiscard]] bool is_vblank() const { return raw_state() >= 144; }
+  [[nodiscard]] bool is_visible() const { return state_ <= 143; }
+  [[nodiscard]] bool is_vblank() const { return state_ >= 144; }
 
-  void reset() { raw_state_set(0); };
+  void reset() { state_ = 0; };
   bool inc(); // Returns true during LY wrap around
 
 private:
