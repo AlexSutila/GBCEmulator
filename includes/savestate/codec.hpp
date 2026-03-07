@@ -45,6 +45,13 @@ public:
     write<std::uint8_t>(as_byte);
   }
 
+  template <typename Fn>
+  void field_complex(const std::uint16_t tag, Fn &&fn) {
+    write<std::uint16_t>(tag);
+    fn(*this);
+    eof();
+  }
+
   template <typename T>
   void field_optional(const std::uint16_t tag, const std::optional<T> val) {
     write<std::uint16_t>(tag);
@@ -87,6 +94,13 @@ public:
     check_tag(tag);
     const std::uint8_t as_byte = read<std::uint8_t>();
     val = static_cast<T>(as_byte);
+  }
+
+  template <typename Fn>
+  void field_complex(const std::uint16_t tag, Fn &&fn) {
+    check_tag(tag);
+    fn(*this);
+    eof();
   }
 
   template <typename T>
@@ -145,10 +159,16 @@ public:
     parse<T>();
   }
 
-  template <typename T>
-  void field_enum(const std::uint16_t tag, const T val) {
+  template <typename T> void field_enum(const std::uint16_t tag, const T val) {
     parse<std::uint16_t>();
     parse<std::uint8_t>(); // Always assume 8 bit
+  }
+
+  template <typename Fn>
+  void field_complex(const std::uint16_t tag, Fn &&fn) {
+    parse<std::uint16_t>();
+    fn(*this);
+    eof();
   }
 
   template <typename T>
