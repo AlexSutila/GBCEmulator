@@ -63,7 +63,8 @@ static constexpr bool is_hram_range(const addr_t a) noexcept {
 }
 
 enum : std::uint16_t {
-  F_VRAM = 1,
+  F_CART = 1,
+  F_VRAM,
   F_WRAM,
   F_HRAM,
   F_OAM,
@@ -83,6 +84,8 @@ enum : std::uint16_t {
 template <typename T> void AddressBus::parse_savestate(T &t) {
   constexpr auto version = 1; // Schema revision
   t.chunk_header(version, Savestate::C_BUS);
+  if (!cart_)
+    throw std::runtime_error("AddressBus::parse_savestate() no cartridge");
 
   // Memory sub-structures
   for (auto &bank : vram) // Duplicate fields, but should be fine
@@ -109,6 +112,9 @@ template <typename T> void AddressBus::parse_savestate(T &t) {
   // Direct memory access sub-structures
   t.field_complex(F_OAM_DMA, [&](T &t) { oam_dma.parse_savestate(t); });
   t.field_complex(F_VDMA, [&](T &t) { vdma.parse_savestate(t); });
+
+  // Cartridge sub-structure (mapper handled internally)
+  t.field_complex(F_CART, [&](T &t) { cart_->parse_savestate(t); });
   t.eof();
 }
 

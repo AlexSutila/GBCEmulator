@@ -16,17 +16,19 @@ enum SavestateOps {
 };
 
 enum ChunkTags : std::uint16_t {
-  C_CPU = 1,
+  C_GBC = 1,
+  C_CPU,
   C_SERIAL,
   C_TIMER,
   C_BUS,
+
+  C_CART,
 
   C_PPU,
   C_FETCHER,
   C_OAM_DMA,
   C_VDMA,
   C_CRAM,
-
 
   /* Denotes end of chunk */
   C_EOF = 0xFFFF

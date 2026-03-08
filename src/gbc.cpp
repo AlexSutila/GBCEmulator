@@ -588,7 +588,7 @@ enum : std::uint16_t {
 
 template <typename T> void GameBoyColor::parse_savestate(T &t) {
   constexpr auto version = 1; // Schema revision
-  t.chunk_header(version, Savestate::C_CPU);
+  t.chunk_header(version, Savestate::C_GBC);
 
   t.field_generic(F_ELAPSED_CLOCKS, sys_.elapsed_clocks);
   t.field_generic(F_CGB_MODE, sys_.cgb_mode);
@@ -614,17 +614,38 @@ template void
 GameBoyColor::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
 
 std::vector<byte_t> GameBoyColor::savestate_serialize() {
+  if (!bus || !cpu || !ppu || !timer || !serial)
+    throw std::runtime_error(
+        "GameBoyColor::serialize_savestate() uninitialized");
+
+  // Align saves to instruction fetches
+  if (!savestate_ready())
+    throw std::runtime_error(
+        "GameBoyColor::serialize_savestate() unsafe point");
+
+  // Writer performs deserialization
   Savestate::Writer out{};
   parse_savestate(out);
   return out.get();
 }
 
 void GameBoyColor::savestate_deserialize(const std::span<const byte_t> data) {
+  if (!bus || !cpu || !ppu || !timer || !serial)
+    throw std::runtime_error(
+        "GameBoyColor::serialize_savestate() uninitialized");
+
+  // Reader performs serialization
   Savestate::Reader in(data);
   parse_savestate(in);
 }
 
 std::size_t GameBoyColor::savestate_size() {
+  if (!bus || !cpu || !ppu || !timer || !serial)
+    throw std::runtime_error(
+        "GameBoyColor::serialize_savestate() uninitialized");
+
+  // Sizer computes size to estimate space needed for memory allocation. The
+  // estimation is generous and should always be large enough to fit a save.
   Savestate::Sizer sz{};
   parse_savestate(sz);
   return sz.get();

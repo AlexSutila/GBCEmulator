@@ -81,6 +81,7 @@ public:
   explicit Cartridge(cart image)
       : image_(std::move(image)), mbc_(make_mbc(image_)) {}
   explicit Cartridge() : image_({}), mbc_(make_test_mbc()) {}
+  template <typename T> void parse_savestate(T &t);
 
   [[nodiscard]] byte_t read_byte(const addr_t addr) const {
     return mbc_->read(addr);

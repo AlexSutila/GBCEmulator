@@ -156,7 +156,7 @@ enum : std::uint16_t {
 
 template <typename T> void VDMA::parse_savestate(T &t) {
   constexpr auto version = 1; // Schema revision
-  t.chunk_header(version, Savestate::C_CPU);
+  t.chunk_header(version, Savestate::C_VDMA);
 
   t.field_generic(F_VDMA_SRC_BASE, src_base_addr);
   t.field_generic(F_VDMA_DEST_BASE, dest_base_addr);

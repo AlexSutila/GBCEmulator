@@ -1,10 +1,45 @@
 #include "cart/cart.hpp"
 #include "frontend/logger.hpp"
+#include "savestate/codec.hpp"
 #include <algorithm>
 #include <bitset>
 #include <cstring>
 #include <fstream>
-#include <string_view>
+#include <stdexcept>
+
+enum : std::uint16_t {
+  F_GLOBAL_CHECKSUM = 1,
+  F_HEADER_CHECKSUM,
+  F_CART_TYPE,
+  F_RAM_BYTES,
+  F_MAPPER,
+};
+
+template <typename T> void Cartridge::parse_savestate(T &t) {
+  constexpr auto version = 1; // Schema revision
+  t.chunk_header(version, Savestate::C_CART);
+  if (!mbc_)
+    throw std::runtime_error("Cartridge::parse_savestate() no mapper");
+
+  // Here we go off an assumption that things like ROM/RAM will not change in
+  // size, since you should only be able to load savestates from a given game
+  // if that cartridge is actually inserted.
+  t.field_generic(F_CART_TYPE, image_.header.cartridge_type);
+  t.field_bytes(F_RAM_BYTES, mbc_->ram());
+
+  // Might not need to load these, but keeping this anyway
+  t.field_generic(F_GLOBAL_CHECKSUM, image_.computed_global_checksum);
+  t.field_generic(F_HEADER_CHECKSUM, image_.header.header_checksum);
+
+  // TODO: Mapper
+  t.eof();
+}
+
+template void
+Cartridge::parse_savestate<Savestate::Writer>(Savestate::Writer &);
+template void
+Cartridge::parse_savestate<Savestate::Reader>(Savestate::Reader &);
+template void Cartridge::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
 
 static std::optional<std::vector<byte_t>> read_all_bytes(const fs::path &p) {
   std::ifstream f(p, std::ios::binary | std::ios::ate);
