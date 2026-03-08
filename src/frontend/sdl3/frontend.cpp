@@ -295,32 +295,32 @@ void SDL3Frontend::render_frame() {
     if (ui_state.show_savestate_manager &&
         (!GbcImGui::dialog_is_detached(GbcImGui::DialogId::Savestates) ||
          !gui.has_detached_dialog_context(GbcImGui::DialogId::Savestates))) {
-      build_savestate_manager_window_locked();
+      build_savestate_manager_window_locked(false);
     }
 
     if (ui_state.show_main_debug_viewer &&
         (!GbcImGui::dialog_is_detached(GbcImGui::DialogId::DebugMain) ||
          !gui.has_detached_dialog_context(GbcImGui::DialogId::DebugMain))) {
       debugger.render_dialog(GbcImGui::DialogId::DebugMain, ui_state, gbc,
-                             host.get_renderer());
+                             host.get_renderer(), false);
     }
     if (ui_state.show_breakpoints &&
         (!GbcImGui::dialog_is_detached(GbcImGui::DialogId::Breakpoints) ||
          !gui.has_detached_dialog_context(GbcImGui::DialogId::Breakpoints))) {
       debugger.render_dialog(GbcImGui::DialogId::Breakpoints, ui_state, gbc,
-                             host.get_renderer());
+                             host.get_renderer(), false);
     }
     if (ui_state.show_memory_viewer &&
         (!GbcImGui::dialog_is_detached(GbcImGui::DialogId::MemoryViewer) ||
          !gui.has_detached_dialog_context(GbcImGui::DialogId::MemoryViewer))) {
       debugger.render_dialog(GbcImGui::DialogId::MemoryViewer, ui_state, gbc,
-                             host.get_renderer());
+                             host.get_renderer(), false);
     }
     if (ui_state.show_ppu_viewer &&
         (!GbcImGui::dialog_is_detached(GbcImGui::DialogId::PpuViewer) ||
          !gui.has_detached_dialog_context(GbcImGui::DialogId::PpuViewer))) {
       debugger.render_dialog(GbcImGui::DialogId::PpuViewer, ui_state, gbc,
-                             host.get_renderer());
+                             host.get_renderer(), false);
     }
 
     poll_zip_choice_response();
@@ -391,23 +391,23 @@ void SDL3Frontend::render_frame() {
                          [&] { gui.render_dialog(GbcImGui::DialogId::Keybinds,
                                                  ui_state, host); });
   render_detached_dialog(GbcImGui::DialogId::Savestates,
-                         [&] { build_savestate_manager_window_locked(); });
+                         [&] { build_savestate_manager_window_locked(true); });
   render_detached_dialog(
       GbcImGui::DialogId::DebugMain,
       [&] { debugger.render_dialog(GbcImGui::DialogId::DebugMain, ui_state, gbc,
-                                   gui.active_renderer()); });
+                                   gui.active_renderer(), true); });
   render_detached_dialog(
       GbcImGui::DialogId::Breakpoints,
       [&] { debugger.render_dialog(GbcImGui::DialogId::Breakpoints, ui_state,
-                                   gbc, gui.active_renderer()); });
+                                   gbc, gui.active_renderer(), true); });
   render_detached_dialog(
       GbcImGui::DialogId::MemoryViewer,
       [&] { debugger.render_dialog(GbcImGui::DialogId::MemoryViewer, ui_state,
-                                   gbc, gui.active_renderer()); });
+                                   gbc, gui.active_renderer(), true); });
   render_detached_dialog(
       GbcImGui::DialogId::PpuViewer,
       [&] { debugger.render_dialog(GbcImGui::DialogId::PpuViewer, ui_state,
-                                   gbc, gui.active_renderer()); });
+                                   gbc, gui.active_renderer(), true); });
 
   gui.use_main_context();
 }

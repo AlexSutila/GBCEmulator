@@ -173,7 +173,7 @@ private:
   void process_events();
   void render_frame();
   byte_t button_mask_for_key(SDL_Keycode key) const;
-  void build_savestate_manager_window_locked();
+  void build_savestate_manager_window_locked(bool fill_viewport = false);
   void refresh_savestate_entries_locked(bool force_refresh = false);
   void release_savestate_textures_locked();
   void reset_savestate_context();

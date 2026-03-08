@@ -76,22 +76,22 @@ struct DetachedDialogSpec {
 constexpr std::array<DetachedDialogSpec,
                      static_cast<std::size_t>(DialogId::Count)>
     kDetachedDialogSpecs{{
-        {DialogId::Settings, "IroGB Settings", &UiState::show_settings, 960,
-         720, true},
-        {DialogId::Cheats, "IroGB Cheats", &UiState::show_cheats, 1120, 760,
+        {DialogId::Settings, "Settings", &UiState::show_settings, 800,
+         550, true},
+        {DialogId::Cheats, "Cheats", &UiState::show_cheats, 850, 600,
          true},
-        {DialogId::Keybinds, "IroGB Keybinds", &UiState::show_keybinds, 760,
-         700, true},
-        {DialogId::Savestates, "IroGB Save States",
-         &UiState::show_savestate_manager, 920, 560, true},
-        {DialogId::DebugMain, "IroGB Debugger",
-         &UiState::show_main_debug_viewer, 1000, 540, true},
-        {DialogId::Breakpoints, "IroGB Breakpoints",
-         &UiState::show_breakpoints, 760, 520, true},
-        {DialogId::MemoryViewer, "IroGB Memory Viewer",
-         &UiState::show_memory_viewer, 920, 520, true},
-        {DialogId::PpuViewer, "IroGB PPU Viewer", &UiState::show_ppu_viewer,
-         700, 520, true},
+        {DialogId::Keybinds, "Keybinds", &UiState::show_keybinds, 480,
+         500, true},
+        {DialogId::Savestates, "Save States",
+         &UiState::show_savestate_manager, 990, 615, true},
+        {DialogId::DebugMain, "Debugger",
+         &UiState::show_main_debug_viewer, 790, 460, true},
+        {DialogId::Breakpoints, "Breakpoints",
+         &UiState::show_breakpoints, 360, 400, true},
+        {DialogId::MemoryViewer, "Memory Viewer",
+         &UiState::show_memory_viewer, 840, 660, true},
+        {DialogId::PpuViewer, "PPU Viewer", &UiState::show_ppu_viewer,
+         425, 570, true},
     }};
 
 [[nodiscard]] constexpr const DetachedDialogSpec &
@@ -101,6 +101,79 @@ dialog_spec(const DialogId id) {
 
 [[nodiscard]] bool window_is_hidden(SDL_Window *window) {
   return !window || (SDL_GetWindowFlags(window) & SDL_WINDOW_HIDDEN) != 0;
+}
+
+constexpr SDL_WindowFlags kDetachedDialogWindowFlags =
+    SDL_WINDOW_HIDDEN | SDL_WINDOW_BORDERLESS | SDL_WINDOW_RESIZABLE |
+    SDL_WINDOW_HIGH_PIXEL_DENSITY;
+
+constexpr ImGuiWindowFlags kDetachedCanvasWindowFlags =
+    ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
+    ImGuiWindowFlags_NoSavedSettings;
+
+SDL_HitTestResult SDLCALL detached_dialog_hit_test(SDL_Window *window,
+                                                   const SDL_Point *area,
+                                                   void * /*data*/) {
+  if (!window || !area)
+    return SDL_HITTEST_NORMAL;
+
+  int width = 0;
+  int height = 0;
+  SDL_GetWindowSize(window, &width, &height);
+  if (width <= 0 || height <= 0)
+    return SDL_HITTEST_NORMAL;
+
+  const float scale = SDL_GetWindowDisplayScale(window);
+  const int resize_border = std::max(6, static_cast<int>(std::lround(6.0f * scale)));
+  const int title_bar_height =
+      std::max(28, static_cast<int>(std::lround(28.0f * scale)));
+  const int close_button_width =
+      std::max(48, static_cast<int>(std::lround(48.0f * scale)));
+
+  const bool left = area->x < resize_border;
+  const bool right = area->x >= width - resize_border;
+  const bool top = area->y < resize_border;
+  const bool bottom = area->y >= height - resize_border;
+
+  if (top && left)
+    return SDL_HITTEST_RESIZE_TOPLEFT;
+  if (top && right)
+    return SDL_HITTEST_RESIZE_TOPRIGHT;
+  if (bottom && left)
+    return SDL_HITTEST_RESIZE_BOTTOMLEFT;
+  if (bottom && right)
+    return SDL_HITTEST_RESIZE_BOTTOMRIGHT;
+  if (top)
+    return SDL_HITTEST_RESIZE_TOP;
+  if (bottom)
+    return SDL_HITTEST_RESIZE_BOTTOM;
+  if (left)
+    return SDL_HITTEST_RESIZE_LEFT;
+  if (right)
+    return SDL_HITTEST_RESIZE_RIGHT;
+
+  const bool in_drag_strip = area->y < title_bar_height;
+  const bool over_close_button = area->x >= width - close_button_width;
+  if (in_drag_strip && !over_close_button)
+    return SDL_HITTEST_DRAGGABLE;
+
+  return SDL_HITTEST_NORMAL;
+}
+
+void setup_full_viewport_window(ImGuiWindowFlags &flags) {
+  if (const ImGuiViewport *viewport = ImGui::GetMainViewport(); viewport) {
+    ImGui::SetNextWindowPos(viewport->Pos, ImGuiCond_Always);
+    ImGui::SetNextWindowSize(viewport->Size, ImGuiCond_Always);
+  }
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+  flags |= kDetachedCanvasWindowFlags;
+}
+
+void teardown_full_viewport_window(const bool enabled) {
+  if (enabled) {
+    ImGui::PopStyleVar(2);
+  }
 }
 } // namespace
 
@@ -233,9 +306,7 @@ void GbcImGui::ensure_detached_dialog_context(const DialogId id) {
   const auto &spec = dialog_spec(id);
   SDL_Window *window =
       SDL_CreateWindow(spec.window_title, spec.default_width,
-                       spec.default_height,
-                       SDL_WINDOW_HIDDEN | SDL_WINDOW_RESIZABLE |
-                           SDL_WINDOW_HIGH_PIXEL_DENSITY);
+                       spec.default_height, kDetachedDialogWindowFlags);
   if (!window)
     return;
 
@@ -244,6 +315,8 @@ void GbcImGui::ensure_detached_dialog_context(const DialogId id) {
     SDL_DestroyWindow(window);
     return;
   }
+
+  SDL_SetWindowHitTest(window, detached_dialog_hit_test, nullptr);
 
   SDL_SetRenderVSync(renderer, 0);
   try {
@@ -286,6 +359,11 @@ void GbcImGui::close_detached_dialog(const DialogId id, UiState &state) {
 
 bool GbcImGui::dialog_visible(const DialogId id, const UiState &state) {
   return state.*(dialog_spec(id).visible_flag);
+}
+
+bool GbcImGui::rendering_detached_dialog(const DialogId id) const {
+  const auto &ctx = detached_dialogs_[dialog_index(id)];
+  return ctx.context && ImGui::GetCurrentContext() == ctx.context;
 }
 
 GbcImGui::ImGuiContextState *
@@ -886,7 +964,12 @@ void GbcImGui::build_rom_source_window(UiState &state) const {
 }
 
 void GbcImGui::build_settings_window(UiState &state, SDLHost &host) {
-  ImGui::Begin("Settings", &state.show_settings);
+  ImGuiWindowFlags flags = 0;
+  const bool fill_viewport = rendering_detached_dialog(DialogId::Settings);
+  if (fill_viewport) {
+    setup_full_viewport_window(flags);
+  }
+  ImGui::Begin("Settings", &state.show_settings, flags);
   ImGui::SeparatorText("General");
   ImGui::Checkbox("Fast forward", &state.fast_forward);
   ImGui::Checkbox("Force DMG monochrome", &settings.force_mono_dmg);
@@ -1016,13 +1099,21 @@ void GbcImGui::build_settings_window(UiState &state, SDLHost &host) {
                  static_cast<int>(state.audio_device_names.size()) - 1);
   }
   ImGui::End();
+  teardown_full_viewport_window(fill_viewport);
 }
 
 void GbcImGui::build_cheats_window(UiState &state) {
-  ImGui::SetNextWindowSize(ImVec2(860.0f * dpi_scale, 520.0f * dpi_scale),
-                           ImGuiCond_FirstUseEver);
-  if (!ImGui::Begin("Cheats", &state.show_cheats)) {
+  ImGuiWindowFlags flags = 0;
+  const bool fill_viewport = rendering_detached_dialog(DialogId::Cheats);
+  if (fill_viewport) {
+    setup_full_viewport_window(flags);
+  } else {
+    ImGui::SetNextWindowSize(ImVec2(860.0f * dpi_scale, 520.0f * dpi_scale),
+                             ImGuiCond_FirstUseEver);
+  }
+  if (!ImGui::Begin("Cheats", &state.show_cheats, flags)) {
     ImGui::End();
+    teardown_full_viewport_window(fill_viewport);
     return;
   }
 
@@ -1179,6 +1270,7 @@ void GbcImGui::build_cheats_window(UiState &state) {
     state.cheats_file_dirty = true;
   }
   ImGui::End();
+  teardown_full_viewport_window(fill_viewport);
 }
 
 void GbcImGui::build_savestate_manager_window(
@@ -1187,19 +1279,26 @@ void GbcImGui::build_savestate_manager_window(
     std::array<char, 96> &manual_label_input,
     std::vector<SavestateEntry> &savestate_entries,
     std::optional<std::filesystem::path> &savestate_selected_path,
-    const SavestateManagerCallbacks &callbacks) {
+    const SavestateManagerCallbacks &callbacks, const bool fill_viewport) {
   if (!state.show_savestate_manager)
     return;
 
-  ImGui::SetNextWindowSize(ImVec2(920, 560), ImGuiCond_FirstUseEver);
-  if (!ImGui::Begin("Save States", &state.show_savestate_manager)) {
+  ImGuiWindowFlags flags = 0;
+  if (fill_viewport) {
+    setup_full_viewport_window(flags);
+  } else {
+    ImGui::SetNextWindowSize(ImVec2(920, 560), ImGuiCond_FirstUseEver);
+  }
+  if (!ImGui::Begin("Save States", &state.show_savestate_manager, flags)) {
     ImGui::End();
+    teardown_full_viewport_window(fill_viewport);
     return;
   }
 
   if (savestate_dir.empty()) {
     ImGui::TextDisabled("Load a ROM to manage savestates.");
     ImGui::End();
+    teardown_full_viewport_window(fill_viewport);
     return;
   }
 
@@ -1357,10 +1456,16 @@ void GbcImGui::build_savestate_manager_window(
   }
 
   ImGui::End();
+  teardown_full_viewport_window(fill_viewport);
 }
 
 void GbcImGui::build_keybinds_window(UiState &state) {
-  ImGui::Begin("Keybinds", &state.show_keybinds);
+  ImGuiWindowFlags flags = 0;
+  const bool fill_viewport = rendering_detached_dialog(DialogId::Keybinds);
+  if (fill_viewport) {
+    setup_full_viewport_window(flags);
+  }
+  ImGui::Begin("Keybinds", &state.show_keybinds, flags);
   ImGui::SeparatorText("Gameplay");
   // Build an array of names for ImGui::Combo
   static std::array<const char *, kPresets.size()> preset_names{};
@@ -1417,6 +1522,7 @@ void GbcImGui::build_keybinds_window(UiState &state) {
   }
 
   ImGui::End();
+  teardown_full_viewport_window(fill_viewport);
 }
 
 void GbcImGui::update_dpi_scale(ImGuiContextState &ctx, const float new_scale) {

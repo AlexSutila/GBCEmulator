@@ -1055,7 +1055,8 @@ void SDL3Frontend::refresh_savestate_entries_locked(const bool force_refresh) {
     savestate_selected_path_.reset();
 }
 
-void SDL3Frontend::build_savestate_manager_window_locked() {
+void SDL3Frontend::build_savestate_manager_window_locked(
+    const bool fill_viewport) {
   if (!ui_state.show_savestate_manager)
     return;
   refresh_savestate_entries_locked(false);
@@ -1085,7 +1086,7 @@ void SDL3Frontend::build_savestate_manager_window_locked() {
                                       : host.get_renderer(),
       static_cast<bool>(gbc), savestate_dir_,
       savestate_manual_label_input_, savestate_entries_, savestate_selected_path_,
-      callbacks);
+      callbacks, fill_viewport);
 }
 
 [[nodiscard]] bool SDL3Frontend::should_preempt_emu_loop() const {

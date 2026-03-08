@@ -94,7 +94,8 @@ public:
       std::array<char, 96> &manual_label_input,
       std::vector<SavestateEntry> &savestate_entries,
       std::optional<std::filesystem::path> &savestate_selected_path,
-      const SavestateManagerCallbacks &callbacks);
+      const SavestateManagerCallbacks &callbacks,
+      bool fill_viewport = false);
 
   static void push_notification(UiState& state, LogLevel level, const std::string& type, const std::string& summary,
                                          const std::string& details = "", time_t timestamp= std::time(nullptr));
@@ -129,6 +130,7 @@ private:
   void sync_detached_dialogs(const UiState &state);
   static void close_detached_dialog(DialogId id, UiState &state);
   [[nodiscard]] static bool dialog_visible(DialogId id, const UiState &state);
+  [[nodiscard]] bool rendering_detached_dialog(DialogId id) const;
   [[nodiscard]] ImGuiContextState *find_context_for_window(Uint32 window_id);
   [[nodiscard]] const ImGuiContextState *find_context_for_window(
       Uint32 window_id) const;
