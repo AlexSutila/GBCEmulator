@@ -15,7 +15,8 @@
 // ROM bank number (00-07)                (0000-7FFF)
 // Notes:
 // - Entire 0000-7FFF region is switched as a single 32 KiB bank.
-// - Only 1 bank switch is allowed per power session; further writes are ignored.
+// - Only 1 bank switch is allowed per power session; further writes are
+//   ignored.
 
 class M161 final : public Mbc {
 public:
@@ -40,24 +41,26 @@ public:
     latched_ = true; // Any write consumes the single allowed bank switch.
   }
 
-  [[nodiscard]] const char *savestate_tag() const noexcept override {
-    return "M161";
+  template <typename T> void parse_savestate_impl(T &t) {
+    constexpr auto version = 1; // Schema revision
+    t.chunk_header(version, Savestate::C_MBC_M161);
+    t.field_generic(F_BANK, bank_);
+    t.field_generic(F_LATCHED, latched_);
+    t.eof();
   }
-  enum : std::uint16_t { F_BANK = 1, F_LATCHED };
-  void savestate_serialize(Savestate::Writer &out) const override {
-    out.field_u8(F_BANK, bank_);
-    out.field_bool(F_LATCHED, latched_);
+
+  void parse_savestate(Savestate::Writer &t) override {
+    parse_savestate_impl(t);
   }
-  void savestate_deserialize(Savestate::Reader &in) override {
-    GBC_SS_DESERIALIZE_BEGIN(in)
-    case F_BANK:
-      bank_ = static_cast<byte_t>(payload.u8() & 0x07);
-      break;
-    GBC_SS_CASE_BOOL(F_LATCHED, latched_);
-    GBC_SS_DESERIALIZE_END();
+  void parse_savestate(Savestate::Reader &t) override {
+    parse_savestate_impl(t);
+  }
+  void parse_savestate(Savestate::Sizer &t) override {
+    parse_savestate_impl(t);
   }
 
 private:
+  enum : std::uint16_t { F_BANK = 1, F_LATCHED };
   std::span<const byte_t> rom_;
 
   static constexpr std::size_t kBank32k = 0x8000;

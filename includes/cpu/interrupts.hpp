@@ -42,25 +42,14 @@ public:
   void write(byte_t value) override;
   [[nodiscard]] byte_t peek() const override;
   byte_t read() override;
-  void savestate_serialize(Savestate::Writer &out) const override;
-  void savestate_deserialize(Savestate::Reader &in) override;
   explicit InterruptBits(bool pull_unused_high);
 
   void put_flag(InterruptFlagMask flag, bool value);
   [[nodiscard]] bool get_flag(InterruptFlagMask flag) const;
 
 private:
-  union {
-    byte_t raw{0x00};
-    struct {
-      byte_t vblank : 1; // Bit 0
-      byte_t lcd : 1;    // Bit 1
-      byte_t timer : 1;  // Bit 2
-      byte_t serial : 1; // Bit 3
-      byte_t joypad : 1; // Bit 4
-      byte_t unused : 3; // Bits 5–7
-    };
-  };
+  // This is set in the constructor, and does not change so we should not need
+  // to serialize it. Just leave it alone and rely on good ol' inheritance.
   const bool pull_high;
 };
 

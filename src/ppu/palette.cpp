@@ -2,9 +2,7 @@
 #include "emu_types.hpp"
 #include "memory/mmio/cgb.hpp"
 #include "savestate/codec.hpp"
-
 #include <cstdint>
-#include <stdexcept>
 
 std::uint16_t argb8888_to_rgb555(const std::uint32_t argb) {
   const std::uint8_t r8 = (argb >> 16) & 0xFF;
@@ -37,32 +35,28 @@ std::uint32_t rgb555_to_argb8888(const std::uint8_t lo, const std::uint8_t hi) {
 /* Initialization order matters because the data register has internal
  * dependencies on both the RAM array and the index register. */
 ColorRam::ColorRam() : mem_{}, idx_reg(), data_reg(mem_, idx_reg) {}
-PPU::PaletteData *ColorRam::get_data_reg() { return &data_reg; }
-PPU::PaletteIdx *ColorRam::get_idx_reg() { return &idx_reg; }
-void ColorRam::savestate_serialize(Savestate::Writer &out) const {
-  out.field_u8(1, idx_reg.peek());
-  out.field(2, [&](Savestate::Writer &w) { w.bytes(mem_); });
+
+enum : std::uint16_t {
+  F_MEM,
+  F_IDX,
+  F_DATA,
+};
+
+template <typename T> void ColorRam::parse_savestate(T &t) {
+  constexpr auto version = 1;
+  t.chunk_header(version, Savestate::C_CRAM);
+  t.field_bytes(F_MEM, mem_);
+  t.field_complex(F_IDX, [&](T &t) { idx_reg.parse_savestate(t); });
+  t.field_complex(F_DATA, [&](T &t) { data_reg.parse_savestate(t); });
+  t.eof();
 }
 
-void ColorRam::savestate_deserialize(Savestate::Reader &in) {
-  while (const auto field = in.next_field()) {
-    auto [id, payload] = *field;
-    switch (id) {
-    case 1:
-      idx_reg.MMIORegister::write(payload.u8());
-      break;
-    case 2:
-      if (payload.remaining() != mem_.size())
-        throw std::runtime_error("ColorRam::savestate_deserialize()");
-      payload.bytes(mem_);
-      break;
-    default:
-      payload.skip(payload.remaining());
-      break;
-    }
-    payload.expect_eof();
-  }
-}
+template void ColorRam::parse_savestate<Savestate::Writer>(Savestate::Writer &);
+template void ColorRam::parse_savestate<Savestate::Reader>(Savestate::Reader &);
+template void ColorRam::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
+
+PPU::PaletteData *ColorRam::get_data_reg() { return &data_reg; }
+PPU::PaletteIdx *ColorRam::get_idx_reg() { return &idx_reg; }
 
 /*
  * Each palette color is stored as a 16-bit little-endian RGB555 value:
@@ -100,6 +94,4 @@ static constexpr std::uint32_t mono_pal[4] = {
     0xFF000000  // black
 };
 
-std::uint32_t get_mono_color(const byte_t idx) {
-  return mono_pal[idx & 0x7];
-}
+std::uint32_t get_mono_color(const byte_t idx) { return mono_pal[idx & 0x7]; }

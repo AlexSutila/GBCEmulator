@@ -6,7 +6,8 @@
 // MBC7 (Tilt sensor + EEPROM)
 // ---------------------------
 // Pan Docs: https://gbdev.io/pandocs/MBC7.html
-// Microchip specs: https://ww1.microchip.com/downloads/aemDocuments/documents/MPD/ProductDocuments/DataSheets/21712C.pdf
+// Microchip specs:
+// https://ww1.microchip.com/downloads/aemDocuments/documents/MPD/ProductDocuments/DataSheets/21712C.pdf
 //
 // Hardware:
 // - 2-axis accelerometer (ADXL202E)
@@ -25,14 +26,14 @@
 // RAM enable 2 (40=enable)               (4000-5FFF)
 //
 // Notes:
-// - A000-BFFF is NOT RAM; it's a register file. Registers are selected by addr bits 4-7.
+// - A000-BFFF is NOT RAM; it's a register file. Registers are selected by addr
+// bits 4-7.
 // - Registers must be enabled by BOTH:
 //    - write 0x0A (low nibble == A) to 0000-1FFF
 //    - write 0x40 to 4000-5FFF
 // - EEPROM is controlled through Ax8x "pins" (CS/CLK/DI) and read back via DO
-// - EEPROM commands listed in Pan Docs are implemented; busy is modeled by DO=0 for a
-//   short number of clock edges after a programming op
-
+// - EEPROM commands listed in Pan Docs are implemented; busy is modeled by DO=0
+//   for a short number of clock edges after a programming op
 
 // ---------------------------
 // 93LC56-like EEPROM core (x16 mode, 128 words = 256 bytes)
@@ -46,24 +47,28 @@ public:
 
   // Expose raw bytes for save persistence
   [[nodiscard]] std::span<const byte_t> bytes() const noexcept { return data_; }
-  [[nodiscard]] std::span<byte_t>       bytes() noexcept { return data_; }
+  [[nodiscard]] std::span<byte_t> bytes() noexcept { return data_; }
 
-  // Ax8x readback: expose pins (only DO is really needed, but returning the full
-  // latched pin state makes debugging easier)
+  // Ax8x readback: expose pins (only DO is really needed, but returning the
+  // full latched pin state makes debugging easier)
   [[nodiscard]] byte_t read_pins() const noexcept {
     byte_t v = 0;
-    if (cs_)  v |= 0x80;
-    if (clk_) v |= 0x40;
-    if (di_)  v |= 0x02;
-    if (do_)  v |= 0x01;
+    if (cs_)
+      v |= 0x80;
+    if (clk_)
+      v |= 0x40;
+    if (di_)
+      v |= 0x02;
+    if (do_)
+      v |= 0x01;
     return v;
   }
 
   // Ax8x write: update pins and advance the serial protocol on CLK rising edges
   void write_pins(byte_t const v) {
-    const bool new_cs  = (v & 0x80) != 0;
+    const bool new_cs = (v & 0x80) != 0;
     const bool new_clk = (v & 0x40) != 0;
-    const bool new_di  = (v & 0x02) != 0;
+    const bool new_di = (v & 0x02) != 0;
 
     const bool cs_fall = (cs_ && !new_cs);
     const bool clk_rise = (!clk_ && new_clk);
@@ -73,12 +78,13 @@ public:
     di_ = new_di;
 
     if (!cs_) {
-      // When CS is low, DO is high-Z on real hardware; for our register readback,
-      // treating it as "ready/high" is sufficient
-      // A high-Z/high impedance state means an electronic outputs neither 0 not 1,
+      // When CS is low, DO is high-Z on real hardware; for our register
+      // readback, treating it as "ready/high" is sufficient A high-Z/high
+      // impedance state means an electronic outputs neither 0 not 1,
       // effectively disconnecting it from the circuit
       do_ = true;
-      // Require CS low between instructions (per MC docs); reset instruction state
+      // Require CS low between instructions (per MC docs); reset instruction
+      // state
       reset_instruction_state();
       return;
     }
@@ -115,7 +121,8 @@ public:
 
     // If we're collecting write data bits
     if (mode_ == Mode::WriteWord || mode_ == Mode::WriteAll) {
-      in_shift_ = static_cast<std::uint16_t>((in_shift_ << 1) | (di_ ? 1u : 0u));
+      in_shift_ =
+          static_cast<std::uint16_t>((in_shift_ << 1) | (di_ ? 1u : 0u));
       ++in_bits_;
       if (in_bits_ == 16) {
         if (ew_enabled_) {
@@ -135,7 +142,8 @@ public:
     }
 
     // Instruction decoding:
-    // Pan Docs: commands are preceded by a "1" start bit; games often send a leading 0
+    // Pan Docs: commands are preceded by a "1" start bit; games often send a
+    // leading 0
     if (!start_seen_) {
       if (di_) {
         start_seen_ = true;
@@ -157,10 +165,44 @@ public:
     }
   }
 
-  void savestate_serialize(Savestate::Writer &out) const;
-  void savestate_deserialize(Savestate::Reader &in);
+  template <typename T> void parse_savestate(T &t) {
+    t.field_generic(F_CS, cs_);
+    t.field_generic(F_CLK, clk_);
+    t.field_generic(F_DI, di_);
+    t.field_generic(F_DO, do_);
+    t.field_generic(F_START_SEEN, start_seen_);
+    t.field_generic(F_CMD, cmd_);
+    t.field_generic(F_CMD_BITS, cmd_bits_);
+    t.field_generic(F_OUT_SHIFT, out_shift_);
+    t.field_generic(F_OUT_BITS, out_bits_);
+    t.field_enum(F_MODE, mode_);
+    t.field_generic(F_IN_SHIFT, in_shift_);
+    t.field_generic(F_IN_BITS, in_bits_);
+    t.field_generic(F_ADDR, addr_);
+    t.field_generic(F_EW_ENABLED, ew_enabled_);
+    t.field_generic(F_BUSY_EDGES, busy_edges_);
+    t.eof();
+  }
 
 private:
+  enum : std::uint16_t {
+    F_CS = 1,
+    F_CLK,
+    F_DI,
+    F_DO,
+    F_START_SEEN,
+    F_CMD,
+    F_CMD_BITS,
+    F_OUT_SHIFT,
+    F_OUT_BITS,
+    F_MODE,
+    F_IN_SHIFT,
+    F_IN_BITS,
+    F_ADDR,
+    F_EW_ENABLED,
+    F_BUSY_EDGES,
+  };
+
   // EEPROM memory layout:
   // Word address N corresponds to bytes [2N] (low) and [2N+1] (high)
   [[nodiscard]] std::uint16_t read_word(std::uint8_t const a) const noexcept {
@@ -172,7 +214,7 @@ private:
 
   void write_word(std::uint8_t const a, std::uint16_t const w) noexcept {
     const std::size_t i = (static_cast<std::size_t>(a) & 0x7F) * 2;
-    data_[i]     = static_cast<byte_t>(w & 0xFF);
+    data_[i] = static_cast<byte_t>(w & 0xFF);
     data_[i + 1] = static_cast<byte_t>((w >> 8) & 0xFF);
   }
 
@@ -335,88 +377,6 @@ private:
   int busy_edges_{0};
 };
 
-enum : std::uint16_t {
-  F_CS = 1,
-  F_CLK,
-  F_DI,
-  F_DO,
-  F_START_SEEN,
-  F_CMD,
-  F_CMD_BITS,
-  F_OUT_SHIFT,
-  F_OUT_BITS,
-  F_MODE,
-  F_IN_SHIFT,
-  F_IN_BITS,
-  F_ADDR,
-  F_EW_ENABLED,
-  F_BUSY_EDGES,
-};
-
-void Eeprom93LC56::savestate_serialize(Savestate::Writer &out) const {
-
-  out.field_bool(F_CS, cs_);
-  out.field_bool(F_CLK, clk_);
-  out.field_bool(F_DI, di_);
-  out.field_bool(F_DO, do_);
-  out.field_bool(F_START_SEEN, start_seen_);
-  out.field_u16(F_CMD, cmd_);
-  out.field_u8(F_CMD_BITS, static_cast<byte_t>(cmd_bits_));
-  out.field_u16(F_OUT_SHIFT, out_shift_);
-  out.field_u8(F_OUT_BITS, static_cast<byte_t>(out_bits_));
-  out.field_u8(F_MODE, static_cast<byte_t>(mode_));
-  out.field_u16(F_IN_SHIFT, in_shift_);
-  out.field_u8(F_IN_BITS, static_cast<byte_t>(in_bits_));
-  out.field_u8(F_ADDR, addr_);
-  out.field_bool(F_EW_ENABLED, ew_enabled_);
-  out.field_u8(F_BUSY_EDGES, static_cast<byte_t>(busy_edges_));
-}
-
-void Eeprom93LC56::savestate_deserialize(Savestate::Reader &in) {
-  GBC_SS_DESERIALIZE_BEGIN(in)
-  GBC_SS_CASE_BOOL(F_CS, cs_);
-  GBC_SS_CASE_BOOL(F_CLK, clk_);
-  GBC_SS_CASE_BOOL(F_DI, di_);
-  GBC_SS_CASE_BOOL(F_DO, do_);
-  GBC_SS_CASE_BOOL(F_START_SEEN, start_seen_);
-  case F_CMD:
-    cmd_ = static_cast<std::uint16_t>(payload.u16() & 0x03FFu);
-    break;
-  case F_CMD_BITS:
-    cmd_bits_ = static_cast<int>(payload.u8() % 11u);
-    break;
-  GBC_SS_CASE_U16(F_OUT_SHIFT, out_shift_);
-  case F_OUT_BITS:
-    out_bits_ = static_cast<int>(payload.u8() % 17u);
-    break;
-  case F_MODE: {
-    switch (payload.u8()) {
-    case 1:
-      mode_ = Mode::WriteWord;
-      break;
-    case 2:
-      mode_ = Mode::WriteAll;
-      break;
-    default:
-      mode_ = Mode::Idle;
-      break;
-    }
-    break;
-  }
-  GBC_SS_CASE_U16(F_IN_SHIFT, in_shift_);
-  case F_IN_BITS:
-    in_bits_ = static_cast<int>(payload.u8() % 17u);
-    break;
-  case F_ADDR:
-    addr_ = static_cast<byte_t>(payload.u8() & 0x7F);
-    break;
-  GBC_SS_CASE_BOOL(F_EW_ENABLED, ew_enabled_);
-  case F_BUSY_EDGES:
-    busy_edges_ = static_cast<int>(payload.u8());
-    break;
-  GBC_SS_DESERIALIZE_END();
-}
-
 class Mbc7 final : public Mbc {
 public:
   explicit Mbc7(const std::span<const byte_t> rom, bool const battery)
@@ -531,61 +491,45 @@ public:
     return eeprom_.bytes();
   }
   std::span<byte_t> ram() noexcept override { return eeprom_.bytes(); }
-  [[nodiscard]] const char *savestate_tag() const noexcept override {
-    return "MBC7";
-  }
-  enum : std::uint16_t {
-    F_ROM_BANK = 1,
-    F_RAM_EN1,
-    F_RAM_EN2,
-    F_ACCEL_X,
-    F_ACCEL_Y,
-    F_LATCHED_X,
-    F_LATCHED_Y,
-    F_NEEDS_ERASE_BEFORE_LATCH,
-    F_EEPROM_STATE,
-  };
-  void savestate_serialize(Savestate::Writer &out) const override {
-    out.field_u8(F_ROM_BANK, rom_bank_);
-    out.field_bool(F_RAM_EN1, ram_en1_);
-    out.field_bool(F_RAM_EN2, ram_en2_);
-    out.field_u16(F_ACCEL_X, accel_x_);
-    out.field_u16(F_ACCEL_Y, accel_y_);
-    out.field_u16(F_LATCHED_X, latched_x_);
-    out.field_u16(F_LATCHED_Y, latched_y_);
-    out.field_bool(F_NEEDS_ERASE_BEFORE_LATCH, needs_erase_before_latch_);
-    out.field(F_EEPROM_STATE, [&](Savestate::Writer &w) {
-      eeprom_.savestate_serialize(w);
-    });
-  }
-  void savestate_deserialize(Savestate::Reader &in) override {
-    GBC_SS_DESERIALIZE_BEGIN(in)
-    case F_ROM_BANK:
-      rom_bank_ = static_cast<byte_t>(payload.u8() & 0x7F);
-      break;
-    GBC_SS_CASE_BOOL(F_RAM_EN1, ram_en1_);
-    GBC_SS_CASE_BOOL(F_RAM_EN2, ram_en2_);
-    GBC_SS_CASE_U16(F_ACCEL_X, accel_x_);
-    GBC_SS_CASE_U16(F_ACCEL_Y, accel_y_);
-    GBC_SS_CASE_U16(F_LATCHED_X, latched_x_);
-    GBC_SS_CASE_U16(F_LATCHED_Y, latched_y_);
-    GBC_SS_CASE_BOOL(F_NEEDS_ERASE_BEFORE_LATCH, needs_erase_before_latch_);
-    case F_EEPROM_STATE:
-      eeprom_.savestate_deserialize(payload);
-      break;
-    GBC_SS_DESERIALIZE_END();
-  }
 
   // Optional accelerometer hook that can be called from frontend/input later:
-  // (Pan Docs says centered around 0x81D0; 0x8000 is the "unlatched" reset value)
+  // (Pan Docs says centered around 0x81D0; 0x8000 is the "unlatched" reset
+  // value)
   void set_accel_raw(std::uint16_t const x, std::uint16_t const y) noexcept {
     accel_x_ = x;
     accel_y_ = y;
   }
 
+  template <typename T> void parse_savestate_impl(T &t) {
+    constexpr auto version = 1; // Schema revision
+    t.chunk_header(version, Savestate::C_MBC_7);
+    t.field_generic(F_ROM_BANK, rom_bank_);
+    t.field_generic(F_RAM_EN1, ram_en1_);
+    t.field_generic(F_RAM_EN2, ram_en2_);
+    t.field_generic(F_ACCEL_X, accel_x_);
+    t.field_generic(F_ACCEL_Y, accel_y_);
+    t.field_generic(F_LATCHED_X, latched_x_);
+    t.field_generic(F_LATCHED_Y, latched_y_);
+    t.field_generic(F_NEEDS_ERASE_BEFORE_LATCH, needs_erase_before_latch_);
+    t.field_complex(F_EEPROM_STATE, [&](T &t) { eeprom_.parse_savestate(t); });
+    t.eof();
+  }
+
+  void parse_savestate(Savestate::Writer &t) override {
+    parse_savestate_impl(t);
+  }
+  void parse_savestate(Savestate::Reader &t) override {
+    parse_savestate_impl(t);
+  }
+  void parse_savestate(Savestate::Sizer &t) override {
+    parse_savestate_impl(t);
+  }
+
 private:
   [[nodiscard]] bool has_battery() const noexcept override { return battery_; }
-  [[nodiscard]] bool regs_enabled() const noexcept { return ram_en1_ && ram_en2_; }
+  [[nodiscard]] bool regs_enabled() const noexcept {
+    return ram_en1_ && ram_en2_;
+  }
 
   std::span<const byte_t> rom_;
   bool battery_{false};
@@ -603,9 +547,22 @@ private:
   std::uint16_t latched_y_{0x8000};
   bool needs_erase_before_latch_{false};
 
+  enum : std::uint16_t {
+    F_ROM_BANK = 1,
+    F_RAM_EN1,
+    F_RAM_EN2,
+    F_ACCEL_X,
+    F_ACCEL_Y,
+    F_LATCHED_X,
+    F_LATCHED_Y,
+    F_NEEDS_ERASE_BEFORE_LATCH,
+    F_EEPROM_STATE,
+  };
+
   Eeprom93LC56 eeprom_{};
 };
 
 std::unique_ptr<Mbc> make_mbc7(cart const &c) {
-  return std::make_unique<Mbc7>(c.rom, type_has_battery(c.header.cartridge_type));
+  return std::make_unique<Mbc7>(c.rom,
+                                type_has_battery(c.header.cartridge_type));
 }

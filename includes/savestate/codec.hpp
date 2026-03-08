@@ -1,195 +1,193 @@
-#ifndef GBC_SAVESTATE_CODEC_HPP
-#define GBC_SAVESTATE_CODEC_HPP
+#ifndef GBC_SCHEMA_HPP
+#define GBC_SCHEMA_HPP
 
-#include "emu_types.hpp"
-
-#include <array>
-#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <span>
 #include <stdexcept>
-#include <string_view>
 #include <vector>
 
 namespace Savestate {
 
-struct Field;
-struct Chunk;
-
-class Writer {
-public:
-  void u8(const byte_t v) { buf_.push_back(v); }
-
-  void boolean(const bool v) { u8(v ? 1 : 0); }
-
-  void u16(const std::uint16_t v) {
-    u8(static_cast<byte_t>(v & 0xFF));
-    u8(static_cast<byte_t>((v >> 8) & 0xFF));
-  }
-
-  void u32(const std::uint32_t v) {
-    u8(static_cast<byte_t>(v & 0xFF));
-    u8(static_cast<byte_t>((v >> 8) & 0xFF));
-    u8(static_cast<byte_t>((v >> 16) & 0xFF));
-    u8(static_cast<byte_t>((v >> 24) & 0xFF));
-  }
-
-  void u64(const std::uint64_t v) {
-    for (int i = 0; i < 8; ++i)
-      u8(static_cast<byte_t>((v >> (i * 8)) & 0xFF));
-  }
-
-  void bytes(std::span<const byte_t> bytes_) {
-    buf_.insert(buf_.end(), bytes_.begin(), bytes_.end());
-  }
-
-  [[nodiscard]] std::size_t size() const noexcept { return buf_.size(); }
-
-  template <typename Fn> void field(const std::uint16_t id, Fn &&fn) {
-    u16(id);
-    const auto size_pos = reserve_u32_();
-    const auto payload_start = size();
-    fn(*this);
-    patch_u32_(size_pos, static_cast<std::uint32_t>(size() - payload_start));
-  }
-
-  void field_u8(const std::uint16_t id, const byte_t v) {
-    field(id, [&](Writer &w) { w.u8(v); });
-  }
-  void field_bool(const std::uint16_t id, const bool v) {
-    field(id, [&](Writer &w) { w.boolean(v); });
-  }
-  void field_u16(const std::uint16_t id, const std::uint16_t v) {
-    field(id, [&](Writer &w) { w.u16(v); });
-  }
-  void field_u32(const std::uint16_t id, const std::uint32_t v) {
-    field(id, [&](Writer &w) { w.u32(v); });
-  }
-  void field_u64(const std::uint16_t id, const std::uint64_t v) {
-    field(id, [&](Writer &w) { w.u64(v); });
-  }
-
-  template <typename Fn>
-  void chunk(const std::string_view tag4, const std::uint16_t version, Fn &&fn) {
-    if (tag4.size() != 4)
-      throw std::runtime_error("Savestate: chunk tag must be 4 bytes");
-    tag(tag4);
-    u16(version);
-    const auto size_pos = reserve_u32_();
-    const auto payload_start = size();
-    fn(*this);
-    patch_u32_(size_pos, static_cast<std::uint32_t>(size() - payload_start));
-  }
-
-  template <std::size_t N> void tag(const std::array<char, N> &tag_) {
-    for (const char c : tag_)
-      u8(static_cast<byte_t>(c));
-  }
-
-  void tag(const std::string_view tag_) {
-    for (const char c : tag_)
-      u8(static_cast<byte_t>(c));
-  }
-
-  [[nodiscard]] const std::vector<byte_t> &data() const noexcept { return buf_; }
-  [[nodiscard]] std::vector<byte_t> take() && { return std::move(buf_); }
-
-private:
-  [[nodiscard]] std::size_t reserve_u32_() {
-    const auto pos = buf_.size();
-    buf_.resize(pos + 4, 0);
-    return pos;
-  }
-
-  void patch_u32_(const std::size_t pos, const std::uint32_t v) {
-    if (pos + 4 > buf_.size())
-      throw std::runtime_error("Savestate: invalid patch offset");
-    buf_[pos + 0] = static_cast<byte_t>(v & 0xFF);
-    buf_[pos + 1] = static_cast<byte_t>((v >> 8) & 0xFF);
-    buf_[pos + 2] = static_cast<byte_t>((v >> 16) & 0xFF);
-    buf_[pos + 3] = static_cast<byte_t>((v >> 24) & 0xFF);
-  }
-
-  std::vector<byte_t> buf_{};
+enum SavestateOps {
+  OP_READ,
+  OP_WRITE,
+  OP_SIZE,
 };
 
+enum ChunkTags : std::uint16_t {
+  C_GBC = 1,
+  C_CPU,
+  C_SERIAL,
+  C_TIMER,
+  C_BUS,
+
+  C_CART,
+  C_MBC_EMS,
+  C_MBC_HUC1,
+  C_MBC_HUC3,
+  C_MBC_M161,
+  C_MBC_1,
+  C_MBC_2,
+  C_MBC_3,
+  C_MBC_5,
+  C_MBC_6,
+  C_MBC_7,
+  C_MBC_MMM01,
+  C_MBC_TAMA5,
+  // C_MBC_TEST, - We don't need this, but might want in future
+  C_WISDOM_TREE, // ✝ Praise the Lord ✝
+
+  C_PPU,
+  C_FETCHER,
+  C_OAM_DMA,
+  C_VDMA,
+  C_CRAM,
+
+  /* Denotes end of chunk */
+  C_EOF = 0xFFFF
+};
+
+// Serialize
+class Writer {
+public:
+  constexpr SavestateOps op() const { return OP_WRITE; }
+
+  template <typename T>
+  void field_generic(const std::uint16_t tag, const T val) {
+    write<std::uint16_t>(tag);
+    write<T>(val);
+  }
+
+  template <typename T> void field_enum(const std::uint16_t tag, const T val) {
+    write<std::uint16_t>(tag);
+
+    // This makes an assumption we don't need >256 enum values lol
+    const std::uint8_t as_byte = static_cast<std::uint8_t>(val);
+    write<std::uint8_t>(as_byte);
+  }
+
+  template <typename Fn> void field_complex(const std::uint16_t tag, Fn &&fn) {
+    write<std::uint16_t>(tag);
+    fn(*this);
+    eof();
+  }
+
+  template <typename T, typename Fn>
+  void field_vector(const std::uint16_t tag, std::vector<T> &vec,
+                    const std::size_t max_size, Fn &&fn) {
+    write<std::uint16_t>(tag);
+    write<std::size_t>(vec.size());
+
+    for (T &e : vec)
+      fn(*this, e); // Should not manipulate, only write out
+
+    eof();
+  }
+
+  void field_bytes(const std::uint16_t tag, std::span<std::uint8_t> bytes) {
+    write<std::uint16_t>(tag);
+    buf_.insert(buf_.end(), bytes.begin(), bytes.end());
+  }
+
+  template <typename T>
+  void field_optional(const std::uint16_t tag, const std::optional<T> val) {
+    write<std::uint16_t>(tag);
+    if (val.has_value()) {
+      write<bool>(true);
+      write<T>(val.value());
+    } else
+      write<bool>(false);
+  }
+
+  void eof() { write<std::uint16_t>(C_EOF); }
+
+  void chunk_header(const std::uint16_t version, const std::uint16_t tag) {
+    write<std::uint16_t>(version);
+    write<std::uint16_t>(tag);
+  }
+
+  std::vector<std::uint8_t> get() const { return buf_; }
+
+private:
+  template <typename T> void write(const T val) {
+    for (std::size_t i = 0; i < sizeof(T); ++i)
+      buf_.push_back(static_cast<std::uint8_t>((val >> (i * 8)) & 0xFF));
+  }
+
+  std::vector<std::uint8_t> buf_{};
+};
+
+// Deserialize
 class Reader {
 public:
   Reader() = default;
-  explicit Reader(const std::span<const byte_t> bytes) : buf_(bytes) {}
+  explicit Reader(const std::span<const std::uint8_t> bytes) : buf_(bytes) {}
+  constexpr SavestateOps op() const { return OP_READ; }
 
-  [[nodiscard]] bool empty() const noexcept { return pos_ >= buf_.size(); }
-  [[nodiscard]] std::size_t remaining() const noexcept { return buf_.size() - pos_; }
-  void skip(const std::size_t n) {
-    require(n);
-    pos_ += n;
+  template <typename T> void field_generic(const std::uint16_t tag, T &val) {
+    check_tag(tag);
+    val = read<T>();
   }
 
-  [[nodiscard]] Reader subreader(const std::size_t n) {
-    require(n);
-    const auto start = pos_;
-    pos_ += n;
-    return Reader(buf_.subspan(start, n));
+  template <typename T> void field_enum(const std::uint16_t tag, T &val) {
+    check_tag(tag);
+    const std::uint8_t as_byte = read<std::uint8_t>();
+    val = static_cast<T>(as_byte);
   }
 
-  void expect_eof() const {
-    if (!empty())
-      throw std::runtime_error("Savestate: trailing field data");
+  template <typename Fn> void field_complex(const std::uint16_t tag, Fn &&fn) {
+    check_tag(tag);
+    fn(*this);
+    eof();
   }
 
-  byte_t u8() {
-    require(1);
-    return buf_[pos_++];
+  template <typename T, typename Fn>
+  void field_vector(const std::uint16_t tag, std::vector<T> &vec,
+                    const std::size_t max_size, Fn &&fn) {
+    check_tag(tag);
+
+    const std::size_t size = read<std::size_t>();
+    if (size > max_size)
+      throw std::runtime_error("Savestate: Exceeded vector capacity");
+
+    vec.clear();
+    vec.resize(size);
+
+    for (T &e : vec)
+      fn(*this, e); // Should populate this structure
+
+    eof();
   }
 
-  bool boolean() {
-    const byte_t v = u8();
-    if (v > 1)
-      throw std::runtime_error("Savestate: invalid boolean");
-    return v != 0;
+  void field_bytes(const std::uint16_t tag, std::span<std::uint8_t> bytes) {
+    check_tag(tag);
+
+    require(bytes.size());
+    for (std::size_t i{0}; i < bytes.size(); ++i)
+      bytes[i] = buf_[pos_ + i];
+    pos_ += bytes.size();
   }
 
-  std::uint16_t u16() {
-    require(2);
-    const auto b0 = static_cast<std::uint16_t>(buf_[pos_++]);
-    const auto b1 = static_cast<std::uint16_t>(buf_[pos_++]);
-    return static_cast<std::uint16_t>(b0 | (b1 << 8));
+  template <typename T>
+  void field_optional(const std::uint16_t tag, std::optional<T> &val) {
+    check_tag(tag);
+    if (read<bool>())
+      val = read<T>();
+    else
+      val.reset();
   }
 
-  std::uint32_t u32() {
-    require(4);
-    std::uint32_t v = 0;
-    for (int i = 0; i < 4; ++i)
-      v |= static_cast<std::uint32_t>(buf_[pos_++]) << (i * 8);
-    return v;
-  }
+  void eof() { check_tag(C_EOF); }
 
-  std::uint64_t u64() {
-    require(8);
-    std::uint64_t v = 0;
-    for (int i = 0; i < 8; ++i)
-      v |= static_cast<std::uint64_t>(buf_[pos_++]) << (i * 8);
-    return v;
+  void chunk_header(const std::uint16_t version, const std::uint16_t tag) {
+    const auto read_version = read<std::uint16_t>();
+    const auto read_tag = read<std::uint16_t>();
+    if (version != read_version)
+      throw std::runtime_error("Savestate: bad version");
+    if (tag != read_tag)
+      throw std::runtime_error("Savestate: bad chunk version");
   }
-
-  void bytes(std::span<byte_t> out) {
-    require(out.size());
-    for (std::size_t i = 0; i < out.size(); ++i)
-      out[i] = buf_[pos_ + i];
-    pos_ += out.size();
-  }
-
-  void expect_tag(const std::string_view tag_) {
-    require(tag_.size());
-    for (const char c : tag_) {
-      if (const auto got = static_cast<char>(u8()); got != c)
-        throw std::runtime_error("Savestate: invalid tag");
-    }
-  }
-
-  [[nodiscard]] std::optional<Field> next_field();
-  [[nodiscard]] std::optional<Chunk> next_chunk();
 
 private:
   void require(const std::size_t n) const {
@@ -197,90 +195,85 @@ private:
       throw std::runtime_error("Savestate: truncated data");
   }
 
-  std::span<const byte_t> buf_;
+  void check_tag(const std::uint16_t tag) {
+    std::uint16_t read_tag = read<std::uint16_t>();
+    if (tag != read_tag)
+      throw std::runtime_error("Savestate: bad chunk tag");
+  }
+
+  template <typename T> T read() {
+    require(sizeof(T));
+
+    T val{0};
+    for (std::size_t i{0}; i < sizeof(T); ++i)
+      val |= static_cast<T>(buf_[pos_++] << (i * 8));
+    return val;
+  }
+
+  std::span<const std::uint8_t> buf_;
   std::size_t pos_{0};
 };
 
-struct Field {
-  std::uint16_t id{};
-  Reader payload{};
+// For memory buffer size determinism
+class Sizer {
+public:
+  constexpr SavestateOps op() const { return OP_SIZE; }
+
+  template <typename T>
+  void field_generic(const std::uint16_t tag, const T val) {
+    parse<std::uint16_t>();
+    parse<T>();
+  }
+
+  template <typename T> void field_enum(const std::uint16_t tag, const T val) {
+    parse<std::uint16_t>();
+    parse<std::uint8_t>(); // Always assume 8 bit
+  }
+
+  template <typename Fn> void field_complex(const std::uint16_t tag, Fn &&fn) {
+    parse<std::uint16_t>();
+    fn(*this);
+    eof();
+  }
+
+  template <typename T, typename Fn>
+  void field_vector(const std::uint16_t tag, std::vector<T> &vec,
+                    const std::size_t max_size, Fn &&fn) {
+    const T dummy{}; // Need this to have some object to pass, otherwise unused
+    parse<std::uint16_t>();
+    parse<std::size_t>();
+
+    for (std::size_t i{0}; i < max_size; ++i)
+      fn(*this, dummy); // Manipulate if you want, doesn't matter
+    eof();
+  }
+
+  void field_bytes(const std::uint16_t tag, std::span<std::uint8_t> bytes) {
+    parse<std::uint16_t>();
+    max_size_ += bytes.size();
+  }
+
+  template <typename T>
+  void field_optional(const std::uint16_t tag, const std::optional<T> val) {
+    parse<std::uint16_t>();
+    parse<bool>();
+    parse<T>();
+  }
+
+  void eof() { parse<std::uint16_t>(); }
+
+  void chunk_header(const std::uint16_t version, const std::uint16_t tag) {
+    parse<std::uint16_t>();
+    parse<std::uint16_t>();
+  }
+
+  const std::size_t get() const { return max_size_; }
+
+private:
+  template <typename T> void parse() { max_size_ += sizeof(T); }
+  std::size_t max_size_{0};
 };
-
-struct Chunk {
-  std::array<char, 4> tag{};
-  std::uint16_t version{};
-  Reader payload{};
-};
-
-inline std::optional<Field> Reader::next_field() {
-  if (empty())
-    return std::nullopt;
-  const auto id = u16();
-  const auto len = static_cast<std::size_t>(u32());
-  return Field{.id = id, .payload = subreader(len)};
-}
-
-inline std::optional<Chunk> Reader::next_chunk() {
-  if (empty())
-    return std::nullopt;
-  std::array<char, 4> tag_{};
-  for (auto &c : tag_)
-    c = static_cast<char>(u8());
-  const auto version = u16();
-  const auto len = static_cast<std::size_t>(u32());
-  return Chunk{.tag = tag_, .version = version, .payload = subreader(len)};
-}
 
 } // namespace Savestate
 
-// Common savestate deserialize boilerplate used by many modules
-// These macros intentionally expose local `id` and `payload` inside the switch
-#define GBC_SS_DESERIALIZE_BEGIN(reader_)                                         \
-  while (const auto gbc_ss_field_ = (reader_).next_field()) {                     \
-    auto [id, payload] = *gbc_ss_field_;                                          \
-    switch (id) {
-
-#define GBC_SS_DESERIALIZE_END()                                                  \
-    default:                                                                      \
-      payload.skip(payload.remaining());                                          \
-      break;                                                                      \
-    }                                                                             \
-    payload.expect_eof();                                                         \
-  }
-
-#define GBC_SS_CASE_U8(field_id_, target_)                                        \
-    case field_id_:                                                               \
-      (target_) = payload.u8();                                                   \
-      break
-
-#define GBC_SS_CASE_BOOL(field_id_, target_)                                      \
-    case field_id_:                                                               \
-      (target_) = payload.boolean();                                              \
-      break
-
-#define GBC_SS_CASE_U16(field_id_, target_)                                       \
-    case field_id_:                                                               \
-      (target_) = payload.u16();                                                  \
-      break
-
-#define GBC_SS_CASE_U32(field_id_, target_)                                       \
-    case field_id_:                                                               \
-      (target_) = payload.u32();                                                  \
-      break
-
-#define GBC_SS_CASE_U64(field_id_, target_)                                       \
-    case field_id_:                                                               \
-      (target_) = payload.u64();                                                  \
-      break
-
-#define GBC_SS_CASE_U8_MASK(field_id_, target_, mask_)                            \
-    case field_id_:                                                               \
-      (target_) = static_cast<byte_t>(payload.u8() & (mask_));                    \
-      break
-
-#define GBC_SS_CASE_U16_MASK(field_id_, target_, mask_)                           \
-    case field_id_:                                                               \
-      (target_) = static_cast<std::uint16_t>(payload.u16() & (mask_));            \
-      break
-
-#endif // GBC_SAVESTATE_CODEC_HPP
+#endif // GBC_SCHEMA_HPP

@@ -21,16 +21,13 @@
 
 struct runtime_sys_info;
 class Frontend;
-namespace Savestate {
-class Reader;
-class Writer;
-}
 
 class PixelProcessingUnit : Debug::Debuggable {
 public:
   PixelProcessingUnit(AddressBus *bus, Frontend &fe,
                       std::optional<Debug::Debugger> &debugger,
                       runtime_sys_info &sys);
+  template <typename T> void parse_savestate(T &t);
   void reset();
   void step();
 
@@ -47,8 +44,6 @@ public:
     std::size_t dots;
   };
   [[nodiscard]] PPUState get_state() const;
-  void savestate_serialize(Savestate::Writer &out) const;
-  void savestate_deserialize(Savestate::Reader &in);
 
 private:
   InterruptBits *if_reg{};
@@ -91,6 +86,7 @@ private:
   PPU::LY ly_{};
 
   /* For tracking locational data for sprites during OAM search */
+  static constexpr auto max_oam_sprite_count = 10;
   std::size_t sprites_searched{};
   std::vector<Sprite> oam_data{};
   /* For the first frame upon the PPU being enabled, the first scanline has

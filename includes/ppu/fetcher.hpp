@@ -14,10 +14,6 @@
 #include <optional>
 
 struct runtime_sys_info;
-namespace Savestate {
-class Reader;
-class Writer;
-}
 
 class Fetcher {
 public:
@@ -32,6 +28,7 @@ public:
           ObjPixelFifo &obj_fifo, // The sprite pixel fifo
           BgPixelFifo &bg_fifo,   // The background pixel fifo
           runtime_sys_info &sys);
+  template <typename T> void parse_savestate(T &t);
   void reset(); // Enters background rendering mode
 
   /* Sprite fetching is tricky. It should take priority over both BG and window
@@ -53,8 +50,6 @@ public:
   [[nodiscard]] bool was_window_visible() const { return win_started; }
   void inc_win_ly() { ++win_internal_ly; }
   void reset_win_ly() { win_internal_ly = 0; } // Reset end of every frame
-  void savestate_serialize(Savestate::Writer &out) const;
-  void savestate_deserialize(Savestate::Reader &in);
 
 private:
   enum FetcherState {

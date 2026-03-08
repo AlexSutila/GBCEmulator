@@ -19,10 +19,6 @@
 
 struct runtime_sys_info;
 class BootROM;
-namespace Savestate {
-class Reader;
-class Writer;
-} // namespace Savestate
 
 enum BusConflictTypes : std::uint32_t {
   BUS_CONFLICT_NONE = 0,
@@ -72,6 +68,12 @@ public:
     byte_t compare{};
   };
 
+  /* Second constructor is called when skipping BIOS, first constructor may also
+   * ignore the BIOS if the initialization fails for some reason. */
+  AddressBus(runtime_sys_info &sys, std::optional<Debug::Debugger> &debugger,
+             std::optional<BootROM> &bios);
+  template <typename T> void parse_savestate(T &t);
+
   void write_byte(addr_t addr, byte_t value) const;
   [[nodiscard]] byte_t read_byte(addr_t addr, bool debug = true) const;
   ObjAttrDMA &get_oam_dma() { return oam_dma; };
@@ -81,15 +83,8 @@ public:
    * regular `read_byte()`, but calls `peak()` for memory mapped registers. */
   [[nodiscard]] byte_t read_byte_safe(addr_t addr) const;
 
-  /* Second constructor is called when skipping BIOS, first constructor may also
-   * ignore the BIOS if the initialization fails for some reason. */
-  AddressBus(runtime_sys_info &sys, std::optional<Debug::Debugger> &debugger,
-             std::optional<BootROM> &bios);
-
   /* For attaching MMIO component interface registers */
-  void
-  connect_mmio(addr_t addr, MMIORegister *reg,
-               MMIOSavestatePolicy policy = MMIOSavestatePolicy::OwnerManaged);
+  void connect_mmio(addr_t addr, MMIORegister *reg);
   [[nodiscard]] MMIORegister *get_mmio(IORegisterMapping mapping) const;
 
   /* Bus conflict management */
@@ -109,8 +104,6 @@ public:
   [[nodiscard]] const Cartridge *get_cartridge() const noexcept {
     return cart_.get();
   }
-  void savestate_serialize(Savestate::Writer &out) const;
-  void savestate_deserialize(Savestate::Reader &in);
 
   /* Convenience getters for PixelProcessor */
   std::array<std::unique_ptr<byte_t[]>, 2> &get_vram() { return vram; }
@@ -158,11 +151,7 @@ private:
   [[nodiscard]] bool is_conflicting(addr_t addr) const;
   BusConflictTypes bus_conflicts{};
 
-  struct ConnectedMMIO {
-    MMIORegister *reg{};
-    MMIOSavestatePolicy savestate_policy{MMIOSavestatePolicy::OwnerManaged};
-  };
-  std::map<addr_t, ConnectedMMIO> io_registers{};
+  std::map<addr_t, MMIORegister *> io_registers{};
   std::array<CheatReadOverride, 0x10000> cheat_overrides_{};
   std::vector<addr_t> cheat_touched_addrs_{};
   bool has_cheat_overrides_{false};

@@ -57,14 +57,19 @@ public:
   GameBoyColor(Frontend &frontend, const std::string &bios_path);
   GameBoyColor(Frontend &frontend, const BootROM &rom);
   explicit GameBoyColor(Frontend &frontend);
-  void insert_cartridge(const cart& c);
+
+  void insert_cartridge(const cart &c);
   void init_test_bed() const;
   void step();
-  CheatStats configure_cheats(const std::vector<CheatCode>& cheats);
+
+  CheatStats configure_cheats(const std::vector<CheatCode> &cheats);
   [[nodiscard]] CheatStats get_cheat_stats() const { return cheat_stats_; }
+
+  template <typename T> void parse_savestate(T &t); // Top level
+  [[nodiscard]] std::vector<byte_t> savestate_serialize();
+  void savestate_deserialize(std::span<const byte_t> data);
+  [[nodiscard]] std::size_t savestate_size();
   [[nodiscard]] bool savestate_ready() const;
-  [[nodiscard]] std::vector<byte_t> serialize_savestate() const;
-  void deserialize_savestate(std::span<const byte_t> data);
 
   /* Optional debugger configurable by frontend */
   void configure_debugger(Debug::Debugger debugger) {
@@ -88,8 +93,8 @@ private:
   std::unique_ptr<SerialUnit> serial{};
 
   /* Top-level system initialization helpers */
-  void system_init(); // Connects all components in the system
-  void skip_bios() const;   // Skips bios when unconfigured
+  void system_init();     // Connects all components in the system
+  void skip_bios() const; // Skips bios when unconfigured
 
   /* Helpers for initializing emulator state to skip the BIOS */
   void cram_init_mono(IORegisterMapping index, IORegisterMapping data) const;

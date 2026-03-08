@@ -39,11 +39,11 @@ public:
     return ram_;
   }
   std::span<byte_t> ram() noexcept override { return ram_; }
-  [[nodiscard]] const char *savestate_tag() const noexcept override {
-    return "NOMB";
-  }
-  void savestate_serialize(Savestate::Writer &) const override {}
-  void savestate_deserialize(Savestate::Reader &) override {}
+
+  // Not needed, left blank intentionally
+  void parse_savestate(Savestate::Writer &t) override {}
+  void parse_savestate(Savestate::Reader &t) override {}
+  void parse_savestate(Savestate::Sizer &t) override {}
 
 private:
   std::span<const byte_t> rom_;

@@ -64,43 +64,37 @@ public:
   std::span<byte_t> ram() noexcept override {
     return {ram_.data(), ram_.size()};
   }
-  enum : std::uint16_t { F_RAM_ENABLED = 1, F_ROM_BANK };
-  [[nodiscard]] const char *savestate_tag() const noexcept override {
-    return "MBC2";
-  }
-  void savestate_serialize(Savestate::Writer &out) const override {
 
-    out.field_bool(F_RAM_ENABLED, ram_enabled_);
-    out.field_u8(F_ROM_BANK, rom_bank_);
+  template <typename T> void parse_savestate_impl(T &t) {
+    constexpr auto version = 1; // Schema revision
+    t.chunk_header(version, Savestate::C_MBC_2);
+    t.field_generic(F_RAM_ENABLED, ram_enabled_);
+    t.field_generic(F_ROM_BANK, rom_bank_);
+    t.eof();
   }
-  void savestate_deserialize(Savestate::Reader &in) override {
-    while (const auto field = in.next_field()) {
-      auto [id, payload] = *field;
-      switch (id) {
-      case F_RAM_ENABLED:
-        ram_enabled_ = payload.boolean();
-        break;
-      case F_ROM_BANK:
-        rom_bank_ = static_cast<byte_t>(payload.u8() & 0x0F);
-        break;
-      default:
-        payload.skip(payload.remaining());
-        break;
-      }
-      payload.expect_eof();
-    }
-    if (rom_bank_ == 0)
-      rom_bank_ = 1;
+
+  void parse_savestate(Savestate::Writer &t) override {
+    parse_savestate_impl(t);
+  }
+  void parse_savestate(Savestate::Reader &t) override {
+    parse_savestate_impl(t);
+  }
+  void parse_savestate(Savestate::Sizer &t) override {
+    parse_savestate_impl(t);
   }
 
 private:
+  enum : std::uint16_t { F_RAM_ENABLED = 1, F_ROM_BANK };
   std::span<const byte_t> rom_;
   std::array<byte_t, 512> ram_{};
   bool battery_{};
 
-  bool ram_enabled_{false}; // RAMG: 0b1010 enables, other values disables. This
-                            // represents the state after writing
-  byte_t rom_bank_{1};      // ROMB: 4-bit for ROM bank number. Never contain zero value
+  // RAMG: 0b1010 enables, other values disables. This represents the state
+  // after writing.
+  bool ram_enabled_{false};
+
+  // ROMB: 4-bit for ROM bank number. Never contain zero value.
+  byte_t rom_bank_{1};
 };
 
 std::unique_ptr<Mbc> make_mbc2(const cart &c) {

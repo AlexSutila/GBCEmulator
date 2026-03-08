@@ -18,8 +18,7 @@
 
 class WisdomTree final : public Mbc {
 public:
-  explicit WisdomTree(const std::span<const byte_t> rom)
-      : rom_(rom) {}
+  explicit WisdomTree(const std::span<const byte_t> rom) : rom_(rom) {}
 
   byte_t read(addr_t const addr) override {
     if (addr <= 0x7FFF) {
@@ -36,30 +35,37 @@ public:
     }
   }
 
-  [[nodiscard]] const char *savestate_tag() const noexcept override {
-    return "WTRE";
+  template <typename T> void parse_savestate_impl(T &t) {
+    constexpr auto version = 1; // Schema revision
+    t.chunk_header(version, Savestate::C_WISDOM_TREE);
+    t.field_generic(F_BANK, bank_);
+    t.eof();
   }
-  enum : std::uint16_t { F_BANK = 1 };
-  void savestate_serialize(Savestate::Writer &out) const override {
-    out.field_u8(F_BANK, bank_);
+
+  void parse_savestate(Savestate::Writer &t) override {
+    parse_savestate_impl(t);
   }
-  void savestate_deserialize(Savestate::Reader &in) override {
-    GBC_SS_DESERIALIZE_BEGIN(in)
-    GBC_SS_CASE_U8(F_BANK, bank_);
-    GBC_SS_DESERIALIZE_END();
+  void parse_savestate(Savestate::Reader &t) override {
+    parse_savestate_impl(t);
+  }
+  void parse_savestate(Savestate::Sizer &t) override {
+    parse_savestate_impl(t);
   }
 
 private:
   static constexpr std::size_t kBankSize32k = 0x8000;
+  enum : std::uint16_t { F_BANK = 1 };
 
   std::span<const byte_t> rom_;
   byte_t bank_{0}; // HW power-on is undefined; 0 is a default
 
   [[nodiscard]] std::size_t bank_count_32k() const noexcept {
-    return std::max<std::size_t>(1, (rom_.size() + (kBankSize32k - 1)) / kBankSize32k);
+    return std::max<std::size_t>(1, (rom_.size() + (kBankSize32k - 1)) /
+                                        kBankSize32k);
   }
 
-  [[nodiscard]] byte_t rom_at_32k(std::size_t const bank, std::size_t const off) const {
+  [[nodiscard]] byte_t rom_at_32k(std::size_t const bank,
+                                  std::size_t const off) const {
     const std::size_t banks = bank_count_32k();
     const std::size_t b = clamp_bank(bank, banks);
     const std::size_t idx = b * kBankSize32k + off;
@@ -67,6 +73,6 @@ private:
   }
 };
 
-std::unique_ptr<Mbc> make_wisdom_tree(const cart& c) {
+std::unique_ptr<Mbc> make_wisdom_tree(const cart &c) {
   return std::make_unique<WisdomTree>(c.rom_span());
 }

@@ -406,7 +406,7 @@ std::vector<std::uint8_t> RaylibFrontend::capture_savestate_thumbnail_rgba() con
 
 void RaylibFrontend::process_quicksave_request() {
   try {
-    const auto blob = gbc->serialize_savestate();
+    const auto blob = gbc->savestate_serialize();
     if (blob.empty()) {
       TraceLog(LOG_WARNING, "Savestate save failed: empty blob");
       return;
@@ -479,7 +479,7 @@ void RaylibFrontend::process_quickload_request() {
     blob = std::move(*file_blob);
 #endif
 
-    gbc->deserialize_savestate(blob);
+    gbc->savestate_deserialize(blob);
     rb_head = 0;
     rb_tail = 0;
     rb_size = 0;

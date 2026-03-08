@@ -1,28 +1,27 @@
 #include "memory/mmio/mmio.hpp"
 #include "savestate/codec.hpp"
 
-void MMIORegister::write(const byte_t value) { raw_state_set(value); }
+enum : std::uint16_t {
+  F_STATE = 1,
+};
 
-byte_t MMIORegister::peek() const { return raw_state(); }
-
-byte_t MMIORegister::read() { return raw_state(); }
-
-void MMIORegister::savestate_serialize(Savestate::Writer &out) const {
-  out.field_u8(1, raw_state());
+/**
+ * We do not consider each MMIO Register its own chunk, as this will likely end
+ * up resulting in very polluted and bloated `chunk tag` enumeration namespace.
+ */
+template <typename T> void MMIORegister::parse_savestate(T &t) {
+  t.field_generic(F_STATE, state_);
 }
 
-void MMIORegister::savestate_deserialize(Savestate::Reader &in) {
-  while (const auto field = in.next_field()) {
-    auto [id, payload] = *field;
-    // Another silly placeholder
-    switch (id) {
-    case 1:
-      raw_state_set(payload.u8());
-      break;
-    default:
-      payload.skip(payload.remaining());
-      break;
-    }
-    payload.expect_eof();
-  }
-}
+template void
+MMIORegister::parse_savestate<Savestate::Writer>(Savestate::Writer &);
+template void
+MMIORegister::parse_savestate<Savestate::Reader>(Savestate::Reader &);
+template void
+MMIORegister::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
+
+void MMIORegister::write(const byte_t value) { state_ = value; }
+
+byte_t MMIORegister::peek() const { return state_; }
+
+byte_t MMIORegister::read() { return state_; }

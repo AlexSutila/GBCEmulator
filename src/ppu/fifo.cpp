@@ -1,6 +1,8 @@
 #include "ppu/fifo.hpp"
+#include "savestate/codec.hpp"
 #include <cassert>
 #include <cstddef>
+#include <cstdint>
 
 constexpr pixel invisible = {
     .color_idx = 0, // Must be zero for transparent
@@ -8,6 +10,57 @@ constexpr pixel invisible = {
     .oam_index = 0,
     .take_priority = false,
 };
+
+/* ======================================================================
+ * Helpers for serialization and deserialization
+ * ====================================================================== */
+
+enum : std::uint16_t {
+  F_COLOR_IDX = 1,
+  F_PALETTE_IDX,
+  F_OAM_IDX,
+  F_TAKE_PRIORITY,
+};
+
+template <typename T> void BgPixelFifo::parse_savestate(T &t) {
+  t.field_complex(1, [&](auto &t) {
+    fifo.parse_savestate(t, [](auto &t, pixel &p) {
+      t.field_generic(F_COLOR_IDX, p.color_idx);
+      t.field_generic(F_PALETTE_IDX, p.palette_idx);
+      t.field_generic(F_OAM_IDX, p.oam_index);
+      t.field_generic(F_TAKE_PRIORITY, p.take_priority);
+    });
+  });
+}
+
+template void
+BgPixelFifo::parse_savestate<Savestate::Writer>(Savestate::Writer &);
+template void
+BgPixelFifo::parse_savestate<Savestate::Reader>(Savestate::Reader &);
+template void
+BgPixelFifo::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
+
+template <typename T> void ObjPixelFifo::parse_savestate(T &t) {
+  t.field_complex(1, [&](auto &t) {
+    fifo.parse_savestate(t, [](auto &t, pixel &p) {
+      t.field_generic(F_COLOR_IDX, p.color_idx);
+      t.field_generic(F_PALETTE_IDX, p.palette_idx);
+      t.field_generic(F_OAM_IDX, p.oam_index);
+      t.field_generic(F_TAKE_PRIORITY, p.take_priority);
+    });
+  });
+}
+
+template void
+ObjPixelFifo::parse_savestate<Savestate::Writer>(Savestate::Writer &);
+template void
+ObjPixelFifo::parse_savestate<Savestate::Reader>(Savestate::Reader &);
+template void
+ObjPixelFifo::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
+
+/* ======================================================================
+ * Background pixel fifo implementation
+ * ====================================================================== */
 
 /* We can only push and pop to this under specific conditions. The hardware
  * tries to keep this FIFO populated with eight pixels minimum all the time. */
@@ -20,6 +73,10 @@ bool BgPixelFifo::can_push() const {
 bool BgPixelFifo::can_pop() const { return fifo.size() > 8; }
 void BgPixelFifo::push(const pixel px) { fifo.push(px); }
 pixel BgPixelFifo::pop() { return fifo.pop(); }
+
+/* ======================================================================
+ * Object (sprites) pixel fifo implementation
+ * ====================================================================== */
 
 /* Pandocs is wrong, object pixel fifo is only eight pixels wide */
 ObjPixelFifo::ObjPixelFifo() : fifo(CircularFifo<pixel, 8>()) {}
@@ -45,19 +102,3 @@ const pixel &ObjPixelFifo::at(const std::size_t index) const {
   return fifo.at(index);
 }
 pixel &ObjPixelFifo::at(const std::size_t index) { return fifo.at(index); }
-
-void BgPixelFifo::savestate_serialize(Savestate::Writer &out) const {
-  fifo.savestate_serialize(out);
-}
-
-void BgPixelFifo::savestate_deserialize(Savestate::Reader &in) {
-  fifo.savestate_deserialize(in);
-}
-
-void ObjPixelFifo::savestate_serialize(Savestate::Writer &out) const {
-  fifo.savestate_serialize(out);
-}
-
-void ObjPixelFifo::savestate_deserialize(Savestate::Reader &in) {
-  fifo.savestate_deserialize(in);
-}

@@ -2,16 +2,10 @@
 #define GBC_FIFO_HPP
 
 #include "ppu/pixel.hpp"
-#include "savestate/codec.hpp"
 #include <array>
 #include <cstddef>
+#include <cstdint>
 #include <stdexcept>
-#include <type_traits>
-
-namespace Savestate {
-class Reader;
-class Writer;
-}
 
 /*
  * Custom FIFO implemented via circular buffer to prevent repeated heap
@@ -25,6 +19,19 @@ public:
   [[nodiscard]] std::size_t size() const noexcept { return count; }
   [[nodiscard]] bool full() const noexcept { return count == cap; }
   [[nodiscard]] bool empty() const noexcept { return count == 0; }
+
+  // Pass an additional function template argument to allow for flexible typing
+  template <typename T_, typename Fn> void parse_savestate(T_ &t, Fn &&fn) {
+    t.field_generic(F_HEAD, head);
+    t.field_generic(F_TAIL, tail);
+    t.field_generic(F_COUNT, count);
+
+    // Important this remains data-type agnostic
+    t.field_complex(F_BUF, [&](auto &t) {
+      for (std::size_t i{0}; i < cap; ++i)
+        fn(t, buf[i]);
+    });
+  }
 
   void push(const T &value) {
     buf[head] = value;
@@ -71,8 +78,6 @@ public:
   }
 
   void clear() noexcept { head = tail = count = 0; }
-  void savestate_serialize(Savestate::Writer &out) const;
-  void savestate_deserialize(Savestate::Reader &in);
 
 private:
   void advance_head() {
@@ -85,57 +90,20 @@ private:
     }
   }
 
+  enum : std::uint16_t {
+    F_HEAD = 1,
+    F_TAIL,
+    F_COUNT,
+    F_BUF,
+  };
+
   std::size_t head{}, tail{}, count{};
   std::array<T, cap> buf{};
 };
 
-template <typename T, std::size_t cap>
-void CircularFifo<T, cap>::savestate_serialize(Savestate::Writer &out) const {
-  static_assert(std::is_trivially_copyable_v<T>);
-  out.field_u32(1, static_cast<std::uint32_t>(head));
-  out.field_u32(2, static_cast<std::uint32_t>(tail));
-  out.field_u32(3, static_cast<std::uint32_t>(count));
-  out.field(4, [&](Savestate::Writer &w) {
-    for (const auto &item : buf) {
-      const auto *p = reinterpret_cast<const byte_t *>(&item);
-      w.bytes({p, sizeof(T)});
-    }
-  });
-}
-
-template <typename T, std::size_t cap>
-void CircularFifo<T, cap>::savestate_deserialize(Savestate::Reader &in) {
-  static_assert(std::is_trivially_copyable_v<T>);
-  while (const auto field = in.next_field()) {
-    auto [id, payload] = *field;
-    switch (id) {
-    case 1:
-      head = payload.u32();
-      break;
-    case 2:
-      tail = payload.u32();
-      break;
-    case 3:
-      count = payload.u32();
-      break;
-    case 4:
-      for (auto &item : buf) {
-        auto *p = reinterpret_cast<byte_t *>(&item);
-        payload.bytes({p, sizeof(T)});
-      }
-      break;
-    default:
-      payload.skip(payload.remaining());
-      break;
-    }
-    payload.expect_eof();
-  }
-  if (head >= cap || tail >= cap || count > cap)
-    throw std::runtime_error("CircularFifo::savestate_deserialize()");
-}
-
 class BgPixelFifo {
 public:
+  template <typename T> void parse_savestate(T &t);
   BgPixelFifo();
   void flush();
 
@@ -147,8 +115,6 @@ public:
   /* Should have error checking for over pushing/popping */
   void push(pixel px);
   pixel pop();
-  void savestate_serialize(Savestate::Writer &out) const;
-  void savestate_deserialize(Savestate::Reader &in);
 
 private:
   CircularFifo<pixel, 16> fifo;
@@ -156,6 +122,7 @@ private:
 
 class ObjPixelFifo {
 public:
+  template <typename T> void parse_savestate(T &t);
   ObjPixelFifo();
   void flush();
 
@@ -169,8 +136,6 @@ public:
   /* Should have error checking for over pushing/popping */
   [[nodiscard]] bool can_pop() const;
   pixel pop();
-  void savestate_serialize(Savestate::Writer &out) const;
-  void savestate_deserialize(Savestate::Reader &in);
 
 private:
   CircularFifo<pixel, 8> fifo; // Yeah, pandocs is wrong lol

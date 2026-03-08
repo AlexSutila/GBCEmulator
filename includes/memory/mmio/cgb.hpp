@@ -97,8 +97,6 @@ public:
 class PaletteIdx final : public MMIORegister {
 public:
   void write(byte_t value) override;
-  [[nodiscard]] byte_t peek() const override;
-  byte_t read() override;
   PaletteIdx() : MMIORegister(0) {}
 
   // Writes to color RAM can increase register value

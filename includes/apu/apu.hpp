@@ -16,8 +16,11 @@ public:
   void step();
 
   // Enable the CGB-02 extra-length-clocking quirk (default: off)
-  // When disabled, extra length clocking only happens on a 0->1 transition of NRx4 bit 6
-  void set_cgb02_length_quirk(const bool enable) { cgb02_length_quirk_ = enable; }
+  // When disabled, extra length clocking only happens on a 0->1 transition of
+  // NRx4 bit 6
+  void set_cgb02_length_quirk(const bool enable) {
+    cgb02_length_quirk_ = enable;
+  }
 
 private:
   [[nodiscard]] bool apu_on_() const { return (nr52 & 0x80) != 0; }
@@ -133,12 +136,13 @@ private:
   bool channel2_enabled{};
   double channel2_phase{};
   bool channel3_enabled{};
-  std::uint8_t ch3_wave_pos{};   // 0..31 (4-bit samples)
-  std::uint16_t ch3_timer{};     // t-cycles until next sample step
+  std::uint8_t ch3_wave_pos{};        // 0..31 (4-bit samples)
+  std::uint16_t ch3_timer{};          // t-cycles until next sample step
   std::uint8_t ch3_wave_byte_index{}; // 0..15, last wave RAM byte read by CH3
-  byte_t ch3_sample_buffer{};         // last byte fetched from wave RAM (persists across retriggers)
+  byte_t ch3_sample_buffer{}; // last byte fetched from wave RAM (persists
+                              // across retriggers)
   bool channel4_enabled{};
-  double ch4_phase{};       // fractional clocks accumulator
+  double ch4_phase{}; // fractional clocks accumulator
 
   // Length (0..64)
   std::uint8_t ch1_length_counter{};
@@ -179,8 +183,10 @@ private:
   std::uint16_t ch4_lfsr{0x7FFF};
 
   // Smoothed mixer controls (to reduce DC-offset step pops)
-  float master_left_cur_{1.0f}, master_left_target_{1.0f}, master_left_step_{0.0f};
-  float master_right_cur_{1.0f}, master_right_target_{1.0f}, master_right_step_{0.0f};
+  float master_left_cur_{1.0f}, master_left_target_{1.0f},
+      master_left_step_{0.0f};
+  float master_right_cur_{1.0f}, master_right_target_{1.0f},
+      master_right_step_{0.0f};
   std::array<float, 4> route_l_cur_{}, route_l_target_{}, route_l_step_{};
   std::array<float, 4> route_r_cur_{}, route_r_target_{}, route_r_step_{};
 

@@ -4,7 +4,28 @@
 #include "memory/mmio/dmg.hpp"
 #include "memory/mmio/mmio.hpp"
 #include "savestate/codec.hpp"
+#include <cstdint>
 #include <stdexcept>
+
+enum : std::uint16_t {
+  F_SERIAL_DATA = 1,
+  F_SERIAL_CTRL,
+};
+
+template <typename T> void SerialUnit::parse_savestate(T &t) {
+  constexpr auto version = 1; // Schema revision
+  t.chunk_header(version, Savestate::C_SERIAL);
+
+  t.field_complex(F_SERIAL_DATA, [&](T &t) { serial_data.parse_savestate(t); });
+  t.field_complex(F_SERIAL_CTRL, [&](T &t) { serial_ctrl.parse_savestate(t); });
+  t.eof();
+}
+
+template void
+SerialUnit::parse_savestate<Savestate::Writer>(Savestate::Writer &);
+template void
+SerialUnit::parse_savestate<Savestate::Reader>(Savestate::Reader &);
+template void SerialUnit::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
 
 /*
  * TODO: We do not actually implement serial data transfers. The idea of doing
@@ -19,10 +40,8 @@ SerialUnit::SerialUnit(AddressBus *const bus)
   using mmio = IORegisterMapping;
 
   /* Configure MMIO register connections over address bus */
-  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_SERIAL_DATA), &serial_data,
-                    MMIOSavestatePolicy::BusAuto);
-  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_SERIAL_CTRL), &serial_ctrl,
-                    MMIOSavestatePolicy::BusAuto);
+  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_SERIAL_DATA), &serial_data);
+  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_SERIAL_CTRL), &serial_ctrl);
 
   /* Configure connection between SC and IF. This really shouldn't happen but
    * we're doing this because we just fire the interrupt on SC writes. */
@@ -32,7 +51,3 @@ SerialUnit::SerialUnit(AddressBus *const bus)
     throw std::runtime_error("Failed to configure serial MMIO");
   serial_ctrl.set_interrupt_reg(if_reg);
 }
-
-void SerialUnit::savestate_serialize(Savestate::Writer &) {}
-
-void SerialUnit::savestate_deserialize(Savestate::Reader &) {}

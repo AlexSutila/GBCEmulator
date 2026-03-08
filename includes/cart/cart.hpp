@@ -13,10 +13,6 @@
 #include <vector>
 
 namespace fs = std::filesystem;
-namespace Savestate {
-class Reader;
-class Writer;
-} // namespace Savestate
 
 constexpr std::size_t kHeaderStart = 0x0100;
 constexpr std::size_t kHeaderEnd = 0x014F;
@@ -85,6 +81,7 @@ public:
   explicit Cartridge(cart image)
       : image_(std::move(image)), mbc_(make_mbc(image_)) {}
   explicit Cartridge() : image_({}), mbc_(make_test_mbc()) {}
+  template <typename T> void parse_savestate(T &t);
 
   [[nodiscard]] byte_t read_byte(const addr_t addr) const {
     return mbc_->read(addr);
@@ -102,8 +99,6 @@ public:
   [[nodiscard]] std::span<byte_t> ram() noexcept { return mbc_->ram(); }
   bool load_save_file(const fs::path &save_path);
   bool write_save_file(const fs::path &save_path) const;
-  void savestate_serialize(Savestate::Writer &out) const;
-  void savestate_deserialize(Savestate::Reader &in);
   bool consume_sram_save() noexcept;
 
 private:

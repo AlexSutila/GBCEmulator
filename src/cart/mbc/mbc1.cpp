@@ -19,7 +19,9 @@ public:
 
   byte_t read(const addr_t addr) override {
     if (addr <= 0x3FFF) {
-      const std::size_t bank0 = mode_ ? (static_cast<std::size_t>(upper2_ & 0x03) << bank2_shift_()) : 0;
+      const std::size_t bank0 =
+          mode_ ? (static_cast<std::size_t>(upper2_ & 0x03) << bank2_shift_())
+                : 0;
       return rom_at(rom_, bank0, addr);
     }
     if (addr <= 0x7FFF) {
@@ -42,7 +44,7 @@ public:
       return;
     }
     if (addr <= 0x3FFF) {
-      rom_bank1_ = static_cast<byte_t>(val & 0x1F);   // keep only low 5 bits
+      rom_bank1_ = static_cast<byte_t>(val & 0x1F); // keep only low 5 bits
       return;
     }
     if (addr <= 0x5FFF) {
@@ -63,45 +65,33 @@ public:
   }
 
   [[nodiscard]] bool has_battery() const noexcept override { return battery_; }
-  [[nodiscard]] std::span<const byte_t> ram() const noexcept override { return ram_; }
+  [[nodiscard]] std::span<const byte_t> ram() const noexcept override {
+    return ram_;
+  }
   std::span<byte_t> ram() noexcept override { return ram_; }
-  [[nodiscard]] const char *savestate_tag() const noexcept override {
-    return "MBC1";
+
+  template <typename T> void parse_savestate_impl(T &t) {
+    constexpr auto version = 1; // Schema revision
+    t.chunk_header(version, Savestate::C_MBC_1);
+    t.field_generic(F_UPPER2, upper2_);
+    t.field_generic(F_MODE, mode_);
+    t.field_generic(F_RAM_ENABLED, ram_enabled_);
+    t.field_generic(F_ROM_BANK1, rom_bank1_);
+    t.eof();
   }
-  enum : std::uint16_t { F_UPPER2 = 1, F_MODE, F_RAM_ENABLED, F_ROM_BANK1 };
-  void savestate_serialize(Savestate::Writer &out) const override {
-    out.field_u8(F_UPPER2, upper2_);
-    out.field_u8(F_MODE, mode_);
-    out.field_bool(F_RAM_ENABLED, ram_enabled_);
-    out.field_u8(F_ROM_BANK1, rom_bank1_);
+
+  void parse_savestate(Savestate::Writer &t) override {
+    parse_savestate_impl(t);
   }
-  void savestate_deserialize(Savestate::Reader &in) override {
-    while (const auto field = in.next_field()) {
-      auto [id, payload] = *field;
-      switch (id) {
-      case F_UPPER2:
-        upper2_ = static_cast<byte_t>(payload.u8() & 0x03);
-        break;
-      case F_MODE:
-        mode_ = static_cast<byte_t>(payload.u8() & 0x01);
-        break;
-      case F_RAM_ENABLED:
-        ram_enabled_ = payload.boolean();
-        break;
-      case F_ROM_BANK1:
-        rom_bank1_ = static_cast<byte_t>(payload.u8() & 0x1F);
-        break;
-      default:
-        payload.skip(payload.remaining());
-        break;
-      }
-      payload.expect_eof();
-    }
-    if (rom_bank1_ == 0)
-      rom_bank1_ = 1;
+  void parse_savestate(Savestate::Reader &t) override {
+    parse_savestate_impl(t);
+  }
+  void parse_savestate(Savestate::Sizer &t) override {
+    parse_savestate_impl(t);
   }
 
 private:
+  enum : std::uint16_t { F_UPPER2 = 1, F_MODE, F_RAM_ENABLED, F_ROM_BANK1 };
   byte_t upper2_{0b00}; // BANK2: upper 2 bits of rom bank number or ram bank
                         // number, depending on mode
   byte_t mode_{0b0};    // MODE: 1: BANK2 affects 0x0000-0x3FFF, 0x4000-0x7FFF,
@@ -116,13 +106,14 @@ private:
   bool is_mbc1m_{false};
 
   [[nodiscard]] std::size_t effective_rom_bank() const {
-    const std::size_t hi =
-        static_cast<std::size_t>(upper2_ & 0x03) << bank2_shift_();
+    const std::size_t hi = static_cast<std::size_t>(upper2_ & 0x03)
+                           << bank2_shift_();
     const auto lo = static_cast<std::size_t>(bank1_low_for_addr_());
     return hi | lo;
   }
 
-  [[nodiscard]] byte_t ram_at(const std::size_t bank, const std::size_t off) const {
+  [[nodiscard]] byte_t ram_at(const std::size_t bank,
+                              const std::size_t off) const {
     if (ram_.empty())
       return open_bus();
     const std::size_t banks =
@@ -158,7 +149,8 @@ private:
   }
 };
 
-std::unique_ptr<Mbc> make_mbc1(const cart& c) {
+std::unique_ptr<Mbc> make_mbc1(const cart &c) {
   const bool battery = type_has_battery(c.header.cartridge_type);
-  return std::make_unique<Mbc1>(c.rom_span(), c.declared_ram_bytes, battery, c.special_mbc == MBC1M_t);
+  return std::make_unique<Mbc1>(c.rom_span(), c.declared_ram_bytes, battery,
+                                c.special_mbc == MBC1M_t);
 }

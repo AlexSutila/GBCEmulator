@@ -23,6 +23,111 @@
 // Store DMG color index in alpha bits bc we're just based like that lmao
 #define DMG_COLOR_PRESERVE_HACK(rgb, idx) ((rgb & 0x00FFFFFF) | (idx << 24))
 
+enum : std::uint16_t {
+  F_FLUSH_ON_DISABLE = 1,
+  F_ROW_PIXELS_RENDERED,
+  F_SPRITES_FETCHED,
+  F_SPRITES_SEARCHED,
+  F_SCANLINE_153_BUG,
+  F_PPU_ENABLE_OAM_BUG,
+  F_STAT_IRQ_EDGE,
+  F_TOTAL_MODE_CLKS,
+  F_CUR_SCANLINE_CLKS,
+  F_CUR_MODE_CLKS,
+  F_STATE,
+
+  // Complex types, leverage recursive descent
+  F_FETCHER,
+  F_OBJ_FIFO,
+  F_BG_FIFO,
+  F_OBJ_CRAM,
+  F_BG_CRAM,
+  F_STAT_DELAY,
+  F_STAT_DELAY_STATE, // Inner state values for `F_STAT_DELAY`
+  F_OAM_DATA,
+
+  // MMIO registers
+  F_LCDC,
+  F_STAT,
+  F_LYC,
+  F_SCY,
+  F_SCX,
+  F_WY,
+  F_WX,
+  F_LY,
+  F_BGP,
+  F_OBP0,
+  F_OBP1,
+  F_OPRI,
+};
+
+enum : std::uint16_t {
+  F_SPRITE_Y = 1,
+  F_SPRITE_X,
+  F_SPRITE_TILE_IDX,
+  F_SPRITE_TILE_ATTR,
+  F_SPRITE_OBJ_NO,
+};
+
+template <typename T> void PixelProcessingUnit::parse_savestate(T &t) {
+  constexpr auto version = 1; // Schema revision
+  t.chunk_header(version, Savestate::C_PPU);
+
+  t.field_generic(F_FLUSH_ON_DISABLE, flush_on_disable);
+  t.field_generic(F_ROW_PIXELS_RENDERED, row_pixels_rendered);
+  t.field_generic(F_SPRITES_FETCHED, sprites_fetched);
+  t.field_generic(F_SPRITES_SEARCHED, sprites_searched);
+  t.field_generic(F_SCANLINE_153_BUG, scanline_153_bug);
+  t.field_generic(F_PPU_ENABLE_OAM_BUG, ppu_enable_oam_bug);
+  t.field_generic(F_STAT_IRQ_EDGE, stat_irq_signal_edge);
+  t.field_generic(F_CUR_SCANLINE_CLKS, cur_scanline_clks);
+  t.field_generic(F_CUR_MODE_CLKS, cur_mode_clks);
+  t.field_optional(F_TOTAL_MODE_CLKS, total_mode_clks);
+  t.field_enum(F_STATE, state);
+
+  // Complex sub-structures
+  t.field_complex(F_FETCHER, [&](T &t) { fetcher->parse_savestate(t); });
+  t.field_complex(F_OBJ_FIFO, [&](T &t) { obj_fifo.parse_savestate(t); });
+  t.field_complex(F_BG_FIFO, [&](T &t) { bg_fifo.parse_savestate(t); });
+  t.field_complex(F_OBJ_CRAM, [&](T &t) { obj_cram->parse_savestate(t); });
+  t.field_complex(F_BG_CRAM, [&](T &t) { bg_cram->parse_savestate(t); });
+  t.field_complex(F_STAT_DELAY, [&](T &t) {
+    stat_delay.parse_savestate(t, [](auto &t, PPU::StatModes &s) {
+      t.field_enum(F_STAT_DELAY_STATE, s);
+    });
+  });
+  t.field_vector(F_OAM_DATA, oam_data, max_oam_sprite_count,
+                 [&](T &t, auto &s) {
+                   t.field_generic(F_SPRITE_Y, s.y_pos);
+                   t.field_generic(F_SPRITE_X, s.x_pos);
+                   t.field_generic(F_SPRITE_TILE_IDX, s.tile_idx);
+                   t.field_generic(F_SPRITE_TILE_ATTR, s.tile_attr);
+                   t.field_generic(F_SPRITE_OBJ_NO, s.obj_no);
+                 });
+
+  // Memory mapped IO registers
+  t.field_complex(F_LCDC, [&](T &t) { lcdc_.parse_savestate(t); });
+  t.field_complex(F_STAT, [&](T &t) { stat_.parse_savestate(t); });
+  t.field_complex(F_LYC, [&](T &t) { lyc_.parse_savestate(t); });
+  t.field_complex(F_SCY, [&](T &t) { scy_.parse_savestate(t); });
+  t.field_complex(F_SCX, [&](T &t) { scx_.parse_savestate(t); });
+  t.field_complex(F_WY, [&](T &t) { wy_.parse_savestate(t); });
+  t.field_complex(F_WX, [&](T &t) { wx_.parse_savestate(t); });
+  t.field_complex(F_BGP, [&](T &t) { bgp_.parse_savestate(t); });
+  t.field_complex(F_OBP0, [&](T &t) { obp0_.parse_savestate(t); });
+  t.field_complex(F_OBP1, [&](T &t) { obp1_.parse_savestate(t); });
+  t.field_complex(F_OPRI, [&](T &t) { opri_.parse_savestate(t); });
+
+  t.eof();
+}
+
+template void
+PixelProcessingUnit::parse_savestate<Savestate::Writer>(Savestate::Writer &);
+template void
+PixelProcessingUnit::parse_savestate<Savestate::Reader>(Savestate::Reader &);
+template void
+PixelProcessingUnit::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
+
 template <typename T>
 T *init_mmio(AddressBus *bus, const IORegisterMapping reg_id) {
   auto *reg = bus->get_mmio(reg_id);
@@ -87,7 +192,6 @@ PixelProcessingUnit::PixelProcessingUnit(
   );
 
   /* Initialize OAM search metadata */
-  constexpr auto max_oam_sprite_count = 10;
   oam_data.reserve(max_oam_sprite_count);
 
   /* Configure PPU to initial state, doesn't technically happen until PPU is
@@ -576,158 +680,5 @@ void PixelProcessingUnit::step() {
   if (stat_delay.full())
     update_stat(stat_delay.pop());
 }
-
-enum : std::uint16_t {
-  F_FLUSH_ON_DISABLE = 1,
-  F_LCDC,
-  F_STAT,
-  F_LYC,
-  F_SCY,
-  F_SCX,
-  F_WY,
-  F_WX,
-  F_LY,
-  F_BGP,
-  F_OBP0,
-  F_OBP1,
-  F_OPRI,
-  F_ROW_PIXELS_RENDERED,
-  F_SPRITES_FETCHED,
-  F_SCANLINE_153_BUG,
-  F_SPRITES_SEARCHED,
-  F_PPU_ENABLE_OAM_BUG,
-  F_OAM_DATA,
-  F_STAT_IRQ_EDGE,
-  F_STAT_DELAY,
-  F_TOTAL_MODE_CLKS,
-  F_CUR_SCANLINE_CLKS,
-  F_CUR_MODE_CLKS,
-  F_STATE,
-  F_FETCHER,
-  F_OBJ_FIFO,
-  F_BG_FIFO,
-  F_OBJ_CRAM,
-  F_BG_CRAM,
-};
-
-#define PPU_SS_FOR_EACH_MMIO_REG(X)                                               \
-  X(F_LCDC, lcdc_)                                                                 \
-  X(F_STAT, stat_)                                                                 \
-  X(F_LYC, lyc_)                                                                   \
-  X(F_SCY, scy_)                                                                   \
-  X(F_SCX, scx_)                                                                   \
-  X(F_WY, wy_)                                                                     \
-  X(F_WX, wx_)                                                                     \
-  X(F_LY, ly_)                                                                     \
-  X(F_BGP, bgp_)                                                                   \
-  X(F_OBP0, obp0_)                                                                 \
-  X(F_OBP1, obp1_)                                                                 \
-  X(F_OPRI, opri_)
-
-void PixelProcessingUnit::savestate_serialize(Savestate::Writer &out) const {
-  out.field_bool(F_FLUSH_ON_DISABLE, flush_on_disable);
-
-  #define PPU_SS_WRITE_MMIO_REG(id_, reg_)                                         \
-    out.field_u8(id_, reg_.MMIORegister::peek());
-  PPU_SS_FOR_EACH_MMIO_REG(PPU_SS_WRITE_MMIO_REG)
-  #undef PPU_SS_WRITE_MMIO_REG
-
-  out.field_u32(F_ROW_PIXELS_RENDERED, static_cast<std::uint32_t>(row_pixels_rendered));
-  out.field_u32(F_SPRITES_FETCHED, static_cast<std::uint32_t>(sprites_fetched));
-  out.field_bool(F_SCANLINE_153_BUG, scanline_153_bug);
-  out.field_u32(F_SPRITES_SEARCHED, static_cast<std::uint32_t>(sprites_searched));
-  out.field_bool(F_PPU_ENABLE_OAM_BUG, ppu_enable_oam_bug);
-
-  out.field(F_OAM_DATA, [&](Savestate::Writer &w) {
-    w.u32(static_cast<std::uint32_t>(oam_data.size()));
-    for (const auto &s : oam_data) {
-      w.u8(s.y_pos);
-      w.u8(s.x_pos);
-      w.u8(s.tile_idx);
-      w.u8(s.tile_attr);
-      w.u32(static_cast<std::uint32_t>(s.obj_no));
-    }
-  });
-
-  out.field_bool(F_STAT_IRQ_EDGE, stat_irq_signal_edge);
-  out.field(F_STAT_DELAY, [&](Savestate::Writer &w) { stat_delay.savestate_serialize(w); });
-
-  if (total_mode_clks.has_value())
-    out.field_u32(F_TOTAL_MODE_CLKS, static_cast<std::uint32_t>(total_mode_clks.value()));
-  out.field_u32(F_CUR_SCANLINE_CLKS, static_cast<std::uint32_t>(cur_scanline_clks));
-  out.field_u32(F_CUR_MODE_CLKS, static_cast<std::uint32_t>(cur_mode_clks));
-  out.field_u8(F_STATE, static_cast<byte_t>(state));
-
-  out.field(F_FETCHER, [&](Savestate::Writer &w) { fetcher->savestate_serialize(w); });
-  out.field(F_OBJ_FIFO, [&](Savestate::Writer &w) { obj_fifo.savestate_serialize(w); });
-  out.field(F_BG_FIFO, [&](Savestate::Writer &w) { bg_fifo.savestate_serialize(w); });
-  out.field(F_OBJ_CRAM, [&](Savestate::Writer &w) { obj_cram->savestate_serialize(w); });
-  out.field(F_BG_CRAM, [&](Savestate::Writer &w) { bg_cram->savestate_serialize(w); });
-}
-
-void PixelProcessingUnit::savestate_deserialize(Savestate::Reader &in) {
-  total_mode_clks.reset();
-  GBC_SS_DESERIALIZE_BEGIN(in)
-  GBC_SS_CASE_BOOL(F_FLUSH_ON_DISABLE, flush_on_disable);
-  #define PPU_SS_READ_MMIO_REG(id_, reg_)                                          \
-    case id_:                                                                      \
-      reg_.MMIORegister::write(payload.u8());                                      \
-      break;
-  PPU_SS_FOR_EACH_MMIO_REG(PPU_SS_READ_MMIO_REG)
-  #undef PPU_SS_READ_MMIO_REG
-
-  GBC_SS_CASE_U32(F_ROW_PIXELS_RENDERED, row_pixels_rendered);
-  GBC_SS_CASE_U32(F_SPRITES_FETCHED, sprites_fetched);
-  GBC_SS_CASE_BOOL(F_SCANLINE_153_BUG, scanline_153_bug);
-  GBC_SS_CASE_U32(F_SPRITES_SEARCHED, sprites_searched);
-  GBC_SS_CASE_BOOL(F_PPU_ENABLE_OAM_BUG, ppu_enable_oam_bug);
-    case F_OAM_DATA: {
-      const auto sprite_count = static_cast<std::size_t>(payload.u32());
-      oam_data.clear();
-      oam_data.reserve(std::max<std::size_t>(oam_data.capacity(), sprite_count));
-      for (std::size_t i = 0; i < sprite_count; ++i) {
-        Sprite sprite{};
-        sprite.y_pos = payload.u8();
-        sprite.x_pos = payload.u8();
-        sprite.tile_idx = payload.u8();
-        sprite.tile_attr = payload.u8();
-        sprite.obj_no = payload.u32();
-        oam_data.push_back(sprite);
-      }
-      break;
-    }
-  GBC_SS_CASE_BOOL(F_STAT_IRQ_EDGE, stat_irq_signal_edge);
-    case F_STAT_DELAY:
-      stat_delay.savestate_deserialize(payload);
-      break;
-  GBC_SS_CASE_U32(F_TOTAL_MODE_CLKS, total_mode_clks);
-  GBC_SS_CASE_U32(F_CUR_SCANLINE_CLKS, cur_scanline_clks);
-  GBC_SS_CASE_U32(F_CUR_MODE_CLKS, cur_mode_clks);
-    case F_STATE: {
-      const auto raw_state = payload.u8();
-      if (raw_state > static_cast<byte_t>(PPU::StatModes::MODE_DRAWING))
-        throw std::runtime_error("PixelProcessingUnit::savestate_deserialize()");
-      state = static_cast<PPU::StatModes>(raw_state);
-      break;
-    }
-    case F_FETCHER:
-      fetcher->savestate_deserialize(payload);
-      break;
-    case F_OBJ_FIFO:
-      obj_fifo.savestate_deserialize(payload);
-      break;
-    case F_BG_FIFO:
-      bg_fifo.savestate_deserialize(payload);
-      break;
-    case F_OBJ_CRAM:
-      obj_cram->savestate_deserialize(payload);
-      break;
-    case F_BG_CRAM:
-      bg_cram->savestate_deserialize(payload);
-      break;
-  GBC_SS_DESERIALIZE_END();
-}
-
-#undef PPU_SS_FOR_EACH_MMIO_REG
 
 #undef DMG_COLOR_PRESERVE_HACK

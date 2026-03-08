@@ -8,12 +8,15 @@
 #include <chrono>
 #include <memory>
 #include <span>
+#include <stdexcept>
 
-struct cart;
 namespace Savestate {
 class Reader;
 class Writer;
-}
+class Sizer;
+}; // namespace Savestate
+
+struct cart;
 
 class Mbc {
 public:
@@ -30,11 +33,19 @@ public:
     return {};
   }
   virtual std::span<byte_t> ram() noexcept { return {}; }
-  [[nodiscard]] virtual const char *savestate_tag() const noexcept {
-    return "UNSP";
+
+  /* NOTE: For future maintainability, we ask that an per-mapper implementation
+   * function exists, and that these serve as nothing more than pure wrappers
+   * around said template. */
+  virtual void parse_savestate(Savestate::Writer &) {
+    throw std::runtime_error("Mbc::parse_savestate() unimplemented");
   }
-  virtual void savestate_serialize(Savestate::Writer &) const {}
-  virtual void savestate_deserialize(Savestate::Reader &) {}
+  virtual void parse_savestate(Savestate::Reader &) {
+    throw std::runtime_error("Mbc::parse_savestate() unimplemented");
+  }
+  virtual void parse_savestate(Savestate::Sizer &) {
+    throw std::runtime_error("Mbc::parse_savestate() unimplemented");
+  }
 };
 
 std::unique_ptr<Mbc> make_mbc(const cart &c);
@@ -45,13 +56,15 @@ static constexpr std::size_t kRamBankSize = 0x2000;
 inline std::size_t rom_bank_count(const std::span<const byte_t> rom) {
   return std::max<std::size_t>(1, rom.size() / kRomBankSize);
 }
-inline std::size_t clamp_bank(const std::size_t bank,
-                              const std::size_t count) {
+
+inline std::size_t clamp_bank(const std::size_t bank, const std::size_t count) {
   return count == 0 ? 0 : bank % count;
 }
+
 inline byte_t open_bus() { return 0xFF; }
 
-inline byte_t rom_at(const std::span<const byte_t> rom, const std::size_t bank, const std::size_t off) {
+inline byte_t rom_at(const std::span<const byte_t> rom, const std::size_t bank,
+                     const std::size_t off) {
   const auto banks = rom_bank_count(rom);
   const auto b = clamp_bank(bank, banks);
   const std::size_t idx = b * kRomBankSize + off;
@@ -71,7 +84,8 @@ inline bool type_has_battery(const byte_t t) {
   case 0x1E: // MBC5+RUMBLE+RAM+BATTERY
   case 0x22: // MBC7+SENSOR+RUMBLE+RAM+BATTERY
   case 0xFD: // TAMA5 (likely, needed for RTC)
-  case 0xFE: // HuC3 (Pan Docs doesn't explicitly list it, but it does have a battery-backed RTC or something)
+  case 0xFE: // HuC3 (Pan Docs doesn't explicitly list it, but it does have a
+             // battery-backed RTC or something)
   case 0xFF: // HuC1+RAM+BATTERY
     return true;
   default:
@@ -79,4 +93,4 @@ inline bool type_has_battery(const byte_t t) {
   }
 }
 
-#endif //GBC_MBC_HPP
+#endif // GBC_MBC_HPP

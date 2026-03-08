@@ -25,23 +25,16 @@ enum class JoypadButton : byte_t {
  */
 class JOYP final : public MMIORegister {
 public:
-  struct SavestateState {
-    byte_t buttons;
-    byte_t select;
-    byte_t last_low;
-  };
+  template <typename T> void parse_savestate(T &t);
   JOYP();
+
   void write(byte_t value) override;
   [[nodiscard]] byte_t peek() const override;
   byte_t read() override;
-  void savestate_serialize(Savestate::Writer &out) const override;
-  void savestate_deserialize(Savestate::Reader &in) override;
 
   void set_button(JoypadButton button, bool pressed);
   void set_state(byte_t mask);
   void set_interrupt_reg(InterruptBits *reg);
-  [[nodiscard]] SavestateState savestate_get() const;
-  void savestate_load(const SavestateState &snapshot);
 
 private:
   [[nodiscard]] byte_t compute_low_bits() const;
@@ -69,7 +62,7 @@ private:
   MMIORegister &sd;
 };
 
-};
+}; // namespace Serial
 
 namespace Audio {
 
@@ -87,7 +80,6 @@ public:
   byte_t read() override;
 
 private:
-  byte_t state{};
   WriteCallback on_write{};
   ReadCallback on_read{};
 };
@@ -218,7 +210,7 @@ public:
   /* PPU needs to check these flags to generate interrupts, but does not set
    * them itself afaik. Hence, we don't need a setter. */
   [[nodiscard]] bool int_enabled(StatIntFlags flag) const {
-    return (raw_state() & static_cast<byte_t>(flag)) != 0;
+    return (state_ & static_cast<byte_t>(flag)) != 0;
   }
   [[nodiscard]] bool get_ly_eq_lyc() const;
   void set_ly_eq_lyc(bool value);
@@ -245,10 +237,10 @@ public:
   byte_t read() override;
   LY() : MMIORegister(0) {}
 
-  [[nodiscard]] bool is_visible() const { return raw_state() <= 143; }
-  [[nodiscard]] bool is_vblank() const { return raw_state() >= 144; }
+  [[nodiscard]] bool is_visible() const { return state_ <= 143; }
+  [[nodiscard]] bool is_vblank() const { return state_ >= 144; }
 
-  void reset() { raw_state_set(0); };
+  void reset() { state_ = 0; };
   bool inc(); // Returns true during LY wrap around
 
 private:
@@ -354,14 +346,13 @@ private:
  */
 class BootROMCtrl final : public MMIORegister {
 public:
+  template <typename T> void parse_savestate(T &t);
   void write(byte_t value) override;
-  void savestate_serialize(Savestate::Writer &out) const override;
-  void savestate_deserialize(Savestate::Reader &in) override;
+  BootROMCtrl();
 
   /* Determine if the boot ROM is currently mapped */
   [[nodiscard]] bool boot_rom_enabled() const;
   void set_boot_rom_enabled(bool enabled);
-  BootROMCtrl();
 
 private:
   bool map_boot_rom;

@@ -10,10 +10,6 @@
 
 struct runtime_sys_info;
 class AddressBus;
-namespace Savestate {
-class Reader;
-class Writer;
-}
 
 [[nodiscard]] inline byte_t vdma_bytes_to_blks(std::size_t bytes);
 [[nodiscard]] inline std::size_t vdma_blks_to_bytes(byte_t blks);
@@ -25,6 +21,7 @@ class ObjAttrDMA {
 public:
   DMA::DMA *get_dma_reg();
   explicit ObjAttrDMA(AddressBus &bus);
+  template <typename T> void parse_savestate(T &t);
 
   struct DMAState {
     addr_t src_base_address;
@@ -32,8 +29,6 @@ public:
     bool active;
   };
   [[nodiscard]] DMAState get_state() const;
-  void savestate_serialize(Savestate::Writer &out) const;
-  void savestate_deserialize(Savestate::Reader &in);
 
   void start(byte_t addr_high); // Begins the actual data transfer
   void step();
@@ -63,6 +58,8 @@ private:
 class VDMA {
 public:
   explicit VDMA(AddressBus &bus, runtime_sys_info &sys);
+  template <typename T> void parse_savestate(T &t);
+
   MMIORegister *get_vdma1() { return &vdma1_; }
   MMIORegister *get_vdma2() { return &vdma2_; }
   MMIORegister *get_vdma3() { return &vdma3_; }
@@ -78,8 +75,6 @@ public:
     bool gdma_active;
   };
   [[nodiscard]] DMAState get_state() const;
-  void savestate_serialize(Savestate::Writer &out) const;
-  void savestate_deserialize(Savestate::Reader &in);
 
   /* The initialization phase of DMA is impacted by double speed mode, but the
    * actual transfer itself is not. Hence, `step_fast_cycle()` exists to run the

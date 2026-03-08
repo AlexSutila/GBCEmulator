@@ -75,43 +75,25 @@ public:
     return ram_;
   }
   std::span<byte_t> ram() noexcept override { return ram_; }
-  enum : std::uint16_t {
-    F_RAM_ENABLED = 1,
-    F_ROM_BANK,
-    F_RAM_BANK,
-    F_RUMBLE_ON
-  };
-  [[nodiscard]] const char *savestate_tag() const noexcept override {
-    return "MBC5";
+
+  template <typename T> void parse_savestate_impl(T &t) {
+    constexpr auto version = 1; // Schema revision
+    t.chunk_header(version, Savestate::C_MBC_5);
+    t.field_generic(F_RAM_ENABLED, ram_enabled_);
+    t.field_generic(F_ROM_BANK, rom_bank_);
+    t.field_generic(F_RAM_ENABLED, ram_bank_);
+    t.field_generic(F_RUMBLE_ON, rumble_on_);
+    t.eof();
   }
-  void savestate_serialize(Savestate::Writer &out) const override {
-    out.field_bool(F_RAM_ENABLED, ram_enabled_);
-    out.field_u16(F_ROM_BANK, rom_bank_);
-    out.field_u32(F_RAM_BANK, static_cast<std::uint32_t>(ram_bank_));
-    out.field_bool(F_RUMBLE_ON, rumble_on_);
+
+  void parse_savestate(Savestate::Writer &t) override {
+    parse_savestate_impl(t);
   }
-  void savestate_deserialize(Savestate::Reader &in) override {
-    while (const auto field = in.next_field()) {
-      auto [id, payload] = *field;
-      switch (id) {
-      case F_RAM_ENABLED:
-        ram_enabled_ = payload.boolean();
-        break;
-      case F_ROM_BANK:
-        rom_bank_ = static_cast<std::uint16_t>(payload.u16() & 0x01FFu);
-        break;
-      case F_RAM_BANK:
-        ram_bank_ = payload.u32();
-        break;
-      case F_RUMBLE_ON:
-        rumble_on_ = payload.boolean();
-        break;
-      default:
-        payload.skip(payload.remaining());
-        break;
-      }
-      payload.expect_eof();
-    }
+  void parse_savestate(Savestate::Reader &t) override {
+    parse_savestate_impl(t);
+  }
+  void parse_savestate(Savestate::Sizer &t) override {
+    parse_savestate_impl(t);
   }
 
 private:
@@ -128,6 +110,13 @@ private:
   bool rumble_on_{false}; // This is the physical state of rumble. Turning it on
                           // has no effect. If we somehow port it to a handset
                           // then this can be hooked up to some motors
+
+  enum : std::uint16_t {
+    F_RAM_ENABLED = 1,
+    F_ROM_BANK,
+    F_RAM_BANK,
+    F_RUMBLE_ON
+  };
 };
 
 std::unique_ptr<Mbc> make_mbc5(const cart &c) {

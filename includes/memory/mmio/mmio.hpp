@@ -3,11 +3,6 @@
 
 #include "emu_types.hpp"
 
-namespace Savestate {
-class Reader;
-class Writer;
-}
-
 /*
  * Game Boy I/O Register Map (FF00–FF7F)
  *
@@ -72,26 +67,23 @@ enum class IORegisterMapping : addr_t {
   MMIO_INT_ENABLE = 0xFFFF,
 };
 
-enum class MMIOSavestatePolicy {
-  BusAuto,
-  OwnerManaged,
-  Skip,
-};
-
 /*
  * General purpose MMIO Register and abstract class for more complicated IO
  * registers that actually interact with other hardware components.
  */
 class MMIORegister {
 public:
+  explicit MMIORegister(const byte_t init_state) : state_(init_state) {}
+  MMIORegister() : state_(0) {}
+
+  template <typename T> void parse_savestate(T &t);
   virtual ~MMIORegister() = default;
+
   /* Note that read() is meant for address bus which may alter internal state
    * peak() can be used by other components to read state. */
   virtual void write(byte_t value);
   [[nodiscard]] virtual byte_t peek() const; // Non-state altering read
-  virtual byte_t read();       // Not const, reads could alter internal state
-  explicit MMIORegister(const byte_t init_state) : state_(init_state) {}
-  MMIORegister() : state_(0) {}
+  virtual byte_t read(); // Not const, reads could alter internal state
 
   /* Overriding this is entirely optional. The intention is, return true if this
    * should behave as an unused 'open bus - return 0xFF' in CGB mode type
@@ -101,15 +93,8 @@ public:
    * Although it may be useless for this emulator, which strictly emulates a
    * GameBoy color, we leave the option here regardless. */
   virtual constexpr bool cgb() { return false; }
-  virtual void savestate_serialize(Savestate::Writer &out) const;
-  virtual void savestate_deserialize(Savestate::Reader &in);
 
 protected:
-  [[nodiscard]] const byte_t &raw_state() const noexcept { return state_; }
-  [[nodiscard]] byte_t &raw_state() noexcept { return state_; }
-  void raw_state_set(const byte_t value) noexcept { state_ = value; }
-
-private:
   byte_t state_{}; // Internal register state
 };
 

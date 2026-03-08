@@ -4,19 +4,52 @@
 #include "memory/mmio/dmg.hpp"
 #include "savestate/codec.hpp"
 
+enum : std::uint16_t {
+  F_SYS_COUNTER = 1,
+  F_TIMA,
+  F_TMA,
+  F_TAC,
+  F_OVERFLOW_PENDING,
+  F_OVERFLOW_DELAY,
+  F_RELOAD_LATCH,
+  F_RELOAD_DELAY,
+};
+
+template <typename T> void TimerUnit::parse_savestate(T &t) {
+  constexpr auto version = 1; // Schema revision
+  t.chunk_header(version, Savestate::C_TIMER);
+
+  t.field_generic(F_SYS_COUNTER, sys_counter_);
+  t.field_generic(F_TIMA, tima_);
+  t.field_generic(F_TMA, tma_);
+  t.field_generic(F_TAC, tac_);
+  t.field_generic(F_OVERFLOW_PENDING, overflow_pending_);
+  t.field_generic(F_OVERFLOW_DELAY, overflow_delay_);
+  t.field_generic(F_RELOAD_LATCH, reload_latch_);
+  t.field_generic(F_RELOAD_DELAY, reload_delay_);
+
+  t.eof();
+}
+
+template void
+TimerUnit::parse_savestate<Savestate::Writer>(Savestate::Writer &);
+template void
+TimerUnit::parse_savestate<Savestate::Reader>(Savestate::Reader &);
+template void TimerUnit::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
+
 template <typename T>
-T* init_mmio(AddressBus* bus, const IORegisterMapping reg_id) {
-  auto* reg = bus->get_mmio(reg_id);
-  if (auto* casted = dynamic_cast<T*>(reg))
+T *init_mmio(AddressBus *bus, const IORegisterMapping reg_id) {
+  auto *reg = bus->get_mmio(reg_id);
+  if (auto *casted = dynamic_cast<T *>(reg))
     return casted;
   throw std::logic_error(std::string("Failed to configure MMIO (Timer)"));
 }
 
-TimerUnit::TimerUnit(AddressBus* const bus)
-  : tima_reg(*this), // Timer counter register
-    tma_reg(*this), // Timer modulo register
-    tac_reg(*this), // Timer control register
-    div_reg(*this) // Divider register
+TimerUnit::TimerUnit(AddressBus *const bus)
+    : tima_reg(*this), // Timer counter register
+      tma_reg(*this),  // Timer modulo register
+      tac_reg(*this),  // Timer control register
+      div_reg(*this)   // Divider register
 {
   using mmio = IORegisterMapping;
   using namespace PPU;
@@ -55,7 +88,8 @@ void TimerUnit::write_div() noexcept {
   sys_counter_ = 0;
 
   // falling edge -> tick
-  if (const bool next_in = edge_input(sys_counter_, tac_); prev_in && !next_in) {
+  if (const bool next_in = edge_input(sys_counter_, tac_);
+      prev_in && !next_in) {
     timer_tick_pulse();
   }
 }
@@ -93,7 +127,8 @@ void TimerUnit::write_tac(byte_t v) noexcept {
   // "writing to TAC may increase TIMA once"
   const bool prev_in = edge_input(sys_counter_, tac_);
   tac_ = v;
-  if (const bool next_in = edge_input(sys_counter_, tac_); prev_in && !next_in) {
+  if (const bool next_in = edge_input(sys_counter_, tac_);
+      prev_in && !next_in) {
     timer_tick_pulse();
   }
 }
@@ -143,8 +178,7 @@ void TimerUnit::service_overflow_pipeline() noexcept {
       tima_ = tma_;
       request_timer_irq();
     }
-  }
-  else if (reload_latch_) {
+  } else if (reload_latch_) {
     if (reload_delay_ > 0 && --reload_delay_ == 0) {
       reload_latch_ = false;
     }
@@ -158,8 +192,7 @@ void TimerUnit::timer_tick_pulse() noexcept {
   if (tima_ == 0xFF) {
     tima_ = 0x00;
     start_overflow_pipeline();
-  }
-  else {
+  } else {
     ++tima_;
   }
 }
@@ -173,39 +206,4 @@ void TimerUnit::step() noexcept {
   if (const bool next = edge_input(sys_counter_, tac_); prev && !next) {
     timer_tick_pulse();
   }
-}
-
-enum : std::uint16_t {
-  F_SYS_COUNTER = 1,
-  F_TIMA,
-  F_TMA,
-  F_TAC,
-  F_OVERFLOW_PENDING,
-  F_OVERFLOW_DELAY,
-  F_RELOAD_LATCH,
-  F_RELOAD_DELAY,
-};
-
-void TimerUnit::savestate_serialize(Savestate::Writer &out) const {
-  out.field_u16(F_SYS_COUNTER, sys_counter_);
-  out.field_u8(F_TIMA, tima_);
-  out.field_u8(F_TMA, tma_);
-  out.field_u8(F_TAC, tac_);
-  out.field_bool(F_OVERFLOW_PENDING, overflow_pending_);
-  out.field_u8(F_OVERFLOW_DELAY, overflow_delay_);
-  out.field_bool(F_RELOAD_LATCH, reload_latch_);
-  out.field_u8(F_RELOAD_DELAY, reload_delay_);
-}
-
-void TimerUnit::savestate_deserialize(Savestate::Reader &in) {
-  GBC_SS_DESERIALIZE_BEGIN(in)
-  GBC_SS_CASE_U16(F_SYS_COUNTER, sys_counter_);
-  GBC_SS_CASE_U8(F_TIMA, tima_);
-  GBC_SS_CASE_U8(F_TMA, tma_);
-  GBC_SS_CASE_U8_MASK(F_TAC, tac_, 0x07);
-  GBC_SS_CASE_BOOL(F_OVERFLOW_PENDING, overflow_pending_);
-  GBC_SS_CASE_U8(F_OVERFLOW_DELAY, overflow_delay_);
-  GBC_SS_CASE_BOOL(F_RELOAD_LATCH, reload_latch_);
-  GBC_SS_CASE_U8(F_RELOAD_DELAY, reload_delay_);
-  GBC_SS_DESERIALIZE_END();
 }

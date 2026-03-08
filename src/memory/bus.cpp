@@ -10,9 +10,15 @@
 
 #include <cassert>
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <stdexcept>
+
+constexpr std::size_t vram_bank_size = 0x2000;
+constexpr std::size_t wram_bank_size = 0x1000;
+constexpr std::size_t hram_size = 0x7F;
+constexpr std::size_t oam_size = 0xA0;
 
 /* To make the contents of this file slightly less egregious of a playground
  * for performing heap corruption exploits lmao */
@@ -56,6 +62,68 @@ static constexpr bool is_hram_range(const addr_t a) noexcept {
   return a >= 0xFF80 && a <= 0xFFFE;
 }
 
+enum : std::uint16_t {
+  F_CART = 1,
+  F_VRAM,
+  F_WRAM,
+  F_HRAM,
+  F_OAM,
+  F_BUS_CONFLICTS,
+  F_OAM_DMA,
+  F_VDMA,
+
+  // MMIO Resisgers
+  F_JOYPAD,
+  F_BOOT_ROM_CTRL,
+  F_WRAM_BANK,
+  F_VRAM_BANK,
+  F_KEY0,
+  F_KEY1,
+};
+
+template <typename T> void AddressBus::parse_savestate(T &t) {
+  constexpr auto version = 1; // Schema revision
+  t.chunk_header(version, Savestate::C_BUS);
+  if (!cart_)
+    throw std::runtime_error("AddressBus::parse_savestate() no cartridge");
+
+  // Memory sub-structures
+  for (auto &bank : vram) // Duplicate fields, but should be fine
+    t.field_bytes(F_VRAM, {bank.get(), vram_bank_size});
+  for (auto &bank : wram) // Duplicate fields, but should be fine
+    t.field_bytes(F_WRAM, {bank.get(), wram_bank_size});
+  t.field_bytes(F_HRAM, {hram.get(), hram_size});
+  t.field_bytes(F_OAM, {oam.get(), oam_size});
+  t.field_enum(F_BUS_CONFLICTS, bus_conflicts);
+
+  // Memory banking memory mapped registers
+  t.field_complex(F_BOOT_ROM_CTRL,
+                  [&](T &t) { boot_rom_ctrl.parse_savestate(t); });
+  t.field_complex(F_WRAM_BANK,
+                  [&](T &t) { wram_bank_ctrl.parse_savestate(t); });
+  t.field_complex(F_VRAM_BANK,
+                  [&](T &t) { vram_bank_ctrl.parse_savestate(t); });
+
+  // Miscellaneous memory mapped registers (nowhere else to put them)
+  t.field_complex(F_JOYPAD, [&](T &t) { joypad_.parse_savestate(t); });
+  t.field_complex(F_KEY0, [&](T &t) { key0.parse_savestate(t); });
+  t.field_complex(F_KEY1, [&](T &t) { key1.parse_savestate(t); });
+
+  // Direct memory access sub-structures
+  t.field_complex(F_OAM_DMA, [&](T &t) { oam_dma.parse_savestate(t); });
+  t.field_complex(F_VDMA, [&](T &t) { vdma.parse_savestate(t); });
+
+  // Cartridge sub-structure (mapper handled internally)
+  t.field_complex(F_CART, [&](T &t) { cart_->parse_savestate(t); });
+  t.eof();
+}
+
+template void
+AddressBus::parse_savestate<Savestate::Writer>(Savestate::Writer &);
+template void
+AddressBus::parse_savestate<Savestate::Reader>(Savestate::Reader &);
+template void AddressBus::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
+
 AddressBus::AddressBus(runtime_sys_info &sys,
                        std::optional<Debug::Debugger> &debugger,
                        std::optional<BootROM> &bios)
@@ -67,10 +135,6 @@ AddressBus::AddressBus(runtime_sys_info &sys,
       bios_(bios),          // Optionally configured by frontend
       sys_(sys)             // Generic system information
 {
-  constexpr std::size_t vram_bank_size = 0x2000;
-  constexpr std::size_t wram_bank_size = 0x1000;
-  constexpr std::size_t hram_size = 0x7F;
-  constexpr std::size_t oam_size = 0xA0;
   using mmio = IORegisterMapping;
   using namespace std::ranges;
 
@@ -82,51 +146,38 @@ AddressBus::AddressBus(runtime_sys_info &sys,
   bus_conflicts = BUS_CONFLICT_NONE;
 
   /* Connect memory mapped IO owned by address bus */
-  connect_mmio(static_cast<addr_t>(mmio::MMIO_JOYPAD), &joypad_,
-               MMIOSavestatePolicy::BusAuto);
-  connect_mmio(static_cast<addr_t>(mmio::MMIO_BOOT_ROM_CTRL), &boot_rom_ctrl,
-               MMIOSavestatePolicy::BusAuto);
-  connect_mmio(static_cast<addr_t>(mmio::MMIO_WRAM_BANK), &wram_bank_ctrl,
-               MMIOSavestatePolicy::BusAuto);
-  connect_mmio(static_cast<addr_t>(mmio::MMIO_VRAM_BANK), &vram_bank_ctrl,
-               MMIOSavestatePolicy::BusAuto);
-  connect_mmio(static_cast<addr_t>(mmio::MMIO_SPD_KEY0), &key0,
-               MMIOSavestatePolicy::BusAuto);
-  connect_mmio(static_cast<addr_t>(mmio::MMIO_SPD_KEY1), &key1,
-               MMIOSavestatePolicy::BusAuto);
+  connect_mmio(static_cast<addr_t>(mmio::MMIO_JOYPAD), &joypad_);
+  connect_mmio(static_cast<addr_t>(mmio::MMIO_BOOT_ROM_CTRL), &boot_rom_ctrl);
+  connect_mmio(static_cast<addr_t>(mmio::MMIO_WRAM_BANK), &wram_bank_ctrl);
+  connect_mmio(static_cast<addr_t>(mmio::MMIO_VRAM_BANK), &vram_bank_ctrl);
+  connect_mmio(static_cast<addr_t>(mmio::MMIO_SPD_KEY0), &key0);
+  connect_mmio(static_cast<addr_t>(mmio::MMIO_SPD_KEY1), &key1);
 
   /* Connect memory mapped IO owned by DMA modules */
-  connect_mmio(static_cast<addr_t>(mmio::MMIO_OAM_DMA), oam_dma.get_dma_reg(),
-               MMIOSavestatePolicy::BusAuto);
-  connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA1), vdma.get_vdma1(),
-               MMIOSavestatePolicy::BusAuto);
-  connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA2), vdma.get_vdma2(),
-               MMIOSavestatePolicy::BusAuto);
-  connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA3), vdma.get_vdma3(),
-               MMIOSavestatePolicy::BusAuto);
-  connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA4), vdma.get_vdma4(),
-               MMIOSavestatePolicy::BusAuto);
+  connect_mmio(static_cast<addr_t>(mmio::MMIO_OAM_DMA), oam_dma.get_dma_reg());
+  connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA1), vdma.get_vdma1());
+  connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA2), vdma.get_vdma2());
+  connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA3), vdma.get_vdma3());
+  connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA4), vdma.get_vdma4());
   connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA5), vdma.get_vdma5());
 }
 
-void AddressBus::connect_mmio(const addr_t addr, MMIORegister *const reg,
-                              const MMIOSavestatePolicy policy) {
+void AddressBus::connect_mmio(const addr_t addr, MMIORegister *const reg) {
   if (!reg)
     throw std::logic_error("AddressBus::connect_mmio() connected `nullptr`");
-  io_registers[addr] = ConnectedMMIO{
-      .reg = reg,
-      .savestate_policy = policy,
-  };
+  io_registers[addr] = reg;
 }
 
 void AddressBus::insert_cartridge(cart c) {
   /* Generic transfer of ownership for actual game cartridges */
   cart_ = std::make_unique<Cartridge>(std::move(c));
 }
+
 void AddressBus::init_test_bed() {
   /* Default constructor initializes an instance of TestMBC */
   cart_ = std::make_unique<Cartridge>();
 }
+
 void AddressBus::eject_cartridge() { cart_.reset(); }
 
 byte_t &AddressBus::vram_byte(const addr_t addr) const {
@@ -185,8 +236,7 @@ byte_t AddressBus::read_byte_no_cheat(const addr_t addr,
   /* Read from memory mapped IO register */
   if (io_registers.contains(addr)) {
     assert((addr >= 0xFF00 && addr <= 0xFF7F) || addr == 0xFFFF);
-    const auto &[reg, savestate_policy] = io_registers.at(addr);
-    (void)savestate_policy;
+    const auto reg = io_registers.at(addr);
     return safe ? reg->peek() : reg->read();
   }
 
@@ -259,7 +309,7 @@ void AddressBus::write_byte(const addr_t addr, const byte_t value) const {
   else if (io_registers.contains(addr)) {
     assert((addr >= 0xFF00 && addr <= 0xFF7F) || addr == 0xFFFF);
     auto const &mmio = io_registers.at(addr);
-    mmio.reg->write(value);
+    mmio->write(value);
   }
 
   /* Write to High RAM */
@@ -275,7 +325,7 @@ MMIORegister *AddressBus::get_mmio(IORegisterMapping mapping) const {
   const auto addr = static_cast<addr_t>(mapping);
   assert(io_registers.contains(addr));
   /* The address bus maintains ownership, so raw pointers are fine. */
-  return io_registers.at(addr).reg;
+  return io_registers.at(addr);
 }
 
 /**
@@ -332,122 +382,4 @@ void AddressBus::set_cheat_overrides(std::span<const CheatOverride> overrides) {
     };
   }
   has_cheat_overrides_ = !cheat_touched_addrs_.empty();
-}
-
-enum : std::uint16_t {
-  F_VRAM = 1,
-  F_WRAM,
-  F_HRAM,
-  F_OAM,
-  F_MMIO_REGS,
-  F_BUS_CONFLICTS,
-  F_OAM_DMA,
-  F_VDMA,
-  F_HAS_CART,
-  F_CART,
-};
-
-void AddressBus::savestate_serialize(Savestate::Writer &out) const {
-  constexpr std::size_t vram_bank_size = 0x2000;
-  constexpr std::size_t wram_bank_size = 0x1000;
-  constexpr std::size_t hram_size = 0x7F;
-  constexpr std::size_t oam_size = 0xA0;
-
-  out.field(F_VRAM, [&](Savestate::Writer &w) {
-    for (const auto &bank : vram)
-      w.bytes({bank.get(), vram_bank_size});
-  });
-  out.field(F_WRAM, [&](Savestate::Writer &w) {
-    for (const auto &bank : wram)
-      w.bytes({bank.get(), wram_bank_size});
-  });
-  out.field(F_HRAM,
-            [&](Savestate::Writer &w) { w.bytes({hram.get(), hram_size}); });
-  out.field(F_OAM,
-            [&](Savestate::Writer &w) { w.bytes({oam.get(), oam_size}); });
-  out.field(F_MMIO_REGS, [&](Savestate::Writer &w) {
-    for (const auto &[addr, mmio] : io_registers) {
-      if (mmio.savestate_policy != MMIOSavestatePolicy::BusAuto)
-        continue;
-      w.field(addr, [&](Savestate::Writer &mmio_w) {
-        mmio.reg->savestate_serialize(mmio_w);
-      });
-    }
-  });
-  out.field_u32(F_BUS_CONFLICTS, bus_conflicts);
-
-  out.field(F_OAM_DMA,
-            [&](Savestate::Writer &w) { oam_dma.savestate_serialize(w); });
-  out.field(F_VDMA, [&](Savestate::Writer &w) { vdma.savestate_serialize(w); });
-
-  out.field_bool(F_HAS_CART, cart_ != nullptr);
-  if (cart_)
-    out.field(F_CART,
-              [&](Savestate::Writer &w) { cart_->savestate_serialize(w); });
-}
-
-void AddressBus::savestate_deserialize(Savestate::Reader &in) {
-  constexpr std::size_t vram_bank_size = 0x2000;
-  constexpr std::size_t wram_bank_size = 0x1000;
-  constexpr std::size_t hram_size = 0x7F;
-  constexpr std::size_t oam_size = 0xA0;
-  std::optional<bool> has_cart = std::nullopt;
-  GBC_SS_DESERIALIZE_BEGIN(in)
-case F_VRAM:
-  for (auto &bank : vram)
-    payload.bytes({bank.get(), vram_bank_size});
-  break;
-case F_WRAM:
-  for (auto &bank : wram)
-    payload.bytes({bank.get(), wram_bank_size});
-  break;
-case F_HRAM:
-  if (payload.remaining() != hram_size)
-    throw std::runtime_error("AddressBus::savestate_deserialize() hram");
-  payload.bytes({hram.get(), hram_size});
-  break;
-case F_OAM:
-  if (payload.remaining() != oam_size)
-    throw std::runtime_error("AddressBus::savestate_deserialize() oam");
-  payload.bytes({oam.get(), oam_size});
-  break;
-case F_MMIO_REGS:
-  while (const auto mmio_field = payload.next_field()) {
-    auto [mmio_addr, mmio_payload] = *mmio_field;
-    const auto it = io_registers.find(static_cast<addr_t>(mmio_addr));
-    if (it != io_registers.end() &&
-        it->second.savestate_policy == MMIOSavestatePolicy::BusAuto) {
-      it->second.reg->savestate_deserialize(mmio_payload);
-    } else {
-      mmio_payload.skip(mmio_payload.remaining());
-    }
-    mmio_payload.expect_eof();
-  }
-  break;
-case F_BUS_CONFLICTS:
-  bus_conflicts = static_cast<BusConflictTypes>(payload.u32());
-  break;
-case F_OAM_DMA:
-  oam_dma.savestate_deserialize(payload);
-  break;
-case F_VDMA:
-  vdma.savestate_deserialize(payload);
-  break;
-  GBC_SS_CASE_BOOL(F_HAS_CART, has_cart);
-case F_CART:
-  if (!cart_)
-    throw std::runtime_error("AddressBus::savestate_deserialize() no cart");
-  cart_->savestate_deserialize(payload);
-  break;
-  GBC_SS_DESERIALIZE_END();
-
-  if (has_cart.has_value()) {
-    if (has_cart.value()) {
-      if (!cart_)
-        throw std::runtime_error("AddressBus::savestate_deserialize() no cart");
-    } else if (cart_) {
-      throw std::runtime_error(
-          "AddressBus::savestate_deserialize() cart mismatch");
-    }
-  }
 }

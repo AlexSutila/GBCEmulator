@@ -6,14 +6,11 @@
 #include "memory/mmio/dmg.hpp"
 
 struct runtime_sys_info;
-namespace Savestate {
-class Reader;
-class Writer;
-}
 
 class TimerUnit {
 public:
   explicit TimerUnit(AddressBus *bus);
+  template <typename T> void parse_savestate(T &t);
   void reset() noexcept;
   void step() noexcept;
 
@@ -29,8 +26,6 @@ public:
 
   [[nodiscard]] byte_t read_tac() const noexcept;
   void write_tac(byte_t v) noexcept;
-  void savestate_serialize(Savestate::Writer &out) const;
-  void savestate_deserialize(Savestate::Reader &in);
 
 private:
   [[nodiscard]] static byte_t tac_sel(byte_t tac) noexcept;

@@ -15,6 +15,66 @@
 #include <sstream>
 #include <stdexcept>
 
+/* We do not save the CPU state (fetch/decode/exec/halt) because we always align
+ * save states with instruction fetches. */
+enum : std::uint16_t {
+  F_PC = 1,
+  F_SP,
+  F_A,
+  F_B,
+  F_C,
+  F_D,
+  F_E,
+  F_F,
+  F_H,
+  F_L,
+  F_IME_RAW,
+  F_HALT_BUG,
+  F_INS_BASE,
+
+  // CPU owns these registers (presumably), so we parse them here
+  F_IF_FLAGS,
+  F_IE_FLAGS,
+};
+
+template <typename T> void LR35902::parse_savestate(T &t) {
+  constexpr auto version = 1; // Schema revision
+  t.chunk_header(version, Savestate::C_CPU);
+
+  ProcessorState state{};
+  if (t.op() == Savestate::OP_WRITE)
+    state = get_state();
+
+  // Exploiting public API exposed to pybindings here
+  t.field_generic(F_PC, state.pc);
+  t.field_generic(F_SP, state.sp);
+  t.field_generic(F_A, state.a);
+  t.field_generic(F_B, state.b);
+  t.field_generic(F_C, state.c);
+  t.field_generic(F_D, state.d);
+  t.field_generic(F_E, state.e);
+  t.field_generic(F_F, state.f);
+  t.field_generic(F_H, state.h);
+  t.field_generic(F_L, state.l);
+  t.field_generic(F_IME_RAW, state.ime_enabled);
+
+  if (t.op() == Savestate::OP_READ)
+    load_state(state);
+
+  // These are not manipulated by the data exposed via public API
+  t.field_generic(F_HALT_BUG, reg_file.halt_bug_triggered);
+  t.field_generic(F_INS_BASE, ins_base_addr);
+
+  // Memory mapped registers for interrupts
+  t.field_complex(F_IF_FLAGS, [&](T &t) { if_reg.parse_savestate(t); });
+  t.field_complex(F_IE_FLAGS, [&](T &t) { ie_reg.parse_savestate(t); });
+  t.eof();
+}
+
+template void LR35902::parse_savestate<Savestate::Writer>(Savestate::Writer &);
+template void LR35902::parse_savestate<Savestate::Reader>(Savestate::Reader &);
+template void LR35902::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
+
 LR35902::LR35902(AddressBus *bus_ptr, std::optional<Debug::Debugger> &debugger,
                  runtime_sys_info &sys)
     : Debuggable(debugger), // For execution breakpoints on fetch
@@ -49,10 +109,8 @@ LR35902::LR35902(AddressBus *bus_ptr, std::optional<Debug::Debugger> &debugger,
   /* Configure interrupts */
   if (!bus)
     throw std::logic_error("LR35902::LR35902() bus_ptr is `nullptr`");
-  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_INT_FLAGS), &if_reg,
-                    MMIOSavestatePolicy::BusAuto);
-  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_INT_ENABLE), &ie_reg,
-                    MMIOSavestatePolicy::BusAuto);
+  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_INT_FLAGS), &if_reg);
+  bus->connect_mmio(static_cast<addr_t>(mmio::MMIO_INT_ENABLE), &ie_reg);
 }
 
 void LR35902::load_state(const ProcessorState state_) {
@@ -94,80 +152,6 @@ LR35902::ProcessorState LR35902::get_state() const {
 
 bool LR35902::savestate_ready() const {
   return state == STATE_FETCH || state == STATE_HALTED;
-}
-
-enum : std::uint16_t {
-  F_PC = 1,
-  F_SP,
-  F_A,
-  F_B,
-  F_C,
-  F_D,
-  F_E,
-  F_F,
-  F_H,
-  F_L,
-  F_IME_RAW,
-  F_HALT_BUG,
-  F_CPU_STATE,
-  F_INS_BASE,
-};
-
-void LR35902::savestate_serialize(Savestate::Writer &out) const {
-  if (!savestate_ready()) [[unlikely]]
-    throw std::runtime_error("LR35902::savestate_serialize() not at boundary");
-  const auto regs = get_state();
-  out.field_u16(F_PC, regs.pc);
-  out.field_u16(F_SP, regs.sp);
-  out.field_u8(F_A, regs.a);
-  out.field_u8(F_B, regs.b);
-  out.field_u8(F_C, regs.c);
-  out.field_u8(F_D, regs.d);
-  out.field_u8(F_E, regs.e);
-  out.field_u8(F_F, regs.f);
-  out.field_u8(F_H, regs.h);
-  out.field_u8(F_L, regs.l);
-  out.field_u8(F_IME_RAW, ime.raw_state());
-  out.field_bool(F_HALT_BUG, reg_file.halt_bug_triggered);
-  out.field_u8(F_CPU_STATE, static_cast<byte_t>(state));
-  out.field_u16(F_INS_BASE, ins_base_addr);
-}
-
-void LR35902::savestate_deserialize(Savestate::Reader &in) {
-  ProcessorState regs = get_state();
-  byte_t ime_state = ime.raw_state();
-  reg_file.halt_bug_triggered = false;
-  auto cpu_state = static_cast<byte_t>(state);
-
-  GBC_SS_DESERIALIZE_BEGIN(in)
-  GBC_SS_CASE_U16(F_PC, regs.pc);
-  GBC_SS_CASE_U16(F_SP, regs.sp);
-  GBC_SS_CASE_U8(F_A, regs.a);
-  GBC_SS_CASE_U8(F_B, regs.b);
-  GBC_SS_CASE_U8(F_C, regs.c);
-  GBC_SS_CASE_U8(F_D, regs.d);
-  GBC_SS_CASE_U8(F_E, regs.e);
-  GBC_SS_CASE_U8(F_F, regs.f);
-  GBC_SS_CASE_U8(F_H, regs.h);
-  GBC_SS_CASE_U8(F_L, regs.l);
-  GBC_SS_CASE_U8(F_IME_RAW, ime_state);
-  GBC_SS_CASE_BOOL(F_HALT_BUG, reg_file.halt_bug_triggered);
-  GBC_SS_CASE_U8(F_CPU_STATE, cpu_state);
-  GBC_SS_CASE_U16(F_INS_BASE, ins_base_addr);
-  GBC_SS_DESERIALIZE_END();
-
-  if (cpu_state != STATE_FETCH && cpu_state != STATE_HALTED)
-    throw std::runtime_error(
-        "LR35902::savestate_deserialize() invalid pipeline state");
-
-  regs.ime_enabled = false;
-  load_state(regs);
-  ime.load_raw_state(ime_state);
-
-  state = static_cast<CpuStates>(cpu_state);
-  ins_ = nullptr;
-  total_ins_clks.reset();
-  cur_ins_clks = 0;
 }
 
 // Lower bits get higher priority, return true if interrupted
