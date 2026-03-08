@@ -11,6 +11,7 @@
 #include "savestate/codec.hpp"
 #include "timer.hpp"
 
+#include <cstdint>
 #include <initializer_list>
 #include <memory>
 #include <optional>
@@ -577,33 +578,54 @@ bool GameBoyColor::savestate_ready() const {
   return cpu && cpu->savestate_ready();
 }
 
-std::vector<byte_t> GameBoyColor::savestate_serialize() const {
+enum : std::uint16_t {
+  F_ELAPSED_CLOCKS = 1,
+  F_CGB_MODE,
+  F_HALTED, // Might not need?
+  F_SPEED_SWITCH_ARMED,
+  F_DOUBLE_SPEED,
+};
+
+template <typename T> void GameBoyColor::parse_savestate(T &t) {
+  constexpr auto version = 1; // Schema revision
+  t.chunk_header(version, Savestate::C_CPU);
+
+  t.field_generic(F_ELAPSED_CLOCKS, sys_.elapsed_clocks);
+  t.field_generic(F_CGB_MODE, sys_.cgb_mode);
+  t.field_generic(F_HALTED, sys_.halted);
+  t.field_generic(F_SPEED_SWITCH_ARMED, sys_.speed_switch_armed);
+  t.field_generic(F_DOUBLE_SPEED, sys_.double_speed);
+
+  // Begin recursive descent into each component
+  cpu->parse_savestate(t);
+  bus->parse_savestate(t);
+  timer->parse_savestate(t);
+  serial->parse_savestate(t);
+  ppu->parse_savestate(t);
+
+  t.eof();
+}
+
+template void
+GameBoyColor::parse_savestate<Savestate::Writer>(Savestate::Writer &);
+template void
+GameBoyColor::parse_savestate<Savestate::Reader>(Savestate::Reader &);
+template void
+GameBoyColor::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
+
+std::vector<byte_t> GameBoyColor::savestate_serialize() {
   Savestate::Writer out{};
-  cpu->parse_savestate(out);
-  bus->parse_savestate(out);
-  timer->parse_savestate(out);
-  serial->parse_savestate(out);
-  ppu->parse_savestate(out);
+  parse_savestate(out);
   return out.get();
 }
 
 void GameBoyColor::savestate_deserialize(const std::span<const byte_t> data) {
   Savestate::Reader in(data);
-  cpu->parse_savestate(in);
-  bus->parse_savestate(in);
-  timer->parse_savestate(in);
-  serial->parse_savestate(in);
-  ppu->parse_savestate(in);
+  parse_savestate(in);
 }
 
-std::size_t GameBoyColor::savestate_size() const {
+std::size_t GameBoyColor::savestate_size() {
   Savestate::Sizer sz{};
-  cpu->parse_savestate(sz);
-  bus->parse_savestate(sz);
-  timer->parse_savestate(sz);
-  serial->parse_savestate(sz);
-  ppu->parse_savestate(sz);
+  parse_savestate(sz);
   return sz.get();
 }
-
-#undef SS_WALK

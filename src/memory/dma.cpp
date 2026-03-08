@@ -26,6 +26,9 @@ enum : std::uint16_t {
   F_OAM_DMA_DATA_OFFSET,
   F_OAM_DMA_STATE,
   F_OAM_DMA_CLOCKS_REMAINING,
+
+  // Memory mapped registers
+  F_OAM_DMA_DMA_REG,
 };
 
 template <typename T> void ObjAttrDMA::parse_savestate(T &t) {
@@ -37,6 +40,8 @@ template <typename T> void ObjAttrDMA::parse_savestate(T &t) {
   t.field_enum(F_OAM_DMA_STATE, state);
   t.field_optional(F_OAM_DMA_CLOCKS_REMAINING, clocks_remaining);
 
+  // Memory mapped registers
+  t.field_complex(F_OAM_DMA_DMA_REG, [&](T &t) { dma_.parse_savestate(t); });
   t.eof();
 }
 
@@ -143,6 +148,10 @@ enum : std::uint16_t {
   F_VDMA_CAN_START_HDMA,
   F_VDMA_STATE,
   F_VDMA_CLOCKS_REMAINING,
+
+  // Memory mapped registers
+  F_VDMA_ADDR_REG,
+  F_VDMA_MODE_REG,
 };
 
 template <typename T> void VDMA::parse_savestate(T &t) {
@@ -157,6 +166,12 @@ template <typename T> void VDMA::parse_savestate(T &t) {
   t.field_enum(F_VDMA_STATE, state);
   t.field_optional(F_VDMA_CLOCKS_REMAINING, clocks_remaining);
 
+  // duplicate tags here are fine, they are all the same thing, just mind order
+  t.field_complex(F_VDMA_ADDR_REG, [&](T &t) { vdma1_.parse_savestate(t); });
+  t.field_complex(F_VDMA_ADDR_REG, [&](T &t) { vdma2_.parse_savestate(t); });
+  t.field_complex(F_VDMA_ADDR_REG, [&](T &t) { vdma3_.parse_savestate(t); });
+  t.field_complex(F_VDMA_ADDR_REG, [&](T &t) { vdma4_.parse_savestate(t); });
+  t.field_complex(F_VDMA_MODE_REG, [&](T &t) { vdma5_.parse_savestate(t); });
   t.eof();
 }
 

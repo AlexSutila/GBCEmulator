@@ -76,6 +76,8 @@ enum : std::uint16_t {
   F_BOOT_ROM_CTRL,
   F_WRAM_BANK,
   F_VRAM_BANK,
+  F_KEY0,
+  F_KEY1,
 };
 
 template <typename T> void AddressBus::parse_savestate(T &t) {
@@ -91,14 +93,18 @@ template <typename T> void AddressBus::parse_savestate(T &t) {
   t.field_bytes(F_OAM, {oam.get(), oam_size});
   t.field_enum(F_BUS_CONFLICTS, bus_conflicts);
 
-  // Memory mapped registers
+  // Memory banking memory mapped registers
   t.field_complex(F_BOOT_ROM_CTRL,
                   [&](T &t) { boot_rom_ctrl.parse_savestate(t); });
   t.field_complex(F_WRAM_BANK,
                   [&](T &t) { wram_bank_ctrl.parse_savestate(t); });
   t.field_complex(F_VRAM_BANK,
                   [&](T &t) { vram_bank_ctrl.parse_savestate(t); });
+
+  // Miscellaneous memory mapped registers (nowhere else to put them)
   t.field_complex(F_JOYPAD, [&](T &t) { joypad_.parse_savestate(t); });
+  t.field_complex(F_KEY0, [&](T &t) { key0.parse_savestate(t); });
+  t.field_complex(F_KEY1, [&](T &t) { key1.parse_savestate(t); });
 
   // Direct memory access sub-structures
   t.field_complex(F_OAM_DMA, [&](T &t) { oam_dma.parse_savestate(t); });
