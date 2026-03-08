@@ -31,6 +31,10 @@ enum : std::uint16_t {
   F_IME_RAW,
   F_HALT_BUG,
   F_INS_BASE,
+
+  // CPU owns these registers (presumably), so we parse them here
+  F_IF_FLAGS,
+  F_IE_FLAGS,
 };
 
 template <typename T> void LR35902::parse_savestate(T &t) {
@@ -60,6 +64,10 @@ template <typename T> void LR35902::parse_savestate(T &t) {
   // These are not manipulated by the data exposed via public API
   t.field_generic(F_HALT_BUG, reg_file.halt_bug_triggered);
   t.field_generic(F_INS_BASE, ins_base_addr);
+
+  // Memory mapped registers for interrupts
+  t.field_complex(F_IF_FLAGS, [&](T &t) { if_reg.parse_savestate(t); });
+  t.field_complex(F_IE_FLAGS, [&](T &t) { ie_reg.parse_savestate(t); });
   t.eof();
 }
 

@@ -25,24 +25,26 @@ InterruptBits::InterruptBits(const bool pull_unused_high)
     : pull_high(pull_unused_high) {}
 
 void InterruptBits::write(const byte_t value) {
-  raw = value;
+  state_ = value;
   if (pull_high)
-    raw |= 0xE0;
+    state_ |= 0xE0;
 }
 
-byte_t InterruptBits::peek() const { return pull_high ? raw | 0xE0 : raw; }
+byte_t InterruptBits::peek() const {
+  return pull_high ? state_ | 0xE0 : state_;
+}
 byte_t InterruptBits::read() { return peek(); }
 
 void InterruptBits::put_flag(InterruptFlagMask flag, const bool value) {
   const auto mask = static_cast<byte_t>(flag);
-  raw = raw & ~mask;
+  state_ = state_ & ~mask;
   if (value)
-    raw = raw | mask;
+    state_ = state_ | mask;
 }
 
 bool InterruptBits::get_flag(InterruptFlagMask flag) const {
   const auto mask = static_cast<byte_t>(flag);
-  return (raw & mask) != 0;
+  return (state_ & mask) != 0;
 }
 
 InterruptMasterEnable::InterruptMasterEnable() : ime_state(IME_DISABLED) {}
