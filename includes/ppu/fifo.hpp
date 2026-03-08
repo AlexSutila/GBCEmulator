@@ -4,6 +4,7 @@
 #include "ppu/pixel.hpp"
 #include <array>
 #include <cstddef>
+#include <cstdint>
 #include <stdexcept>
 
 /*
@@ -18,6 +19,19 @@ public:
   [[nodiscard]] std::size_t size() const noexcept { return count; }
   [[nodiscard]] bool full() const noexcept { return count == cap; }
   [[nodiscard]] bool empty() const noexcept { return count == 0; }
+
+  // Pass an additional function template argument to allow for flexible typing
+  template <typename T_, typename Fn> void parse_savestate(T_ &t, Fn &&fn) {
+    t.field_generic(F_HEAD, head);
+    t.field_generic(F_TAIL, tail);
+    t.field_generic(F_COUNT, count);
+
+    // Important this remains data-type agnostic
+    t.field_complex(F_BUF, [&](auto &t) {
+      for (std::size_t i{0}; i < cap; ++i)
+        fn(t, buf[i]);
+    });
+  }
 
   void push(const T &value) {
     buf[head] = value;
@@ -76,12 +90,20 @@ private:
     }
   }
 
+  enum : std::uint16_t {
+    F_HEAD = 1,
+    F_TAIL,
+    F_COUNT,
+    F_BUF,
+  };
+
   std::size_t head{}, tail{}, count{};
   std::array<T, cap> buf{};
 };
 
 class BgPixelFifo {
 public:
+  template <typename T> void parse_savestate(T &t);
   BgPixelFifo();
   void flush();
 
@@ -100,6 +122,7 @@ private:
 
 class ObjPixelFifo {
 public:
+  template <typename T> void parse_savestate(T &t);
   ObjPixelFifo();
   void flush();
 

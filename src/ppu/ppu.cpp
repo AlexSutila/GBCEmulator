@@ -43,6 +43,7 @@ enum : std::uint16_t {
   F_OBJ_CRAM,
   F_BG_CRAM,
   F_STAT_DELAY,
+  F_STAT_DELAY_STATE, // Inner state values for `F_STAT_DELAY`
   F_OAM_DATA,
 
   // MMIO registers
@@ -84,6 +85,13 @@ template <typename T> void PixelProcessingUnit::parse_savestate(T &t) {
   t.field_optional(F_TOTAL_MODE_CLKS, total_mode_clks);
   t.field_enum(F_STATE, state);
 
+  t.field_complex(F_OBJ_FIFO, [&](T &t) { obj_fifo.parse_savestate(t); });
+  t.field_complex(F_BG_FIFO, [&](T &t) { bg_fifo.parse_savestate(t); });
+  t.field_complex(F_STAT_DELAY, [&](T &t) {
+    stat_delay.parse_savestate(t, [](auto &t, PPU::StatModes &s) {
+      t.field_enum(F_STAT_DELAY_STATE, s);
+    });
+  });
   t.field_vector(F_OAM_DATA, oam_data, max_oam_sprite_count,
                  [&](T &t, auto &s) {
                    t.field_generic(F_SPRITE_Y, s.y_pos);
