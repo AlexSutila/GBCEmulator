@@ -1,6 +1,7 @@
 #include "cart/cart.hpp"
 #include "cart/mbc.hpp"
 #include "cart/mbc_creator.hpp"
+#include "savestate/codec.hpp"
 
 #include <algorithm>
 #include <array>
@@ -36,12 +37,9 @@
 
 class Mbc6 final : public Mbc {
 public:
-  Mbc6(const std::span<const byte_t> rom,
-       const std::size_t ram_bytes,
+  Mbc6(const std::span<const byte_t> rom, const std::size_t ram_bytes,
        const bool battery)
-      : rom_(rom),
-        ram_(ram_bytes),
-        persist_(battery),
+      : rom_(rom), ram_(ram_bytes), persist_(battery),
         flash_(kFlashSize, 0xFF) {
     hidden_.fill(0xFF);
   }
@@ -66,13 +64,15 @@ public:
 
     // A000-AFFF RAM bank A
     if (addr >= 0xA000 && addr <= 0xAFFF) {
-      if (!ram_enabled_ || ram_.empty()) return open_bus();
+      if (!ram_enabled_ || ram_.empty())
+        return open_bus();
       return ram_at_4k(ram_bank_a_, static_cast<std::size_t>(addr - 0xA000));
     }
 
     // B000-BFFF RAM bank B
     if (addr >= 0xB000 && addr <= 0xBFFF) {
-      if (!ram_enabled_ || ram_.empty()) return open_bus();
+      if (!ram_enabled_ || ram_.empty())
+        return open_bus();
       return ram_at_4k(ram_bank_b_, static_cast<std::size_t>(addr - 0xB000));
     }
 
@@ -100,32 +100,92 @@ public:
 
     // External RAM writes
     if (addr >= 0xA000 && addr <= 0xAFFF) {
-      if (!ram_enabled_ || ram_.empty()) return;
+      if (!ram_enabled_ || ram_.empty())
+        return;
       ram_write_4k(ram_bank_a_, static_cast<std::size_t>(addr - 0xA000), val);
       return;
     }
     if (addr >= 0xB000 && addr <= 0xBFFF) {
-      if (!ram_enabled_ || ram_.empty()) return;
+      if (!ram_enabled_ || ram_.empty())
+        return;
       ram_write_4k(ram_bank_b_, static_cast<std::size_t>(addr - 0xB000), val);
       return;
     }
   }
 
-  // MBC6 has non-volatile flash, which is technically persistent and can act as battery-backed flash
-  // More research needed
+  // MBC6 has non-volatile flash, which is technically persistent and can act as
+  // battery-backed flash More research needed
   [[nodiscard]] bool has_battery() const noexcept override { return persist_; }
 
-  [[nodiscard]] std::span<const byte_t> ram() const noexcept override { return ram_; }
+  [[nodiscard]] std::span<const byte_t> ram() const noexcept override {
+    return ram_;
+  }
   std::span<byte_t> ram() noexcept override { return ram_; }
 
+  template <typename T> void parse_savestate_impl(T &t) {
+    constexpr auto version = 1; // Schema revision
+    t.chunk_header(version, Savestate::C_MBC_6);
+    t.field_generic(F_RAM_ENABLED, ram_enabled_);
+    t.field_generic(F_RAM_BANK_A, ram_bank_a_);
+    t.field_generic(F_RAM_BANK_B, ram_bank_b_);
+    t.field_generic(F_FLASH_CE, flash_ce_);
+    t.field_generic(F_FLASH_WP, flash_wp_);
+    t.field_generic(F_A_FLASH, a_flash_);
+    t.field_generic(F_B_FLASH, b_flash_);
+    t.field_generic(F_A_BANK, a_bank_);
+    t.field_generic(F_B_BANK, b_bank_);
+    t.field_enum(F_FLASH_MODE, flash_mode_);
+    t.field_enum(F_SEQ, seq_);
+    t.field_generic(F_SECTOR0_PROTECTED, sector0_protected_);
+
+    // Doesn't look like this changes? Leaving as pure bytes for now
+    t.field_bytes(F_FLASH_DATA, {flash_.data(), flash_.size()});
+    t.field_bytes(F_HIDDEN_DATA, {hidden_.data(), hidden_.size()});
+
+    // This one is kinda tricky bc we use `std::bitset`
+    const auto write_latch = [&](T &t, ProgramLatch &l) {
+      t.field_generic(1, l.active);
+      t.field_generic(2, l.filled);
+      t.field_generic(3, l.base);
+      t.field_bytes(4, {l.buf.data(), l.buf.size()});
+
+      /* More or less, we need to convert to an array of packed bytes. The
+       * packed bytes are serialized, intermediate forms are generated based
+       * on what serializer or deserializer object is passed in. */
+      std::array<byte_t, kProgMaskBytes> arr{};
+      if (t.op() == Savestate::OP_WRITE)
+        arr = pack_written_(l.written);
+      t.field_bytes(5, {arr.data(), arr.size()}); // Lol
+      if (t.op() == Savestate::OP_READ)
+        unpack_written_(arr, l.written);
+    };
+
+    // Serialize latch sub-structures
+    t.field_complex(F_PROG_STATE, [&](T &t) { write_latch(t, prog_); });
+    t.field_complex(F_HIDDEN_PROG_STATE,
+                    [&](T &t) { write_latch(t, hidden_prog_); });
+    t.eof();
+  }
+
+  void parse_savestate(Savestate::Writer &t) override {
+    parse_savestate_impl(t);
+  }
+  void parse_savestate(Savestate::Reader &t) override {
+    parse_savestate_impl(t);
+  }
+  void parse_savestate(Savestate::Sizer &t) override {
+    parse_savestate_impl(t);
+  }
+
 private:
-  static constexpr std::size_t kRomBank8K  = 0x2000;
-  static constexpr std::size_t kRamBank4K  = 0x1000;
-  static constexpr std::size_t kFlashSize  = 0x100000; // 1 MiB
-  static constexpr std::size_t kFlashBanks = kFlashSize / kRomBank8K; // 128 banks of 8 KiB
-  static constexpr std::size_t kSectorSize = 0x20000;  // 128 KiB
+  static constexpr std::size_t kRomBank8K = 0x2000;
+  static constexpr std::size_t kRamBank4K = 0x1000;
+  static constexpr std::size_t kFlashSize = 0x100000; // 1 MiB
+  static constexpr std::size_t kFlashBanks =
+      kFlashSize / kRomBank8K;                        // 128 banks of 8 KiB
+  static constexpr std::size_t kSectorSize = 0x20000; // 128 KiB
   static constexpr std::size_t kHiddenSize = 256;
-  static constexpr std::size_t kProgChunk  = 0x80;  // 128 bytes
+  static constexpr std::size_t kProgChunk = 0x80; // 128 bytes
   static constexpr std::size_t kProgMaskBytes = kProgChunk / 8;
 
   enum class Window : std::uint8_t { A, B };
@@ -158,24 +218,24 @@ private:
     Hidden77_AA,
     Hidden77_55,
     Hidden77_Final
-    };
+  };
 
-    struct ProgramLatch {
-      bool active{false};
-      bool filled{false};          // all 128 bytes received
-      std::size_t base{0};         // chip address aligned to 128 bytes
-      std::array<byte_t, kProgChunk> buf{};
-      std::bitset<kProgChunk> written{};
+  struct ProgramLatch {
+    bool active{false};
+    bool filled{false};  // all 128 bytes received
+    std::size_t base{0}; // chip address aligned to 128 bytes
+    std::array<byte_t, kProgChunk> buf{};
+    std::bitset<kProgChunk> written{};
 
-      ProgramLatch() { reset(); }
+    ProgramLatch() { reset(); }
 
-      void reset() {
-        active = false;
-        filled = false;
-        base = 0;
-        buf.fill(0xFF);
-        written.reset();
-      }
+    void reset() {
+      active = false;
+      filled = false;
+      base = 0;
+      buf.fill(0xFF);
+      written.reset();
+    }
   };
 
   std::span<const byte_t> rom_;
@@ -185,16 +245,17 @@ private:
   bool persist_{true};
 
   // MBC6 registers/state
-  bool  ram_enabled_{false};
+  bool ram_enabled_{false};
   byte_t ram_bank_a_{0};
   byte_t ram_bank_b_{0};
 
-  bool  flash_ce_{false};   // flash enable (bit0)
-  bool  flash_wp_{false};   // flash write enable (/WP) (bit0), protects sector0+hidden when 0
-  bool  a_flash_{false};    // window A selects flash (true) or ROM (false)
-  bool  b_flash_{false};    // window B selects flash (true) or ROM (false)
-  byte_t a_bank_{0};        // 00-7F (8 KiB banks)
-  byte_t b_bank_{0};        // 00-7F
+  bool flash_ce_{false}; // flash enable (bit0)
+  bool flash_wp_{
+      false}; // flash write enable (/WP) (bit0), protects sector0+hidden when 0
+  bool a_flash_{false}; // window A selects flash (true) or ROM (false)
+  bool b_flash_{false}; // window B selects flash (true) or ROM (false)
+  byte_t a_bank_{0};    // 00-7F (8 KiB banks)
+  byte_t b_bank_{0};    // 00-7F
 
   // Flash storage and mode
   std::vector<byte_t> flash_;
@@ -207,6 +268,25 @@ private:
   ProgramLatch hidden_prog_{}; // hidden region 128-byte program buffer
 
   bool sector0_protected_{false};
+
+  enum : std::uint16_t {
+    F_RAM_ENABLED = 1,
+    F_RAM_BANK_A,
+    F_RAM_BANK_B,
+    F_FLASH_CE,
+    F_FLASH_WP,
+    F_A_FLASH,
+    F_B_FLASH,
+    F_A_BANK,
+    F_B_BANK,
+    F_FLASH_MODE,
+    F_SEQ,
+    F_SECTOR0_PROTECTED,
+    F_FLASH_DATA,
+    F_HIDDEN_DATA,
+    F_PROG_STATE,
+    F_HIDDEN_PROG_STATE,
+  };
 
   [[nodiscard]] static byte_t flash_mode_to_raw_(const FlashMode mode) {
     return static_cast<byte_t>(mode);
@@ -288,10 +368,12 @@ private:
   }
 
   [[nodiscard]] std::size_t rom_8k_bank_count() const noexcept {
-    return std::max<std::size_t>(1, (rom_.size() + (kRomBank8K - 1)) / kRomBank8K);
+    return std::max<std::size_t>(1,
+                                 (rom_.size() + (kRomBank8K - 1)) / kRomBank8K);
   }
 
-  [[nodiscard]] byte_t rom_at_8k(const std::size_t bank, const std::size_t off) const {
+  [[nodiscard]] byte_t rom_at_8k(const std::size_t bank,
+                                 const std::size_t off) const {
     const std::size_t banks = rom_8k_bank_count();
     const std::size_t b = clamp_bank(bank, banks);
     const std::size_t idx = b * kRomBank8K + off;
@@ -299,17 +381,23 @@ private:
   }
 
   // ---------- helpers: RAM 4 KiB banks ----------
-  [[nodiscard]] byte_t ram_at_4k(const std::size_t bank, const std::size_t off) const {
-    if (ram_.empty()) return open_bus();
-    const std::size_t banks = std::max<std::size_t>(1, ram_.size() / kRamBank4K);
+  [[nodiscard]] byte_t ram_at_4k(const std::size_t bank,
+                                 const std::size_t off) const {
+    if (ram_.empty())
+      return open_bus();
+    const std::size_t banks =
+        std::max<std::size_t>(1, ram_.size() / kRamBank4K);
     const std::size_t b = clamp_bank(bank, banks);
     const std::size_t idx = (b * kRamBank4K + off) % ram_.size();
     return ram_[idx];
   }
 
-  void ram_write_4k(const std::size_t bank, const std::size_t off, const byte_t v) {
-    if (ram_.empty()) return;
-    const std::size_t banks = std::max<std::size_t>(1, ram_.size() / kRamBank4K);
+  void ram_write_4k(const std::size_t bank, const std::size_t off,
+                    const byte_t v) {
+    if (ram_.empty())
+      return;
+    const std::size_t banks =
+        std::max<std::size_t>(1, ram_.size() / kRamBank4K);
     const std::size_t b = clamp_bank(bank, banks);
     const std::size_t idx = (b * kRamBank4K + off) % ram_.size();
     ram_[idx] = v;
@@ -362,23 +450,27 @@ private:
   }
 
   // ---------- window reads/writes ----------
-  [[nodiscard]] byte_t read_window(const Window w, const std::size_t off) const {
+  [[nodiscard]] byte_t read_window(const Window w,
+                                   const std::size_t off) const {
     const bool use_flash = (w == Window::A) ? a_flash_ : b_flash_;
-    const byte_t bank    = (w == Window::A) ? a_bank_  : b_bank_;
+    const byte_t bank = (w == Window::A) ? a_bank_ : b_bank_;
 
     if (!use_flash) {
       return rom_at_8k(bank, off);
     }
 
-    if (!flash_ce_) return open_bus();
+    if (!flash_ce_)
+      return open_bus();
 
-    const std::size_t chip_addr = (static_cast<std::size_t>(bank) % kFlashBanks) * kRomBank8K + off;
+    const std::size_t chip_addr =
+        (static_cast<std::size_t>(bank) % kFlashBanks) * kRomBank8K + off;
     return flash_read(chip_addr, off);
   }
 
-  void write_window(const Window w, const addr_t abs_addr, const std::size_t off, const byte_t val) {
+  void write_window(const Window w, const addr_t abs_addr,
+                    const std::size_t off, const byte_t val) {
     const bool use_flash = (w == Window::A) ? a_flash_ : b_flash_;
-    const byte_t bank    = (w == Window::A) ? a_bank_  : b_bank_;
+    const byte_t bank = (w == Window::A) ? a_bank_ : b_bank_;
 
     if (!use_flash) {
       // ROM mapped, ignore writes in 4000-7FFF region.
@@ -389,7 +481,8 @@ private:
       return;
     }
 
-    const std::size_t chip_addr = (static_cast<std::size_t>(bank) % kFlashBanks) * kRomBank8K + off;
+    const std::size_t chip_addr =
+        (static_cast<std::size_t>(bank) % kFlashBanks) * kRomBank8K + off;
     flash_write(w, abs_addr, chip_addr, off, val);
   }
 
@@ -398,18 +491,22 @@ private:
     // Pan Docs: bit7 done, bit4 timeout, bit1 sector0 protected
     // We model instant completion, no timeout
     byte_t s = 0x80;
-    if (sector0_protected_) s |= 0x02;
+    if (sector0_protected_)
+      s |= 0x02;
     return s;
   }
 
-  [[nodiscard]] byte_t flash_read(const std::size_t chip_addr, const std::size_t off_in_window) const {
+  [[nodiscard]] byte_t flash_read(const std::size_t chip_addr,
+                                  const std::size_t off_in_window) const {
     switch (flash_mode_) {
     case FlashMode::ReadArray:
       return (chip_addr < flash_.size()) ? flash_[chip_addr] : 0xFF;
     case FlashMode::IdMode:
       // JEDEC ID: (C2,81) at $XXX0,$XXX1
-      if (off_in_window == 0x0000) return 0xC2;
-      if (off_in_window == 0x0001) return 0x81;
+      if (off_in_window == 0x0000)
+        return 0xC2;
+      if (off_in_window == 0x0001)
+        return 0x81;
       return 0xFF;
     case FlashMode::HiddenRead:
       return hidden_[off_in_window & 0xFF];
@@ -424,46 +521,51 @@ private:
   // Command address helpers per Pan Docs table:
   // Bank A command addresses: Y=5, X=4 => 0x5555 and 0x4AAA
   // Bank B command addresses: Y=7, X=6 => 0x7555 and 0x6AAA
-  [[nodiscard]] static bool is_cmd_aa_addr(const Window w, const addr_t a) noexcept {
+  [[nodiscard]] static bool is_cmd_aa_addr(const Window w,
+                                           const addr_t a) noexcept {
     return (w == Window::A) ? (a == 0x5555) : (a == 0x7555);
   }
-  [[nodiscard]] static bool is_cmd_55_addr(const Window w, const addr_t a) noexcept {
+  [[nodiscard]] static bool is_cmd_55_addr(const Window w,
+                                           const addr_t a) noexcept {
     return (w == Window::A) ? (a == 0x4AAA) : (a == 0x6AAA);
   }
 
   [[nodiscard]] bool can_modify_sector0() const noexcept {
-    // Flash Write Enable controls /WP; when 0, sector0 and hidden region can't be erased/programmed
-    // Additionally, protect/unprotect command can protect sector0
+    // Flash Write Enable controls /WP; when 0, sector0 and hidden region can't
+    // be erased/programmed Additionally, protect/unprotect command can protect
+    // sector0
     return flash_wp_ && !sector0_protected_;
   }
-  [[nodiscard]] bool can_modify_hidden() const noexcept {
-    return flash_wp_;
-  }
+  [[nodiscard]] bool can_modify_hidden() const noexcept { return flash_wp_; }
 
-    void discard_program_buffers() {
+  void discard_program_buffers() {
     prog_.reset();
     hidden_prog_.reset();
   }
 
-  void commit_program_block(const ProgramLatch& p) {
+  void commit_program_block(const ProgramLatch &p) {
     for (std::size_t i = 0; i < kProgChunk; ++i) {
       const std::size_t a = p.base + i;
-      if (a >= flash_.size()) break;
+      if (a >= flash_.size())
+        break;
 
       const std::size_t sector = a / kSectorSize;
-      if (sector == 0 && !can_modify_sector0()) continue;
+      if (sector == 0 && !can_modify_sector0())
+        continue;
 
       // Flash programming typically can only clear bits (1->0)
       flash_[a] = static_cast<byte_t>(flash_[a] & p.buf[i]);
     }
   }
 
-  void commit_hidden_block(const ProgramLatch& p) {
-    if (!can_modify_hidden()) return;
+  void commit_hidden_block(const ProgramLatch &p) {
+    if (!can_modify_hidden())
+      return;
     const std::size_t base = p.base & 0xFF;
     for (std::size_t i = 0; i < kProgChunk; ++i) {
       const std::size_t idx = base + i;
-      if (idx >= kHiddenSize) break;
+      if (idx >= kHiddenSize)
+        break;
       hidden_[idx] = static_cast<byte_t>(hidden_[idx] & p.buf[i]);
     }
   }
@@ -478,9 +580,11 @@ private:
     }
 
     const std::size_t off = chip_addr - prog_.base;
-    if (off >= kProgChunk) return;
+    if (off >= kProgChunk)
+      return;
 
-    // Commit happens on second write to the final address after all 128 bytes were written.
+    // Commit happens on second write to the final address after all 128 bytes
+    // were written.
     if (prog_.filled && off == (kProgChunk - 1)) {
       commit_program_block(prog_);
       flash_mode_ = FlashMode::Status;
@@ -490,7 +594,8 @@ private:
 
     prog_.buf[off] = val;
     prog_.written.set(off);
-    if (prog_.written.all()) prog_.filled = true;
+    if (prog_.written.all())
+      prog_.filled = true;
   }
 
   void program_write_hidden(const std::size_t hidden_idx, const byte_t val) {
@@ -503,7 +608,8 @@ private:
     }
 
     const std::size_t off = hidden_idx - hidden_prog_.base;
-    if (off >= kProgChunk) return;
+    if (off >= kProgChunk)
+      return;
 
     if (hidden_prog_.filled && off == (kProgChunk - 1)) {
       commit_hidden_block(hidden_prog_);
@@ -514,11 +620,13 @@ private:
 
     hidden_prog_.buf[off] = val;
     hidden_prog_.written.set(off);
-    if (hidden_prog_.written.all()) hidden_prog_.filled = true;
+    if (hidden_prog_.written.all())
+      hidden_prog_.filled = true;
   }
 
-  void flash_write(const Window w, const addr_t abs_addr, const std::size_t chip_addr,
-                   const std::size_t off_in_window, const byte_t val) {
+  void flash_write(const Window w, const addr_t abs_addr,
+                   const std::size_t chip_addr, const std::size_t off_in_window,
+                   const byte_t val) {
     // F0 exits any mode
     if (val == 0xF0) {
       flash_mode_ = FlashMode::ReadArray;
@@ -532,39 +640,49 @@ private:
       return;
     }
 
-    // Program mode: capture 128 bytes (aligned) into a buffer, then commit on a 2nd write to the final address
+    // Program mode: capture 128 bytes (aligned) into a buffer, then commit on a
+    // 2nd write to the final address
     if (flash_mode_ == FlashMode::Program) {
       program_write_main(chip_addr, val);
       return;
     }
 
-    // Hidden region program mode: same 128-byte buffer + commit behavior, but applied to the 256-byte hidden region
+    // Hidden region program mode: same 128-byte buffer + commit behavior, but
+    // applied to the 256-byte hidden region
     if (flash_mode_ == FlashMode::HiddenProgram) {
       program_write_hidden(off_in_window & 0xFF, val);
       return;
     }
 
-    // HiddenRead/IdMode: generally require F0 to exit; allow starting sequences anyway by resetting state on AA
-    // Now handle command sequences (unlock patterns)
+    // HiddenRead/IdMode: generally require F0 to exit; allow starting sequences
+    // anyway by resetting state on AA Now handle command sequences (unlock
+    // patterns)
     const bool aa_addr = is_cmd_aa_addr(w, abs_addr);
     const bool s55_addr = is_cmd_55_addr(w, abs_addr);
 
     switch (seq_) {
     case Seq::Idle:
-      if (aa_addr && val == 0xAA) seq_ = Seq::GotAA;
+      if (aa_addr && val == 0xAA)
+        seq_ = Seq::GotAA;
       return;
 
     case Seq::GotAA:
-      if (s55_addr && val == 0x55) seq_ = Seq::Got55;
-      else seq_ = Seq::Idle;
+      if (s55_addr && val == 0x55)
+        seq_ = Seq::Got55;
+      else
+        seq_ = Seq::Idle;
       return;
 
     case Seq::Got55:
-      if (!aa_addr) { seq_ = Seq::Idle; return; }
+      if (!aa_addr) {
+        seq_ = Seq::Idle;
+        return;
+      }
 
       if (val == 0x04) {
         // Erase hidden region* (requires flash_wp_)
-        if (can_modify_hidden()) hidden_.fill(0xFF);
+        if (can_modify_hidden())
+          hidden_.fill(0xFF);
         flash_mode_ = FlashMode::Status;
         seq_ = Seq::Idle;
         return;
@@ -583,14 +701,16 @@ private:
       }
       if (val == 0x20) {
         // Protect sector 0*
-        if (can_modify_hidden()) sector0_protected_ = true;
+        if (can_modify_hidden())
+          sector0_protected_ = true;
         flash_mode_ = FlashMode::Status;
         seq_ = Seq::Idle;
         return;
       }
       if (val == 0x40) {
         // Unprotect sector 0*
-        if (can_modify_hidden()) sector0_protected_ = false;
+        if (can_modify_hidden())
+          sector0_protected_ = false;
         flash_mode_ = FlashMode::Status;
         seq_ = Seq::Idle;
         return;
@@ -627,13 +747,19 @@ private:
 
     case Seq::Erase_80:
       // Expect AA to cmd addr
-      if (aa_addr && val == 0xAA) { seq_ = Seq::Erase_AA; return; }
+      if (aa_addr && val == 0xAA) {
+        seq_ = Seq::Erase_AA;
+        return;
+      }
       seq_ = Seq::Idle;
       return;
 
     case Seq::Erase_AA:
       // Expect 55 to second addr
-      if (s55_addr && val == 0x55) { seq_ = Seq::Erase_55; return; }
+      if (s55_addr && val == 0x55) {
+        seq_ = Seq::Erase_55;
+        return;
+      }
       seq_ = Seq::Idle;
       return;
 
@@ -643,9 +769,10 @@ private:
       if (val == 0x10 && aa_addr) {
         // Chip erase: erase sectors 1..7 always, sector0 only if allowed
         for (std::size_t s = 0; s < 8; ++s) {
-          if (s == 0 && !can_modify_sector0()) continue;
+          if (s == 0 && !can_modify_sector0())
+            continue;
           const std::size_t base = s * kSectorSize;
-          const std::size_t end  = std::min(base + kSectorSize, flash_.size());
+          const std::size_t end = std::min(base + kSectorSize, flash_.size());
           std::fill(flash_.begin() + static_cast<std::ptrdiff_t>(base),
                     flash_.begin() + static_cast<std::ptrdiff_t>(end),
                     static_cast<byte_t>(0xFF));
@@ -659,7 +786,7 @@ private:
         if (const std::size_t sector = chip_addr / kSectorSize; sector < 8) {
           if (sector != 0 || can_modify_sector0()) {
             const std::size_t base = sector * kSectorSize;
-            const std::size_t end  = std::min(base + kSectorSize, flash_.size());
+            const std::size_t end = std::min(base + kSectorSize, flash_.size());
             std::fill(flash_.begin() + static_cast<std::ptrdiff_t>(base),
                       flash_.begin() + static_cast<std::ptrdiff_t>(end),
                       static_cast<byte_t>(0xFF));
@@ -675,28 +802,41 @@ private:
     }
 
     case Seq::Cmd60_AA:
-      if (aa_addr && val == 0xAA) { seq_ = Seq::Cmd60_55; return; }
+      if (aa_addr && val == 0xAA) {
+        seq_ = Seq::Cmd60_55;
+        return;
+      }
       seq_ = Seq::Idle;
       return;
 
     case Seq::Cmd60_55:
-      if (!s55_addr || val != 0x55) { seq_ = Seq::Idle; return; }
+      if (!s55_addr || val != 0x55) {
+        seq_ = Seq::Idle;
+        return;
+      }
 
-      // Next write at cmd addr chooses function; we implement by waiting for the next byte at cmd addr
-      // by reusing Got55 state logic: set to Got55 but require aa_addr next
+      // Next write at cmd addr chooses function; we implement by waiting for
+      // the next byte at cmd addr by reusing Got55 state logic: set to Got55
+      // but require aa_addr next
       seq_ = Seq::Got55;
-      // And we "pretend" the previous steps already happened, so treat next as a cmd at aa_addr
-      // To do that, we keep seq_=Got55 and require aa_addr in that state
-      // The caller will immediately return; next write processes
+      // And we "pretend" the previous steps already happened, so treat next as
+      // a cmd at aa_addr To do that, we keep seq_=Got55 and require aa_addr in
+      // that state The caller will immediately return; next write processes
       return;
 
     case Seq::Hidden77_AA:
-      if (aa_addr && val == 0xAA) { seq_ = Seq::Hidden77_55; return; }
+      if (aa_addr && val == 0xAA) {
+        seq_ = Seq::Hidden77_55;
+        return;
+      }
       seq_ = Seq::Idle;
       return;
 
     case Seq::Hidden77_55:
-      if (!s55_addr || val != 0x55) { seq_ = Seq::Idle; return; }
+      if (!s55_addr || val != 0x55) {
+        seq_ = Seq::Idle;
+        return;
+      }
 
       // Next write at cmd addr should be 0x77 to enter HiddenRead
       seq_ = Seq::Hidden77_Final;
@@ -712,28 +852,34 @@ private:
       return;
     }
   }
-  // We overload the AA/55/command decoding to also support the “* commands” listed
-  // under the AA 55 60 ... category (hidden erase/program, protect/unprotect)
-  // The simplest way: interpret those commands when we see them at the "cmd addr" in Got55,
-  // which already requires AA addr
+  // We overload the AA/55/command decoding to also support the “* commands”
+  // listed under the AA 55 60 ... category (hidden erase/program,
+  // protect/unprotect) The simplest way: interpret those commands when we see
+  // them at the "cmd addr" in Got55, which already requires AA addr
   //
   // To enable that, we check those command bytes in the Got55 handler above
   // But Got55 currently handles 0x90,0xA0,0x80,0x60,0x77 only
-  // We extend it by patching in a helper called from write_window once per write,
-  // OR implement it directly by adding cases. To keep this file compact, we implement
-  // them by exploiting the existing flow: after AA 55 60 AA 55, we land back in Got55,
-  // so the "command byte" is processed here too
+  // We extend it by patching in a helper called from write_window once per
+  // write, OR implement it directly by adding cases. To keep this file compact,
+  // we implement them by exploiting the existing flow: after AA 55 60 AA 55, we
+  // land back in Got55, so the "command byte" is processed here too
 
   // Helpers for persisting MBC6's non-volatile flash/hidden storage
-  [[nodiscard]] std::span<const byte_t> flash() const noexcept { return flash_; }
+  [[nodiscard]] std::span<const byte_t> flash() const noexcept {
+    return flash_;
+  }
   std::span<byte_t> flash() noexcept { return flash_; }
 
-  [[nodiscard]] std::span<const byte_t> hidden() const noexcept { return {hidden_.data(), hidden_.size()}; }
-  std::span<byte_t> hidden() noexcept { return {hidden_.data(), hidden_.size()}; }
+  [[nodiscard]] std::span<const byte_t> hidden() const noexcept {
+    return {hidden_.data(), hidden_.size()};
+  }
+  std::span<byte_t> hidden() noexcept {
+    return {hidden_.data(), hidden_.size()};
+  }
 };
 
-
-std::unique_ptr<Mbc> make_mbc6(const cart& c) {
-  // MBC6 has non-volatile flash; treat as persistent even if battery flag isn't set
+std::unique_ptr<Mbc> make_mbc6(const cart &c) {
+  // MBC6 has non-volatile flash; treat as persistent even if battery flag isn't
+  // set
   return std::make_unique<Mbc6>(c.rom_span(), c.declared_ram_bytes, true);
 }

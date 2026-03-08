@@ -1,6 +1,7 @@
 #include "cart/cart.hpp"
 #include "cart/mbc.hpp"
 #include "cart/mbc_creator.hpp"
+#include "savestate/codec.hpp"
 
 // ---------------------------
 // MBC3 (ROM/RAM + RTC)
@@ -16,7 +17,7 @@ public:
   Mbc3(const std::span<const byte_t> rom, std::size_t const ram_bytes,
        bool const battery, bool const has_rtc, bool const is_mbc30)
       : rom_(rom), ram_(ram_bytes), battery_(battery), has_rtc_(has_rtc),
-        is_mbc30_(is_mbc30){}
+        is_mbc30_(is_mbc30) {}
 
   // TODO: currently there is no mechanism to keep the clock ticking after the
   // emulator is shut down. It is reasonable to calculate the delta between now
@@ -110,6 +111,38 @@ public:
   }
   std::span<byte_t> ram() noexcept override { return ram_; }
 
+  template <typename T> void parse_savestate_impl(T &t) {
+    constexpr auto version = 1; // Schema revision
+    t.chunk_header(version, Savestate::C_MBC_3);
+    t.field_generic(F_RAM_RTC_ENABLED, ram_rtc_enabled_);
+    t.field_generic(F_ROM_BANK, rom_bank_);
+    t.field_generic(F_SEL, sel_);
+    t.field_generic(F_LATCH_PREV, latch_prev_);
+    t.field_generic(F_LATCH_PREV, latch_prev_);
+
+    const auto write_rtc = [&](T &t, RtcRegs &r) {
+      t.field_generic(1, r.sec);
+      t.field_generic(2, r.min);
+      t.field_generic(3, r.hour);
+      t.field_generic(4, r.day);
+      t.field_generic(5, r.halt);
+      t.field_generic(6, r.carry);
+    };
+    t.field_complex(F_RTC, [&](T &t) { write_rtc(t, rtc_); });
+    t.field_complex(F_LATCHED_RTC, [&](T &t) { write_rtc(t, latched_); });
+    t.eof();
+  }
+
+  void parse_savestate(Savestate::Writer &t) override {
+    parse_savestate_impl(t);
+  }
+  void parse_savestate(Savestate::Reader &t) override {
+    parse_savestate_impl(t);
+  }
+  void parse_savestate(Savestate::Sizer &t) override {
+    parse_savestate_impl(t);
+  }
+
 private:
   std::span<const byte_t> rom_;
   std::vector<byte_t> ram_;
@@ -122,6 +155,7 @@ private:
       0b0000001}; // ROMB except all 7 bits are used; zero value disallowed
   byte_t sel_{0}; // RAM bank or RTC reg selector
   byte_t latch_prev_{0}; // Latch clock data
+
   struct RtcRegs {       // Implements RTC Register 08-0C. Note: this is an
                    // abstraction, not a 1-to-1 replication of hw reg behavior
     byte_t sec{0}, min{0}, hour{0};
@@ -133,8 +167,17 @@ private:
   RtcRegs rtc_{};
   RtcRegs latched_{};
   bool latched_valid_{false};
-
   bool &rtc_halt_ = rtc_.halt;
+
+  enum : std::uint16_t {
+    F_RAM_RTC_ENABLED = 1,
+    F_ROM_BANK,
+    F_SEL,
+    F_LATCH_PREV,
+    F_LATCHED_VALID,
+    F_RTC,
+    F_LATCHED_RTC
+  };
 
   static byte_t rtc_reg_read(const RtcRegs &r, byte_t const reg) {
     switch (reg) {
@@ -239,7 +282,7 @@ private:
 std::unique_ptr<Mbc> make_mbc3(const cart &c) {
   const bool has_rtc =
       c.header.cartridge_type == 0x0F || // MBC3+TIMER+BATTERY
-      c.header.cartridge_type == 0x10;  // MBC3+TIMER+RAM+BATTERY
+      c.header.cartridge_type == 0x10;   // MBC3+TIMER+RAM+BATTERY
   return std::make_unique<Mbc3>(c.rom_span(), c.declared_ram_bytes,
                                 type_has_battery(c.header.cartridge_type),
                                 has_rtc, c.special_mbc == MBC30_t);

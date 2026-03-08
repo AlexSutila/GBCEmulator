@@ -1,6 +1,7 @@
 #include "cart/cart.hpp"
 #include "cart/mbc.hpp"
 #include "cart/mbc_creator.hpp"
+#include "savestate/codec.hpp"
 
 // ---------------------------
 // M161 (32 KiB multicart, one-time bank switch)
@@ -14,7 +15,8 @@
 // ROM bank number (00-07)                (0000-7FFF)
 // Notes:
 // - Entire 0000-7FFF region is switched as a single 32 KiB bank.
-// - Only 1 bank switch is allowed per power session; further writes are ignored.
+// - Only 1 bank switch is allowed per power session; further writes are
+//   ignored.
 
 class M161 final : public Mbc {
 public:
@@ -39,7 +41,26 @@ public:
     latched_ = true; // Any write consumes the single allowed bank switch.
   }
 
+  template <typename T> void parse_savestate_impl(T &t) {
+    constexpr auto version = 1; // Schema revision
+    t.chunk_header(version, Savestate::C_MBC_M161);
+    t.field_generic(F_BANK, bank_);
+    t.field_generic(F_LATCHED, latched_);
+    t.eof();
+  }
+
+  void parse_savestate(Savestate::Writer &t) override {
+    parse_savestate_impl(t);
+  }
+  void parse_savestate(Savestate::Reader &t) override {
+    parse_savestate_impl(t);
+  }
+  void parse_savestate(Savestate::Sizer &t) override {
+    parse_savestate_impl(t);
+  }
+
 private:
+  enum : std::uint16_t { F_BANK = 1, F_LATCHED };
   std::span<const byte_t> rom_;
 
   static constexpr std::size_t kBank32k = 0x8000;

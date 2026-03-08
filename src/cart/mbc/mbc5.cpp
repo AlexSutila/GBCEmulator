@@ -1,6 +1,7 @@
 #include "cart/cart.hpp"
 #include "cart/mbc.hpp"
 #include "cart/mbc_creator.hpp"
+#include "savestate/codec.hpp"
 
 // ---------------------------
 // MBC5
@@ -75,6 +76,26 @@ public:
   }
   std::span<byte_t> ram() noexcept override { return ram_; }
 
+  template <typename T> void parse_savestate_impl(T &t) {
+    constexpr auto version = 1; // Schema revision
+    t.chunk_header(version, Savestate::C_MBC_5);
+    t.field_generic(F_RAM_ENABLED, ram_enabled_);
+    t.field_generic(F_ROM_BANK, rom_bank_);
+    t.field_generic(F_RAM_ENABLED, ram_bank_);
+    t.field_generic(F_RUMBLE_ON, rumble_on_);
+    t.eof();
+  }
+
+  void parse_savestate(Savestate::Writer &t) override {
+    parse_savestate_impl(t);
+  }
+  void parse_savestate(Savestate::Reader &t) override {
+    parse_savestate_impl(t);
+  }
+  void parse_savestate(Savestate::Sizer &t) override {
+    parse_savestate_impl(t);
+  }
+
 private:
   std::span<const byte_t> rom_;
   std::vector<byte_t> ram_;
@@ -89,6 +110,13 @@ private:
   bool rumble_on_{false}; // This is the physical state of rumble. Turning it on
                           // has no effect. If we somehow port it to a handset
                           // then this can be hooked up to some motors
+
+  enum : std::uint16_t {
+    F_RAM_ENABLED = 1,
+    F_ROM_BANK,
+    F_RAM_BANK,
+    F_RUMBLE_ON
+  };
 };
 
 std::unique_ptr<Mbc> make_mbc5(const cart &c) {
