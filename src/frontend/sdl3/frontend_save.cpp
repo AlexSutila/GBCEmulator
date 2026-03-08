@@ -629,6 +629,7 @@ void SDL3Frontend::release_savestate_textures_locked() {
       SDL_DestroyTexture(entry.thumb_texture);
       entry.thumb_texture = nullptr;
     }
+    entry.thumb_renderer = nullptr;
     entry.thumb_texture_attempted = false;
   }
 }
@@ -1054,7 +1055,8 @@ void SDL3Frontend::refresh_savestate_entries_locked(const bool force_refresh) {
     savestate_selected_path_.reset();
 }
 
-void SDL3Frontend::build_savestate_manager_window_locked() {
+void SDL3Frontend::build_savestate_manager_window_locked(
+    const bool fill_viewport) {
   if (!ui_state.show_savestate_manager)
     return;
   refresh_savestate_entries_locked(false);
@@ -1080,9 +1082,11 @@ void SDL3Frontend::build_savestate_manager_window_locked() {
   };
 
   gui.build_savestate_manager_window(
-      ui_state, host, static_cast<bool>(gbc), savestate_dir_,
+      ui_state, gui.active_renderer() ? gui.active_renderer()
+                                      : host.get_renderer(),
+      static_cast<bool>(gbc), savestate_dir_,
       savestate_manual_label_input_, savestate_entries_, savestate_selected_path_,
-      callbacks);
+      callbacks, fill_viewport);
 }
 
 [[nodiscard]] bool SDL3Frontend::should_preempt_emu_loop() const {

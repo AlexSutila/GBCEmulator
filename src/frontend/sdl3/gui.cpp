@@ -61,31 +61,187 @@ std::string cheat_display_name(const Settings::CheatEntry &entry,
     return entry.code;
   return "Cheat " + std::to_string(index + 1);
 }
+
+using DialogId = GbcImGui::DialogId;
+
+struct DetachedDialogSpec {
+  DialogId id;
+  const char *window_title;
+  bool UiState::*visible_flag;
+  int default_width;
+  int default_height;
+  bool detached;
+};
+
+constexpr std::array<DetachedDialogSpec,
+                     static_cast<std::size_t>(DialogId::Count)>
+    kDetachedDialogSpecs{{
+        {DialogId::Settings, "Settings", &UiState::show_settings, 800,
+         550, true},
+        {DialogId::Cheats, "Cheats", &UiState::show_cheats, 850, 600,
+         true},
+        {DialogId::Keybinds, "Keybinds", &UiState::show_keybinds, 480,
+         500, true},
+        {DialogId::Savestates, "Save States",
+         &UiState::show_savestate_manager, 990, 615, true},
+        {DialogId::DebugMain, "Debugger",
+         &UiState::show_main_debug_viewer, 790, 460, true},
+        {DialogId::Breakpoints, "Breakpoints",
+         &UiState::show_breakpoints, 360, 400, true},
+        {DialogId::MemoryViewer, "Memory Viewer",
+         &UiState::show_memory_viewer, 840, 660, true},
+        {DialogId::PpuViewer, "PPU Viewer", &UiState::show_ppu_viewer,
+         425, 570, true},
+    }};
+
+[[nodiscard]] constexpr const DetachedDialogSpec &
+dialog_spec(const DialogId id) {
+  return kDetachedDialogSpecs[static_cast<std::size_t>(id)];
+}
+
+[[nodiscard]] bool window_is_hidden(SDL_Window *window) {
+  return !window || (SDL_GetWindowFlags(window) & SDL_WINDOW_HIDDEN) != 0;
+}
+
+constexpr SDL_WindowFlags kDetachedDialogWindowFlags =
+    SDL_WINDOW_HIDDEN | SDL_WINDOW_BORDERLESS | SDL_WINDOW_RESIZABLE |
+    SDL_WINDOW_HIGH_PIXEL_DENSITY;
+
+constexpr ImGuiWindowFlags kDetachedCanvasWindowFlags =
+    ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
+    ImGuiWindowFlags_NoSavedSettings;
+
+SDL_HitTestResult SDLCALL detached_dialog_hit_test(SDL_Window *window,
+                                                   const SDL_Point *area,
+                                                   void * /*data*/) {
+  if (!window || !area)
+    return SDL_HITTEST_NORMAL;
+
+  int width = 0;
+  int height = 0;
+  SDL_GetWindowSize(window, &width, &height);
+  if (width <= 0 || height <= 0)
+    return SDL_HITTEST_NORMAL;
+
+  const float scale = SDL_GetWindowDisplayScale(window);
+  const int resize_border = std::max(6, static_cast<int>(std::lround(6.0f * scale)));
+  const int title_bar_height =
+      std::max(28, static_cast<int>(std::lround(28.0f * scale)));
+  const int close_button_width =
+      std::max(48, static_cast<int>(std::lround(48.0f * scale)));
+
+  const bool left = area->x < resize_border;
+  const bool right = area->x >= width - resize_border;
+  const bool top = area->y < resize_border;
+  const bool bottom = area->y >= height - resize_border;
+
+  if (top && left)
+    return SDL_HITTEST_RESIZE_TOPLEFT;
+  if (top && right)
+    return SDL_HITTEST_RESIZE_TOPRIGHT;
+  if (bottom && left)
+    return SDL_HITTEST_RESIZE_BOTTOMLEFT;
+  if (bottom && right)
+    return SDL_HITTEST_RESIZE_BOTTOMRIGHT;
+  if (top)
+    return SDL_HITTEST_RESIZE_TOP;
+  if (bottom)
+    return SDL_HITTEST_RESIZE_BOTTOM;
+  if (left)
+    return SDL_HITTEST_RESIZE_LEFT;
+  if (right)
+    return SDL_HITTEST_RESIZE_RIGHT;
+
+  const bool in_drag_strip = area->y < title_bar_height;
+  const bool over_close_button = area->x >= width - close_button_width;
+  if (in_drag_strip && !over_close_button)
+    return SDL_HITTEST_DRAGGABLE;
+
+  return SDL_HITTEST_NORMAL;
+}
+
+void setup_full_viewport_window(ImGuiWindowFlags &flags) {
+  if (const ImGuiViewport *viewport = ImGui::GetMainViewport(); viewport) {
+    ImGui::SetNextWindowPos(viewport->Pos, ImGuiCond_Always);
+    ImGui::SetNextWindowSize(viewport->Size, ImGuiCond_Always);
+  }
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+  flags |= kDetachedCanvasWindowFlags;
+}
+
+void teardown_full_viewport_window(const bool enabled) {
+  if (enabled) {
+    ImGui::PopStyleVar(2);
+  }
+}
 } // namespace
+
+void GbcImGui::activate_context(const ImGuiContextState &ctx) {
+  if (!ctx.context)
+    return;
+  ImGui::SetCurrentContext(ctx.context);
+  dpi_scale = ctx.dpi_scale;
+  active_renderer_ = ctx.renderer;
+}
+
+void GbcImGui::init_context(ImGuiContextState &ctx, SDL_Window *window,
+                            SDL_Renderer *renderer, const bool owns_window) {
+  ctx.window = window;
+  ctx.renderer = renderer;
+  ctx.owns_window = owns_window;
+  ctx.context = ImGui::CreateContext();
+  activate_context(ctx);
+  ImGui::StyleColorsDark();
+
+  if (!ImGui_ImplSDL3_InitForSDLRenderer(window, renderer)) {
+    ImGui::DestroyContext(ctx.context);
+    ctx = {};
+    throw std::runtime_error("Failed to initialize ImGui SDL3 backend");
+  }
+  if (!ImGui_ImplSDLRenderer3_Init(renderer)) {
+    ImGui_ImplSDL3_Shutdown();
+    ImGui::DestroyContext(ctx.context);
+    ctx = {};
+    throw std::runtime_error("Failed to initialize ImGui SDL renderer backend");
+  }
+
+  ctx.dpi_scale = 1.0f;
+  update_dpi_scale(ctx, SDL_GetWindowDisplayScale(window));
+
+  const ImGuiIO &io = ImGui::GetIO();
+  if (fs::exists(font))
+    io.Fonts->AddFontFromFileTTF(font.c_str(), base_font_size);
+}
+
+void GbcImGui::shutdown_context(ImGuiContextState &ctx) {
+  if (!ctx.context)
+    return;
+
+  activate_context(ctx);
+  ImGui_ImplSDLRenderer3_Shutdown();
+  ImGui_ImplSDL3_Shutdown();
+  ImGui::DestroyContext(ctx.context);
+
+  ctx.context = nullptr;
+  if (ctx.owns_window) {
+    if (ctx.renderer)
+      SDL_DestroyRenderer(ctx.renderer);
+    if (ctx.window)
+      SDL_DestroyWindow(ctx.window);
+  }
+  ctx.window = nullptr;
+  ctx.renderer = nullptr;
+  ctx.dpi_scale = 1.0f;
+  ctx.owns_window = false;
+}
 
 void GbcImGui::init(const SDLHost &host) {
   settings = Settings::load();
 
-  /* ImGui initialization */
   IMGUI_CHECKVERSION();
-  ImGui::CreateContext();
-  ImGui::StyleColorsDark();
-
-  if (!ImGui_ImplSDL3_InitForSDLRenderer(host.get_window(),
-                                         host.get_renderer()))
-    throw std::runtime_error("Failed to initialize ImGui SDL3 backend");
-  if (!ImGui_ImplSDLRenderer3_Init(host.get_renderer()))
-    throw std::runtime_error("Failed to initialize ImGui SDL renderer backend");
-
-  const ImGuiIO &io = ImGui::GetIO();
-
-  dpi_scale = SDL_GetWindowDisplayScale(host.get_window());
-  update_dpi_scale(dpi_scale);
-
-  // HiDPI scaling
-  if (fs::exists(font)) {
-    io.Fonts->AddFontFromFileTTF(font.c_str(), base_font_size);
-  }
+  init_context(main_context_, host.get_window(), host.get_renderer(), false);
+  use_main_context();
 
   rom_sel_conf.path = settings.rom_dir;
   rom_sel_conf.flags =
@@ -99,11 +255,175 @@ void GbcImGui::init(const SDLHost &host) {
   }
 }
 
-void GbcImGui::shutdown() const {
+void GbcImGui::shutdown() {
   settings.save();
-  ImGui_ImplSDLRenderer3_Shutdown();
-  ImGui_ImplSDL3_Shutdown();
-  ImGui::DestroyContext();
+  for (auto &ctx : detached_dialogs_) {
+    shutdown_context(ctx);
+  }
+  shutdown_context(main_context_);
+  active_renderer_ = nullptr;
+}
+
+void GbcImGui::use_main_context() { activate_context(main_context_); }
+
+void GbcImGui::prepare_dialog_windows(const UiState &state) {
+  sync_detached_dialogs(state);
+  use_main_context();
+}
+
+bool GbcImGui::dialog_is_detached(const DialogId id) {
+  return dialog_spec(id).detached;
+}
+
+bool GbcImGui::has_detached_dialog_context(const DialogId id) const {
+  return detached_dialogs_[dialog_index(id)].context != nullptr;
+}
+
+void GbcImGui::render_dialog(const DialogId id, UiState &state, SDLHost &host) {
+  switch (id) {
+  case DialogId::Settings:
+    build_settings_window(state, host);
+    break;
+  case DialogId::Cheats:
+    build_cheats_window(state);
+    break;
+  case DialogId::Keybinds:
+    build_keybinds_window(state);
+    break;
+  default:
+    break;
+  }
+}
+
+void GbcImGui::ensure_detached_dialog_context(const DialogId id) {
+  if (!dialog_is_detached(id))
+    return;
+
+  auto &ctx = detached_dialogs_[dialog_index(id)];
+  if (ctx.context)
+    return;
+
+  const auto &spec = dialog_spec(id);
+  SDL_Window *window =
+      SDL_CreateWindow(spec.window_title, spec.default_width,
+                       spec.default_height, kDetachedDialogWindowFlags);
+  if (!window)
+    return;
+
+  SDL_Renderer *renderer = SDL_CreateRenderer(window, nullptr);
+  if (!renderer) {
+    SDL_DestroyWindow(window);
+    return;
+  }
+
+  SDL_SetWindowHitTest(window, detached_dialog_hit_test, nullptr);
+
+  SDL_SetRenderVSync(renderer, 0);
+  try {
+    init_context(ctx, window, renderer, true);
+  } catch (...) {
+    SDL_DestroyRenderer(renderer);
+    SDL_DestroyWindow(window);
+    ctx = {};
+  }
+}
+
+void GbcImGui::hide_detached_dialog(const DialogId id) const {
+  auto &ctx = detached_dialogs_[dialog_index(id)];
+  if (ctx.window && !window_is_hidden(ctx.window)) {
+    SDL_HideWindow(ctx.window);
+  }
+}
+
+void GbcImGui::sync_detached_dialogs(const UiState &state) {
+  for (const auto &spec : kDetachedDialogSpecs) {
+    if (!spec.detached)
+      continue;
+
+    if (dialog_visible(spec.id, state)) {
+      ensure_detached_dialog_context(spec.id);
+      auto &ctx = detached_dialogs_[dialog_index(spec.id)];
+      if (ctx.window && window_is_hidden(ctx.window)) {
+        SDL_ShowWindow(ctx.window);
+        SDL_RaiseWindow(ctx.window);
+      }
+    } else {
+      hide_detached_dialog(spec.id);
+    }
+  }
+}
+
+void GbcImGui::close_detached_dialog(const DialogId id, UiState &state) {
+  state.*(dialog_spec(id).visible_flag) = false;
+}
+
+bool GbcImGui::dialog_visible(const DialogId id, const UiState &state) {
+  return state.*(dialog_spec(id).visible_flag);
+}
+
+bool GbcImGui::rendering_detached_dialog(const DialogId id) const {
+  const auto &ctx = detached_dialogs_[dialog_index(id)];
+  return ctx.context && ImGui::GetCurrentContext() == ctx.context;
+}
+
+GbcImGui::ImGuiContextState *
+GbcImGui::find_context_for_window(const Uint32 window_id) {
+  if (main_context_.window &&
+      SDL_GetWindowID(main_context_.window) == window_id) {
+    return &main_context_;
+  }
+
+  for (auto &ctx : detached_dialogs_) {
+    if (ctx.window && SDL_GetWindowID(ctx.window) == window_id) {
+      return &ctx;
+    }
+  }
+  return nullptr;
+}
+
+const GbcImGui::ImGuiContextState *
+GbcImGui::find_context_for_window(const Uint32 window_id) const {
+  if (main_context_.window &&
+      SDL_GetWindowID(main_context_.window) == window_id) {
+    return &main_context_;
+  }
+
+  for (const auto &ctx : detached_dialogs_) {
+    if (ctx.window && SDL_GetWindowID(ctx.window) == window_id) {
+      return &ctx;
+    }
+  }
+  return nullptr;
+}
+
+bool GbcImGui::use_detached_dialog_context(const DialogId id, UiState &state) {
+  if (!dialog_is_detached(id) || !dialog_visible(id, state))
+    return false;
+
+  ensure_detached_dialog_context(id);
+  auto &ctx = detached_dialogs_[dialog_index(id)];
+  if (!ctx.context)
+    return false;
+
+  if (ctx.window && window_is_hidden(ctx.window)) {
+    SDL_ShowWindow(ctx.window);
+    SDL_RaiseWindow(ctx.window);
+  }
+
+  activate_context(ctx);
+  return true;
+}
+
+void GbcImGui::present_detached_dialog(const DialogId id) const {
+  const auto &ctx = detached_dialogs_[dialog_index(id)];
+  if (!ctx.context || !ctx.renderer || window_is_hidden(ctx.window))
+    return;
+
+  ImGui::SetCurrentContext(ctx.context);
+  SDL_SetRenderDrawColor(ctx.renderer, 18, 18, 18, 255);
+  SDL_RenderClear(ctx.renderer);
+  ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), ctx.renderer);
+  SDL_RenderPresent(ctx.renderer);
 }
 
 void GbcImGui::render(UiState &state, SDLHost &host) {
@@ -120,12 +440,21 @@ void GbcImGui::render(UiState &state, SDLHost &host) {
   build_status_bar(state);
   build_file_dialogs(state);
   build_rom_source_window(state);
-  if (state.show_settings)
-    build_settings_window(state, host);
-  if (state.show_cheats)
-    build_cheats_window(state);
-  if (state.show_keybinds)
-    build_keybinds_window(state);
+  if (state.show_settings &&
+      (!dialog_is_detached(DialogId::Settings) ||
+       !has_detached_dialog_context(DialogId::Settings))) {
+    render_dialog(DialogId::Settings, state, host);
+  }
+  if (state.show_cheats &&
+      (!dialog_is_detached(DialogId::Cheats) ||
+       !has_detached_dialog_context(DialogId::Cheats))) {
+    render_dialog(DialogId::Cheats, state, host);
+  }
+  if (state.show_keybinds &&
+      (!dialog_is_detached(DialogId::Keybinds) ||
+       !has_detached_dialog_context(DialogId::Keybinds))) {
+    render_dialog(DialogId::Keybinds, state, host);
+  }
   if (state.show_notifications)
     build_notification_window(state);
   if (state.show_about)
@@ -137,15 +466,42 @@ void GbcImGui::render(UiState &state, SDLHost &host) {
 // Returns true if the event was handled by the GUI and should be ignored by the
 // game
 bool GbcImGui::process_event(const SDL_Event &e, UiState &ui_state) {
+  if (e.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED) {
+    for (std::size_t i = 0; i < detached_dialogs_.size(); ++i) {
+      auto &ctx = detached_dialogs_[i];
+      if (!ctx.window || e.window.windowID != SDL_GetWindowID(ctx.window))
+        continue;
+
+      const auto id = static_cast<DialogId>(i);
+      close_detached_dialog(id, ui_state);
+      hide_detached_dialog(id);
+      use_main_context();
+      return true;
+    }
+  }
+
+  use_main_context();
   ImGui_ImplSDL3_ProcessEvent(&e);
+  for (auto &ctx : detached_dialogs_) {
+    if (!ctx.context)
+      continue;
+    activate_context(ctx);
+    ImGui_ImplSDL3_ProcessEvent(&e);
+  }
 
   // Handle DPI changes
   if (e.type == SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED) {
+    ImGuiContextState *ctx = find_context_for_window(e.window.windowID);
+
     // The event data contains the new scale, but it's safer to query the window
     // because SDL validates it against the specific display
-    if (SDL_Window *window = SDL_GetWindowFromID(e.window.windowID)) {
+    SDL_Window *window = nullptr;
+    if (ctx)
+      window = SDL_GetWindowFromID(e.window.windowID);
+    if (ctx && window) {
+      activate_context(*ctx);
       if (const float new_scale = SDL_GetWindowDisplayScale(window);
-          std::abs(new_scale - dpi_scale) > 0.001f) {
+          std::abs(new_scale - ctx->dpi_scale) > 0.001f) {
         // We also want to resize the window to maintain physical size
         if (const Uint32 flags = SDL_GetWindowFlags(window);
             !(flags & (SDL_WINDOW_MAXIMIZED | SDL_WINDOW_FULLSCREEN))) {
@@ -154,14 +510,15 @@ bool GbcImGui::process_event(const SDL_Event &e, UiState &ui_state) {
 
           // If moving 2.0x -> 1.0x, ratio is 0.5.
           // Window should shrink by half to look the same physical size.
-          const float ratio = new_scale / dpi_scale;
+          const float ratio = new_scale / ctx->dpi_scale;
           SDL_SetWindowSize(window,
                             static_cast<int>(static_cast<float>(w) * ratio),
                             static_cast<int>(static_cast<float>(h) * ratio));
         }
-        update_dpi_scale(new_scale);
+        update_dpi_scale(*ctx, new_scale);
       }
     }
+    use_main_context();
     return false; // Pass this event to the game (SDLHost might need it too)
   }
 
@@ -180,13 +537,30 @@ bool GbcImGui::process_event(const SDL_Event &e, UiState &ui_state) {
         }
       }
       ui_state.waiting_for_bind.reset();
+      use_main_context();
       return true; // CONSUMED: this keypress won't press a button in-game
     }
     // Handle ImGui capture (e.g. typing in a file dialog)
-    if (ImGui::GetIO().WantCaptureKeyboard) {
+    bool wants_keyboard = false;
+    activate_context(main_context_);
+    wants_keyboard = ImGui::GetIO().WantCaptureKeyboard;
+    if (!wants_keyboard) {
+      for (auto &ctx : detached_dialogs_) {
+        if (!ctx.context || window_is_hidden(ctx.window))
+          continue;
+        activate_context(ctx);
+        if (ImGui::GetIO().WantCaptureKeyboard) {
+          wants_keyboard = true;
+          break;
+        }
+      }
+    }
+    use_main_context();
+    if (wants_keyboard) {
       return true; // CONSUMED
     }
   }
+  use_main_context();
   return false; // NOT CONSUMED: pass to game loop
 }
 
@@ -590,7 +964,12 @@ void GbcImGui::build_rom_source_window(UiState &state) const {
 }
 
 void GbcImGui::build_settings_window(UiState &state, SDLHost &host) {
-  ImGui::Begin("Settings", &state.show_settings);
+  ImGuiWindowFlags flags = 0;
+  const bool fill_viewport = rendering_detached_dialog(DialogId::Settings);
+  if (fill_viewport) {
+    setup_full_viewport_window(flags);
+  }
+  ImGui::Begin("Settings", &state.show_settings, flags);
   ImGui::SeparatorText("General");
   ImGui::Checkbox("Fast forward", &state.fast_forward);
   ImGui::Checkbox("Force DMG monochrome", &settings.force_mono_dmg);
@@ -720,13 +1099,21 @@ void GbcImGui::build_settings_window(UiState &state, SDLHost &host) {
                  static_cast<int>(state.audio_device_names.size()) - 1);
   }
   ImGui::End();
+  teardown_full_viewport_window(fill_viewport);
 }
 
 void GbcImGui::build_cheats_window(UiState &state) {
-  ImGui::SetNextWindowSize(ImVec2(860.0f * dpi_scale, 520.0f * dpi_scale),
-                           ImGuiCond_FirstUseEver);
-  if (!ImGui::Begin("Cheats", &state.show_cheats)) {
+  ImGuiWindowFlags flags = 0;
+  const bool fill_viewport = rendering_detached_dialog(DialogId::Cheats);
+  if (fill_viewport) {
+    setup_full_viewport_window(flags);
+  } else {
+    ImGui::SetNextWindowSize(ImVec2(860.0f * dpi_scale, 520.0f * dpi_scale),
+                             ImGuiCond_FirstUseEver);
+  }
+  if (!ImGui::Begin("Cheats", &state.show_cheats, flags)) {
     ImGui::End();
+    teardown_full_viewport_window(fill_viewport);
     return;
   }
 
@@ -883,27 +1270,35 @@ void GbcImGui::build_cheats_window(UiState &state) {
     state.cheats_file_dirty = true;
   }
   ImGui::End();
+  teardown_full_viewport_window(fill_viewport);
 }
 
 void GbcImGui::build_savestate_manager_window(
-    UiState &state, const SDLHost &host, const bool emulator_ready,
+    UiState &state, SDL_Renderer *renderer, const bool emulator_ready,
     const std::filesystem::path &savestate_dir,
     std::array<char, 96> &manual_label_input,
     std::vector<SavestateEntry> &savestate_entries,
     std::optional<std::filesystem::path> &savestate_selected_path,
-    const SavestateManagerCallbacks &callbacks) {
+    const SavestateManagerCallbacks &callbacks, const bool fill_viewport) {
   if (!state.show_savestate_manager)
     return;
 
-  ImGui::SetNextWindowSize(ImVec2(920, 560), ImGuiCond_FirstUseEver);
-  if (!ImGui::Begin("Save States", &state.show_savestate_manager)) {
+  ImGuiWindowFlags flags = 0;
+  if (fill_viewport) {
+    setup_full_viewport_window(flags);
+  } else {
+    ImGui::SetNextWindowSize(ImVec2(920, 560), ImGuiCond_FirstUseEver);
+  }
+  if (!ImGui::Begin("Save States", &state.show_savestate_manager, flags)) {
     ImGui::End();
+    teardown_full_viewport_window(fill_viewport);
     return;
   }
 
   if (savestate_dir.empty()) {
     ImGui::TextDisabled("Load a ROM to manage savestates.");
     ImGui::End();
+    teardown_full_viewport_window(fill_viewport);
     return;
   }
 
@@ -1013,16 +1408,23 @@ void GbcImGui::build_savestate_manager_window(
       }
 
       ImGui::SeparatorText("Thumbnail");
-      if (!entry.thumb_texture && !entry.thumb_texture_attempted) {
+      if (entry.thumb_texture && entry.thumb_renderer != renderer) {
+        SDL_DestroyTexture(entry.thumb_texture);
+        entry.thumb_texture = nullptr;
+        entry.thumb_texture_attempted = false;
+        entry.thumb_renderer = nullptr;
+      }
+      if (renderer && !entry.thumb_texture && !entry.thumb_texture_attempted) {
         entry.thumb_texture_attempted = true;
         if (std::filesystem::exists(entry.thumb_path)) {
           if (const auto pixels = read_thumb_raw_argb_gui(
                   entry.thumb_path, entry.thumb_w, entry.thumb_h);
               pixels.has_value()) {
             entry.thumb_texture = SDL_CreateTexture(
-                host.get_renderer(), SDL_PIXELFORMAT_ARGB8888,
-                SDL_TEXTUREACCESS_STATIC, entry.thumb_w, entry.thumb_h);
+                renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC,
+                entry.thumb_w, entry.thumb_h);
             if (entry.thumb_texture) {
+              entry.thumb_renderer = renderer;
               SDL_UpdateTexture(entry.thumb_texture, nullptr, pixels->data(),
                                 entry.thumb_w *
                                     static_cast<int>(sizeof(std::uint32_t)));
@@ -1054,10 +1456,16 @@ void GbcImGui::build_savestate_manager_window(
   }
 
   ImGui::End();
+  teardown_full_viewport_window(fill_viewport);
 }
 
 void GbcImGui::build_keybinds_window(UiState &state) {
-  ImGui::Begin("Keybinds", &state.show_keybinds);
+  ImGuiWindowFlags flags = 0;
+  const bool fill_viewport = rendering_detached_dialog(DialogId::Keybinds);
+  if (fill_viewport) {
+    setup_full_viewport_window(flags);
+  }
+  ImGui::Begin("Keybinds", &state.show_keybinds, flags);
   ImGui::SeparatorText("Gameplay");
   // Build an array of names for ImGui::Combo
   static std::array<const char *, kPresets.size()> preset_names{};
@@ -1114,16 +1522,17 @@ void GbcImGui::build_keybinds_window(UiState &state) {
   }
 
   ImGui::End();
+  teardown_full_viewport_window(fill_viewport);
 }
 
-void GbcImGui::update_dpi_scale(const float new_scale) {
+void GbcImGui::update_dpi_scale(ImGuiContextState &ctx, const float new_scale) {
   ImGui::GetStyle() = ImGuiStyle();
   ImGui::StyleColorsDark();
   ImGuiStyle &style = ImGui::GetStyle();
 
   style.FontScaleDpi = new_scale;
   // Calculate relative change (e.g., moving 1.0 -> 2.0 means factor 2.0)
-  const float relative_scale = new_scale / dpi_scale;
+  const float relative_scale = new_scale / ctx.dpi_scale;
 
   // Scale all padding, rounding, and spacing
   style.ScaleAllSizes(relative_scale);
@@ -1142,6 +1551,7 @@ void GbcImGui::update_dpi_scale(const float new_scale) {
     }
   }
 
+  ctx.dpi_scale = new_scale;
   dpi_scale = new_scale;
 }
 

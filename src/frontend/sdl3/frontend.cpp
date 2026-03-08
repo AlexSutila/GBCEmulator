@@ -42,7 +42,7 @@ SDL3Frontend::SDL3Frontend() : host(framebuf_width, framebuf_height, scale) {
       static_cast<int>(std::ceil(ImGui::GetFrameHeight()));
   SDL_SetWindowSize(host.get_window(), framebuf_width * scale,
                     framebuf_height * scale + bar_height_px * 2);
-  debugger.init(host);
+  debugger.init();
   SDL_AddEventWatch(reinterpret_cast<SDL_EventFilter>(event_watcher), this);
   framebuffers[0] =
       std::make_unique<std::uint32_t[]>(framebuf_height * framebuf_width);
@@ -268,6 +268,11 @@ void SDL3Frontend::render_frame() {
 
   // --- PHASE 2: UI COMPOSITION ---
   // 1. Start the ImGui frame
+  {
+    std::lock_guard lock(ui_mutex);
+    gui.prepare_dialog_windows(ui_state);
+  }
+  gui.use_main_context();
   GbcImGui::new_frame();
   // 2. Build the UI Windows
   bool request_quit = false;
@@ -286,7 +291,38 @@ void SDL3Frontend::render_frame() {
       ui_state.cheats_file_dirty = false;
       save_active_cheats_locked();
     }
-    build_savestate_manager_window_locked();
+
+    if (ui_state.show_savestate_manager &&
+        (!GbcImGui::dialog_is_detached(GbcImGui::DialogId::Savestates) ||
+         !gui.has_detached_dialog_context(GbcImGui::DialogId::Savestates))) {
+      build_savestate_manager_window_locked(false);
+    }
+
+    if (ui_state.show_main_debug_viewer &&
+        (!GbcImGui::dialog_is_detached(GbcImGui::DialogId::DebugMain) ||
+         !gui.has_detached_dialog_context(GbcImGui::DialogId::DebugMain))) {
+      debugger.render_dialog(GbcImGui::DialogId::DebugMain, ui_state, gbc,
+                             host.get_renderer(), false);
+    }
+    if (ui_state.show_breakpoints &&
+        (!GbcImGui::dialog_is_detached(GbcImGui::DialogId::Breakpoints) ||
+         !gui.has_detached_dialog_context(GbcImGui::DialogId::Breakpoints))) {
+      debugger.render_dialog(GbcImGui::DialogId::Breakpoints, ui_state, gbc,
+                             host.get_renderer(), false);
+    }
+    if (ui_state.show_memory_viewer &&
+        (!GbcImGui::dialog_is_detached(GbcImGui::DialogId::MemoryViewer) ||
+         !gui.has_detached_dialog_context(GbcImGui::DialogId::MemoryViewer))) {
+      debugger.render_dialog(GbcImGui::DialogId::MemoryViewer, ui_state, gbc,
+                             host.get_renderer(), false);
+    }
+    if (ui_state.show_ppu_viewer &&
+        (!GbcImGui::dialog_is_detached(GbcImGui::DialogId::PpuViewer) ||
+         !gui.has_detached_dialog_context(GbcImGui::DialogId::PpuViewer))) {
+      debugger.render_dialog(GbcImGui::DialogId::PpuViewer, ui_state, gbc,
+                             host.get_renderer(), false);
+    }
+
     poll_zip_choice_response();
     request_quit = ui_state.request_quit;
     if (request_quit)
@@ -319,12 +355,7 @@ void SDL3Frontend::render_frame() {
     startup_window_size_adjusted = true;
   }
 
-  // 3. Build debugger windows (if active)
-  if (ui_state.show_main_debug_viewer || ui_state.show_breakpoints ||
-      ui_state.show_ppu_viewer || ui_state.show_memory_viewer)
-    debugger.render(ui_state, gbc);
-
-  // 4. Finalize ImGui frame
+  // 3. Finalize ImGui frame
   GbcImGui::end_frame();
 
   // --- PHASE 3: DRAW TO SCREEN ---
@@ -336,6 +367,49 @@ void SDL3Frontend::render_frame() {
   host.draw_overlay(ImGui::GetDrawData());
   // 4. Swap buffers
   host.present();
+
+  const auto render_detached_dialog = [this]<typename RenderFn>(
+                                          const GbcImGui::DialogId id,
+                                          RenderFn &&render_fn) {
+    std::lock_guard lock(ui_mutex);
+    if (!gui.use_detached_dialog_context(id, ui_state))
+      return;
+
+    GbcImGui::new_frame();
+    render_fn();
+    GbcImGui::end_frame();
+    gui.present_detached_dialog(id);
+  };
+
+  render_detached_dialog(GbcImGui::DialogId::Settings,
+                         [&] { gui.render_dialog(GbcImGui::DialogId::Settings,
+                                                 ui_state, host); });
+  render_detached_dialog(GbcImGui::DialogId::Cheats,
+                         [&] { gui.render_dialog(GbcImGui::DialogId::Cheats,
+                                                 ui_state, host); });
+  render_detached_dialog(GbcImGui::DialogId::Keybinds,
+                         [&] { gui.render_dialog(GbcImGui::DialogId::Keybinds,
+                                                 ui_state, host); });
+  render_detached_dialog(GbcImGui::DialogId::Savestates,
+                         [&] { build_savestate_manager_window_locked(true); });
+  render_detached_dialog(
+      GbcImGui::DialogId::DebugMain,
+      [&] { debugger.render_dialog(GbcImGui::DialogId::DebugMain, ui_state, gbc,
+                                   gui.active_renderer(), true); });
+  render_detached_dialog(
+      GbcImGui::DialogId::Breakpoints,
+      [&] { debugger.render_dialog(GbcImGui::DialogId::Breakpoints, ui_state,
+                                   gbc, gui.active_renderer(), true); });
+  render_detached_dialog(
+      GbcImGui::DialogId::MemoryViewer,
+      [&] { debugger.render_dialog(GbcImGui::DialogId::MemoryViewer, ui_state,
+                                   gbc, gui.active_renderer(), true); });
+  render_detached_dialog(
+      GbcImGui::DialogId::PpuViewer,
+      [&] { debugger.render_dialog(GbcImGui::DialogId::PpuViewer, ui_state,
+                                   gbc, gui.active_renderer(), true); });
+
+  gui.use_main_context();
 }
 
 std::tuple<AddressBus *const, Cartridge *const, Joypad::JOYP *const>
@@ -367,8 +441,6 @@ SDL3Frontend::build_emulator_instance(
   if (!bus_ptr)
     throw std::runtime_error("Failed to acquire AddressBus resource");
   auto *const cart_ptr = bus_ptr->get_cartridge();
-  if (!bus_ptr)
-    throw std::runtime_error("Failed to acquire Cartridge resource");
   auto *joyp_ptr = dynamic_cast<Joypad::JOYP *>(
       gbc->get_bus()->get_mmio(IORegisterMapping::MMIO_JOYPAD));
   if (!joyp_ptr)
@@ -384,7 +456,6 @@ std::vector<byte_t> SDL3Frontend::prime_sram_saves(
     Cartridge *const cart_ptr) {
   using namespace std::filesystem;
   std::vector<byte_t> save_snapshot{};
-  std::error_code ec{};
 
   // Prime existing SRAM save, if it exists
   if (cart_ptr->has_battery() && initial_save_path.has_value()) {

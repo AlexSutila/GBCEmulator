@@ -41,7 +41,7 @@ FetchContent_MakeAvailable(picosha2)
 FetchContent_Declare(
     imgui
     GIT_REPOSITORY https://github.com/ocornut/imgui.git
-    GIT_TAG v1.92.5
+    GIT_TAG v1.92.6
 )
 FetchContent_MakeAvailable(imgui)
 
@@ -114,5 +114,8 @@ set_target_properties(gbc_full PROPERTIES
 )
 
 install(TARGETS gbc_full
-    RUNTIME DESTINATION bin
+        RUNTIME_DEPENDENCIES
+        PRE_EXCLUDE_REGEXES "api-ms-" "ext-ms-"
+        POST_EXCLUDE_REGEXES ".*/System32/.*\\.dll"
+        RUNTIME DESTINATION bin
 )

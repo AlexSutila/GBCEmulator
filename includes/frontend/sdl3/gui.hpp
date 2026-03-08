@@ -44,6 +44,18 @@ class GbcImGui {
   }};
 
 public:
+  enum class DialogId : std::size_t {
+    Settings,
+    Cheats,
+    Keybinds,
+    Savestates,
+    DebugMain,
+    Breakpoints,
+    MemoryViewer,
+    PpuViewer,
+    Count
+  };
+
   struct SavestateManagerCallbacks {
     std::function<void(const std::string &label)> queue_manual_save;
     std::function<void()> request_load_most_recent;
@@ -53,7 +65,7 @@ public:
   };
 
   void init(const SDLHost& host);
-  void shutdown() const;
+  void shutdown();
 
   // The main render pass for UI
   static void new_frame() {
@@ -61,6 +73,14 @@ public:
     ImGui_ImplSDL3_NewFrame();
     ImGui::NewFrame();
   }
+  void use_main_context();
+  void prepare_dialog_windows(const UiState &state);
+  [[nodiscard]] static bool dialog_is_detached(DialogId id);
+  [[nodiscard]] bool has_detached_dialog_context(DialogId id) const;
+  [[nodiscard]] bool use_detached_dialog_context(DialogId id, UiState &state);
+  void present_detached_dialog(DialogId id) const;
+  [[nodiscard]] SDL_Renderer *active_renderer() const { return active_renderer_; }
+  void render_dialog(DialogId id, UiState &state, SDLHost &host);
   void render(UiState& state, SDLHost& host);
   static void end_frame() {ImGui::Render();}
 
@@ -69,12 +89,13 @@ public:
   void clear_bios_path();
   bool process_event(const SDL_Event& e, UiState& ui_state);
   static void build_savestate_manager_window(
-      UiState &state, const SDLHost &host, bool emulator_ready,
+      UiState &state, SDL_Renderer *renderer, bool emulator_ready,
       const std::filesystem::path &savestate_dir,
       std::array<char, 96> &manual_label_input,
       std::vector<SavestateEntry> &savestate_entries,
       std::optional<std::filesystem::path> &savestate_selected_path,
-      const SavestateManagerCallbacks &callbacks);
+      const SavestateManagerCallbacks &callbacks,
+      bool fill_viewport = false);
 
   static void push_notification(UiState& state, LogLevel level, const std::string& type, const std::string& summary,
                                          const std::string& details = "", time_t timestamp= std::time(nullptr));
@@ -84,8 +105,38 @@ public:
   [[nodiscard]] Settings& get_settings() { return settings; }
 
 private:
+  struct ImGuiContextState {
+    ImGuiContext *context{nullptr};
+    SDL_Window *window{nullptr};
+    SDL_Renderer *renderer{nullptr};
+    float dpi_scale{1.0f};
+    bool owns_window{false};
+  };
+
   Settings settings;
   float dpi_scale{1.0f};
+  SDL_Renderer *active_renderer_{nullptr};
+  ImGuiContextState main_context_{};
+  std::array<ImGuiContextState, static_cast<std::size_t>(DialogId::Count)>
+      detached_dialogs_{};
+
+  void init_context(ImGuiContextState &ctx, SDL_Window *window,
+                    SDL_Renderer *renderer, bool owns_window);
+  void shutdown_context(ImGuiContextState &ctx);
+  void activate_context(const ImGuiContextState &ctx);
+  void update_dpi_scale(ImGuiContextState &ctx, float new_scale);
+  void ensure_detached_dialog_context(DialogId id);
+  void hide_detached_dialog(DialogId id) const;
+  void sync_detached_dialogs(const UiState &state);
+  static void close_detached_dialog(DialogId id, UiState &state);
+  [[nodiscard]] static bool dialog_visible(DialogId id, const UiState &state);
+  [[nodiscard]] bool rendering_detached_dialog(DialogId id) const;
+  [[nodiscard]] ImGuiContextState *find_context_for_window(Uint32 window_id);
+  [[nodiscard]] const ImGuiContextState *find_context_for_window(
+      Uint32 window_id) const;
+  [[nodiscard]] static constexpr std::size_t dialog_index(DialogId id) {
+    return static_cast<std::size_t>(id);
+  }
 
   void build_main_menu_bar(UiState& state) const;
   void build_status_bar(UiState &state) const;
@@ -101,7 +152,6 @@ private:
   // Helpers
   IGFD::FileDialogConfig rom_sel_conf;
   IGFD::FileDialogConfig bios_sel_conf;
-  void update_dpi_scale(float new_scale);
   [[nodiscard]] std::tuple<ImVec2, ImVec2> get_min_dialog_size() const ;
   static ImVec4 get_darkened_color(ImVec4 color, float factor);
   static void apply_keybind_preset(std::array<SDL_Keycode, 8>& array, int keybind_preset_index);
