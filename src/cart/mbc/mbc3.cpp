@@ -156,7 +156,7 @@ private:
   byte_t sel_{0}; // RAM bank or RTC reg selector
   byte_t latch_prev_{0}; // Latch clock data
 
-  struct RtcRegs {       // Implements RTC Register 08-0C. Note: this is an
+  struct RtcRegs { // Implements RTC Register 08-0C. Note: this is an
                    // abstraction, not a 1-to-1 replication of hw reg behavior
     byte_t sec{0}, min{0}, hour{0};
     std::uint16_t day{0};
