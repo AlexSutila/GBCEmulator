@@ -8,6 +8,7 @@ class AddressBus;
 
 class SerialUnit {
 public:
+  template <typename T> void parse_savestate(T &t);
   explicit SerialUnit(AddressBus *bus);
 
 private:

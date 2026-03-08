@@ -3,7 +3,29 @@
 #include "memory/bus.hpp"
 #include "memory/mmio/dmg.hpp"
 #include "memory/mmio/mmio.hpp"
+#include "savestate/codec.hpp"
+#include <cstdint>
 #include <stdexcept>
+
+enum : std::uint16_t {
+  F_SERIAL_DATA = 1,
+  F_SERIAL_CTRL,
+};
+
+template <typename T> void SerialUnit::parse_savestate(T &t) {
+  constexpr auto version = 1; // Schema revision
+  t.chunk_header(version, Savestate::C_SERIAL);
+
+  t.field_complex(F_SERIAL_DATA, [&](T &t) { serial_data.parse_savestate(t); });
+  t.field_complex(F_SERIAL_CTRL, [&](T &t) { serial_ctrl.parse_savestate(t); });
+  t.eof();
+}
+
+template void
+SerialUnit::parse_savestate<Savestate::Writer>(Savestate::Writer &);
+template void
+SerialUnit::parse_savestate<Savestate::Reader>(Savestate::Reader &);
+template void SerialUnit::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
 
 /*
  * TODO: We do not actually implement serial data transfers. The idea of doing
