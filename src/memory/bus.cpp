@@ -6,12 +6,19 @@
 #include "memory/mmio/cgb.hpp"
 #include "memory/mmio/dmg.hpp"
 #include "memory/mmio/mmio.hpp"
+#include "savestate/codec.hpp"
 
 #include <cassert>
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <stdexcept>
+
+constexpr std::size_t vram_bank_size = 0x2000;
+constexpr std::size_t wram_bank_size = 0x1000;
+constexpr std::size_t hram_size = 0x7F;
+constexpr std::size_t oam_size = 0xA0;
 
 /* To make the contents of this file slightly less egregious of a playground
  * for performing heap corruption exploits lmao */
@@ -55,6 +62,56 @@ static constexpr bool is_hram_range(const addr_t a) noexcept {
   return a >= 0xFF80 && a <= 0xFFFE;
 }
 
+enum : std::uint16_t {
+  F_VRAM = 1,
+  F_WRAM,
+  F_HRAM,
+  F_OAM,
+  F_BUS_CONFLICTS,
+  F_OAM_DMA,
+  F_VDMA,
+
+  // MMIO Resisgers
+  F_JOYPAD,
+  F_BOOT_ROM_CTRL,
+  F_WRAM_BANK,
+  F_VRAM_BANK,
+};
+
+template <typename T> void AddressBus::parse_savestate(T &t) {
+  constexpr auto version = 1; // Schema revision
+  t.chunk_header(version, Savestate::C_BUS);
+
+  // Memory sub-structures
+  for (auto &bank : vram) // Duplicate fields, but should be fine
+    t.field_bytes(F_VRAM, {bank.get(), vram_bank_size});
+  for (auto &bank : wram) // Duplicate fields, but should be fine
+    t.field_bytes(F_WRAM, {bank.get(), wram_bank_size});
+  t.field_bytes(F_HRAM, {hram.get(), hram_size});
+  t.field_bytes(F_OAM, {oam.get(), oam_size});
+  t.field_enum(F_BUS_CONFLICTS, bus_conflicts);
+
+  // Memory mapped registers
+  t.field_complex(F_BOOT_ROM_CTRL,
+                  [&](T &t) { boot_rom_ctrl.parse_savestate(t); });
+  t.field_complex(F_WRAM_BANK,
+                  [&](T &t) { wram_bank_ctrl.parse_savestate(t); });
+  t.field_complex(F_VRAM_BANK,
+                  [&](T &t) { vram_bank_ctrl.parse_savestate(t); });
+  t.field_complex(F_JOYPAD, [&](T &t) { joypad_.parse_savestate(t); });
+
+  // Direct memory access sub-structures
+  t.field_complex(F_OAM_DMA, [&](T &t) { oam_dma.parse_savestate(t); });
+  t.field_complex(F_VDMA, [&](T &t) { vdma.parse_savestate(t); });
+  t.eof();
+}
+
+template void
+AddressBus::parse_savestate<Savestate::Writer>(Savestate::Writer &);
+template void
+AddressBus::parse_savestate<Savestate::Reader>(Savestate::Reader &);
+template void AddressBus::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
+
 AddressBus::AddressBus(runtime_sys_info &sys,
                        std::optional<Debug::Debugger> &debugger,
                        std::optional<BootROM> &bios)
@@ -66,10 +123,6 @@ AddressBus::AddressBus(runtime_sys_info &sys,
       bios_(bios),          // Optionally configured by frontend
       sys_(sys)             // Generic system information
 {
-  constexpr std::size_t vram_bank_size = 0x2000;
-  constexpr std::size_t wram_bank_size = 0x1000;
-  constexpr std::size_t hram_size = 0x7F;
-  constexpr std::size_t oam_size = 0xA0;
   using mmio = IORegisterMapping;
   using namespace std::ranges;
 

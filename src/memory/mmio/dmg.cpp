@@ -1,6 +1,7 @@
 #include "memory/mmio/dmg.hpp"
 #include "cpu/interrupts.hpp"
 #include "emu_types.hpp"
+#include "savestate/codec.hpp"
 #include "timer.hpp"
 #include <cassert>
 
@@ -123,6 +124,17 @@ void DMA::write(const byte_t value) {
 
 /* Always start with boot ROM mapped */
 BootROMCtrl::BootROMCtrl() : MMIORegister() { map_boot_rom = true; }
+
+template <typename T> void BootROMCtrl::parse_savestate(T &t) {
+  t.field_generic(1, map_boot_rom); // Not enum worthy
+}
+
+template void
+BootROMCtrl::parse_savestate<Savestate::Writer>(Savestate::Writer &);
+template void
+BootROMCtrl::parse_savestate<Savestate::Reader>(Savestate::Reader &);
+template void
+BootROMCtrl::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
 
 /* Writing this register disables the boot ROM */
 void BootROMCtrl::write(const byte_t value) {

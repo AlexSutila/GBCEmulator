@@ -1,29 +1,31 @@
 #include "cpu/interrupts.hpp"
 #include "memory/mmio/dmg.hpp"
 #include "memory/mmio/mmio.hpp"
+#include "savestate/codec.hpp"
+#include <cstdint>
 
 constexpr byte_t select_mask = 0x30;
 constexpr byte_t high_bits = 0xC0;
 
 namespace Joypad {
 
+enum : std::uint16_t {
+  F_SELECT_BITS = 1,
+  F_LAST_LOW,
+};
+
+template <typename T> void JOYP::parse_savestate(T &t) {
+  t.field_generic(F_SELECT_BITS, select_bits);
+  t.field_generic(F_LAST_LOW, last_low);
+}
+
+template void JOYP::parse_savestate<Savestate::Writer>(Savestate::Writer &);
+template void JOYP::parse_savestate<Savestate::Reader>(Savestate::Reader &);
+template void JOYP::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
+
 JOYP::JOYP() : MMIORegister(0), select_bits(select_mask), last_low(0x0F) {}
 
 void JOYP::set_interrupt_reg(InterruptBits *reg) { if_reg = reg; }
-
-JOYP::SavestateState JOYP::savestate_get() const {
-  return {
-      .buttons = state_,
-      .select = select_bits,
-      .last_low = last_low,
-  };
-}
-
-void JOYP::savestate_load(const SavestateState &snapshot) {
-  state_ = snapshot.buttons;
-  select_bits = snapshot.select & select_mask;
-  last_low = snapshot.last_low & 0x0F;
-}
 
 void JOYP::set_button(JoypadButton button, const bool pressed) {
   const auto mask = static_cast<byte_t>(button);

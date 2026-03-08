@@ -19,6 +19,7 @@ enum ChunkTags : std::uint16_t {
   C_CPU = 1,
   C_TIMER,
   C_OAM_DMA,
+  C_BUS,
   C_VDMA,
   C_PPU,
   C_FETCHER,
