@@ -89,6 +89,8 @@ template <typename T> void PixelProcessingUnit::parse_savestate(T &t) {
   t.field_complex(F_FETCHER, [&](T &t) { fetcher->parse_savestate(t); });
   t.field_complex(F_OBJ_FIFO, [&](T &t) { obj_fifo.parse_savestate(t); });
   t.field_complex(F_BG_FIFO, [&](T &t) { bg_fifo.parse_savestate(t); });
+  t.field_complex(F_OBJ_CRAM, [&](T &t) { obj_cram->parse_savestate(t); });
+  t.field_complex(F_BG_CRAM, [&](T &t) { bg_cram->parse_savestate(t); });
   t.field_complex(F_STAT_DELAY, [&](T &t) {
     stat_delay.parse_savestate(t, [](auto &t, PPU::StatModes &s) {
       t.field_enum(F_STAT_DELAY_STATE, s);

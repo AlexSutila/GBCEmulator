@@ -22,6 +22,7 @@ enum ChunkTags : std::uint16_t {
   C_VDMA,
   C_PPU,
   C_FETCHER,
+  C_CRAM,
 
   /* Denotes end of chunk */
   C_EOF = 0xFFFF
@@ -62,6 +63,11 @@ public:
       fn(*this, e); // Should not manipulate, only write out
 
     eof();
+  }
+
+  void field_bytes(const std::uint16_t tag, std::span<std::uint8_t> bytes) {
+    write<std::uint16_t>(tag);
+    buf_.insert(buf_.end(), bytes.begin(), bytes.end());
   }
 
   template <typename T>
@@ -132,6 +138,15 @@ public:
       fn(*this, e); // Should populate this structure
 
     eof();
+  }
+
+  void field_bytes(const std::uint16_t tag, std::span<std::uint8_t> bytes) {
+    check_tag(tag);
+
+    require(bytes.size());
+    for (std::size_t i{0}; i < bytes.size(); ++i)
+      bytes[i] = buf_[pos_ + i];
+    pos_ += bytes.size();
   }
 
   template <typename T>
@@ -211,6 +226,11 @@ public:
     for (std::size_t i{0}; i < max_size; ++i)
       fn(*this, dummy); // Manipulate if you want, doesn't matter
     eof();
+  }
+
+  void field_bytes(const std::uint16_t tag, std::span<std::uint8_t> bytes) {
+    parse<std::uint16_t>();
+    max_size_ += bytes.size();
   }
 
   template <typename T>

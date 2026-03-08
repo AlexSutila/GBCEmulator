@@ -12,6 +12,8 @@ public:
                                             byte_t palette_idx) const;
   PPU::PaletteData *get_data_reg();
   PPU::PaletteIdx *get_idx_reg();
+
+  template <typename T> void parse_savestate(T &t);
   ColorRam();
 
 private:
