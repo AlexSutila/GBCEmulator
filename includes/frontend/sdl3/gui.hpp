@@ -44,6 +44,18 @@ class GbcImGui {
   }};
 
 public:
+  enum class DialogId : std::size_t {
+    Settings,
+    Cheats,
+    Keybinds,
+    Savestates,
+    DebugMain,
+    Breakpoints,
+    MemoryViewer,
+    PpuViewer,
+    Count
+  };
+
   struct SavestateManagerCallbacks {
     std::function<void(const std::string &label)> queue_manual_save;
     std::function<void()> request_load_most_recent;
@@ -62,13 +74,14 @@ public:
     ImGui::NewFrame();
   }
   void use_main_context();
-  void use_tool_context();
-  [[nodiscard]] bool has_tool_window() const { return tool_context_.context != nullptr; }
-  [[nodiscard]] SDL_Renderer *get_tool_renderer() const { return tool_context_.renderer; }
-  [[nodiscard]] bool sync_tool_window(UiState &state);
+  void prepare_dialog_windows(const UiState &state);
+  [[nodiscard]] static bool dialog_is_detached(DialogId id);
+  [[nodiscard]] bool has_detached_dialog_context(DialogId id) const;
+  [[nodiscard]] bool use_detached_dialog_context(DialogId id, UiState &state);
+  void present_detached_dialog(DialogId id) const;
+  [[nodiscard]] SDL_Renderer *active_renderer() const { return active_renderer_; }
+  void render_dialog(DialogId id, UiState &state, SDLHost &host);
   void render(UiState& state, SDLHost& host);
-  void render_tool_windows(UiState &state, SDLHost &host);
-  void render_tool_window_frame() const;
   static void end_frame() {ImGui::Render();}
 
   void update_rom_path(const std::string& rom_path);
@@ -101,17 +114,27 @@ private:
 
   Settings settings;
   float dpi_scale{1.0f};
+  SDL_Renderer *active_renderer_{nullptr};
   ImGuiContextState main_context_{};
-  ImGuiContextState tool_context_{};
-  bool tool_window_visible_{false};
+  std::array<ImGuiContextState, static_cast<std::size_t>(DialogId::Count)>
+      detached_dialogs_{};
 
   void init_context(ImGuiContextState &ctx, SDL_Window *window,
                     SDL_Renderer *renderer, bool owns_window);
   void shutdown_context(ImGuiContextState &ctx);
-  void activate_context(ImGuiContextState &ctx);
+  void activate_context(const ImGuiContextState &ctx);
   void update_dpi_scale(ImGuiContextState &ctx, float new_scale);
-  static void close_tool_windows(UiState &state);
-  [[nodiscard]] bool wants_detached_tool_window(const UiState &state) const;
+  void ensure_detached_dialog_context(DialogId id);
+  void hide_detached_dialog(DialogId id) const;
+  void sync_detached_dialogs(const UiState &state);
+  static void close_detached_dialog(DialogId id, UiState &state);
+  [[nodiscard]] static bool dialog_visible(DialogId id, const UiState &state);
+  [[nodiscard]] ImGuiContextState *find_context_for_window(Uint32 window_id);
+  [[nodiscard]] const ImGuiContextState *find_context_for_window(
+      Uint32 window_id) const;
+  [[nodiscard]] static constexpr std::size_t dialog_index(DialogId id) {
+    return static_cast<std::size_t>(id);
+  }
 
   void build_main_menu_bar(UiState& state) const;
   void build_status_bar(UiState &state) const;

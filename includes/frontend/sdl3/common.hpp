@@ -106,6 +106,7 @@ struct SavestateEntry {
   std::uintmax_t file_size{};
   int thumb_w{};
   int thumb_h{};
+  SDL_Renderer *thumb_renderer{nullptr};
   SDL_Texture *thumb_texture{nullptr};
   bool thumb_texture_attempted{false};
 };

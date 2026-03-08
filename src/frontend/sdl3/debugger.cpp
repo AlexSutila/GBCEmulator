@@ -20,17 +20,10 @@ constexpr auto tile_data_height_px = tile_data_height_tiles * 8;
 constexpr auto tile_data_width_px = tile_data_width_tiles * 8;
 constexpr auto black = 0xFF000000;
 
-void DebuggerImGui::init(SDL_Renderer *renderer) {
-  if (!renderer)
-    throw std::runtime_error("Failed to initialize debugger renderer");
+DebuggerImGui::~DebuggerImGui() { destroy_tile_data_textures(); }
 
-  for (auto &texture : ctx.tile_data_texture) {
-    texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
-                                SDL_TEXTUREACCESS_STREAMING,
-                                tile_data_width_px, tile_data_height_px);
-    if (!texture)
-      throw std::runtime_error("Failed to initialize debug textures");
-  }
+void DebuggerImGui::init() {
+  destroy_tile_data_textures();
 
   // Clears buffers used to update textures
   for (auto &buf : tile_data_buf) {
@@ -45,15 +38,37 @@ void DebuggerImGui::init(SDL_Renderer *renderer) {
 // This is a public entry point called from the main GUI render loop
 // Replaces the build_ui functionality
 void DebuggerImGui::render(UiState &state,
-                           const std::unique_ptr<GameBoyColor> &core) {
+                           const std::unique_ptr<GameBoyColor> &core,
+                           SDL_Renderer *renderer) {
   if (state.show_main_debug_viewer)
-    build_debug_window(state);
+    render_dialog(GbcImGui::DialogId::DebugMain, state, core, renderer);
   if (state.show_memory_viewer)
-    build_memory_viewer_window(state, core);
+    render_dialog(GbcImGui::DialogId::MemoryViewer, state, core, renderer);
   if (state.show_breakpoints)
-    build_breakpoints_window(state, core);
+    render_dialog(GbcImGui::DialogId::Breakpoints, state, core, renderer);
   if (state.show_ppu_viewer)
-    build_ppu_viewer_window(state);
+    render_dialog(GbcImGui::DialogId::PpuViewer, state, core, renderer);
+}
+
+void DebuggerImGui::render_dialog(const GbcImGui::DialogId id, UiState &state,
+                                  const std::unique_ptr<GameBoyColor> &core,
+                                  SDL_Renderer *renderer) {
+  switch (id) {
+  case GbcImGui::DialogId::DebugMain:
+    build_debug_window(state);
+    break;
+  case GbcImGui::DialogId::MemoryViewer:
+    build_memory_viewer_window(state, core);
+    break;
+  case GbcImGui::DialogId::Breakpoints:
+    build_breakpoints_window(state, core);
+    break;
+  case GbcImGui::DialogId::PpuViewer:
+    build_ppu_viewer_window(state, renderer);
+    break;
+  default:
+    break;
+  }
 }
 
 // Called by the emulator thread when a breakpoint is hit
@@ -264,7 +279,8 @@ void DebuggerImGui::build_breakpoints_window(
   ImGui::End();
 }
 
-void DebuggerImGui::build_ppu_viewer_window(UiState &state) const {
+void DebuggerImGui::build_ppu_viewer_window(UiState &state,
+                                            SDL_Renderer *renderer) {
   std::lock_guard lock(dbg_mutex);
 
   ImGui::Begin("Pixel Processor Viewer", &state.show_ppu_viewer);
@@ -273,9 +289,9 @@ void DebuggerImGui::build_ppu_viewer_window(UiState &state) const {
 
   // Render tile data to debug view for both banks
   ImGui::SeparatorText("Tile Data: (VRAM banks 0, 1)");
-  render_vram_tile_data(0);
+  render_vram_tile_data(0, renderer);
   ImGui::SameLine();
-  render_vram_tile_data(1);
+  render_vram_tile_data(1, renderer);
   ImGui::End();
 }
 
@@ -316,16 +332,58 @@ void DebuggerImGui::build_config_breakpoint_window(
   }
 }
 
-void DebuggerImGui::render_vram_tile_data(const size_t vram_bank_idx) const {
+void DebuggerImGui::ensure_tile_data_textures(SDL_Renderer *renderer) {
+  if (!renderer) {
+    destroy_tile_data_textures();
+    return;
+  }
+
+  if (tile_data_renderer_ == renderer && tile_data_textures_[0] &&
+      tile_data_textures_[1]) {
+    return;
+  }
+
+  destroy_tile_data_textures();
+  tile_data_renderer_ = renderer;
+
+  for (auto &texture : tile_data_textures_) {
+    texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
+                                SDL_TEXTUREACCESS_STREAMING,
+                                tile_data_width_px, tile_data_height_px);
+    if (!texture) {
+      destroy_tile_data_textures();
+      return;
+    }
+  }
+}
+
+void DebuggerImGui::destroy_tile_data_textures() {
+  for (auto &texture : tile_data_textures_) {
+    if (texture) {
+      SDL_DestroyTexture(texture);
+      texture = nullptr;
+    }
+  }
+  tile_data_renderer_ = nullptr;
+}
+
+void DebuggerImGui::render_vram_tile_data(const size_t vram_bank_idx,
+                                          SDL_Renderer *renderer) {
   constexpr float scale = 1.5f; // Lol, hardcoded bc idc
   constexpr ImVec2 size(tile_data_width_px * scale,
                         tile_data_height_px * scale);
 
+  ensure_tile_data_textures(renderer);
+  if (!tile_data_textures_.at(vram_bank_idx)) {
+    ImGui::TextDisabled("Renderer unavailable.");
+    return;
+  }
+
   // Fetch tile data from VRAM, as is, and render to texture
-  SDL_UpdateTexture(ctx.tile_data_texture.at(vram_bank_idx), nullptr,
+  SDL_UpdateTexture(tile_data_textures_.at(vram_bank_idx), nullptr,
                     tile_data_buf.at(vram_bank_idx).data(),
                     tile_data_width_px * sizeof(std::uint32_t));
-  ImGui::Image(ctx.tile_data_texture.at(vram_bank_idx), size);
+  ImGui::Image(tile_data_textures_.at(vram_bank_idx), size);
 }
 
 void DebuggerImGui::read_vram_tile_data(

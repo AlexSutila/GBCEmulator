@@ -62,15 +62,54 @@ std::string cheat_display_name(const Settings::CheatEntry &entry,
   return "Cheat " + std::to_string(index + 1);
 }
 
-constexpr int kToolWindowWidth = 1280;
-constexpr int kToolWindowHeight = 900;
+using DialogId = GbcImGui::DialogId;
+
+struct DetachedDialogSpec {
+  DialogId id;
+  const char *window_title;
+  bool UiState::*visible_flag;
+  int default_width;
+  int default_height;
+  bool detached;
+};
+
+constexpr std::array<DetachedDialogSpec,
+                     static_cast<std::size_t>(DialogId::Count)>
+    kDetachedDialogSpecs{{
+        {DialogId::Settings, "IroGB Settings", &UiState::show_settings, 960,
+         720, true},
+        {DialogId::Cheats, "IroGB Cheats", &UiState::show_cheats, 1120, 760,
+         true},
+        {DialogId::Keybinds, "IroGB Keybinds", &UiState::show_keybinds, 760,
+         700, true},
+        {DialogId::Savestates, "IroGB Save States",
+         &UiState::show_savestate_manager, 920, 560, true},
+        {DialogId::DebugMain, "IroGB Debugger",
+         &UiState::show_main_debug_viewer, 1000, 540, true},
+        {DialogId::Breakpoints, "IroGB Breakpoints",
+         &UiState::show_breakpoints, 760, 520, true},
+        {DialogId::MemoryViewer, "IroGB Memory Viewer",
+         &UiState::show_memory_viewer, 920, 520, true},
+        {DialogId::PpuViewer, "IroGB PPU Viewer", &UiState::show_ppu_viewer,
+         700, 520, true},
+    }};
+
+[[nodiscard]] constexpr const DetachedDialogSpec &
+dialog_spec(const DialogId id) {
+  return kDetachedDialogSpecs[static_cast<std::size_t>(id)];
+}
+
+[[nodiscard]] bool window_is_hidden(SDL_Window *window) {
+  return !window || (SDL_GetWindowFlags(window) & SDL_WINDOW_HIDDEN) != 0;
+}
 } // namespace
 
-void GbcImGui::activate_context(ImGuiContextState &ctx) {
+void GbcImGui::activate_context(const ImGuiContextState &ctx) {
   if (!ctx.context)
     return;
   ImGui::SetCurrentContext(ctx.context);
   dpi_scale = ctx.dpi_scale;
+  active_renderer_ = ctx.renderer;
 }
 
 void GbcImGui::init_context(ImGuiContextState &ctx, SDL_Window *window,
@@ -97,7 +136,7 @@ void GbcImGui::init_context(ImGuiContextState &ctx, SDL_Window *window,
   ctx.dpi_scale = 1.0f;
   update_dpi_scale(ctx, SDL_GetWindowDisplayScale(window));
 
-  ImGuiIO &io = ImGui::GetIO();
+  const ImGuiIO &io = ImGui::GetIO();
   if (fs::exists(font))
     io.Fonts->AddFontFromFileTTF(font.c_str(), base_font_size);
 }
@@ -129,25 +168,6 @@ void GbcImGui::init(const SDLHost &host) {
 
   IMGUI_CHECKVERSION();
   init_context(main_context_, host.get_window(), host.get_renderer(), false);
-
-  if (SDL_Window *tool_window =
-          SDL_CreateWindow("IroGB Tools", kToolWindowWidth, kToolWindowHeight,
-                           SDL_WINDOW_HIDDEN | SDL_WINDOW_RESIZABLE |
-                               SDL_WINDOW_HIGH_PIXEL_DENSITY)) {
-    if (SDL_Renderer *tool_renderer = SDL_CreateRenderer(tool_window, nullptr)) {
-      SDL_SetRenderVSync(tool_renderer, 0);
-      try {
-        init_context(tool_context_, tool_window, tool_renderer, true);
-      } catch (...) {
-        SDL_DestroyRenderer(tool_renderer);
-        SDL_DestroyWindow(tool_window);
-        tool_context_ = {};
-      }
-    } else {
-      SDL_DestroyWindow(tool_window);
-    }
-  }
-
   use_main_context();
 
   rom_sel_conf.path = settings.rom_dir;
@@ -164,42 +184,168 @@ void GbcImGui::init(const SDLHost &host) {
 
 void GbcImGui::shutdown() {
   settings.save();
-  shutdown_context(tool_context_);
+  for (auto &ctx : detached_dialogs_) {
+    shutdown_context(ctx);
+  }
   shutdown_context(main_context_);
+  active_renderer_ = nullptr;
 }
 
 void GbcImGui::use_main_context() { activate_context(main_context_); }
 
-void GbcImGui::use_tool_context() {
-  if (tool_context_.context) {
-    activate_context(tool_context_);
-  } else {
-    activate_context(main_context_);
+void GbcImGui::prepare_dialog_windows(const UiState &state) {
+  sync_detached_dialogs(state);
+  use_main_context();
+}
+
+bool GbcImGui::dialog_is_detached(const DialogId id) {
+  return dialog_spec(id).detached;
+}
+
+bool GbcImGui::has_detached_dialog_context(const DialogId id) const {
+  return detached_dialogs_[dialog_index(id)].context != nullptr;
+}
+
+void GbcImGui::render_dialog(const DialogId id, UiState &state, SDLHost &host) {
+  switch (id) {
+  case DialogId::Settings:
+    build_settings_window(state, host);
+    break;
+  case DialogId::Cheats:
+    build_cheats_window(state);
+    break;
+  case DialogId::Keybinds:
+    build_keybinds_window(state);
+    break;
+  default:
+    break;
   }
 }
 
-bool GbcImGui::wants_detached_tool_window(const UiState &state) const {
-  return has_tool_window() &&
-         (state.show_settings || state.show_cheats || state.show_keybinds ||
-          state.show_savestate_manager || state.show_main_debug_viewer ||
-          state.show_breakpoints || state.show_ppu_viewer ||
-          state.show_memory_viewer);
+void GbcImGui::ensure_detached_dialog_context(const DialogId id) {
+  if (!dialog_is_detached(id))
+    return;
+
+  auto &ctx = detached_dialogs_[dialog_index(id)];
+  if (ctx.context)
+    return;
+
+  const auto &spec = dialog_spec(id);
+  SDL_Window *window =
+      SDL_CreateWindow(spec.window_title, spec.default_width,
+                       spec.default_height,
+                       SDL_WINDOW_HIDDEN | SDL_WINDOW_RESIZABLE |
+                           SDL_WINDOW_HIGH_PIXEL_DENSITY);
+  if (!window)
+    return;
+
+  SDL_Renderer *renderer = SDL_CreateRenderer(window, nullptr);
+  if (!renderer) {
+    SDL_DestroyWindow(window);
+    return;
+  }
+
+  SDL_SetRenderVSync(renderer, 0);
+  try {
+    init_context(ctx, window, renderer, true);
+  } catch (...) {
+    SDL_DestroyRenderer(renderer);
+    SDL_DestroyWindow(window);
+    ctx = {};
+  }
 }
 
-bool GbcImGui::sync_tool_window(UiState &state) {
-  if (!has_tool_window())
+void GbcImGui::hide_detached_dialog(const DialogId id) const {
+  auto &ctx = detached_dialogs_[dialog_index(id)];
+  if (ctx.window && !window_is_hidden(ctx.window)) {
+    SDL_HideWindow(ctx.window);
+  }
+}
+
+void GbcImGui::sync_detached_dialogs(const UiState &state) {
+  for (const auto &spec : kDetachedDialogSpecs) {
+    if (!spec.detached)
+      continue;
+
+    if (dialog_visible(spec.id, state)) {
+      ensure_detached_dialog_context(spec.id);
+      auto &ctx = detached_dialogs_[dialog_index(spec.id)];
+      if (ctx.window && window_is_hidden(ctx.window)) {
+        SDL_ShowWindow(ctx.window);
+        SDL_RaiseWindow(ctx.window);
+      }
+    } else {
+      hide_detached_dialog(spec.id);
+    }
+  }
+}
+
+void GbcImGui::close_detached_dialog(const DialogId id, UiState &state) {
+  state.*(dialog_spec(id).visible_flag) = false;
+}
+
+bool GbcImGui::dialog_visible(const DialogId id, const UiState &state) {
+  return state.*(dialog_spec(id).visible_flag);
+}
+
+GbcImGui::ImGuiContextState *
+GbcImGui::find_context_for_window(const Uint32 window_id) {
+  if (main_context_.window &&
+      SDL_GetWindowID(main_context_.window) == window_id) {
+    return &main_context_;
+  }
+
+  for (auto &ctx : detached_dialogs_) {
+    if (ctx.window && SDL_GetWindowID(ctx.window) == window_id) {
+      return &ctx;
+    }
+  }
+  return nullptr;
+}
+
+const GbcImGui::ImGuiContextState *
+GbcImGui::find_context_for_window(const Uint32 window_id) const {
+  if (main_context_.window &&
+      SDL_GetWindowID(main_context_.window) == window_id) {
+    return &main_context_;
+  }
+
+  for (const auto &ctx : detached_dialogs_) {
+    if (ctx.window && SDL_GetWindowID(ctx.window) == window_id) {
+      return &ctx;
+    }
+  }
+  return nullptr;
+}
+
+bool GbcImGui::use_detached_dialog_context(const DialogId id, UiState &state) {
+  if (!dialog_is_detached(id) || !dialog_visible(id, state))
     return false;
 
-  const bool should_show = wants_detached_tool_window(state);
-  if (should_show && !tool_window_visible_) {
-    SDL_ShowWindow(tool_context_.window);
-    SDL_RaiseWindow(tool_context_.window);
-    tool_window_visible_ = true;
-  } else if (!should_show && tool_window_visible_) {
-    SDL_HideWindow(tool_context_.window);
-    tool_window_visible_ = false;
+  ensure_detached_dialog_context(id);
+  auto &ctx = detached_dialogs_[dialog_index(id)];
+  if (!ctx.context)
+    return false;
+
+  if (ctx.window && window_is_hidden(ctx.window)) {
+    SDL_ShowWindow(ctx.window);
+    SDL_RaiseWindow(ctx.window);
   }
-  return should_show;
+
+  activate_context(ctx);
+  return true;
+}
+
+void GbcImGui::present_detached_dialog(const DialogId id) const {
+  const auto &ctx = detached_dialogs_[dialog_index(id)];
+  if (!ctx.context || !ctx.renderer || window_is_hidden(ctx.window))
+    return;
+
+  ImGui::SetCurrentContext(ctx.context);
+  SDL_SetRenderDrawColor(ctx.renderer, 18, 18, 18, 255);
+  SDL_RenderClear(ctx.renderer);
+  ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), ctx.renderer);
+  SDL_RenderPresent(ctx.renderer);
 }
 
 void GbcImGui::render(UiState &state, SDLHost &host) {
@@ -216,12 +362,21 @@ void GbcImGui::render(UiState &state, SDLHost &host) {
   build_status_bar(state);
   build_file_dialogs(state);
   build_rom_source_window(state);
-  if (!has_tool_window() && state.show_settings)
-    build_settings_window(state, host);
-  if (!has_tool_window() && state.show_cheats)
-    build_cheats_window(state);
-  if (!has_tool_window() && state.show_keybinds)
-    build_keybinds_window(state);
+  if (state.show_settings &&
+      (!dialog_is_detached(DialogId::Settings) ||
+       !has_detached_dialog_context(DialogId::Settings))) {
+    render_dialog(DialogId::Settings, state, host);
+  }
+  if (state.show_cheats &&
+      (!dialog_is_detached(DialogId::Cheats) ||
+       !has_detached_dialog_context(DialogId::Cheats))) {
+    render_dialog(DialogId::Cheats, state, host);
+  }
+  if (state.show_keybinds &&
+      (!dialog_is_detached(DialogId::Keybinds) ||
+       !has_detached_dialog_context(DialogId::Keybinds))) {
+    render_dialog(DialogId::Keybinds, state, host);
+  }
   if (state.show_notifications)
     build_notification_window(state);
   if (state.show_about)
@@ -230,70 +385,35 @@ void GbcImGui::render(UiState &state, SDLHost &host) {
     build_cart_info_window(state);
 }
 
-void GbcImGui::render_tool_windows(UiState &state, SDLHost &host) {
-  if (!has_tool_window())
-    return;
-
-  if (state.show_settings)
-    build_settings_window(state, host);
-  if (state.show_cheats)
-    build_cheats_window(state);
-  if (state.show_keybinds)
-    build_keybinds_window(state);
-}
-
-void GbcImGui::render_tool_window_frame() const {
-  if (!tool_window_visible_ || !tool_context_.context || !tool_context_.renderer)
-    return;
-
-  ImGui::SetCurrentContext(tool_context_.context);
-  SDL_SetRenderDrawColor(tool_context_.renderer, 18, 18, 18, 255);
-  SDL_RenderClear(tool_context_.renderer);
-  ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(),
-                                        tool_context_.renderer);
-  SDL_RenderPresent(tool_context_.renderer);
-}
-
-void GbcImGui::close_tool_windows(UiState &state) {
-  state.show_settings = false;
-  state.show_cheats = false;
-  state.show_keybinds = false;
-  state.show_savestate_manager = false;
-  state.show_main_debug_viewer = false;
-  state.show_breakpoints = false;
-  state.show_ppu_viewer = false;
-  state.show_memory_viewer = false;
-}
-
 // Returns true if the event was handled by the GUI and should be ignored by the
 // game
 bool GbcImGui::process_event(const SDL_Event &e, UiState &ui_state) {
-  if (tool_context_.window &&
-      e.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED &&
-      e.window.windowID == SDL_GetWindowID(tool_context_.window)) {
-    close_tool_windows(ui_state);
-    SDL_HideWindow(tool_context_.window);
-    tool_window_visible_ = false;
-    use_main_context();
-    return true;
+  if (e.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED) {
+    for (std::size_t i = 0; i < detached_dialogs_.size(); ++i) {
+      auto &ctx = detached_dialogs_[i];
+      if (!ctx.window || e.window.windowID != SDL_GetWindowID(ctx.window))
+        continue;
+
+      const auto id = static_cast<DialogId>(i);
+      close_detached_dialog(id, ui_state);
+      hide_detached_dialog(id);
+      use_main_context();
+      return true;
+    }
   }
 
   use_main_context();
   ImGui_ImplSDL3_ProcessEvent(&e);
-  if (tool_context_.context) {
-    use_tool_context();
+  for (auto &ctx : detached_dialogs_) {
+    if (!ctx.context)
+      continue;
+    activate_context(ctx);
     ImGui_ImplSDL3_ProcessEvent(&e);
   }
 
   // Handle DPI changes
   if (e.type == SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED) {
-    ImGuiContextState *ctx = nullptr;
-    if (e.window.windowID == SDL_GetWindowID(main_context_.window)) {
-      ctx = &main_context_;
-    } else if (tool_context_.window &&
-               e.window.windowID == SDL_GetWindowID(tool_context_.window)) {
-      ctx = &tool_context_;
-    }
+    ImGuiContextState *ctx = find_context_for_window(e.window.windowID);
 
     // The event data contains the new scale, but it's safer to query the window
     // because SDL validates it against the specific display
@@ -344,11 +464,18 @@ bool GbcImGui::process_event(const SDL_Event &e, UiState &ui_state) {
     }
     // Handle ImGui capture (e.g. typing in a file dialog)
     bool wants_keyboard = false;
-    use_main_context();
+    activate_context(main_context_);
     wants_keyboard = ImGui::GetIO().WantCaptureKeyboard;
-    if (!wants_keyboard && tool_context_.context) {
-      use_tool_context();
-      wants_keyboard = ImGui::GetIO().WantCaptureKeyboard;
+    if (!wants_keyboard) {
+      for (auto &ctx : detached_dialogs_) {
+        if (!ctx.context || window_is_hidden(ctx.window))
+          continue;
+        activate_context(ctx);
+        if (ImGui::GetIO().WantCaptureKeyboard) {
+          wants_keyboard = true;
+          break;
+        }
+      }
     }
     use_main_context();
     if (wants_keyboard) {
@@ -1182,6 +1309,12 @@ void GbcImGui::build_savestate_manager_window(
       }
 
       ImGui::SeparatorText("Thumbnail");
+      if (entry.thumb_texture && entry.thumb_renderer != renderer) {
+        SDL_DestroyTexture(entry.thumb_texture);
+        entry.thumb_texture = nullptr;
+        entry.thumb_texture_attempted = false;
+        entry.thumb_renderer = nullptr;
+      }
       if (renderer && !entry.thumb_texture && !entry.thumb_texture_attempted) {
         entry.thumb_texture_attempted = true;
         if (std::filesystem::exists(entry.thumb_path)) {
@@ -1192,6 +1325,7 @@ void GbcImGui::build_savestate_manager_window(
                 renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC,
                 entry.thumb_w, entry.thumb_h);
             if (entry.thumb_texture) {
+              entry.thumb_renderer = renderer;
               SDL_UpdateTexture(entry.thumb_texture, nullptr, pixels->data(),
                                 entry.thumb_w *
                                     static_cast<int>(sizeof(std::uint32_t)));

@@ -629,6 +629,7 @@ void SDL3Frontend::release_savestate_textures_locked() {
       SDL_DestroyTexture(entry.thumb_texture);
       entry.thumb_texture = nullptr;
     }
+    entry.thumb_renderer = nullptr;
     entry.thumb_texture_attempted = false;
   }
 }
@@ -1080,7 +1081,7 @@ void SDL3Frontend::build_savestate_manager_window_locked() {
   };
 
   gui.build_savestate_manager_window(
-      ui_state, gui.has_tool_window() ? gui.get_tool_renderer()
+      ui_state, gui.active_renderer() ? gui.active_renderer()
                                       : host.get_renderer(),
       static_cast<bool>(gbc), savestate_dir_,
       savestate_manual_label_input_, savestate_entries_, savestate_selected_path_,
