@@ -28,6 +28,7 @@ public:
           ObjPixelFifo &obj_fifo, // The sprite pixel fifo
           BgPixelFifo &bg_fifo,   // The background pixel fifo
           runtime_sys_info &sys);
+  template <typename T> void parse_savestate(T &t);
   void reset(); // Enters background rendering mode
 
   /* Sprite fetching is tricky. It should take priority over both BG and window

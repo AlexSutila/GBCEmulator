@@ -21,6 +21,7 @@ enum ChunkTags : std::uint16_t {
   C_OAM_DMA,
   C_VDMA,
   C_PPU,
+  C_FETCHER,
 
   /* Denotes end of chunk */
   C_EOF = 0xFFFF
