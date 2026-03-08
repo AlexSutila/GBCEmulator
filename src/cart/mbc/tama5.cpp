@@ -1,6 +1,7 @@
 #include "cart/cart.hpp"
 #include "cart/mbc.hpp"
 #include "cart/mbc_creator.hpp"
+#include "savestate/codec.hpp"
 
 // ---------------------------
 // TAMA5 (Bandai)
@@ -130,10 +131,45 @@ public:
   }
   std::span<byte_t> ram() noexcept override { return save_; }
 
+  template <typename T> void parse_savestate_impl(T &t) {
+    constexpr auto version = 1; // Schema revision
+    t.chunk_header(version, Savestate::C_MBC_TAMA5);
+    t.field_generic(F_UNLOCKED, unlocked_);
+    t.field_generic(F_UNLOCK_PENDING, unlock_pending_);
+    t.field_generic(F_PATTERN_FLIP, pattern_flip_);
+    t.field_generic(F_REG_SEL, reg_sel_);
+    t.field_bytes(F_REGS, {regs_, sizeof(regs_)});
+    t.field_generic(F_RTC_PAGE_REG, rtc_page_reg_);
+    t.field_generic(F_CACHED_MIN, cached_min_);
+    t.field_generic(F_CACHED_HOUR, cached_hour_);
+    t.eof();
+  }
+
+  void parse_savestate(Savestate::Writer &t) override {
+    parse_savestate_impl(t);
+  }
+  void parse_savestate(Savestate::Reader &t) override {
+    parse_savestate_impl(t);
+  }
+  void parse_savestate(Savestate::Sizer &t) override {
+    parse_savestate_impl(t);
+  }
+
 private:
   std::span<const byte_t> rom_;
   std::vector<byte_t> save_;
   bool battery_{false};
+
+  enum : std::uint16_t {
+    F_UNLOCKED = 1,
+    F_UNLOCK_PENDING,
+    F_PATTERN_FLIP,
+    F_REG_SEL,
+    F_REGS,
+    F_RTC_PAGE_REG,
+    F_CACHED_MIN,
+    F_CACHED_HOUR,
+  };
 
   // ---------------------------
   // Persistent storage layout
@@ -150,8 +186,7 @@ private:
   }
 
   static std::size_t rtc_base_() { return kRamBytes; }
-  static std::size_t rtc_idx_(std::size_t const page,
-                              std::size_t const reg) {
+  static std::size_t rtc_idx_(std::size_t const page, std::size_t const reg) {
     return rtc_base_() + page * kRtcRegsPerPage + reg;
   }
 
@@ -310,7 +345,8 @@ private:
   }
 
   [[nodiscard]] byte_t data_in_byte_() const {
-    return static_cast<byte_t>(((regs_[0x05] & 0x0F) << 4) | (regs_[0x04] & 0x0F));
+    return static_cast<byte_t>(((regs_[0x05] & 0x0F) << 4) |
+                               (regs_[0x04] & 0x0F));
   }
 
   void set_data_out_byte_(byte_t const b) {
@@ -322,8 +358,8 @@ private:
   // Command execution
   // ---------------------------
   void exec_command_() {
-    const auto cmd = static_cast<byte_t>(((regs_[0x06] & 0x0F) << 4) |
-                                           (regs_[0x07] & 0x0F));
+    const auto cmd =
+        static_cast<byte_t>(((regs_[0x06] & 0x0F) << 4) | (regs_[0x07] & 0x0F));
 
     // 0x70-0x7F: "open bus" echo (place cmd into data-out, maybe sufficient)
     if ((cmd & 0xF0) == 0x70) {
@@ -352,8 +388,8 @@ private:
 
   void ram_op_() {
     const bool is_write = (regs_[0x06] & 0x02) != 0; // per procedure in post
-    const auto addr =
-        static_cast<std::size_t>(((regs_[0x06] & 0x01) << 4) | (regs_[0x07] & 0x0F));
+    const auto addr = static_cast<std::size_t>(((regs_[0x06] & 0x01) << 4) |
+                                               (regs_[0x07] & 0x0F));
     if (is_write) {
       ram_byte_(addr) = data_in_byte_();
       return;
@@ -455,7 +491,7 @@ private:
   // RTC read/write helpers
   // ---------------------------
   [[nodiscard]] byte_t rtc_read_(std::size_t const page,
-                                byte_t const regno) const {
+                                 byte_t const regno) const {
     const auto r = static_cast<byte_t>(regno & 0x0F);
 
     if (r <= 0x0C) {
@@ -494,7 +530,8 @@ private:
       if (nyb & 0x01) {
         // Reset alarm page registers (best-effort: clear the meaningful fields)
         for (std::size_t i = 0; i < kRtcRegsPerPage; ++i)
-          rtc_nyb_(1, i) = static_cast<byte_t>(rtc_nyb_(1, i) & mask_for_(1, i));
+          rtc_nyb_(1, i) =
+              static_cast<byte_t>(rtc_nyb_(1, i) & mask_for_(1, i));
       }
       if (nyb & 0x02) {
         // Reset timer: clear seconds/minutes/hours to 00:00:00
@@ -513,23 +550,37 @@ private:
   // ---------------------------
   // RTC ticking (calendar)
   // ---------------------------
-  static int days_in_month(int const year, int const month, int const leap_mod4) {
+  static int days_in_month(int const year, int const month,
+                           int const leap_mod4) {
     (void)year;
     const bool leap = (leap_mod4 == 0);
     switch (month) {
-    case 1:  return 31;
-    case 2:  return leap ? 29 : 28;
-    case 3:  return 31;
-    case 4:  return 30;
-    case 5:  return 31;
-    case 6:  return 30;
-    case 7:  return 31;
-    case 8:  return 31;
-    case 9:  return 30;
-    case 10: return 31;
-    case 11: return 30;
-    case 12: return 31;
-    default: return 30;
+    case 1:
+      return 31;
+    case 2:
+      return leap ? 29 : 28;
+    case 3:
+      return 31;
+    case 4:
+      return 30;
+    case 5:
+      return 31;
+    case 6:
+      return 30;
+    case 7:
+      return 31;
+    case 8:
+      return 31;
+    case 9:
+      return 30;
+    case 10:
+      return 31;
+    case 11:
+      return 30;
+    case 12:
+      return 31;
+    default:
+      return 30;
     }
   }
 
@@ -574,18 +625,22 @@ private:
     year = y10 * 10 + y1;
   }
 
-  void encode_time_(int sec, int min, int hour, int dow, int day,
-                    int month, int year) {
+  void encode_time_(int sec, int min, int hour, int dow, int day, int month,
+                    int year) {
     sec %= 60;
     min %= 60;
     hour %= 24;
     dow %= 7;
-    if (dow < 0) dow += 7;
+    if (dow < 0)
+      dow += 7;
 
     year %= 100;
-    if (year < 0) year += 100;
-    if (month < 1) month = 1;
-    if (month > 12) month = 12;
+    if (year < 0)
+      year += 100;
+    if (month < 1)
+      month = 1;
+    if (month > 12)
+      month = 12;
 
     const bool mode24 = (rtc_nyb_(1, 0x0A) & 0x1) != 0;
 
@@ -600,7 +655,8 @@ private:
     } else {
       const bool pm = hour >= 12;
       int h12 = hour % 12;
-      if (h12 == 0) h12 = 12;
+      if (h12 == 0)
+        h12 = 12;
       const int tens = h12 / 10; // 0 or 1
       const int ones = h12 % 10;
       const auto h10 = static_cast<byte_t>((tens & 0x1) | (pm ? 0x2 : 0x0));
@@ -610,7 +666,8 @@ private:
 
     rtc_write_(0, 0x06, static_cast<byte_t>(dow), true);
 
-    if (day < 1) day = 1;
+    if (day < 1)
+      day = 1;
     const int d10 = day / 10;
     const int d1 = day % 10;
     rtc_write_(0, 0x07, static_cast<byte_t>(d1), true);
@@ -640,15 +697,24 @@ private:
     std::uint32_t total = seconds;
     sec += static_cast<int>(total % 60);
     total /= 60;
-    if (sec >= 60) { sec -= 60; total += 1; }
+    if (sec >= 60) {
+      sec -= 60;
+      total += 1;
+    }
 
     min += static_cast<int>(total % 60);
     total /= 60;
-    if (min >= 60) { min -= 60; total += 1; }
+    if (min >= 60) {
+      min -= 60;
+      total += 1;
+    }
 
     hour += static_cast<int>(total % 24);
     total /= 24;
-    if (hour >= 24) { hour -= 24; total += 1; }
+    if (hour >= 24) {
+      hour -= 24;
+      total += 1;
+    }
 
     // Add remaining days with basic calendar handling
     while (total > 0) {
@@ -662,7 +728,8 @@ private:
         if (month > 12) {
           month = 1;
           ++year;
-          if (year >= 100) year = 0;
+          if (year >= 100)
+            year = 0;
 
           // update leap-year mod-4 counter
           leap_mod4 = (leap_mod4 + 1) & 0x3;
@@ -677,5 +744,6 @@ private:
 };
 
 std::unique_ptr<Mbc> make_tama5(const cart &c) {
-  return std::make_unique<Tama5>(c.rom_span(), type_has_battery(c.header.cartridge_type));
+  return std::make_unique<Tama5>(c.rom_span(),
+                                 type_has_battery(c.header.cartridge_type));
 }

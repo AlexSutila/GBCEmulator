@@ -34,9 +34,8 @@ enum ChunkTags : std::uint16_t {
   C_MBC_6,
   C_MBC_7,
   C_MBC_MMM01,
-  C_MBC_NONE,
   C_MBC_TAMA5,
-  C_MBC_TEST,
+  // C_MBC_TEST, - We don't need this, but might want in future
   C_WISDOM_TREE, // ✝ Praise the Lord ✝
 
   C_PPU,

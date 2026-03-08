@@ -40,6 +40,11 @@ public:
   }
   std::span<byte_t> ram() noexcept override { return ram_; }
 
+  // Not needed, left blank intentionally
+  void parse_savestate(Savestate::Writer &t) override {}
+  void parse_savestate(Savestate::Reader &t) override {}
+  void parse_savestate(Savestate::Sizer &t) override {}
+
 private:
   std::span<const byte_t> rom_;
   std::vector<byte_t> ram_;

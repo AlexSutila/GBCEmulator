@@ -1,6 +1,7 @@
 #include "cart/cart.hpp"
 #include "cart/mbc.hpp"
 #include "cart/mbc_creator.hpp"
+#include "savestate/codec.hpp"
 
 // ---------------------------
 // MMM01 (multi-game compilation mapper; MBC1-like with "unmapped" menu mode)
@@ -9,14 +10,16 @@
 //
 // Memory (mapped mode):
 // 0000-3FFF: "ROM Bank X0" region (varies with multiplex/mode)
-// 4000-7FFF: switchable, but bank 00/20/40/60 within-game are remapped to 01/21/41/61
-// A000-BFFF: banked RAM, depends on mode + multiplex; unknown if accessible in unmapped mode
+// 4000-7FFF: switchable, but bank 00/20/40/60 within-game are remapped to
+// 01/21/41/61 A000-BFFF: banked RAM, depends on mode + multiplex; unknown if
+// accessible in unmapped mode.
 //
 // Key behavior:
 // - Starts in "unmapped" mode: last 32 KiB of ROM is always mapped at 0000-7FFF
 // - Enter "mapped" mode by writing bit6=1 in 0000-1FFF (Mapping Enable)
-// - In mapped mode, extended bits are no longer writeable; mapper behaves like MBC1,
-//   but the latched extended bits still contribute to the full bank number
+// - In mapped mode, extended bits are no longer writeable; mapper behaves like
+//   MBC1, but the latched extended bits still contribute to the full bank
+//   number.
 
 class Mmm01 final : public Mbc {
 public:
@@ -49,8 +52,8 @@ public:
       // In practice, letting it work improves compatibility with the one known
       // RAM-containing MMM01 cart, and doesn't affect most carts
       const std::size_t bank = ram_bank_a000();
-      const std::size_t idx =
-          (bank * kRamBankSize + (addr - 0xA000)) % std::max<std::size_t>(1, ram_.size());
+      const std::size_t idx = (bank * kRamBankSize + (addr - 0xA000)) %
+                              std::max<std::size_t>(1, ram_.size());
       return ram_[idx];
     }
 
@@ -58,7 +61,7 @@ public:
   }
 
   void write(addr_t const addr, byte_t const val) override {
-    // 0000-1FFF: RAM Enable + (unmapped-only) RAM Bank Mask + Mapping Enable 
+    // 0000-1FFF: RAM Enable + (unmapped-only) RAM Bank Mask + Mapping Enable
     if (addr <= 0x1FFF) {
       ram_enabled_ = ((val & 0x0F) == 0x0A);
 
@@ -72,7 +75,7 @@ public:
       return;
     }
 
-    // 2000-3FFF: ROM Bank Low + (unmapped-only) ROM Bank Mid 
+    // 2000-3FFF: ROM Bank Low + (unmapped-only) ROM Bank Mid
     if (addr <= 0x3FFF) {
       set_rom_bank_low_locked(static_cast<byte_t>(val & 0x1F));
 
@@ -82,7 +85,8 @@ public:
       return;
     }
 
-    // 4000-5FFF: RAM Bank Low + (unmapped-only) RAM Bank High + ROM Bank High + mode write lock 
+    // 4000-5FFF: RAM Bank Low + (unmapped-only) RAM Bank High + ROM Bank High +
+    // mode write lock
     if (addr <= 0x5FFF) {
       set_ram_bank_low_locked(static_cast<byte_t>(val & 0x03));
 
@@ -94,7 +98,7 @@ public:
       return;
     }
 
-    // 6000-7FFF: mode select + (unmapped-only) ROM Bank Mask + multiplex enable 
+    // 6000-7FFF: mode select + (unmapped-only) ROM Bank Mask + multiplex enable
     if (addr <= 0x7FFF) {
       if (!mode_write_lock_) {
         mbc1_mode_ = ((val & 0x01) != 0);
@@ -116,16 +120,46 @@ public:
       if (!ram_enabled_ || ram_.empty())
         return;
       const std::size_t bank = ram_bank_a000();
-      const std::size_t idx =
-          (bank * kRamBankSize + (addr - 0xA000)) % std::max<std::size_t>(1, ram_.size());
+      const std::size_t idx = (bank * kRamBankSize + (addr - 0xA000)) %
+                              std::max<std::size_t>(1, ram_.size());
       ram_[idx] = val;
       return;
     }
   }
 
   [[nodiscard]] bool has_battery() const noexcept override { return battery_; }
-  [[nodiscard]] std::span<const byte_t> ram() const noexcept override { return ram_; }
+  [[nodiscard]] std::span<const byte_t> ram() const noexcept override {
+    return ram_;
+  }
   std::span<byte_t> ram() noexcept override { return ram_; }
+
+  template <typename T> void parse_savestate_impl(T &t) {
+    constexpr auto version = 1; // Schema revision
+    t.chunk_header(version, Savestate::C_MBC_MMM01);
+    t.field_generic(F_MAPPED, mapped_);
+    t.field_generic(F_RAM_ENABLED, ram_enabled_);
+    t.field_generic(F_MULTIPLEX, multiplex_);
+    t.field_generic(F_MBC1_MODE, mbc1_mode_);
+    t.field_generic(F_MODE_WRITE_LOCK, mode_write_lock_);
+    t.field_generic(F_RAM_BANK_MASK, ram_bank_mask_);
+    t.field_generic(F_ROM_BANK_MASK, rom_bank_mask_);
+    t.field_generic(F_ROM_BANK_LOW, rom_bank_low_);
+    t.field_generic(F_ROM_BANK_MID, rom_bank_mid_);
+    t.field_generic(F_ROM_BANK_HIGH, rom_bank_high_);
+    t.field_generic(F_RAM_BANK_LOW, rom_bank_low_);
+    t.field_generic(F_RAM_BANK_HIGH, ram_bank_high_);
+    t.eof();
+  }
+
+  void parse_savestate(Savestate::Writer &t) override {
+    parse_savestate_impl(t);
+  }
+  void parse_savestate(Savestate::Reader &t) override {
+    parse_savestate_impl(t);
+  }
+  void parse_savestate(Savestate::Sizer &t) override {
+    parse_savestate_impl(t);
+  }
 
 private:
   std::span<const byte_t> rom_;
@@ -133,30 +167,47 @@ private:
   bool battery_{};
 
   // State
-  bool mapped_{false};          // "unmapped" at power-on
-  bool ram_enabled_{false};     // low nibble == A enables
+  bool mapped_{false};      // "unmapped" at power-on
+  bool ram_enabled_{false}; // low nibble == A enables
 
   bool multiplex_{false};       // mode reg bit6 (unmapped-only)
   bool mbc1_mode_{false};       // mode reg bit0
-  bool mode_write_lock_{false}; // prevents changes to mbc1_mode_ 
+  bool mode_write_lock_{false}; // prevents changes to mbc1_mode_
 
   // Registers (7-bit, but we store only used fields)
-  byte_t ram_bank_mask_{0};     // 2-bit write-lock mask for RAM Bank Low
-  byte_t rom_bank_mask_{0};     // 5-bit write-lock mask for ROM Bank Low (bit0 forced 0)
+  byte_t ram_bank_mask_{0}; // 2-bit write-lock mask for RAM Bank Low
+  // 5-bit write-lock mask for ROM Bank Low (bit0 forced 0)
+  byte_t rom_bank_mask_{0};
 
-  byte_t rom_bank_low_{0x01};   // behaves like $01 on power-up
-  byte_t rom_bank_mid_{0x00};   // unmapped-only
-  byte_t rom_bank_high_{0x00};  // unmapped-only
+  byte_t rom_bank_low_{0x01};  // behaves like $01 on power-up
+  byte_t rom_bank_mid_{0x00};  // unmapped-only
+  byte_t rom_bank_high_{0x00}; // unmapped-only
 
-  byte_t ram_bank_low_{0x00};   // MBC1 RAM bank reg (or swapped in multiplex)
-  byte_t ram_bank_high_{0x00};  // unmapped-only
+  byte_t ram_bank_low_{0x00};  // MBC1 RAM bank reg (or swapped in multiplex)
+  byte_t ram_bank_high_{0x00}; // unmapped-only
+
+  enum : std::uint16_t {
+    F_MAPPED = 1,
+    F_RAM_ENABLED,
+    F_MULTIPLEX,
+    F_MBC1_MODE,
+    F_MODE_WRITE_LOCK,
+    F_RAM_BANK_MASK,
+    F_ROM_BANK_MASK,
+    F_ROM_BANK_LOW,
+    F_ROM_BANK_MID,
+    F_ROM_BANK_HIGH,
+    F_RAM_BANK_LOW,
+    F_RAM_BANK_HIGH,
+  };
 
   void set_rom_bank_low_locked(byte_t const new_low) {
     // ROM Bank Mask prevents writes to matching bits of ROM Bank Low
     // Mask bit0 is always 0, so bit0 is always writable
     const auto lock = static_cast<byte_t>(rom_bank_mask_ & 0x1F);
     const auto keep = static_cast<byte_t>(rom_bank_low_ & lock);
-    const auto take = static_cast<byte_t>(new_low & static_cast<byte_t>(~lock) & 0x1F);
+    const auto take =
+        static_cast<byte_t>(new_low & static_cast<byte_t>(~lock) & 0x1F);
     rom_bank_low_ = static_cast<byte_t>((keep | take) & 0x1F);
   }
 
@@ -164,20 +215,24 @@ private:
     // RAM Bank Mask prevents writes to matching bits of RAM Bank Low
     const auto lock = static_cast<byte_t>(ram_bank_mask_ & 0x03);
     const auto keep = static_cast<byte_t>(ram_bank_low_ & lock);
-    const auto take = static_cast<byte_t>(new_low & static_cast<byte_t>(~lock) & 0x03);
+    const auto take =
+        static_cast<byte_t>(new_low & static_cast<byte_t>(~lock) & 0x03);
     ram_bank_low_ = static_cast<byte_t>((keep | take) & 0x03);
   }
 
   [[nodiscard]] byte_t rom_bank_low_for_0000() const {
-    // 0000-3FFF uses only the “game select” bits of ROM Bank Low: ROM Bank Low & ROM Bank Mask
+    // 0000-3FFF uses only the “game select” bits of ROM Bank Low: ROM Bank Low
+    // & ROM Bank Mask
     return static_cast<byte_t>((rom_bank_low_ & rom_bank_mask_) & 0x1F);
   }
 
   [[nodiscard]] byte_t rom_bank_low_for_4000() const {
-    // 4000-7FFF uses ROM Bank Low (complete), but bank $00/$20/$40/$60 are remapped
-    // by forcing low bit if the unmasked bits are 0
+    // 4000-7FFF uses ROM Bank Low (complete), but bank $00/$20/$40/$60 are
+    // remapped by forcing low bit if the unmasked bits are 0
     auto low = static_cast<byte_t>(rom_bank_low_ & 0x1F);
-    if (const auto unmasked = static_cast<byte_t>(low & static_cast<byte_t>(~rom_bank_mask_) & 0x1F); unmasked == 0)
+    if (const auto unmasked = static_cast<byte_t>(
+            low & static_cast<byte_t>(~rom_bank_mask_) & 0x1F);
+        unmasked == 0)
       low = static_cast<byte_t>(low | 0x01);
     return low;
   }
@@ -188,14 +243,16 @@ private:
     if (!multiplex_) {
       const auto mid = static_cast<std::size_t>(rom_bank_mid_ & 0x03);
       const auto low = static_cast<std::size_t>(rom_bank_low_for_0000());
-      return (hi << 7) | (mid << 5) | low; // mapped, multiplex disabled 
+      return (hi << 7) | (mid << 5) | low; // mapped, multiplex disabled
     }
 
-    // multiplex enabled: mid-bits come from RAM Bank Low, masked in mode0, full in mode1
+    // multiplex enabled: mid-bits come from RAM Bank Low, masked in mode0, full
+    // in mode1
     const auto rb_mask = static_cast<byte_t>(ram_bank_mask_ & 0x03);
-    const std::size_t mid = mbc1_mode_
-        ? static_cast<std::size_t>(ram_bank_low_ & 0x03)                  // mode1
-        : static_cast<std::size_t>((ram_bank_low_ & rb_mask) & 0x03);     // mode0 
+    const std::size_t mid =
+        mbc1_mode_ ? static_cast<std::size_t>(ram_bank_low_ & 0x03) // mode1
+                   : static_cast<std::size_t>((ram_bank_low_ & rb_mask) &
+                                              0x03); // mode0
 
     const auto low = static_cast<std::size_t>(rom_bank_low_for_0000());
     return (hi << 7) | (mid << 5) | low;
@@ -207,10 +264,11 @@ private:
     if (!multiplex_) {
       const auto mid = static_cast<std::size_t>(rom_bank_mid_ & 0x03);
       const auto low = static_cast<std::size_t>(rom_bank_low_for_4000());
-      return (hi << 7) | (mid << 5) | low; // mapped, multiplex disabled 
+      return (hi << 7) | (mid << 5) | low; // mapped, multiplex disabled
     }
 
-    // multiplex enabled: 4000-7FFF uses RAM Bank Low complete, independent of mode 
+    // multiplex enabled: 4000-7FFF uses RAM Bank Low complete, independent of
+    // mode
     const auto mid = static_cast<std::size_t>(ram_bank_low_ & 0x03);
     const auto low = static_cast<std::size_t>(rom_bank_low_for_4000());
     return (hi << 7) | (mid << 5) | low;
@@ -223,23 +281,25 @@ private:
     const auto hi = static_cast<std::size_t>(ram_bank_high_ & 0x03);
 
     if (multiplex_) {
-      // multiplex enabled: low bits come from ROM Bank Mid 
+      // multiplex enabled: low bits come from ROM Bank Mid
       const auto low = static_cast<std::size_t>(rom_bank_mid_ & 0x03);
       const std::size_t bank = (hi << 2) | low;
-      const std::size_t banks = std::max<std::size_t>(1, ram_.size() / kRamBankSize);
+      const std::size_t banks =
+          std::max<std::size_t>(1, ram_.size() / kRamBankSize);
       return clamp_bank(bank, banks);
     }
 
     // multiplex disabled:
     // mode0: RAM Bank Low & RAM Bank Mask
-    // mode1: RAM Bank Low full 
+    // mode1: RAM Bank Low full
     const auto rb_mask = static_cast<byte_t>(ram_bank_mask_ & 0x03);
-    const std::size_t low = mbc1_mode_
-        ? static_cast<std::size_t>(ram_bank_low_ & 0x03)
-        : static_cast<std::size_t>((ram_bank_low_ & rb_mask) & 0x03);
+    const std::size_t low =
+        mbc1_mode_ ? static_cast<std::size_t>(ram_bank_low_ & 0x03)
+                   : static_cast<std::size_t>((ram_bank_low_ & rb_mask) & 0x03);
 
     const std::size_t bank = (hi << 2) | low;
-    const std::size_t banks = std::max<std::size_t>(1, ram_.size() / kRamBankSize);
+    const std::size_t banks =
+        std::max<std::size_t>(1, ram_.size() / kRamBankSize);
     return clamp_bank(bank, banks);
   }
 };

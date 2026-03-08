@@ -8,6 +8,10 @@
 // accuracy of the components we are emulating, so we devised this fabricated
 // memory bank controller to act like a fat block of straight-up RAM. This MBC
 // allows us to freely read and write whatever addresses we want.
+//
+// We have yet to support savestates on this mapper type because there is not
+// much of a reason to implement it. If someone reading this wants to do it
+// because they have some need for it, feel free.
 
 class TestMbc final : public Mbc {
 public:
@@ -23,7 +27,4 @@ private:
   std::vector<byte_t> ram_{};
 };
 
-std::unique_ptr<Mbc> make_test_mbc() {
-  // TODO: Might be nice to have a way to force CGB/DMG modes
-  return std::make_unique<TestMbc>();
-}
+std::unique_ptr<Mbc> make_test_mbc() { return std::make_unique<TestMbc>(); }
