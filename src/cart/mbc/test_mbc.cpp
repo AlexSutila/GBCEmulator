@@ -1,6 +1,5 @@
 #include "cart/mbc.hpp"
 #include "cart/mbc_creator.hpp"
-#include <stdexcept>
 
 // ---------------------------
 // Test MBC
@@ -19,9 +18,6 @@ public:
     ram_.at(addr) = val;
   }
   byte_t read(addr_t const addr) override { return ram_.at(addr); }
-  [[nodiscard]] const char *savestate_tag() const noexcept override {
-    return "TEST";
-  }
 
 private:
   std::vector<byte_t> ram_{};

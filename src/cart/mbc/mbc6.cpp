@@ -117,9 +117,6 @@ public:
 
   [[nodiscard]] std::span<const byte_t> ram() const noexcept override { return ram_; }
   std::span<byte_t> ram() noexcept override { return ram_; }
-  [[nodiscard]] const char *savestate_tag() const noexcept override {
-    return "MBC6";
-  }
 
 private:
   static constexpr std::size_t kRomBank8K  = 0x2000;

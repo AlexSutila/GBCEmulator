@@ -26,12 +26,11 @@ template <typename T> void Cartridge::parse_savestate(T &t) {
   // if that cartridge is actually inserted.
   t.field_generic(F_CART_TYPE, image_.header.cartridge_type);
   t.field_bytes(F_RAM_BYTES, mbc_->ram());
+  t.field_complex(F_MAPPER, [&](T &t) { mbc_->parse_savestate(t); });
 
   // Might not need to load these, but keeping this anyway
   t.field_generic(F_GLOBAL_CHECKSUM, image_.computed_global_checksum);
   t.field_generic(F_HEADER_CHECKSUM, image_.header.header_checksum);
-
-  // TODO: Mapper
   t.eof();
 }
 

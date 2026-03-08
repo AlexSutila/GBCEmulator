@@ -82,9 +82,6 @@ public:
   [[nodiscard]] bool has_battery() const noexcept override { return battery_; }
   [[nodiscard]] std::span<const byte_t> ram() const noexcept override { return ram_; }
   std::span<byte_t> ram() noexcept override { return ram_; }
-  [[nodiscard]] const char *savestate_tag() const noexcept override {
-    return "HUC1";
-  }
 
 private:
   std::span<const byte_t> rom_;

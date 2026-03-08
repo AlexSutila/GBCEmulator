@@ -445,9 +445,6 @@ public:
     return eeprom_.bytes();
   }
   std::span<byte_t> ram() noexcept override { return eeprom_.bytes(); }
-  [[nodiscard]] const char *savestate_tag() const noexcept override {
-    return "MBC7";
-  }
 
   // Optional accelerometer hook that can be called from frontend/input later:
   // (Pan Docs says centered around 0x81D0; 0x8000 is the "unlatched" reset value)

@@ -1,6 +1,7 @@
 #include "cart/cart.hpp"
 #include "cart/mbc.hpp"
 #include "cart/mbc_creator.hpp"
+#include "savestate/codec.hpp"
 
 // ---------------------------
 // EMS (Flash cart / Multi-ROM selector)
@@ -92,10 +93,30 @@ public:
   }
 
   [[nodiscard]] bool has_battery() const noexcept override { return false; }
-  [[nodiscard]] std::span<const byte_t> ram() const noexcept override { return {}; }
+  [[nodiscard]] std::span<const byte_t> ram() const noexcept override {
+    return {};
+  }
   std::span<byte_t> ram() noexcept override { return {}; }
-  [[nodiscard]] const char *savestate_tag() const noexcept override {
-    return "EMS ";
+
+  template <typename T> void parse_savestate_impl(T &t) {
+    constexpr auto version = 1; // Schema revision
+    t.chunk_header(version, Savestate::C_MBC_EMS);
+    t.field_generic(F_IN_GAME, in_game_);
+    t.field_enum(F_MODE, mode_);
+    t.field_generic(F_PENDING_BASE, pending_base_);
+    t.field_generic(F_BASE_BANK, base_bank_);
+    t.field_generic(F_BANK_SEL, bank_sel_);
+    t.eof();
+  }
+
+  void parse_savestate(Savestate::Writer &t) override {
+    parse_savestate_impl(t);
+  }
+  void parse_savestate(Savestate::Reader &t) override {
+    parse_savestate_impl(t);
+  }
+  void parse_savestate(Savestate::Sizer &t) override {
+    parse_savestate_impl(t);
   }
 
 private:
@@ -103,6 +124,14 @@ private:
     None = 0,
     SelectGameBase,
     SelectBank,
+  };
+
+  enum : std::uint16_t {
+    F_IN_GAME = 1,
+    F_MODE,
+    F_PENDING_BASE,
+    F_BASE_BANK,
+    F_BANK_SEL,
   };
 
   [[nodiscard]] static Mode mode_from_raw_(const byte_t raw) {

@@ -39,10 +39,6 @@ public:
     latched_ = true; // Any write consumes the single allowed bank switch.
   }
 
-  [[nodiscard]] const char *savestate_tag() const noexcept override {
-    return "M161";
-  }
-
 private:
   std::span<const byte_t> rom_;
 

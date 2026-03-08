@@ -64,9 +64,6 @@ public:
   [[nodiscard]] bool has_battery() const noexcept override { return battery_; }
   [[nodiscard]] std::span<const byte_t> ram() const noexcept override { return ram_; }
   std::span<byte_t> ram() noexcept override { return ram_; }
-  [[nodiscard]] const char *savestate_tag() const noexcept override {
-    return "MBC1";
-  }
 
 private:
   byte_t upper2_{0b00}; // BANK2: upper 2 bits of rom bank number or ram bank

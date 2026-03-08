@@ -23,6 +23,21 @@ enum ChunkTags : std::uint16_t {
   C_BUS,
 
   C_CART,
+  C_MBC_EMS,
+  C_MBC_HUC1,
+  C_MBC_HUC3,
+  C_MBC_M161,
+  C_MBC_1,
+  C_MBC_2,
+  C_MBC_3,
+  C_MBC_5,
+  C_MBC_6,
+  C_MBC_7,
+  C_MBC_MMM01,
+  C_MBC_NONE,
+  C_MBC_TAMA5,
+  C_MBC_TEST,
+  C_WISDOM_TREE, // ✝ Praise the Lord ✝
 
   C_PPU,
   C_FETCHER,

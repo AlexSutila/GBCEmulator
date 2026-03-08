@@ -35,10 +35,6 @@ public:
     }
   }
 
-  [[nodiscard]] const char *savestate_tag() const noexcept override {
-    return "WTRE";
-  }
-
 private:
   static constexpr std::size_t kBankSize32k = 0x8000;
 

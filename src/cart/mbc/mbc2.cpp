@@ -63,9 +63,6 @@ public:
   std::span<byte_t> ram() noexcept override {
     return {ram_.data(), ram_.size()};
   }
-  [[nodiscard]] const char *savestate_tag() const noexcept override {
-    return "MBC2";
-  }
 
 private:
   std::span<const byte_t> rom_;
