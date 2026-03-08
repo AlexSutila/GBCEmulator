@@ -80,7 +80,6 @@ public:
   byte_t read() override;
 
 private:
-  byte_t state{};
   WriteCallback on_write{};
   ReadCallback on_read{};
 };

@@ -172,10 +172,12 @@ void AddressBus::insert_cartridge(cart c) {
   /* Generic transfer of ownership for actual game cartridges */
   cart_ = std::make_unique<Cartridge>(std::move(c));
 }
+
 void AddressBus::init_test_bed() {
   /* Default constructor initializes an instance of TestMBC */
   cart_ = std::make_unique<Cartridge>();
 }
+
 void AddressBus::eject_cartridge() { cart_.reset(); }
 
 byte_t &AddressBus::vram_byte(const addr_t addr) const {

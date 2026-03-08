@@ -575,13 +575,18 @@ GameBoyColor::configure_cheats(const std::vector<CheatCode> &cheats) {
 }
 
 bool GameBoyColor::savestate_ready() const {
-  return cpu && cpu->savestate_ready();
+  const bool cpu_ok = cpu && cpu->savestate_ready();
+  const bool cart_ok = bus && bus->get_cartridge();
+
+  // Aligned with instruction fetch and must have cart inserted. We also just
+  // let it slide in halt mode to prevent excessive wait periods.
+  return cpu_ok && cart_ok;
 }
 
 enum : std::uint16_t {
   F_ELAPSED_CLOCKS = 1,
   F_CGB_MODE,
-  F_HALTED, // Might not need?
+  F_HALTED,
   F_SPEED_SWITCH_ARMED,
   F_DOUBLE_SPEED,
 };
