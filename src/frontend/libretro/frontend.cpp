@@ -12,7 +12,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
-#include <stdexcept>
 #include <vector>
 
 /* ======================================================================
@@ -62,6 +61,22 @@ void LibretroFrontend::queue_audio_samples(const float *samples,
   cb.audio_batch_cb(audio_buffer.data(), frames);
 }
 
+[[nodiscard]] std::vector<byte_t> LibretroFrontend::take_snapshot() const {
+  while (!gbc->savestate_ready())
+    gbc->step(); // Only a few hundred cycles max of wait time max
+  return gbc->savestate_serialize();
+}
+
+void LibretroFrontend::restore_snapshot(std::span<const byte_t> snapshot) {
+  gbc->savestate_deserialize(snapshot);
+}
+
+void LibretroFrontend::load_game(cart &c) {
+  gbc->insert_cartridge(c); // Save should be ready if it doesnt throw
+  initial_state = take_snapshot();
+  state_size = gbc->savestate_size();
+}
+
 void LibretroFrontend::try_show_frame() {
   if (!frame_ready)
     return;
@@ -88,6 +103,9 @@ void LibretroFrontend::try_poll_input() {
   }
 }
 
+/* Super simple workaround for a soft reset mechanism */
+void LibretroFrontend::reset() { gbc->savestate_deserialize(initial_state); }
+
 bool LibretroFrontend::test_input(unsigned id) const {
   return cb.input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, id);
 }
@@ -99,30 +117,6 @@ Joypad::JOYP *LibretroFrontend::get_joyp() const {
 
   auto joyp = bus->get_mmio(IORegisterMapping::MMIO_JOYPAD);
   return static_cast<Joypad::JOYP *>(joyp);
-}
-
-cart LibretroFrontend::get_image() const {
-  if (!gbc)
-    throw std::runtime_error(
-        "LibretroFrontend::get_image(): GameBoy core is null");
-
-  auto *bus = gbc->get_bus();
-  if (!bus)
-    throw std::runtime_error(
-        "LibretroFrontend::get_image(): AddressBus is null");
-
-  auto *cartridge = bus->get_cartridge();
-  if (!cartridge)
-    throw std::runtime_error(
-        "LibretroFrontend::get_image(): Cartridge is null");
-
-  return cartridge->image();
-}
-
-void LibretroFrontend::reset() {
-  const cart image = get_image(); // Intentionally copied
-  gbc = std::make_unique<GameBoyColor>(*this);
-  gbc->insert_cartridge(image);
 }
 
 void LibretroFrontend::start() { /* unused */ }

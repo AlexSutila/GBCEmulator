@@ -135,11 +135,11 @@ bool retro_load_game(const struct retro_game_info *info) {
 
   /* Our interface requires a `std::vector()`, construct accordingly */
   std::vector<byte_t> raw(data_ptr, data_ptr + size);
-  auto &gbc = LibretroFrontend::get_instance().get();
+  auto &instance = LibretroFrontend::get_instance();
 
   try {
     cart c = load_cart_raw(raw);
-    gbc->insert_cartridge(c);
+    instance.load_game(c);
   } catch (...) {
     return false;
   }
@@ -159,11 +159,35 @@ bool retro_load_game_special(unsigned type, const struct retro_game_info *info,
   return false;
 }
 
-size_t retro_serialize_size(void) { return 0; }
+size_t retro_serialize_size(void) {
+  auto &instance = LibretroFrontend::get_instance();
+  return instance.get_state_size();
+}
 
-bool retro_serialize(void *data_, size_t size) { return false; }
+bool retro_serialize(void *data_, size_t size) {
+  auto &instance = LibretroFrontend::get_instance();
+  const auto snapshot = instance.take_snapshot();
+  if (size < snapshot.size()) [[unlikely]]
+    return false;
 
-bool retro_unserialize(const void *data_, size_t size) { return false; }
+  // std::memcpy(data_, snapshot.data(), snapshot.size()); - lolno
+  std::span<byte_t> dst(static_cast<byte_t *>(data_), snapshot.size());
+  std::ranges::copy(snapshot, dst.begin());
+  return true;
+}
+
+bool retro_unserialize(const void *data_, size_t size) {
+  auto &instance = LibretroFrontend::get_instance();
+  try {
+    std::span<const byte_t> snapshot(static_cast<const byte_t *>(data_), size);
+    instance.restore_snapshot(snapshot);
+    return true;
+
+    // Could be invalid field/chunk version or save state corruption
+  } catch (...) {
+    return false;
+  }
+}
 
 void *retro_get_memory_data(unsigned id) {
   if (id == RETRO_MEMORY_SAVE_RAM) {
