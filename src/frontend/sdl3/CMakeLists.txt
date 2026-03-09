@@ -89,6 +89,9 @@ add_executable(gbc_full
     ${CMAKE_SOURCE_DIR}/src/frontend/sdl3/sdl_host.cpp
     ${CMAKE_SOURCE_DIR}/src/frontend/sdl3/main.cpp
     ${CMAKE_SOURCE_DIR}/src/frontend/sdl3/gui.cpp
+    ${CMAKE_SOURCE_DIR}/src/frontend/sdl3/gui_context.cpp
+    ${CMAKE_SOURCE_DIR}/src/frontend/sdl3/gui_main.cpp
+    ${CMAKE_SOURCE_DIR}/src/frontend/sdl3/gui_tools.cpp
     ${GBC_CORE_SOURCES}
 )
 

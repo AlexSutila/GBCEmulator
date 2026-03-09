@@ -4,11 +4,43 @@
 
 #include "common.hpp"
 #include "sdl_host.hpp"
+#include <array>
+#include <ctime>
 #include <functional>
+#include <string_view>
+#include <tuple>
 #include <imgui.h>
 #include <ImGuiFileDialog.h>
 #include <backends/imgui_impl_sdlrenderer3.h>
 #include <backends/imgui_impl_sdl3.h>
+
+inline bool window_is_hidden(SDL_Window *window) {
+  return !window || (SDL_GetWindowFlags(window) & SDL_WINDOW_HIDDEN) != 0;
+}
+
+constexpr SDL_WindowFlags kDetachedDialogWindowFlags =
+    SDL_WINDOW_HIDDEN | SDL_WINDOW_BORDERLESS | SDL_WINDOW_RESIZABLE |
+    SDL_WINDOW_HIGH_PIXEL_DENSITY;
+
+constexpr ImGuiWindowFlags kDetachedCanvasWindowFlags =
+    ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
+    ImGuiWindowFlags_NoSavedSettings;
+
+inline void setup_full_viewport_window(ImGuiWindowFlags &flags) {
+  if (const ImGuiViewport *viewport = ImGui::GetMainViewport(); viewport) {
+    ImGui::SetNextWindowPos(viewport->Pos, ImGuiCond_Always);
+    ImGui::SetNextWindowSize(viewport->Size, ImGuiCond_Always);
+  }
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+  flags |= kDetachedCanvasWindowFlags;
+}
+
+inline void teardown_full_viewport_window(const bool enabled) {
+  if (enabled) {
+    ImGui::PopStyleVar(2);
+  }
+}
 
 class GbcImGui {
   static constexpr std::string_view rom_filters =
@@ -77,7 +109,7 @@ public:
   void prepare_dialog_windows(const UiState &state);
   [[nodiscard]] static bool dialog_is_detached(DialogId id);
   [[nodiscard]] bool has_detached_dialog_context(DialogId id) const;
-  [[nodiscard]] bool use_detached_dialog_context(DialogId id, UiState &state);
+  [[nodiscard]] bool use_detached_dialog_context(DialogId id, const UiState &state);
   void present_detached_dialog(DialogId id) const;
   [[nodiscard]] SDL_Renderer *active_renderer() const { return active_renderer_; }
   void render_dialog(DialogId id, UiState &state, SDLHost &host);

@@ -18,26 +18,6 @@ constexpr auto tile_data_height_px = tile_data_height_tiles * 8;
 constexpr auto tile_data_width_px = tile_data_width_tiles * 8;
 constexpr auto black = 0xFF000000;
 
-constexpr ImGuiWindowFlags kDetachedCanvasWindowFlags =
-    ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
-    ImGuiWindowFlags_NoSavedSettings;
-
-void setup_full_viewport_window(ImGuiWindowFlags &flags) {
-  if (const ImGuiViewport *viewport = ImGui::GetMainViewport(); viewport) {
-    ImGui::SetNextWindowPos(viewport->Pos, ImGuiCond_Always);
-    ImGui::SetNextWindowSize(viewport->Size, ImGuiCond_Always);
-  }
-  ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
-  ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-  flags |= kDetachedCanvasWindowFlags;
-}
-
-void teardown_full_viewport_window(const bool enabled) {
-  if (enabled) {
-    ImGui::PopStyleVar(2);
-  }
-}
-
 DebuggerImGui::~DebuggerImGui() { destroy_tile_data_textures(); }
 
 void DebuggerImGui::init() {

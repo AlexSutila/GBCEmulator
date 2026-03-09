@@ -868,7 +868,7 @@ std::vector<std::uint32_t> SDL3Frontend::capture_savestate_thumbnail() const {
   constexpr int src_w = framebuf_width;
   constexpr int src_h = framebuf_height;
   std::vector<std::uint32_t> out(
-      static_cast<std::size_t>(kSavestateThumbWidth * kSavestateThumbHeight));
+      kSavestateThumbWidth * kSavestateThumbHeight);
   const std::uint32_t *src = get_front_buffer();
   const bool cgb_mode = is_cgb.load(std::memory_order_relaxed);
   for (int y = 0; y < kSavestateThumbHeight; ++y) {
