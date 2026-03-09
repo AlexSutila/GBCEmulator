@@ -213,9 +213,18 @@ size_t retro_get_memory_size(unsigned id) {
   return 0;
 }
 
-void retro_cheat_reset(void) {}
+void retro_cheat_reset(void) {
+  auto &instance = LibretroFrontend::get_instance();
+  instance.cheat_reset();
+}
 
-void retro_cheat_set(unsigned index, bool enabled, const char *code) {}
+void retro_cheat_set(unsigned index, bool enabled, const char *code) {
+  auto &instance = LibretroFrontend::get_instance();
+  if (code) {
+    std::string code_str(code);
+    instance.cheat_set(index, enabled, code_str);
+  }
+}
 
 #ifdef __cplusplus
 }

@@ -18,7 +18,10 @@
  * Start singleton LibretroFrontend implementation
  * ====================================================================== */
 
-LibretroFrontend::LibretroFrontend() { audio_buffer.reserve(4096); }
+LibretroFrontend::LibretroFrontend() {
+  audio_buffer.reserve(4096);
+  cheat_codes.clear();
+}
 
 LibretroFrontend::~LibretroFrontend() {}
 
@@ -69,6 +72,24 @@ void LibretroFrontend::queue_audio_samples(const float *samples,
 
 void LibretroFrontend::restore_snapshot(std::span<const byte_t> snapshot) {
   gbc->savestate_deserialize(snapshot);
+}
+
+void LibretroFrontend::cheat_set(std::size_t index, bool enabled,
+                                 std::string &code) {
+  if (index >= cheat_codes.size())
+    cheat_codes.resize(index + 1);
+
+  cheat_codes.at(index) = {
+      .enabled = enabled,
+      .code = code,
+      .format = GameBoyColor::CheatFormat::CHEAT_AUTO,
+  };
+  gbc->configure_cheats(cheat_codes);
+}
+
+void LibretroFrontend::cheat_reset() {
+  cheat_codes.clear(); // Wipe internal data structures clean
+  gbc->configure_cheats(cheat_codes);
 }
 
 void LibretroFrontend::load_game(cart &c) {

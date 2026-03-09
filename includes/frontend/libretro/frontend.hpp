@@ -2,6 +2,7 @@
 #define GBC_LIBRETRO_FRONTEND_HPP
 
 #include "frontend/frontend.hpp"
+#include "gbc.hpp"
 #include "libretro.h"
 #include "memory/mmio/dmg.hpp"
 #include <array>
@@ -68,6 +69,9 @@ public:
   void restore_snapshot(std::span<const byte_t> snapshot);
   std::size_t get_state_size() const { return state_size; }
 
+  void cheat_set(std::size_t index, bool enabled, std::string &code);
+  void cheat_reset();
+
   void load_game(cart &c);
   void try_show_frame();
   void try_poll_input();
@@ -102,6 +106,7 @@ private:
   std::size_t state_size{}; // Maximum
 
   // Keep private for singleton design pattern
+  std::vector<GameBoyColor::CheatCode> cheat_codes;
   explicit LibretroFrontend();
 };
 
