@@ -641,12 +641,14 @@ void GameBoyColor::savestate_deserialize(const std::span<const byte_t> data) {
     throw std::runtime_error(
         "GameBoyColor::serialize_savestate() uninitialized");
 
+  // First pass does a check on the buffer content to make sure the save is in
+  // a valid format BEFORE blindly altering system components.
   Savestate::Checker check(data);
-  parse_savestate(check);
+  parse_savestate(check); // Throws if failed
 
   // Reader performs serialization
   Savestate::Reader in(data);
-  parse_savestate(in);
+  parse_savestate(in); // Also throws if failed, but REALLY not good
 }
 
 std::size_t GameBoyColor::savestate_size() {
