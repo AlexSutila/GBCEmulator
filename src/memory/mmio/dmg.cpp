@@ -135,6 +135,8 @@ template void
 BootROMCtrl::parse_savestate<Savestate::Reader>(Savestate::Reader &);
 template void
 BootROMCtrl::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
+template void
+BootROMCtrl::parse_savestate<Savestate::Checker>(Savestate::Checker &);
 
 /* Writing this register disables the boot ROM */
 void BootROMCtrl::write(const byte_t value) {

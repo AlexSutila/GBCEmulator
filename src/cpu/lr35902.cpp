@@ -74,6 +74,8 @@ template <typename T> void LR35902::parse_savestate(T &t) {
 template void LR35902::parse_savestate<Savestate::Writer>(Savestate::Writer &);
 template void LR35902::parse_savestate<Savestate::Reader>(Savestate::Reader &);
 template void LR35902::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
+template void
+LR35902::parse_savestate<Savestate::Checker>(Savestate::Checker &);
 
 LR35902::LR35902(AddressBus *bus_ptr, std::optional<Debug::Debugger> &debugger,
                  runtime_sys_info &sys)

@@ -13,6 +13,7 @@
 namespace Savestate {
 class Reader;
 class Writer;
+class Checker;
 class Sizer;
 }; // namespace Savestate
 
@@ -44,6 +45,9 @@ public:
     throw std::runtime_error("Mbc::parse_savestate() unimplemented");
   }
   virtual void parse_savestate(Savestate::Sizer &) {
+    throw std::runtime_error("Mbc::parse_savestate() unimplemented");
+  }
+  virtual void parse_savestate(Savestate::Checker &) {
     throw std::runtime_error("Mbc::parse_savestate() unimplemented");
   }
 };

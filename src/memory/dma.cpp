@@ -50,6 +50,8 @@ ObjAttrDMA::parse_savestate<Savestate::Writer>(Savestate::Writer &);
 template void
 ObjAttrDMA::parse_savestate<Savestate::Reader>(Savestate::Reader &);
 template void ObjAttrDMA::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
+template void
+ObjAttrDMA::parse_savestate<Savestate::Checker>(Savestate::Checker &);
 
 ObjAttrDMA::ObjAttrDMA(AddressBus &bus) : dma_(*this), bus_(bus) {
   src_base_addr = data_offset = 0;
@@ -178,6 +180,7 @@ template <typename T> void VDMA::parse_savestate(T &t) {
 template void VDMA::parse_savestate<Savestate::Writer>(Savestate::Writer &);
 template void VDMA::parse_savestate<Savestate::Reader>(Savestate::Reader &);
 template void VDMA::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
+template void VDMA::parse_savestate<Savestate::Checker>(Savestate::Checker &);
 
 VDMA::VDMA(AddressBus &bus, runtime_sys_info &sys)
     : vdma1_(), vdma2_(), // Source low and high registers

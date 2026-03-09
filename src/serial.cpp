@@ -26,6 +26,8 @@ SerialUnit::parse_savestate<Savestate::Writer>(Savestate::Writer &);
 template void
 SerialUnit::parse_savestate<Savestate::Reader>(Savestate::Reader &);
 template void SerialUnit::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
+template void
+SerialUnit::parse_savestate<Savestate::Checker>(Savestate::Checker &);
 
 /*
  * TODO: We do not actually implement serial data transfers. The idea of doing

@@ -12,6 +12,7 @@ namespace Savestate {
 enum SavestateOps {
   OP_READ,
   OP_WRITE,
+  OP_CHECK,
   OP_SIZE,
 };
 
@@ -207,6 +208,103 @@ private:
     T val{0};
     for (std::size_t i{0}; i < sizeof(T); ++i)
       val |= static_cast<T>(buf_[pos_++] << (i * 8));
+    return val;
+  }
+
+  std::span<const std::uint8_t> buf_;
+  std::size_t pos_{0};
+};
+
+// For a single pass recursive check of all tags, versions, and EOF flags
+// ... also caution, I was lazy and let a clanker write this lol - Dorce
+class Checker {
+public:
+  Checker() = default;
+  explicit Checker(std::span<const std::uint8_t> bytes) : buf_(bytes) {}
+  constexpr SavestateOps op() const { return OP_CHECK; }
+
+  template <typename T> void field_generic(const std::uint16_t tag, const T) {
+    check_tag(tag);
+    skip<T>();
+  }
+
+  template <typename T> void field_enum(const std::uint16_t tag, const T) {
+    check_tag(tag);
+    skip<std::uint8_t>();
+  }
+
+  template <typename Fn> void field_complex(const std::uint16_t tag, Fn &&fn) {
+    check_tag(tag);
+    fn(*this);
+    eof();
+  }
+
+  template <typename T, typename Fn>
+  void field_vector(const std::uint16_t tag, std::vector<T> &,
+                    const std::size_t max_size, Fn &&fn) {
+    check_tag(tag);
+
+    const std::size_t size = read<std::size_t>();
+    if (size > max_size)
+      throw std::runtime_error("Savestate: exceeded vector capacity");
+
+    T dummy{};
+    for (std::size_t i = 0; i < size; ++i)
+      fn(*this, dummy);
+
+    eof();
+  }
+
+  void field_bytes(const std::uint16_t tag, std::span<std::uint8_t> bytes) {
+    check_tag(tag);
+    require(bytes.size());
+    pos_ += bytes.size();
+  }
+
+  template <typename T>
+  void field_optional(const std::uint16_t tag, const std::optional<T>) {
+    check_tag(tag);
+
+    bool present = read<bool>();
+    if (present)
+      skip<T>();
+  }
+
+  void eof() { check_tag(C_EOF); }
+
+  void chunk_header(const std::uint16_t version, const std::uint16_t tag) {
+    const auto read_version = read<std::uint16_t>();
+    const auto read_tag = read<std::uint16_t>();
+    if (version != read_version)
+      throw std::runtime_error("Savestate: bad version");
+    if (tag != read_tag)
+      throw std::runtime_error("Savestate: bad chunk tag");
+  }
+
+private:
+  void require(std::size_t n) const {
+    if (pos_ + n > buf_.size())
+      throw std::runtime_error("Savestate: truncated data");
+  }
+
+  void check_tag(std::uint16_t tag) {
+    auto read_tag = read<std::uint16_t>();
+    if (read_tag != tag)
+      throw std::runtime_error("Savestate: bad field tag");
+  }
+
+  template <typename T> void skip() {
+    require(sizeof(T));
+    pos_ += sizeof(T);
+  }
+
+  template <typename T> T read() {
+    require(sizeof(T));
+
+    T val{0};
+    for (std::size_t i = 0; i < sizeof(T); ++i)
+      val |= static_cast<T>(buf_[pos_++] << (i * 8));
+
     return val;
   }
 

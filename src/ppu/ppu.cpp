@@ -127,6 +127,8 @@ template void
 PixelProcessingUnit::parse_savestate<Savestate::Reader>(Savestate::Reader &);
 template void
 PixelProcessingUnit::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
+template void
+PixelProcessingUnit::parse_savestate<Savestate::Checker>(Savestate::Checker &);
 
 template <typename T>
 T *init_mmio(AddressBus *bus, const IORegisterMapping reg_id) {

@@ -524,6 +524,9 @@ public:
   void parse_savestate(Savestate::Sizer &t) override {
     parse_savestate_impl(t);
   }
+  void parse_savestate(Savestate::Checker &t) override {
+    parse_savestate_impl(t);
+  }
 
 private:
   [[nodiscard]] bool has_battery() const noexcept override { return battery_; }

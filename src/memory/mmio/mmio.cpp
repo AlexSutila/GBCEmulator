@@ -19,6 +19,8 @@ template void
 MMIORegister::parse_savestate<Savestate::Reader>(Savestate::Reader &);
 template void
 MMIORegister::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
+template void
+MMIORegister::parse_savestate<Savestate::Checker>(Savestate::Checker &);
 
 void MMIORegister::write(const byte_t value) { state_ = value; }
 

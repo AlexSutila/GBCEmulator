@@ -82,6 +82,9 @@ public:
   void parse_savestate(Savestate::Sizer &t) override {
     parse_savestate_impl(t);
   }
+  void parse_savestate(Savestate::Checker &t) override {
+    parse_savestate_impl(t);
+  }
 
 private:
   enum : std::uint16_t { F_RAM_ENABLED = 1, F_ROM_BANK };

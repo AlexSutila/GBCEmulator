@@ -617,6 +617,8 @@ template void
 GameBoyColor::parse_savestate<Savestate::Reader>(Savestate::Reader &);
 template void
 GameBoyColor::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
+template void
+GameBoyColor::parse_savestate<Savestate::Checker>(Savestate::Checker &);
 
 std::vector<byte_t> GameBoyColor::savestate_serialize() {
   if (!bus || !cpu || !ppu || !timer || !serial)
@@ -638,6 +640,9 @@ void GameBoyColor::savestate_deserialize(const std::span<const byte_t> data) {
   if (!bus || !cpu || !ppu || !timer || !serial)
     throw std::runtime_error(
         "GameBoyColor::serialize_savestate() uninitialized");
+
+  Savestate::Checker check(data);
+  parse_savestate(check);
 
   // Reader performs serialization
   Savestate::Reader in(data);

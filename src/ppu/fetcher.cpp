@@ -62,6 +62,8 @@ template <typename T> void Fetcher::parse_savestate(T &t) {
 template void Fetcher::parse_savestate<Savestate::Writer>(Savestate::Writer &t);
 template void Fetcher::parse_savestate<Savestate::Reader>(Savestate::Reader &t);
 template void Fetcher::parse_savestate<Savestate::Sizer>(Savestate::Sizer &t);
+template void
+Fetcher::parse_savestate<Savestate::Checker>(Savestate::Checker &t);
 
 Fetcher::Fetcher(std::array<std::unique_ptr<byte_t[]>, 2> &vram,
                  PPU::LCDCtrl &lcdc, MMIORegister &scy, MMIORegister &scx,

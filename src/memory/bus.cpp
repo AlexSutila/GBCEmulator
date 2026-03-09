@@ -123,6 +123,7 @@ AddressBus::parse_savestate<Savestate::Writer>(Savestate::Writer &);
 template void
 AddressBus::parse_savestate<Savestate::Reader>(Savestate::Reader &);
 template void AddressBus::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
+template void AddressBus::parse_savestate<Savestate::Checker>(Savestate::Checker &);
 
 AddressBus::AddressBus(runtime_sys_info &sys,
                        std::optional<Debug::Debugger> &debugger,

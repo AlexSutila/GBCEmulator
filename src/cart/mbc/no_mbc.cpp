@@ -44,6 +44,7 @@ public:
   void parse_savestate(Savestate::Writer &t) override {}
   void parse_savestate(Savestate::Reader &t) override {}
   void parse_savestate(Savestate::Sizer &t) override {}
+  void parse_savestate(Savestate::Checker &t) override {}
 
 private:
   std::span<const byte_t> rom_;

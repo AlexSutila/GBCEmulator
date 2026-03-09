@@ -54,6 +54,8 @@ template <typename T> void ColorRam::parse_savestate(T &t) {
 template void ColorRam::parse_savestate<Savestate::Writer>(Savestate::Writer &);
 template void ColorRam::parse_savestate<Savestate::Reader>(Savestate::Reader &);
 template void ColorRam::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
+template void
+ColorRam::parse_savestate<Savestate::Checker>(Savestate::Checker &);
 
 PPU::PaletteData *ColorRam::get_data_reg() { return &data_reg; }
 PPU::PaletteIdx *ColorRam::get_idx_reg() { return &idx_reg; }

@@ -39,6 +39,8 @@ template void
 BgPixelFifo::parse_savestate<Savestate::Reader>(Savestate::Reader &);
 template void
 BgPixelFifo::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
+template void
+BgPixelFifo::parse_savestate<Savestate::Checker>(Savestate::Checker &);
 
 template <typename T> void ObjPixelFifo::parse_savestate(T &t) {
   t.field_complex(1, [&](auto &t) {
@@ -57,6 +59,8 @@ template void
 ObjPixelFifo::parse_savestate<Savestate::Reader>(Savestate::Reader &);
 template void
 ObjPixelFifo::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
+template void
+ObjPixelFifo::parse_savestate<Savestate::Checker>(Savestate::Checker &);
 
 /* ======================================================================
  * Background pixel fifo implementation

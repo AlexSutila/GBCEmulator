@@ -39,6 +39,8 @@ Cartridge::parse_savestate<Savestate::Writer>(Savestate::Writer &);
 template void
 Cartridge::parse_savestate<Savestate::Reader>(Savestate::Reader &);
 template void Cartridge::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
+template void
+Cartridge::parse_savestate<Savestate::Checker>(Savestate::Checker &);
 
 static std::optional<std::vector<byte_t>> read_all_bytes(const fs::path &p) {
   std::ifstream f(p, std::ios::binary | std::ios::ate);

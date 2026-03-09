@@ -169,6 +169,9 @@ public:
   void parse_savestate(Savestate::Sizer &t) override {
     parse_savestate_impl(t);
   }
+  void parse_savestate(Savestate::Checker &t) override {
+    parse_savestate_impl(t);
+  }
 
 private:
   std::span<const byte_t> rom_;

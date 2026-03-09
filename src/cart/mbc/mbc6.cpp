@@ -176,6 +176,9 @@ public:
   void parse_savestate(Savestate::Sizer &t) override {
     parse_savestate_impl(t);
   }
+  void parse_savestate(Savestate::Checker &t) override {
+    parse_savestate_impl(t);
+  }
 
 private:
   static constexpr std::size_t kRomBank8K = 0x2000;

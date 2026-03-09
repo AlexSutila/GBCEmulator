@@ -22,6 +22,7 @@ template <typename T> void JOYP::parse_savestate(T &t) {
 template void JOYP::parse_savestate<Savestate::Writer>(Savestate::Writer &);
 template void JOYP::parse_savestate<Savestate::Reader>(Savestate::Reader &);
 template void JOYP::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
+template void JOYP::parse_savestate<Savestate::Checker>(Savestate::Checker &);
 
 JOYP::JOYP() : MMIORegister(0), select_bits(select_mask), last_low(0x0F) {}
 
