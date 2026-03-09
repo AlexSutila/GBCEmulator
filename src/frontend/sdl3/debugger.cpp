@@ -3,13 +3,11 @@
 #include "SDL3/SDL_render.h"
 #include "debugger/breakpoint.hpp"
 #include "debugger/print.hpp"
-#include "frontend/sdl3/sdl_host.hpp"
 #include "ppu/palette.hpp"
 #include <algorithm>
 #include <cassert>
 #include <imgui.h>
 #include <mutex>
-#include <stdexcept>
 
 constexpr auto hex_viewer_bytes_shown = 0x10 * 0x10; // Don't mess with this
 static_assert(hex_viewer_bytes_shown % 0x10 == 0, "Should be a factor of 16");

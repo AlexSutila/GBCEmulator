@@ -8,6 +8,9 @@
 #include "memory/mmio/dmg.hpp"
 #include "sdl_host.hpp"
 #include <atomic>
+#include <chrono>
+#include <condition_variable>
+#include <mutex>
 #include <thread>
 
 using Clock = std::chrono::steady_clock;
@@ -141,6 +144,7 @@ private:
   std::atomic<std::int64_t> suppress_vsync_until_ns{0};
   std::atomic<std::int64_t> last_forced_redraw_ns{0};
   std::atomic_flag render_guard = ATOMIC_FLAG_INIT;
+  static std::int64_t steady_now_ns();
 
   // Avoid redundant texture uploads
   std::atomic<bool> video_dirty{true};
@@ -166,7 +170,7 @@ private:
       const std::stop_token &st, const cart &cart,
       const std::optional<std::string> &bios,
       const std::optional<std::filesystem::path> &initial_save_path);
-  void advance_emulator_core(const int cycles);
+  void advance_emulator_core(int cycles);
   void join_emu_thread_if_running();
 
   // Main loop helpers
@@ -201,6 +205,7 @@ private:
 
   // Input helpers
   InputState input_state{};
+  void update_input_buttons(byte_t mask, bool pressed);
   void handle_controller_press(SDL_GamepadButton key, bool pressed);
   void handle_keypress(SDL_Keycode key, bool pressed);
   static bool SDLCALL event_watcher(void *userdata, const SDL_Event *event);

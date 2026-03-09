@@ -81,6 +81,9 @@ target_link_libraries(imgui PRIVATE SDL3::SDL3)
 add_executable(gbc_full
     ${CMAKE_SOURCE_DIR}/src/frontend/sdl3/debugger.cpp
     ${CMAKE_SOURCE_DIR}/src/frontend/sdl3/frontend.cpp
+    ${CMAKE_SOURCE_DIR}/src/frontend/sdl3/frontend_emulation.cpp
+    ${CMAKE_SOURCE_DIR}/src/frontend/sdl3/frontend_input.cpp
+    ${CMAKE_SOURCE_DIR}/src/frontend/sdl3/frontend_render.cpp
     ${CMAKE_SOURCE_DIR}/src/frontend/sdl3/frontend_rom_io.cpp
     ${CMAKE_SOURCE_DIR}/src/frontend/sdl3/frontend_save.cpp
     ${CMAKE_SOURCE_DIR}/src/frontend/sdl3/sdl_host.cpp
