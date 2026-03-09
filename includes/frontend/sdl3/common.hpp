@@ -65,7 +65,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Settings, volume,
                                                 recent_roms)
 
 inline Settings Settings::load(const std::string &filename) {
-  Settings s;
+  Settings s = {};
   if (std::ifstream file(filename); file.is_open()) {
     try {
       nlohmann::json j;
