@@ -22,33 +22,33 @@ target_include_directories(libretro_api
 # Core build
 # ===========================================================================
 
-add_library(gbc_libretro SHARED
+add_library(irogb_libretro SHARED
     ${CMAKE_SOURCE_DIR}/src/frontend/libretro/libretro_host.cpp
     ${CMAKE_SOURCE_DIR}/src/frontend/libretro/frontend.cpp
     ${GBC_CORE_SOURCES}
 )
 
-set_target_properties(gbc_libretro PROPERTIES
+set_target_properties(irogb_libretro PROPERTIES
     PREFIX ""
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
     LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
     ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 
-target_compile_options(gbc_libretro
+target_compile_options(irogb_libretro
     PRIVATE
         ${GBC_COMPILE_OPTIONS}
         -fPIC
 )
 
-target_include_directories(gbc_libretro
+target_include_directories(irogb_libretro
     PRIVATE ${GBC_INCLUDE_DIR}
 )
 
-target_link_libraries(gbc_libretro
+target_link_libraries(irogb_libretro
     PRIVATE libretro_api
 )
 
-target_include_directories(gbc_libretro
+target_include_directories(irogb_libretro
     PRIVATE ${CMAKE_SOURCE_DIR}/include
 )

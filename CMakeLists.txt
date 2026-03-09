@@ -137,19 +137,19 @@ if(NOT EMSCRIPTEN)
             set_property(TARGET imgui
                 PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE
             )
-            set_property(TARGET gbc_full
+            set_property(TARGET irogb_full
                 PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE
             )
         endif() # BUILD_FULL
 
         if(BUILD_SIMPLE)
-            set_property(TARGET gbc_simple
+            set_property(TARGET irogb_simple
                 PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE
             )
         endif() # BUILD_SIMPLE
 
         if(BUILD_LIBRETRO)
-            set_property(TARGET gbc_libretro
+            set_property(TARGET irogb_libretro
                 PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE
             )
         endif() # BUILD_SIMPLE

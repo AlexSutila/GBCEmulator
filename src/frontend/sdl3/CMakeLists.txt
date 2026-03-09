@@ -78,7 +78,7 @@ target_link_libraries(imgui PRIVATE SDL3::SDL3)
 # Build target
 # ===========================================================================
 
-add_executable(gbc_full
+add_executable(irogb_full
     ${CMAKE_SOURCE_DIR}/src/frontend/sdl3/debugger.cpp
     ${CMAKE_SOURCE_DIR}/src/frontend/sdl3/frontend.cpp
     ${CMAKE_SOURCE_DIR}/src/frontend/sdl3/frontend_emulation.cpp
@@ -95,7 +95,7 @@ add_executable(gbc_full
     ${GBC_CORE_SOURCES}
 )
 
-target_link_libraries(gbc_full
+target_link_libraries(irogb_full
     PRIVATE
         SDL3::SDL3
         imgui
@@ -105,21 +105,21 @@ target_link_libraries(gbc_full
         CURL::libcurl
 )
 
-target_include_directories(gbc_full
+target_include_directories(irogb_full
     PRIVATE
         ${GBC_INCLUDE_DIR}
         ${PICOSHA2_INCLUDE_DIR}
 )
 
-target_compile_options(gbc_full
+target_compile_options(irogb_full
     PRIVATE ${GBC_COMPILE_OPTIONS}
 )
 
-set_target_properties(gbc_full PROPERTIES
+set_target_properties(irogb_full PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 
-install(TARGETS gbc_full
+install(TARGETS irogb_full
         RUNTIME_DEPENDENCIES
         PRE_EXCLUDE_REGEXES "api-ms-" "ext-ms-"
         POST_EXCLUDE_REGEXES ".*/System32/.*\\.dll"

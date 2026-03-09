@@ -101,21 +101,21 @@ if(BUILD_SIMPLE)
         )
 
     else() # EMSCRIPTEN
-        add_executable(gbc_simple
+        add_executable(irogb_simple
             ${CMAKE_SOURCE_DIR}/src/frontend/raylib/frontend.cpp
             ${CMAKE_SOURCE_DIR}/src/frontend/raylib/main.cpp
             ${GBC_CORE_SOURCES}
         )
-        target_link_libraries(gbc_simple
+        target_link_libraries(irogb_simple
             PRIVATE raylib
         )
-        target_include_directories(gbc_simple
+        target_include_directories(irogb_simple
             PRIVATE ${GBC_INCLUDE_DIR}
         )
-        target_compile_options(gbc_simple
+        target_compile_options(irogb_simple
             PRIVATE ${GBC_COMPILE_OPTIONS}
         )
-        set_target_properties(gbc_simple PROPERTIES
+        set_target_properties(irogb_simple PROPERTIES
             RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
         )
     endif() # EMSCRIPTEN
