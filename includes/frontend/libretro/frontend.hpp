@@ -64,13 +64,10 @@ public:
   void clear(std::uint32_t c) override;
   void start() override;
 
+
+  void load_game(cart &c);
   void try_show_frame();
   void try_poll_input();
-
-  /* CGB models do not have soft reset buttons, so we resort to hard reset only.
-   * To support this, we have to pull the original image back down, recreate the
-   * emulator instance, and re-insert the cartridge. */
-  cart get_image() const; // Contains original raw data bytes
   void reset();
 
 private:
@@ -94,6 +91,12 @@ private:
   // Libretro specific metadata and stuff
   LibretroCallbacks cb{};
   LibretroMeta meta{};
+
+  // For implementation of a `soft reset mechanism`. The system does not have a
+  // reset button so we leverage a save state to roll back to. This snapshot is
+  // captured upon cartridge insertion.
+  std::vector<byte_t> initial_state{};
+  std::size_t state_size{}; // Maximum
 
   // Keep private for singleton design pattern
   explicit LibretroFrontend();

@@ -135,11 +135,11 @@ bool retro_load_game(const struct retro_game_info *info) {
 
   /* Our interface requires a `std::vector()`, construct accordingly */
   std::vector<byte_t> raw(data_ptr, data_ptr + size);
-  auto &gbc = LibretroFrontend::get_instance().get();
+  auto &instance = LibretroFrontend::get_instance();
 
   try {
     cart c = load_cart_raw(raw);
-    gbc->insert_cartridge(c);
+    instance.load_game(c);
   } catch (...) {
     return false;
   }
