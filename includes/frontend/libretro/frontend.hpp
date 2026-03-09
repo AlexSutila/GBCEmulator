@@ -64,6 +64,9 @@ public:
   void clear(std::uint32_t c) override;
   void start() override;
 
+  [[nodiscard]] std::vector<byte_t> take_snapshot() const;
+  void restore_snapshot(std::span<const byte_t> snapshot);
+  std::size_t get_state_size() const { return state_size; }
 
   void load_game(cart &c);
   void try_show_frame();

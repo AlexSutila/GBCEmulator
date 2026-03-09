@@ -12,7 +12,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
-#include <stdexcept>
 #include <vector>
 
 /* ======================================================================
@@ -62,9 +61,19 @@ void LibretroFrontend::queue_audio_samples(const float *samples,
   cb.audio_batch_cb(audio_buffer.data(), frames);
 }
 
+[[nodiscard]] std::vector<byte_t> LibretroFrontend::take_snapshot() const {
+  while (!gbc->savestate_ready())
+    gbc->step(); // Only a few hundred cycles max of wait time max
+  return gbc->savestate_serialize();
+}
+
+void LibretroFrontend::restore_snapshot(std::span<const byte_t> snapshot) {
+  gbc->savestate_deserialize(snapshot);
+}
+
 void LibretroFrontend::load_game(cart &c) {
   gbc->insert_cartridge(c); // Save should be ready if it doesnt throw
-  initial_state = gbc->savestate_serialize();
+  initial_state = take_snapshot();
   state_size = gbc->savestate_size();
 }
 
@@ -94,11 +103,8 @@ void LibretroFrontend::try_poll_input() {
   }
 }
 
-void LibretroFrontend::reset() {
-  while (!gbc->savestate_ready())
-    gbc->step(); // Only a few hundred cycles max of wait time
-  gbc->savestate_deserialize(initial_state);
-}
+/* Super simple workaround for a soft reset mechanism */
+void LibretroFrontend::reset() { gbc->savestate_deserialize(initial_state); }
 
 bool LibretroFrontend::test_input(unsigned id) const {
   return cb.input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, id);
