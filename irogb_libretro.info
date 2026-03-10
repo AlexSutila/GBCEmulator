@@ -17,4 +17,4 @@ systemid = "game_boy"
 supports_no_game = "false"
 database = ""
 
-description = "A libretro port of the IroGB Game Boy Color emulator. IroGB is a reasonably accurate CGB emulator core that operates on a clock-cycle-stepped model and passes over 95% of the test cases across three of the most widely used GB/GBC emulator development test suites (mooneye/blargg/acid), with improved test coverage yet to come. The project was developed as a passion project, aiming to balance emulation accuracy with practical system requirements."
+description = "A libretro port of the IroGB Game Boy Color emulator. IroGB is a reasonably accurate CGB emulator core that operates on a clock-cycle-stepped model and passes over 95% of the test cases across three of the most widely used GB/GBC emulator test suites (mooneye/blargg/acid), with improved test coverage yet to come. The project was developed as a passion project, aiming to balance emulation accuracy with practical system requirements."
