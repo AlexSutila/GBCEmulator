@@ -65,7 +65,7 @@ jobs:
           printf "%s" "$DEPLOY_SSH_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           printf "%s\n" "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
-          
+
           rsync -az --delete \
             -e "ssh -p $DEPLOY_PORT -i ~/.ssh/id_ed25519" \
             dist/ "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/"

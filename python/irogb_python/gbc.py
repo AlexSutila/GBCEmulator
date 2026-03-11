@@ -10,11 +10,7 @@ from . import gbc_py as core
 
 
 class GameBoyColor:
-    def __init__(
-        self,
-        cartridge: Cartridge = None,
-        dbg_callback: Callable = None
-    ):
+    def __init__(self, cartridge: Cartridge = None, dbg_callback: Callable = None):
         try:
             self._gbc = (
                 core.GameBoyColor(dbg_callback)
@@ -22,19 +18,17 @@ class GameBoyColor:
                 else core.GameBoyColor()
             )
         except Exception as e:
-            raise RuntimeError(
-                "Failed to initialize GameBoyColor core instance"
-            ) from e
+            raise RuntimeError("Failed to initialize GameBoyColor core instance") from e
 
         # Entirely optional, only check if provided
         if cartridge is not None:
             self.insert_cartridge(cartridge)
 
-    '''
+    """
 
     Internal helpers for argument correctness checks
 
-    '''
+    """
 
     def _check_bitwidth_byte(self, value: int):
         if value > 0xFF or value < 0x00:
@@ -44,11 +38,11 @@ class GameBoyColor:
         if addr > 0xFFFF or addr < 0x0000:
             raise ValueError("`addr` must be 16-bits")
 
-    '''
+    """
 
     Publicly exposed interface implementation
 
-    '''
+    """
 
     @property
     def cpu_state(self):
@@ -65,9 +59,7 @@ class GameBoyColor:
         try:
             ppu = self._gbc.get_ppu()
         except Exception as e:
-            raise RuntimeError(
-                "Failed to initialize PPUState core instance"
-            ) from e
+            raise RuntimeError("Failed to initialize PPUState core instance") from e
         return PPUState(ppu.get_state())
 
     @property
@@ -75,9 +67,7 @@ class GameBoyColor:
         try:
             debugger = self._gbc.get_debugger()
         except Exception as e:
-            raise RuntimeError(
-                "Failed to initialize Debugger core instance"
-            ) from e
+            raise RuntimeError("Failed to initialize Debugger core instance") from e
         return Debugger(debugger)
 
     @property
@@ -85,9 +75,7 @@ class GameBoyColor:
         try:
             frame = self._gbc.get_frame()
         except Exception as e:
-            raise RuntimeError(
-                "Failed to acquire frame from core"
-            ) from e
+            raise RuntimeError("Failed to acquire frame from core") from e
         return RenderedFrame(frame)
 
     def insert_cartridge(self, cartridge: Cartridge):

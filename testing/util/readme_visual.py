@@ -23,10 +23,7 @@ def __run_test_set(
     seconds: List[int],
     out_path: str,
 ):
-    images = [
-        run_and_get_frame(path, second)
-        for path, second in zip(paths, seconds)
-    ]
+    images = [run_and_get_frame(path, second) for path, second in zip(paths, seconds)]
     n = len(images)
 
     rows, cols = 2, 4
@@ -60,37 +57,37 @@ def __run_test_set(
 def make_dmg_demo():
     __run_test_set(
         paths=[
-            f'{os.getenv('ROMS')}/kirby.gb',
-            f'{os.getenv('ROMS')}/duck_tales.gb',
-            f'{os.getenv('ROMS')}/smb2.gb',
-            f'{os.getenv('ROMS')}/smb.gb',
-            f'{os.getenv('ROMS')}/zelda.gb',
-            f'{os.getenv('ROMS')}/tetris.gb',
-            f'{os.getenv('ROMS')}/pk_red.gb',
-            f'{os.getenv('ROMS')}/castlevania.gb',
+            f"{os.getenv('ROMS')}/kirby.gb",
+            f"{os.getenv('ROMS')}/duck_tales.gb",
+            f"{os.getenv('ROMS')}/smb2.gb",
+            f"{os.getenv('ROMS')}/smb.gb",
+            f"{os.getenv('ROMS')}/zelda.gb",
+            f"{os.getenv('ROMS')}/tetris.gb",
+            f"{os.getenv('ROMS')}/pk_red.gb",
+            f"{os.getenv('ROMS')}/castlevania.gb",
         ],
         seconds=[8, 5, 5, 7, 65, 20, 30, 15],
-        out_path='assets/dmg_demo.png'
+        out_path="assets/dmg_demo.png",
     )
 
 
 def make_cgb_demo():
     __run_test_set(
         paths=[
-            f'{os.getenv('ROMS')}/pk_crystal.gbc',
-            f'{os.getenv('ROMS')}/pk_silver.gbc',
-            f'{os.getenv('ROMS')}/pk_yellow.gbc',
-            f'{os.getenv('ROMS')}/tetris.gbc',
-            f'{os.getenv('ROMS')}/zelda.gbc',
-            f'{os.getenv('ROMS')}/shantae.gbc',
-            f'{os.getenv('ROMS')}/wario3.gbc',
-            f'{os.getenv('ROMS')}/smb.gbc',
+            f"{os.getenv('ROMS')}/pk_crystal.gbc",
+            f"{os.getenv('ROMS')}/pk_silver.gbc",
+            f"{os.getenv('ROMS')}/pk_yellow.gbc",
+            f"{os.getenv('ROMS')}/tetris.gbc",
+            f"{os.getenv('ROMS')}/zelda.gbc",
+            f"{os.getenv('ROMS')}/shantae.gbc",
+            f"{os.getenv('ROMS')}/wario3.gbc",
+            f"{os.getenv('ROMS')}/smb.gbc",
         ],
         seconds=[66, 66, 38, 20, 65, 25, 45, 15],
-        out_path='assets/cgb_demo.png'
+        out_path="assets/cgb_demo.png",
     )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     make_dmg_demo()
     make_cgb_demo()
