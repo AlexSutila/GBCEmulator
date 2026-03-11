@@ -17,16 +17,17 @@
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
 
+// clang-format off
 EM_JS(int, web_load_active_save, (std::uint8_t *out_ptr, int out_cap), {
   try {
     if (!out_ptr || out_cap <= 0)
       return 0;
     const api = globalThis.IroGBSaves;
-    if (!api || typeof api.loadActiveSram != = "function")
+    if (!api || typeof api.loadActiveSram !== "function")
       return 0;
 
     const bytes = api.loadActiveSram();
-    if (!(bytes instanceof Uint8Array) || bytes.length == = 0)
+    if (!(bytes instanceof Uint8Array) || bytes.length === 0)
       return 0;
 
     const n = Math.min(bytes.length, out_cap | 0) | 0;
@@ -43,7 +44,7 @@ EM_JS(int, web_save_active_save, (const std::uint8_t *data_ptr, int len), {
     if (!data_ptr || len <= 0)
       return 0;
     const api = globalThis.IroGBSaves;
-    if (!api || typeof api.saveActiveSram != = "function")
+    if (!api || typeof api.saveActiveSram !== "function")
       return 0;
 
     const start = data_ptr >>> 0;
@@ -59,11 +60,11 @@ EM_JS(int, web_save_active_save, (const std::uint8_t *data_ptr, int len), {
 EM_JS(int, web_load_active_state, (std::uint8_t *out_ptr, int out_cap), {
   try {
     const api = globalThis.IroGBSaves;
-    if (!api || typeof api.loadActiveState != = "function")
+    if (!api || typeof api.loadActiveState !== "function")
       return 0;
 
     const bytes = api.loadActiveState();
-    if (!(bytes instanceof Uint8Array) || bytes.length == = 0)
+    if (!(bytes instanceof Uint8Array) || bytes.length === 0)
       return 0;
 
     if (!out_ptr || out_cap <= 0) {
@@ -84,7 +85,7 @@ EM_JS(int, web_save_active_state, (const std::uint8_t *data_ptr, int len), {
     if (!data_ptr || len <= 0)
       return 0;
     const api = globalThis.IroGBSaves;
-    if (!api || typeof api.saveActiveState != = "function")
+    if (!api || typeof api.saveActiveState !== "function")
       return 0;
 
     const start = data_ptr >>> 0;
@@ -103,7 +104,7 @@ EM_JS(int, web_set_pending_state_thumb_rgba,
           if (!data_ptr || len <= 0 || width <= 0 || height <= 0)
             return 0;
           const api = globalThis.IroGBSaves;
-          if (!api || typeof api.setPendingStateThumbnailRgba != = "function")
+          if (!api || typeof api.setPendingStateThumbnailRgba !== "function")
             return 0;
 
           const start = data_ptr >>> 0;
@@ -169,6 +170,8 @@ static void frame_cb(void *user) {
   auto *fe = static_cast<RaylibFrontend *>(user);
   fe->tick_web();
 }
+
+// clang-format off
 #endif // __EMSCRIPTEN__
 
 namespace {
