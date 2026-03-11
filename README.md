@@ -73,18 +73,11 @@ We cannot realistically expect to pass every single one of these tests, as not a
 This codebase was designed intentionally to make writing new frontends and ports extremely easy.
 
 ## Building
-To build one or more desktop build targets in either `Release` or `Debug` mode, the following commands can be used:
+To build one or more desktop build targets in `Release` mode, the following command can be used:
 ```bash
-# From repository root dir
-mkdir build/ && cd build/
-cmake .. -DCMAKE_BUILD_TYPE=Release \
-    -DBUILD_FULL=ON         \
-    -DBUILD_LIBRETRO=ON     \
-    -DBUILD_SIMPLE=ON
-make -j$(nproc)
+make full simple
 ```
-
-This command builds all desktop build targets. To select one or more, simply exclude the corresponding `-DBUILD=...` argument. Building the WASM frontend follows a similar procedure but using the [emsdk](https://emscripten.org/docs/tools_reference/emsdk.html) rather than vanilla `cmake` and choice of C/C++ compiler.
+This command builds all desktop build targets. To select one or more, simply exclude either build target.
 
 ## Python Library
 To use as a python library, you can install the python bindings to a virtual environment built from source as follows:
