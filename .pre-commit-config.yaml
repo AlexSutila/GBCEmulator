@@ -1,0 +1,35 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+      - id: check-yaml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+      - id: detect-private-key
+
+  - repo: https://github.com/pre-commit/mirrors-clang-format
+    rev: v22.1.0
+    hooks:
+      - id: clang-format
+        files: \.(c|cc|cpp|cxx|h|hh|hpp|hxx)$
+
+  - repo: https://github.com/psf/black
+    rev: 26.3.0
+    hooks:
+      - id: black
+        files: \.py$
+
+  - repo: https://github.com/biomejs/pre-commit
+    rev: v2.4.6
+    hooks:
+      - id: biome-format
+
+  - repo: https://github.com/cheshirekow/cmake-format-precommit
+    rev: v0.6.13
+    hooks:
+      - id: cmake-format
+        additional_dependencies: [pyyaml]
+        files: (CMakeLists\.txt|\.cmake)$
