@@ -17,7 +17,7 @@ option(BUILD_PYTHON     "Python bindings to emulator core"          OFF)
 
 
 # ===========================================================================
-#  Emulator core source files - Common and needed across ALL build targets
+#  Emulator core source files - Common and needed across all build targets
 # ===========================================================================
 set(GBC_CORE_SOURCES
     ${CMAKE_SOURCE_DIR}/src/timer.cpp
