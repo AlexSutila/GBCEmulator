@@ -83,15 +83,11 @@ public:
   void step();
 
   /* For enabling and observing the state of both HDMA and GDMA procedures. */
-  [[nodiscard]] bool enabled() const {
-    return gdma_enabled() || hdma_enabled();
-  }
+  [[nodiscard]] bool enabled() const { return gdma_enabled() || hdma_enabled(); }
   void enable(DMA::VDMATransferMode mode, byte_t blks);
 
   /* To be used by the VDMA5 register to interrogate the progress of HDMA */
-  [[nodiscard]] bool waiting_on_hblank() const {
-    return state == STATE_HDMA_WAIT;
-  }
+  [[nodiscard]] bool waiting_on_hblank() const { return state == STATE_HDMA_WAIT; }
   [[nodiscard]] bool complete() const { return state == STATE_DISABLED; }
   [[nodiscard]] byte_t get_blks_remaining() const;
 

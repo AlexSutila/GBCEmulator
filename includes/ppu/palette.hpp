@@ -8,8 +8,7 @@
 
 class ColorRam {
 public:
-  [[nodiscard]] std::uint32_t get_cgb_color(byte_t color_idx,
-                                            byte_t palette_idx) const;
+  [[nodiscard]] std::uint32_t get_cgb_color(byte_t color_idx, byte_t palette_idx) const;
   PPU::PaletteData *get_data_reg();
   PPU::PaletteIdx *get_idx_reg();
 

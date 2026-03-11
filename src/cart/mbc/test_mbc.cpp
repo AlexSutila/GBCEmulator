@@ -18,9 +18,7 @@ public:
   TestMbc() : Mbc(), ram_(0x10000, 0) {}
 
   // This doesn't need to be anything fancy, just use the full addr range
-  void write(addr_t const addr, byte_t const val) override {
-    ram_.at(addr) = val;
-  }
+  void write(addr_t const addr, byte_t const val) override { ram_.at(addr) = val; }
   byte_t read(addr_t const addr) override { return ram_.at(addr); }
 
 private:

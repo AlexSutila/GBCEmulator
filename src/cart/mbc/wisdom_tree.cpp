@@ -42,18 +42,10 @@ public:
     t.eof();
   }
 
-  void parse_savestate(Savestate::Writer &t) override {
-    parse_savestate_impl(t);
-  }
-  void parse_savestate(Savestate::Reader &t) override {
-    parse_savestate_impl(t);
-  }
-  void parse_savestate(Savestate::Sizer &t) override {
-    parse_savestate_impl(t);
-  }
-  void parse_savestate(Savestate::Checker &t) override {
-    parse_savestate_impl(t);
-  }
+  void parse_savestate(Savestate::Writer &t) override { parse_savestate_impl(t); }
+  void parse_savestate(Savestate::Reader &t) override { parse_savestate_impl(t); }
+  void parse_savestate(Savestate::Sizer &t) override { parse_savestate_impl(t); }
+  void parse_savestate(Savestate::Checker &t) override { parse_savestate_impl(t); }
 
 private:
   static constexpr std::size_t kBankSize32k = 0x8000;
@@ -63,12 +55,10 @@ private:
   byte_t bank_{0}; // HW power-on is undefined; 0 is a default
 
   [[nodiscard]] std::size_t bank_count_32k() const noexcept {
-    return std::max<std::size_t>(1, (rom_.size() + (kBankSize32k - 1)) /
-                                        kBankSize32k);
+    return std::max<std::size_t>(1, (rom_.size() + (kBankSize32k - 1)) / kBankSize32k);
   }
 
-  [[nodiscard]] byte_t rom_at_32k(std::size_t const bank,
-                                  std::size_t const off) const {
+  [[nodiscard]] byte_t rom_at_32k(std::size_t const bank, std::size_t const off) const {
     const std::size_t banks = bank_count_32k();
     const std::size_t b = clamp_bank(bank, banks);
     const std::size_t idx = b * kBankSize32k + off;

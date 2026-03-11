@@ -65,8 +65,7 @@ addr_t PaletteIdx::get_address() const { return state_ & 0x3F; }
 
 /* It kinda sucks, but this ends up needing a reference to the underlying color
  * RAM memory block that it reads from, and the corresponding index register. */
-PaletteData::PaletteData(std::array<byte_t, 64> &mem, PaletteIdx &idx)
-    : mem_(mem), idx_(idx) {}
+PaletteData::PaletteData(std::array<byte_t, 64> &mem, PaletteIdx &idx) : mem_(mem), idx_(idx) {}
 
 /* Writes to PaletteData registers also have the opportunity to increment their
  * corresponding PaletteIndex register. */

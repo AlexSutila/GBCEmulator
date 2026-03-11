@@ -29,8 +29,7 @@ void PyGameBoyColor::insert_cartridge(cart c) {
 using frame_buf_t = std::array<std::uint32_t, 160 * 144>;
 frame_buf_t PyGameBoyColor::get_frame() { return fe_.get_frame(); }
 
-void PyGameBoyColor::breakpoint_add(const addr_t addr,
-                                    Debug::BreakReason reason) {
+void PyGameBoyColor::breakpoint_add(const addr_t addr, Debug::BreakReason reason) {
   auto &debugger = fe_.get()->get_debugger();
   debugger->breakpoint_add(addr, reason);
 }
@@ -82,7 +81,6 @@ LR35902 *PyGameBoyColor::get_cpu() {
 }
 
 void PyGameBoyColor::put_joyp_state(std::uint8_t state) {
-  auto *joyp = dynamic_cast<Joypad::JOYP *>(
-      get_bus()->get_mmio(IORegisterMapping::MMIO_JOYPAD));
+  auto *joyp = dynamic_cast<Joypad::JOYP *>(get_bus()->get_mmio(IORegisterMapping::MMIO_JOYPAD));
   joyp->set_state(state);
 }

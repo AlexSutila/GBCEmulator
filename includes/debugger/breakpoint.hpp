@@ -30,8 +30,7 @@ enum BreakReason : std::uint32_t {
 };
 
 constexpr BreakReason operator|(const BreakReason a, const BreakReason b) {
-  return static_cast<BreakReason>(static_cast<std::uint32_t>(a) |
-                                  static_cast<std::uint32_t>(b));
+  return static_cast<BreakReason>(static_cast<std::uint32_t>(a) | static_cast<std::uint32_t>(b));
 }
 
 constexpr bool operator&(const BreakReason a, const BreakReason b) {

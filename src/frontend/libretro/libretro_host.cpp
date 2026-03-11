@@ -78,8 +78,13 @@ void retro_set_environment(retro_environment_t cb) {
   callbacks.environ_cb = cb;
 
   static const retro_controller_description port1[] = {
-      {"Game Boy Joypad", RETRO_DEVICE_JOYPAD}, {nullptr, 0}};
-  static const retro_controller_info ports[] = {{port1, 1}, {nullptr, 0}};
+      {"Game Boy Joypad", RETRO_DEVICE_JOYPAD},
+      {          nullptr,                   0}
+  };
+  static const retro_controller_info ports[] = {
+      {  port1, 1},
+      {nullptr, 0}
+  };
   callbacks.environ_cb(RETRO_ENVIRONMENT_SET_CONTROLLER_INFO, (void *)ports);
 
   enum retro_pixel_format fmt = RETRO_PIXEL_FORMAT_XRGB8888;
@@ -154,8 +159,7 @@ void retro_unload_game(void) {}
 unsigned retro_get_region(void) { return RETRO_REGION_NTSC; }
 
 /* Not applicable */
-bool retro_load_game_special(unsigned type, const struct retro_game_info *info,
-                             size_t num) {
+bool retro_load_game_special(unsigned type, const struct retro_game_info *info, size_t num) {
   return false;
 }
 

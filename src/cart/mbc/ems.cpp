@@ -93,9 +93,7 @@ public:
   }
 
   [[nodiscard]] bool has_battery() const noexcept override { return false; }
-  [[nodiscard]] std::span<const byte_t> ram() const noexcept override {
-    return {};
-  }
+  [[nodiscard]] std::span<const byte_t> ram() const noexcept override { return {}; }
   std::span<byte_t> ram() noexcept override { return {}; }
 
   template <typename T> void parse_savestate_impl(T &t) {
@@ -109,18 +107,10 @@ public:
     t.eof();
   }
 
-  void parse_savestate(Savestate::Writer &t) override {
-    parse_savestate_impl(t);
-  }
-  void parse_savestate(Savestate::Reader &t) override {
-    parse_savestate_impl(t);
-  }
-  void parse_savestate(Savestate::Sizer &t) override {
-    parse_savestate_impl(t);
-  }
-  void parse_savestate(Savestate::Checker &t) override {
-    parse_savestate_impl(t);
-  }
+  void parse_savestate(Savestate::Writer &t) override { parse_savestate_impl(t); }
+  void parse_savestate(Savestate::Reader &t) override { parse_savestate_impl(t); }
+  void parse_savestate(Savestate::Sizer &t) override { parse_savestate_impl(t); }
+  void parse_savestate(Savestate::Checker &t) override { parse_savestate_impl(t); }
 
 private:
   enum class Mode : byte_t {
@@ -151,8 +141,7 @@ private:
   void sync_banks_() {
     if (in_game_) {
       rom0_bank_ = static_cast<std::size_t>(base_bank_);
-      rom1_bank_ = static_cast<std::size_t>(base_bank_) +
-                   static_cast<std::size_t>(bank_sel_);
+      rom1_bank_ = static_cast<std::size_t>(base_bank_) + static_cast<std::size_t>(bank_sel_);
       return;
     }
     rom0_bank_ = 0;
@@ -172,6 +161,4 @@ private:
   std::size_t rom1_bank_{1};
 };
 
-std::unique_ptr<Mbc> make_ems(const cart &c) {
-  return std::make_unique<Ems>(c.rom_span());
-}
+std::unique_ptr<Mbc> make_ems(const cart &c) { return std::make_unique<Ems>(c.rom_span()); }

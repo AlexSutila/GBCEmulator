@@ -64,8 +64,7 @@ std::string strip_non_hex(const std::string_view text) {
   out.reserve(text.size());
   for (const char c : text) {
     if (std::isxdigit(static_cast<unsigned char>(c)) != 0)
-      out.push_back(
-          static_cast<char>(std::toupper(static_cast<unsigned char>(c))));
+      out.push_back(static_cast<char>(std::toupper(static_cast<unsigned char>(c))));
   }
   return out;
 }
@@ -119,15 +118,13 @@ std::optional<ParsedCheat> parse_gameshark_cheat(const std::string_view code) {
   const auto value = parse_hex_byte(std::string_view(hex).substr(2, 2));
   const auto addr_lo = parse_hex_byte(std::string_view(hex).substr(4, 2));
   const auto addr_hi = parse_hex_byte(std::string_view(hex).substr(6, 2));
-  if (!command.has_value() || !value.has_value() || !addr_lo.has_value() ||
-      !addr_hi.has_value())
+  if (!command.has_value() || !value.has_value() || !addr_lo.has_value() || !addr_hi.has_value())
     return std::nullopt;
 
   if (*command != 0x01 && *command != 0x0D)
     return std::nullopt;
 
-  const auto addr =
-      static_cast<addr_t>((static_cast<addr_t>(*addr_hi) << 8) | *addr_lo);
+  const auto addr = static_cast<addr_t>((static_cast<addr_t>(*addr_hi) << 8) | *addr_lo);
   if (!is_cheat_writable_addr(addr))
     return std::nullopt;
 
@@ -137,8 +134,7 @@ std::optional<ParsedCheat> parse_gameshark_cheat(const std::string_view code) {
   };
 }
 
-std::optional<ParsedCheat>
-parse_codebreaker_cheat(const std::string_view code) {
+std::optional<ParsedCheat> parse_codebreaker_cheat(const std::string_view code) {
   // mGBA-style GB CodeBreaker parsing:
   //   XXXXXX-YY
   // where XXXXXX = command/address bytes and YY = value byte.
@@ -155,17 +151,13 @@ parse_codebreaker_cheat(const std::string_view code) {
     return std::nullopt;
 
   const auto cmd = parse_hex_byte(std::string_view(normalized).substr(0, 2));
-  const auto addr_hi =
-      parse_hex_byte(std::string_view(normalized).substr(2, 2));
-  const auto addr_lo =
-      parse_hex_byte(std::string_view(normalized).substr(4, 2));
+  const auto addr_hi = parse_hex_byte(std::string_view(normalized).substr(2, 2));
+  const auto addr_lo = parse_hex_byte(std::string_view(normalized).substr(4, 2));
   const auto value = parse_hex_byte(std::string_view(normalized).substr(7, 2));
-  if (!cmd.has_value() || !addr_hi.has_value() || !addr_lo.has_value() ||
-      !value.has_value())
+  if (!cmd.has_value() || !addr_hi.has_value() || !addr_lo.has_value() || !value.has_value())
     return std::nullopt;
 
-  const auto addr =
-      static_cast<addr_t>((static_cast<addr_t>(*addr_hi) << 8) | *addr_lo);
+  const auto addr = static_cast<addr_t>((static_cast<addr_t>(*addr_hi) << 8) | *addr_lo);
   if (!is_cheat_writable_addr(addr))
     return std::nullopt;
 
@@ -175,8 +167,7 @@ parse_codebreaker_cheat(const std::string_view code) {
   };
 }
 
-std::optional<AddressBus::CheatOverride>
-parse_gamegenie_cheat(const std::string_view code) {
+std::optional<AddressBus::CheatOverride> parse_gamegenie_cheat(const std::string_view code) {
   // Game Boy Game Genie:
   // - 6 digits:  ABC-DEF
   //   value=AB, addr=(F xor F)CDE
@@ -191,13 +182,11 @@ parse_gamegenie_cheat(const std::string_view code) {
   const auto d = parse_hex_nibble(hex[3]);
   const auto e = parse_hex_nibble(hex[4]);
   const auto f = parse_hex_nibble(hex[5]);
-  if (!value.has_value() || !c.has_value() || !d.has_value() ||
-      !e.has_value() || !f.has_value())
+  if (!value.has_value() || !c.has_value() || !d.has_value() || !e.has_value() || !f.has_value())
     return std::nullopt;
 
   const auto addr_hi = *f ^ 0xF;
-  const auto addr =
-      static_cast<addr_t>((addr_hi << 12) | (*c << 8) | (*d << 4) | *e);
+  const auto addr = static_cast<addr_t>((addr_hi << 12) | (*c << 8) | (*d << 4) | *e);
   if (!is_game_genie_addr(addr))
     return std::nullopt;
 
@@ -227,8 +216,7 @@ bool looks_like_gamegenie(const std::string_view code) {
   return code.find('-') != std::string_view::npos;
 }
 
-std::optional<AddressBus::CheatOverride>
-to_override(const std::optional<ParsedCheat> parsed) {
+std::optional<AddressBus::CheatOverride> to_override(const std::optional<ParsedCheat> parsed) {
   if (!parsed.has_value())
     return std::nullopt;
   return AddressBus::CheatOverride{
@@ -237,13 +225,11 @@ to_override(const std::optional<ParsedCheat> parsed) {
   };
 }
 
-std::optional<AddressBus::CheatOverride>
-parse_gameshark_override(const std::string_view code) {
+std::optional<AddressBus::CheatOverride> parse_gameshark_override(const std::string_view code) {
   return to_override(parse_gameshark_cheat(code));
 }
 
-std::optional<AddressBus::CheatOverride>
-parse_raw_override(const std::string_view code) {
+std::optional<AddressBus::CheatOverride> parse_raw_override(const std::string_view code) {
   // Extended raw compare format:
   //   AAAA?CC:VV
   // Applies VV only when the original byte at AAAA equals CC.
@@ -253,8 +239,7 @@ parse_raw_override(const std::string_view code) {
       return std::nullopt;
 
     const auto addr_hex = strip_non_hex(code.substr(0, qmark));
-    const auto cmp_hex =
-        strip_non_hex(code.substr(qmark + 1, colon - (qmark + 1)));
+    const auto cmp_hex = strip_non_hex(code.substr(qmark + 1, colon - (qmark + 1)));
     const auto value_hex = strip_non_hex(code.substr(colon + 1));
     if (addr_hex.size() != 4 || cmp_hex.size() != 2 || value_hex.size() != 2)
       return std::nullopt;
@@ -278,17 +263,14 @@ parse_raw_override(const std::string_view code) {
   return to_override(parse_raw_cheat(code));
 }
 
-std::optional<AddressBus::CheatOverride>
-parse_codebreaker_override(const std::string_view code) {
+std::optional<AddressBus::CheatOverride> parse_codebreaker_override(const std::string_view code) {
   return to_override(parse_codebreaker_cheat(code));
 }
 
-using CheatParser =
-    std::optional<AddressBus::CheatOverride> (*)(std::string_view);
+using CheatParser = std::optional<AddressBus::CheatOverride> (*)(std::string_view);
 
 std::optional<AddressBus::CheatOverride>
-first_match(const std::string_view code,
-            const std::initializer_list<CheatParser> parsers) {
+first_match(const std::string_view code, const std::initializer_list<CheatParser> parsers) {
   for (const auto parser : parsers) {
     if (const auto compiled = parser(code); compiled.has_value())
       return compiled;
@@ -296,9 +278,8 @@ first_match(const std::string_view code,
   return std::nullopt;
 }
 
-std::optional<AddressBus::CheatOverride>
-compile_cheat(const std::string_view code,
-              const GameBoyColor::CheatFormat format) {
+std::optional<AddressBus::CheatOverride> compile_cheat(const std::string_view code,
+                                                       const GameBoyColor::CheatFormat format) {
   using fmt = GameBoyColor::CheatFormat;
   switch (format) {
   case fmt::CHEAT_GAMESHARK:
@@ -314,13 +295,11 @@ compile_cheat(const std::string_view code,
       if (const auto gg = parse_gamegenie_cheat(code); gg.has_value())
         return gg;
     }
-    return first_match(code,
-                       {parse_codebreaker_override, parse_gameshark_override,
-                        parse_raw_override, parse_gamegenie_cheat});
+    return first_match(code, {parse_codebreaker_override, parse_gameshark_override,
+                              parse_raw_override, parse_gamegenie_cheat});
   default:
-    return first_match(code,
-                       {parse_gameshark_override, parse_raw_override,
-                        parse_codebreaker_override, parse_gamegenie_cheat});
+    return first_match(code, {parse_gameshark_override, parse_raw_override,
+                              parse_codebreaker_override, parse_gamegenie_cheat});
   }
 }
 } // namespace
@@ -356,8 +335,7 @@ GameBoyColor::GameBoyColor(Frontend &frontend, const BootROM &rom)
 }
 
 GameBoyColor::GameBoyColor(Frontend &frontend)
-    : Debuggable(debugger_), debugger_(std::nullopt), bios_(std::nullopt),
-      fe_(frontend) {
+    : Debuggable(debugger_), debugger_(std::nullopt), bios_(std::nullopt), fe_(frontend) {
   system_init(); // Connects all system components
   skip_bios();   // BIOS is left unconfigured
   /* We still kind of have to do this here in case we run DMG games. Will likely
@@ -384,10 +362,10 @@ void GameBoyColor::system_init() {
   serial = std::make_unique<SerialUnit>(bus.get());
 
   /* Joypad initialization */
-  auto *const joypad_reg = dynamic_cast<Joypad::JOYP *>(
-      bus->get_mmio(IORegisterMapping::MMIO_JOYPAD));
-  auto *const if_reg = dynamic_cast<InterruptBits *>(
-      bus->get_mmio(IORegisterMapping::MMIO_INT_FLAGS));
+  auto *const joypad_reg =
+      dynamic_cast<Joypad::JOYP *>(bus->get_mmio(IORegisterMapping::MMIO_JOYPAD));
+  auto *const if_reg =
+      dynamic_cast<InterruptBits *>(bus->get_mmio(IORegisterMapping::MMIO_INT_FLAGS));
   if (!joypad_reg || !if_reg)
     throw std::logic_error("Failed to configure joypad MMIO");
 
@@ -461,8 +439,7 @@ void GameBoyColor::cram_init_mono() const {
   cram_init_mono(mmio::MMIO_LCD_OBPI, mmio::MMIO_LCD_OBPD);
 }
 
-void GameBoyColor::cram_init_mono(IORegisterMapping index,
-                                  IORegisterMapping data) const {
+void GameBoyColor::cram_init_mono(IORegisterMapping index, IORegisterMapping data) const {
   constexpr auto nr_palettes = 8;
 
   /* Convert index and data enumerations into 16-bit addresses */
@@ -521,8 +498,7 @@ void GameBoyColor::step_dma(const bool fast_cycle) const {
 bool GameBoyColor::vdma_enabled() const { return bus->get_vdma().enabled(); }
 
 void GameBoyColor::step_processor() const {
-  if (const auto &vdma = bus->get_vdma();
-      !vdma.enabled()) // CPU is halted until VDMA is complete
+  if (const auto &vdma = bus->get_vdma(); !vdma.enabled()) // CPU is halted until VDMA is complete
     cpu->step();
 }
 
@@ -546,8 +522,7 @@ void GameBoyColor::step() {
   }
 }
 
-GameBoyColor::CheatStats
-GameBoyColor::configure_cheats(const std::vector<CheatCode> &cheats) {
+GameBoyColor::CheatStats GameBoyColor::configure_cheats(const std::vector<CheatCode> &cheats) {
   std::vector<AddressBus::CheatOverride> overrides{};
   overrides.reserve(cheats.size());
   cheat_stats_ = {};
@@ -611,24 +586,18 @@ template <typename T> void GameBoyColor::parse_savestate(T &t) {
   t.eof();
 }
 
-template void
-GameBoyColor::parse_savestate<Savestate::Writer>(Savestate::Writer &);
-template void
-GameBoyColor::parse_savestate<Savestate::Reader>(Savestate::Reader &);
-template void
-GameBoyColor::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
-template void
-GameBoyColor::parse_savestate<Savestate::Checker>(Savestate::Checker &);
+template void GameBoyColor::parse_savestate<Savestate::Writer>(Savestate::Writer &);
+template void GameBoyColor::parse_savestate<Savestate::Reader>(Savestate::Reader &);
+template void GameBoyColor::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
+template void GameBoyColor::parse_savestate<Savestate::Checker>(Savestate::Checker &);
 
 std::vector<byte_t> GameBoyColor::savestate_serialize() {
   if (!bus || !cpu || !ppu || !timer || !serial)
-    throw std::runtime_error(
-        "GameBoyColor::serialize_savestate() uninitialized");
+    throw std::runtime_error("GameBoyColor::serialize_savestate() uninitialized");
 
   // Align saves to instruction fetches
   if (!savestate_ready())
-    throw std::runtime_error(
-        "GameBoyColor::serialize_savestate() unsafe point");
+    throw std::runtime_error("GameBoyColor::serialize_savestate() unsafe point");
 
   // Writer performs deserialization
   Savestate::Writer out{};
@@ -638,8 +607,7 @@ std::vector<byte_t> GameBoyColor::savestate_serialize() {
 
 void GameBoyColor::savestate_deserialize(const std::span<const byte_t> data) {
   if (!bus || !cpu || !ppu || !timer || !serial)
-    throw std::runtime_error(
-        "GameBoyColor::serialize_savestate() uninitialized");
+    throw std::runtime_error("GameBoyColor::serialize_savestate() uninitialized");
 
   // First pass does a check on the buffer content to make sure the save is in
   // a valid format BEFORE blindly altering system components.
@@ -653,8 +621,7 @@ void GameBoyColor::savestate_deserialize(const std::span<const byte_t> data) {
 
 std::size_t GameBoyColor::savestate_size() {
   if (!bus || !cpu || !ppu || !timer || !serial)
-    throw std::runtime_error(
-        "GameBoyColor::serialize_savestate() uninitialized");
+    throw std::runtime_error("GameBoyColor::serialize_savestate() uninitialized");
 
   // Sizer computes size to estimate space needed for memory allocation. The
   // estimation is generous and should always be large enough to fit a save.

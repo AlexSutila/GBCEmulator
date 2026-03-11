@@ -112,8 +112,7 @@ protected:
     return "?";
   }
 
-  template <StatusFlagMask flag, bool expect>
-  [[nodiscard]] static const char *to_string() {
+  template <StatusFlagMask flag, bool expect> [[nodiscard]] static const char *to_string() {
     if constexpr (flag == StatusFlagMask::FLAG_C_MASK)
       return expect ? "C" : "!C";
     if constexpr (flag == StatusFlagMask::FLAG_N_MASK)

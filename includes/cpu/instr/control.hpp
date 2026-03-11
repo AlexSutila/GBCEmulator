@@ -14,8 +14,7 @@
  */
 class CPL final : public Instruction {
 public:
-  CPL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  CPL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
     write_reg<Register8Bit::REG_A>(~a);
@@ -31,8 +30,7 @@ public:
  */
 class SCF final : public Instruction {
 public:
-  SCF(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  SCF(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     reg_file->reg_af.set_flag(StatusFlagMask::FLAG_C_MASK);
     reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_N_MASK);
@@ -47,8 +45,7 @@ public:
  */
 class CCF final : public Instruction {
 public:
-  CCF(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  CCF(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const bool c = reg_file->reg_af.get_flag(StatusFlagMask::FLAG_C_MASK);
     reg_file->reg_af.put_flag(StatusFlagMask::FLAG_C_MASK, !c);
@@ -64,8 +61,7 @@ public:
  */
 class NOP final : public Instruction {
 public:
-  NOP(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  NOP(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::string describe() override { return IroGB::format("NOP"); }
   std::size_t exec() override { return 4; }
 };
@@ -75,8 +71,7 @@ public:
  */
 class DI final : public Instruction {
 public:
-  DI(RegisterFile *reg_file_ptr, AddressBus *bus_ptr,
-     InterruptMasterEnable *ime_ptr)
+  DI(RegisterFile *reg_file_ptr, AddressBus *bus_ptr, InterruptMasterEnable *ime_ptr)
       : Instruction(reg_file_ptr, bus_ptr), ime(ime_ptr) {}
   std::size_t exec() override {
     ime->disable();
@@ -93,8 +88,7 @@ private:
  */
 class EI final : public Instruction {
 public:
-  EI(RegisterFile *reg_file_ptr, AddressBus *bus_ptr,
-     InterruptMasterEnable *ime_ptr)
+  EI(RegisterFile *reg_file_ptr, AddressBus *bus_ptr, InterruptMasterEnable *ime_ptr)
       : Instruction(reg_file_ptr, bus_ptr), ime(ime_ptr) {}
   std::size_t exec() override {
     ime->enable(true);
@@ -113,13 +107,11 @@ private:
  */
 class HALT final : public Instruction {
 public:
-  HALT(RegisterFile *reg_file_ptr, AddressBus *bus_ptr,
-       InterruptMasterEnable &ime, InterruptBits &if_reg, InterruptBits &ie_reg,
-       runtime_sys_info &sys)
-      : Instruction(reg_file_ptr, bus_ptr),
-        ime_(ime),   // Needed to trigger the HALT bug
-        if_(if_reg), // ^^^
-        ie_(ie_reg), // ^^^
+  HALT(RegisterFile *reg_file_ptr, AddressBus *bus_ptr, InterruptMasterEnable &ime,
+       InterruptBits &if_reg, InterruptBits &ie_reg, runtime_sys_info &sys)
+      : Instruction(reg_file_ptr, bus_ptr), ime_(ime), // Needed to trigger the HALT bug
+        if_(if_reg),                                   // ^^^
+        ie_(ie_reg),                                   // ^^^
         sys_(sys) {}
   std::size_t exec() override {
     constexpr byte_t mask = 0x1F; // Mask out unused interrupt bits

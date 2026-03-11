@@ -3,16 +3,14 @@
 #include "memory/bus.hpp"
 #include "memory/mmio/mmio.hpp"
 
-constexpr addr_t audio_base =
-    static_cast<addr_t>(IORegisterMapping::MMIO_AUDIO_BASE);
+constexpr addr_t audio_base = static_cast<addr_t>(IORegisterMapping::MMIO_AUDIO_BASE);
 constexpr std::size_t audio_register_count = 0x17;
 constexpr std::size_t audio_unused_count = 0x09; // FF27-FF2F
 constexpr std::size_t wave_ram_size = 0x10;
 
 [[nodiscard]] byte_t read_ff(byte_t) { return 0xFF; }
 
-void Audio::AudioRegister::configure(const byte_t initial,
-                                     WriteCallback on_write_cb,
+void Audio::AudioRegister::configure(const byte_t initial, WriteCallback on_write_cb,
                                      ReadCallback on_read_cb) {
   state_ = initial;
   on_write = std::move(on_write_cb);
@@ -87,13 +85,11 @@ void APU::register_mmio() {
   for (std::size_t i = 0; i < audio_register_count; ++i)
     bus_.connect_mmio(static_cast<addr_t>(audio_base + i), &audio_registers[i]);
   for (std::size_t i = 0; i < audio_unused_count; ++i)
-    bus_.connect_mmio(
-        static_cast<addr_t>(audio_base + audio_register_count + i),
-        &audio_unused[i]);
+    bus_.connect_mmio(static_cast<addr_t>(audio_base + audio_register_count + i), &audio_unused[i]);
   for (std::size_t i = 0; i < wave_ram_size; ++i) {
-    bus_.connect_mmio(static_cast<addr_t>(audio_base + audio_register_count +
-                                          audio_unused_count + i),
-                      &wave_ram[i]);
+    bus_.connect_mmio(
+        static_cast<addr_t>(audio_base + audio_register_count + audio_unused_count + i),
+        &wave_ram[i]);
   }
 
   for (auto &b : wave_ram_bytes)
@@ -107,16 +103,12 @@ void APU::register_mmio() {
         0x00,
         [this, i](const byte_t v) {
           const std::size_t dst =
-              channel3_enabled
-                  ? static_cast<std::size_t>((ch3_wave_pos >> 1) & 0x0Fu)
-                  : i;
+              channel3_enabled ? static_cast<std::size_t>((ch3_wave_pos >> 1) & 0x0Fu) : i;
           wave_ram_bytes[dst] = v;
         },
         [this, i](byte_t) -> byte_t {
           const std::size_t src =
-              channel3_enabled
-                  ? static_cast<std::size_t>((ch3_wave_pos >> 1) & 0x0Fu)
-                  : i;
+              channel3_enabled ? static_cast<std::size_t>((ch3_wave_pos >> 1) & 0x0Fu) : i;
           return wave_ram_bytes[src];
         });
   }
@@ -198,9 +190,8 @@ void APU::register_mmio() {
           return;
         nr14 = value;
 
-        maybe_extra_length_clock(next_step_clocks_length(), prev_len_en,
-                                 new_len_en, cgb02_length_quirk_,
-                                 ch1_length_counter, trigger,
+        maybe_extra_length_clock(next_step_clocks_length(), prev_len_en, new_len_en,
+                                 cgb02_length_quirk_, ch1_length_counter, trigger,
                                  [this] { disable_channel1(); });
 
         if (trigger)
@@ -254,9 +245,8 @@ void APU::register_mmio() {
           return;
         nr24 = value;
 
-        maybe_extra_length_clock(next_step_clocks_length(), prev_len_en,
-                                 new_len_en, cgb02_length_quirk_,
-                                 ch2_length_counter, trigger,
+        maybe_extra_length_clock(next_step_clocks_length(), prev_len_en, new_len_en,
+                                 cgb02_length_quirk_, ch2_length_counter, trigger,
                                  [this] { disable_channel2(); });
 
         if (trigger)
@@ -317,9 +307,8 @@ void APU::register_mmio() {
           return;
         nr34 = v;
 
-        maybe_extra_length_clock(next_step_clocks_length(), prev_len_en,
-                                 new_len_en, cgb02_length_quirk_,
-                                 ch3_length_counter, trigger,
+        maybe_extra_length_clock(next_step_clocks_length(), prev_len_en, new_len_en,
+                                 cgb02_length_quirk_, ch3_length_counter, trigger,
                                  [this] { disable_channel3(); });
 
         if (trigger)
@@ -373,9 +362,8 @@ void APU::register_mmio() {
           return;
         nr44 = v;
 
-        maybe_extra_length_clock(next_step_clocks_length(), prev_len_en,
-                                 new_len_en, cgb02_length_quirk_,
-                                 ch4_length_counter, trigger,
+        maybe_extra_length_clock(next_step_clocks_length(), prev_len_en, new_len_en,
+                                 cgb02_length_quirk_, ch4_length_counter, trigger,
                                  [this] { disable_channel4(); });
 
         if (trigger)
@@ -427,11 +415,9 @@ void APU::register_mmio() {
         }
       },
       [this](byte_t) {
-        const auto status =
-            static_cast<byte_t>((channel1_enabled ? 0x01 : 0x00) |
-                                (channel2_enabled ? 0x02 : 0x00) |
-                                (channel3_enabled ? 0x04 : 0x00) |
-                                (channel4_enabled ? 0x08 : 0x00));
+        const auto status = static_cast<byte_t>(
+            (channel1_enabled ? 0x01 : 0x00) | (channel2_enabled ? 0x02 : 0x00) |
+            (channel3_enabled ? 0x04 : 0x00) | (channel4_enabled ? 0x08 : 0x00));
         return static_cast<byte_t>(0x70 | (nr52 & 0x80) | status);
       });
 }

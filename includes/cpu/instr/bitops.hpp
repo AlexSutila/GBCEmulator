@@ -16,8 +16,7 @@
  */
 class RLCA final : public Instruction {
 public:
-  RLCA(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  RLCA(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
 
@@ -44,8 +43,7 @@ public:
  */
 class RRCA final : public Instruction {
 public:
-  RRCA(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  RRCA(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
 
@@ -72,8 +70,7 @@ public:
  */
 class RLA final : public Instruction {
 public:
-  RLA(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  RLA(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
     const bool old_c = reg_file->reg_af.get_flag(StatusFlagMask::FLAG_C_MASK);
@@ -101,8 +98,7 @@ public:
  */
 class RRA final : public Instruction {
 public:
-  RRA(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  RRA(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
     const bool old_c = reg_file->reg_af.get_flag(StatusFlagMask::FLAG_C_MASK);
@@ -148,8 +144,7 @@ private:
 
 template <Register8Bit dst> class RLC_X final : public Instruction {
 public:
-  RLC_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  RLC_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const byte_t x = read_reg<dst>();
 
@@ -166,15 +161,12 @@ public:
     write_reg<dst>(result);
     return 8;
   }
-  std::string describe() override {
-    return IroGB::format("RLC {}", to_string<dst>());
-  }
+  std::string describe() override { return IroGB::format("RLC {}", to_string<dst>()); }
 };
 
 class RLC_HL final : public Instruction {
 public:
-  RLC_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  RLC_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const addr_t addr = read_reg<Register16Bit::REG_HL>();
     switch (state) {
@@ -213,8 +205,7 @@ private:
 
 template <Register8Bit dst> class RL_X final : public Instruction {
 public:
-  RL_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  RL_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const byte_t x = read_reg<dst>();
     const bool old_c = reg_file->reg_af.get_flag(StatusFlagMask::FLAG_C_MASK);
@@ -231,15 +222,12 @@ public:
     write_reg<dst>(result);
     return 8;
   }
-  std::string describe() override {
-    return IroGB::format("RL {}", to_string<dst>());
-  }
+  std::string describe() override { return IroGB::format("RL {}", to_string<dst>()); }
 };
 
 class RL_HL final : public Instruction {
 public:
-  RL_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  RL_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const addr_t hl = read_reg<Register16Bit::REG_HL>();
     switch (state) {
@@ -278,8 +266,7 @@ private:
 
 template <Register8Bit dst> class RRC_X final : public Instruction {
 public:
-  RRC_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  RRC_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const byte_t x = read_reg<dst>();
     const bool carry = (x & 0x01) != 0x00;
@@ -295,15 +282,12 @@ public:
     write_reg<dst>(result);
     return 8;
   }
-  std::string describe() override {
-    return IroGB::format("RRC {}", to_string<dst>());
-  }
+  std::string describe() override { return IroGB::format("RRC {}", to_string<dst>()); }
 };
 
 class RRC_HL final : public Instruction {
 public:
-  RRC_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  RRC_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const addr_t addr = read_reg<Register16Bit::REG_HL>();
     switch (state) {
@@ -342,8 +326,7 @@ private:
 
 template <Register8Bit dst> class RR_X final : public Instruction {
 public:
-  RR_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  RR_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const byte_t x = read_reg<dst>();
     const bool old_c = reg_file->reg_af.get_flag(StatusFlagMask::FLAG_C_MASK);
@@ -360,15 +343,12 @@ public:
     write_reg<dst>(result);
     return 8;
   }
-  std::string describe() override {
-    return IroGB::format("RR {}", to_string<dst>());
-  }
+  std::string describe() override { return IroGB::format("RR {}", to_string<dst>()); }
 };
 
 class RR_HL final : public Instruction {
 public:
-  RR_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  RR_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const addr_t addr = read_reg<Register16Bit::REG_HL>();
     switch (state) {
@@ -407,8 +387,7 @@ private:
 
 template <Register8Bit dst> class SLA_X final : public Instruction {
 public:
-  SLA_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  SLA_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const byte_t x = read_reg<dst>();
     const bool carry = (x & 0x80) != 0x00;
@@ -424,15 +403,12 @@ public:
     write_reg<dst>(result);
     return 8;
   }
-  std::string describe() override {
-    return IroGB::format("SLA {}", to_string<dst>());
-  }
+  std::string describe() override { return IroGB::format("SLA {}", to_string<dst>()); }
 };
 
 class SLA_HL final : public Instruction {
 public:
-  SLA_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  SLA_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const addr_t addr = read_reg<Register16Bit::REG_HL>();
     switch (state) {
@@ -469,8 +445,7 @@ private:
 
 template <Register8Bit dst> class SRA_X final : public Instruction {
 public:
-  SRA_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  SRA_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const byte_t x = read_reg<dst>();
     const bool carry = (x & 0x01) != 0x00;
@@ -486,15 +461,12 @@ public:
     write_reg<dst>(result);
     return 8;
   }
-  std::string describe() override {
-    return IroGB::format("SLA {}", to_string<dst>());
-  }
+  std::string describe() override { return IroGB::format("SLA {}", to_string<dst>()); }
 };
 
 class SRA_HL final : public Instruction {
 public:
-  SRA_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  SRA_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const addr_t addr = read_reg<Register16Bit::REG_HL>();
     switch (state) {
@@ -531,8 +503,7 @@ private:
 
 template <Register8Bit dst> class SWAP_X final : public Instruction {
 public:
-  SWAP_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  SWAP_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const byte_t x = read_reg<dst>();
     const byte_t result = ((x & 0xF0) >> 4) | ((x & 0x0F) << 4);
@@ -547,15 +518,12 @@ public:
     write_reg<dst>(result);
     return 8;
   }
-  std::string describe() override {
-    return IroGB::format("SWAP {}", to_string<dst>());
-  }
+  std::string describe() override { return IroGB::format("SWAP {}", to_string<dst>()); }
 };
 
 class SWAP_HL final : public Instruction {
 public:
-  SWAP_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  SWAP_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const addr_t addr = read_reg<Register16Bit::REG_HL>();
     switch (state) {
@@ -592,8 +560,7 @@ private:
 
 template <Register8Bit dst> class SRL_X final : public Instruction {
 public:
-  SRL_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  SRL_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const byte_t x = read_reg<dst>();
     const bool carry = (x & 0x01) != 0x00;
@@ -609,15 +576,12 @@ public:
     write_reg<dst>(result);
     return 8;
   }
-  std::string describe() override {
-    return IroGB::format("SRL {}", to_string<dst>());
-  }
+  std::string describe() override { return IroGB::format("SRL {}", to_string<dst>()); }
 };
 
 class SRL_HL final : public Instruction {
 public:
-  SRL_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  SRL_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const addr_t addr = read_reg<Register16Bit::REG_HL>();
     switch (state) {
@@ -652,11 +616,9 @@ private:
   byte_t n{};
 };
 
-template <byte_t bit, Register8Bit dst>
-class BIT_N_X final : public Instruction {
+template <byte_t bit, Register8Bit dst> class BIT_N_X final : public Instruction {
 public:
-  BIT_N_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  BIT_N_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const byte_t x = read_reg<dst>();
     const bool bit_is_zero = ((x >> bit) & 0x01) == 0;
@@ -674,8 +636,7 @@ public:
 
 template <byte_t bit> class BIT_N_HL final : public Instruction {
 public:
-  BIT_N_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  BIT_N_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const addr_t addr = read_reg<Register16Bit::REG_HL>();
     const byte_t n = bus->read_byte(addr);
@@ -687,17 +648,13 @@ public:
     reg_file->reg_af.put_flag(StatusFlagMask::FLAG_H_MASK, true);
     return 12;
   }
-  std::string describe() override {
-    return IroGB::format("BIT {}, HL", static_cast<int>(bit));
-  }
+  std::string describe() override { return IroGB::format("BIT {}, HL", static_cast<int>(bit)); }
   std::size_t mem_access_t_cycle() override { return 8; }
 };
 
-template <byte_t bit, Register8Bit dst>
-class RES_N_X final : public Instruction {
+template <byte_t bit, Register8Bit dst> class RES_N_X final : public Instruction {
 public:
-  RES_N_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  RES_N_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     byte_t x = read_reg<dst>();
     x &= ~(1 << bit);
@@ -711,8 +668,7 @@ public:
 
 template <byte_t bit> class RES_N_HL final : public Instruction {
 public:
-  RES_N_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  RES_N_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     addr_t hl = read_reg<Register16Bit::REG_HL>();
     switch (state) {
@@ -731,9 +687,7 @@ public:
   std::size_t mem_access_t_cycle() override {
     return state == InstrStates::INSTR_STATE_READ ? 8 : 12;
   }
-  std::string describe() override {
-    return IroGB::format("RST {}, HL", static_cast<int>(bit));
-  }
+  std::string describe() override { return IroGB::format("RST {}, HL", static_cast<int>(bit)); }
   void parse() override { state = InstrStates::INSTR_STATE_READ; }
 
 private:
@@ -741,11 +695,9 @@ private:
   byte_t n{};
 };
 
-template <byte_t bit, Register8Bit dst>
-class SET_N_X final : public Instruction {
+template <byte_t bit, Register8Bit dst> class SET_N_X final : public Instruction {
 public:
-  SET_N_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  SET_N_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     byte_t x = read_reg<dst>();
     x |= (1 << bit);
@@ -759,8 +711,7 @@ public:
 
 template <byte_t bit> class SET_N_HL final : public Instruction {
 public:
-  SET_N_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  SET_N_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const addr_t hl = read_reg<Register16Bit::REG_HL>();
     switch (state) {
@@ -779,9 +730,7 @@ public:
   std::size_t mem_access_t_cycle() override {
     return state == InstrStates::INSTR_STATE_READ ? 8 : 12;
   }
-  std::string describe() override {
-    return IroGB::format("SET {}, HL", static_cast<int>(bit));
-  }
+  std::string describe() override { return IroGB::format("SET {}, HL", static_cast<int>(bit)); }
   void parse() override { state = InstrStates::INSTR_STATE_READ; }
 
 private:

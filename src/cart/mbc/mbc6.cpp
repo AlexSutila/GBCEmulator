@@ -37,10 +37,8 @@
 
 class Mbc6 final : public Mbc {
 public:
-  Mbc6(const std::span<const byte_t> rom, const std::size_t ram_bytes,
-       const bool battery)
-      : rom_(rom), ram_(ram_bytes), persist_(battery),
-        flash_(kFlashSize, 0xFF) {
+  Mbc6(const std::span<const byte_t> rom, const std::size_t ram_bytes, const bool battery)
+      : rom_(rom), ram_(ram_bytes), persist_(battery), flash_(kFlashSize, 0xFF) {
     hidden_.fill(0xFF);
   }
 
@@ -117,9 +115,7 @@ public:
   // battery-backed flash More research needed
   [[nodiscard]] bool has_battery() const noexcept override { return persist_; }
 
-  [[nodiscard]] std::span<const byte_t> ram() const noexcept override {
-    return ram_;
-  }
+  [[nodiscard]] std::span<const byte_t> ram() const noexcept override { return ram_; }
   std::span<byte_t> ram() noexcept override { return ram_; }
 
   template <typename T> void parse_savestate_impl(T &t) {
@@ -162,31 +158,21 @@ public:
 
     // Serialize latch sub-structures
     t.field_complex(F_PROG_STATE, [&](T &t) { write_latch(t, prog_); });
-    t.field_complex(F_HIDDEN_PROG_STATE,
-                    [&](T &t) { write_latch(t, hidden_prog_); });
+    t.field_complex(F_HIDDEN_PROG_STATE, [&](T &t) { write_latch(t, hidden_prog_); });
     t.eof();
   }
 
-  void parse_savestate(Savestate::Writer &t) override {
-    parse_savestate_impl(t);
-  }
-  void parse_savestate(Savestate::Reader &t) override {
-    parse_savestate_impl(t);
-  }
-  void parse_savestate(Savestate::Sizer &t) override {
-    parse_savestate_impl(t);
-  }
-  void parse_savestate(Savestate::Checker &t) override {
-    parse_savestate_impl(t);
-  }
+  void parse_savestate(Savestate::Writer &t) override { parse_savestate_impl(t); }
+  void parse_savestate(Savestate::Reader &t) override { parse_savestate_impl(t); }
+  void parse_savestate(Savestate::Sizer &t) override { parse_savestate_impl(t); }
+  void parse_savestate(Savestate::Checker &t) override { parse_savestate_impl(t); }
 
 private:
   static constexpr std::size_t kRomBank8K = 0x2000;
   static constexpr std::size_t kRamBank4K = 0x1000;
-  static constexpr std::size_t kFlashSize = 0x100000; // 1 MiB
-  static constexpr std::size_t kFlashBanks =
-      kFlashSize / kRomBank8K;                        // 128 banks of 8 KiB
-  static constexpr std::size_t kSectorSize = 0x20000; // 128 KiB
+  static constexpr std::size_t kFlashSize = 0x100000;                 // 1 MiB
+  static constexpr std::size_t kFlashBanks = kFlashSize / kRomBank8K; // 128 banks of 8 KiB
+  static constexpr std::size_t kSectorSize = 0x20000;                 // 128 KiB
   static constexpr std::size_t kHiddenSize = 256;
   static constexpr std::size_t kProgChunk = 0x80; // 128 bytes
   static constexpr std::size_t kProgMaskBytes = kProgChunk / 8;
@@ -253,12 +239,11 @@ private:
   byte_t ram_bank_b_{0};
 
   bool flash_ce_{false}; // flash enable (bit0)
-  bool flash_wp_{
-      false}; // flash write enable (/WP) (bit0), protects sector0+hidden when 0
-  bool a_flash_{false}; // window A selects flash (true) or ROM (false)
-  bool b_flash_{false}; // window B selects flash (true) or ROM (false)
-  byte_t a_bank_{0};    // 00-7F (8 KiB banks)
-  byte_t b_bank_{0};    // 00-7F
+  bool flash_wp_{false}; // flash write enable (/WP) (bit0), protects sector0+hidden when 0
+  bool a_flash_{false};  // window A selects flash (true) or ROM (false)
+  bool b_flash_{false};  // window B selects flash (true) or ROM (false)
+  byte_t a_bank_{0};     // 00-7F (8 KiB banks)
+  byte_t b_bank_{0};     // 00-7F
 
   // Flash storage and mode
   std::vector<byte_t> flash_;
@@ -312,9 +297,7 @@ private:
     }
   }
 
-  [[nodiscard]] static byte_t seq_to_raw_(const Seq seq) {
-    return static_cast<byte_t>(seq);
-  }
+  [[nodiscard]] static byte_t seq_to_raw_(const Seq seq) { return static_cast<byte_t>(seq); }
 
   [[nodiscard]] static Seq seq_from_raw_(const byte_t raw) {
     switch (raw) {
@@ -371,12 +354,10 @@ private:
   }
 
   [[nodiscard]] std::size_t rom_8k_bank_count() const noexcept {
-    return std::max<std::size_t>(1,
-                                 (rom_.size() + (kRomBank8K - 1)) / kRomBank8K);
+    return std::max<std::size_t>(1, (rom_.size() + (kRomBank8K - 1)) / kRomBank8K);
   }
 
-  [[nodiscard]] byte_t rom_at_8k(const std::size_t bank,
-                                 const std::size_t off) const {
+  [[nodiscard]] byte_t rom_at_8k(const std::size_t bank, const std::size_t off) const {
     const std::size_t banks = rom_8k_bank_count();
     const std::size_t b = clamp_bank(bank, banks);
     const std::size_t idx = b * kRomBank8K + off;
@@ -384,23 +365,19 @@ private:
   }
 
   // ---------- helpers: RAM 4 KiB banks ----------
-  [[nodiscard]] byte_t ram_at_4k(const std::size_t bank,
-                                 const std::size_t off) const {
+  [[nodiscard]] byte_t ram_at_4k(const std::size_t bank, const std::size_t off) const {
     if (ram_.empty())
       return open_bus();
-    const std::size_t banks =
-        std::max<std::size_t>(1, ram_.size() / kRamBank4K);
+    const std::size_t banks = std::max<std::size_t>(1, ram_.size() / kRamBank4K);
     const std::size_t b = clamp_bank(bank, banks);
     const std::size_t idx = (b * kRamBank4K + off) % ram_.size();
     return ram_[idx];
   }
 
-  void ram_write_4k(const std::size_t bank, const std::size_t off,
-                    const byte_t v) {
+  void ram_write_4k(const std::size_t bank, const std::size_t off, const byte_t v) {
     if (ram_.empty())
       return;
-    const std::size_t banks =
-        std::max<std::size_t>(1, ram_.size() / kRamBank4K);
+    const std::size_t banks = std::max<std::size_t>(1, ram_.size() / kRamBank4K);
     const std::size_t b = clamp_bank(bank, banks);
     const std::size_t idx = (b * kRamBank4K + off) % ram_.size();
     ram_[idx] = v;
@@ -453,8 +430,7 @@ private:
   }
 
   // ---------- window reads/writes ----------
-  [[nodiscard]] byte_t read_window(const Window w,
-                                   const std::size_t off) const {
+  [[nodiscard]] byte_t read_window(const Window w, const std::size_t off) const {
     const bool use_flash = (w == Window::A) ? a_flash_ : b_flash_;
     const byte_t bank = (w == Window::A) ? a_bank_ : b_bank_;
 
@@ -465,13 +441,12 @@ private:
     if (!flash_ce_)
       return open_bus();
 
-    const std::size_t chip_addr =
-        (static_cast<std::size_t>(bank) % kFlashBanks) * kRomBank8K + off;
+    const std::size_t chip_addr = (static_cast<std::size_t>(bank) % kFlashBanks) * kRomBank8K + off;
     return flash_read(chip_addr, off);
   }
 
-  void write_window(const Window w, const addr_t abs_addr,
-                    const std::size_t off, const byte_t val) {
+  void write_window(const Window w, const addr_t abs_addr, const std::size_t off,
+                    const byte_t val) {
     const bool use_flash = (w == Window::A) ? a_flash_ : b_flash_;
     const byte_t bank = (w == Window::A) ? a_bank_ : b_bank_;
 
@@ -484,8 +459,7 @@ private:
       return;
     }
 
-    const std::size_t chip_addr =
-        (static_cast<std::size_t>(bank) % kFlashBanks) * kRomBank8K + off;
+    const std::size_t chip_addr = (static_cast<std::size_t>(bank) % kFlashBanks) * kRomBank8K + off;
     flash_write(w, abs_addr, chip_addr, off, val);
   }
 
@@ -524,12 +498,10 @@ private:
   // Command address helpers per Pan Docs table:
   // Bank A command addresses: Y=5, X=4 => 0x5555 and 0x4AAA
   // Bank B command addresses: Y=7, X=6 => 0x7555 and 0x6AAA
-  [[nodiscard]] static bool is_cmd_aa_addr(const Window w,
-                                           const addr_t a) noexcept {
+  [[nodiscard]] static bool is_cmd_aa_addr(const Window w, const addr_t a) noexcept {
     return (w == Window::A) ? (a == 0x5555) : (a == 0x7555);
   }
-  [[nodiscard]] static bool is_cmd_55_addr(const Window w,
-                                           const addr_t a) noexcept {
+  [[nodiscard]] static bool is_cmd_55_addr(const Window w, const addr_t a) noexcept {
     return (w == Window::A) ? (a == 0x4AAA) : (a == 0x6AAA);
   }
 
@@ -627,9 +599,8 @@ private:
       hidden_prog_.filled = true;
   }
 
-  void flash_write(const Window w, const addr_t abs_addr,
-                   const std::size_t chip_addr, const std::size_t off_in_window,
-                   const byte_t val) {
+  void flash_write(const Window w, const addr_t abs_addr, const std::size_t chip_addr,
+                   const std::size_t off_in_window, const byte_t val) {
     // F0 exits any mode
     if (val == 0xF0) {
       flash_mode_ = FlashMode::ReadArray;
@@ -777,8 +748,7 @@ private:
           const std::size_t base = s * kSectorSize;
           const std::size_t end = std::min(base + kSectorSize, flash_.size());
           std::fill(flash_.begin() + static_cast<std::ptrdiff_t>(base),
-                    flash_.begin() + static_cast<std::ptrdiff_t>(end),
-                    static_cast<byte_t>(0xFF));
+                    flash_.begin() + static_cast<std::ptrdiff_t>(end), static_cast<byte_t>(0xFF));
         }
         flash_mode_ = FlashMode::Status;
         seq_ = Seq::Idle;
@@ -791,8 +761,7 @@ private:
             const std::size_t base = sector * kSectorSize;
             const std::size_t end = std::min(base + kSectorSize, flash_.size());
             std::fill(flash_.begin() + static_cast<std::ptrdiff_t>(base),
-                      flash_.begin() + static_cast<std::ptrdiff_t>(end),
-                      static_cast<byte_t>(0xFF));
+                      flash_.begin() + static_cast<std::ptrdiff_t>(end), static_cast<byte_t>(0xFF));
           }
         }
         flash_mode_ = FlashMode::Status;
@@ -868,17 +837,13 @@ private:
   // land back in Got55, so the "command byte" is processed here too
 
   // Helpers for persisting MBC6's non-volatile flash/hidden storage
-  [[nodiscard]] std::span<const byte_t> flash() const noexcept {
-    return flash_;
-  }
+  [[nodiscard]] std::span<const byte_t> flash() const noexcept { return flash_; }
   std::span<byte_t> flash() noexcept { return flash_; }
 
   [[nodiscard]] std::span<const byte_t> hidden() const noexcept {
     return {hidden_.data(), hidden_.size()};
   }
-  std::span<byte_t> hidden() noexcept {
-    return {hidden_.data(), hidden_.size()};
-  }
+  std::span<byte_t> hidden() noexcept { return {hidden_.data(), hidden_.size()}; }
 };
 
 std::unique_ptr<Mbc> make_mbc6(const cart &c) {

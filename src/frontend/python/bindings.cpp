@@ -21,8 +21,7 @@ static void bind_cart(py::module_ &m) {
       .def_property_readonly(
           "rom",
           [](const cart &c) {
-            return py::bytes(reinterpret_cast<const char *>(c.rom_data()),
-                             c.rom_size());
+            return py::bytes(reinterpret_cast<const char *>(c.rom_data()), c.rom_size());
           },
           "ROM contents as immutable bytes")
       .def_property_readonly("rom_size", &cart::rom_size);
@@ -56,18 +55,15 @@ static void bind_cart(py::module_ &m) {
       },
       py::arg("rom_bytes"), "Load a Game Boy cartridge from raw ROM bytes");
   m.def(
-      "load_cart_fs",
-      [](const fs::path &rom_path) { return load_cart_fs(rom_path); },
+      "load_cart_fs", [](const fs::path &rom_path) { return load_cart_fs(rom_path); },
       py::arg("rom_path"), "Load a Game Boy cartridge from filesystem");
 }
 
 static void bind_address_bus(const py::module_ &m) {
   py::class_<AddressBus>(m, "AddressBus")
       .def("init_test_bed", &AddressBus::init_test_bed)
-      .def("write_byte", &AddressBus::write_byte, py::arg("addr"),
-           py::arg("value"))
-      .def("read_byte", &AddressBus::read_byte, py::arg("addr"),
-           py::arg("debug") = true);
+      .def("write_byte", &AddressBus::write_byte, py::arg("addr"), py::arg("value"))
+      .def("read_byte", &AddressBus::read_byte, py::arg("addr"), py::arg("debug") = true);
 }
 
 static void bind_processor(const py::module_ &m) {
@@ -132,15 +128,13 @@ static void bind_debugger(const py::module_ &m) {
       .value("BRK_STEP_SCANLINE", Debug::BreakReason::BRK_STEP_SCANLINE)
       .value("BRK_STEP_FRAME", Debug::BreakReason::BRK_STEP_FRAME);
   py::class_<Debug::Breakpoint>(m, "Breakpoint")
-      .def(py::init<Debug::BreakReason, addr_t>(), py::arg("reason_flags"),
-           py::arg("watch_addr"))
+      .def(py::init<Debug::BreakReason, addr_t>(), py::arg("reason_flags"), py::arg("watch_addr"))
       .def("eval", &Debug::Breakpoint::eval, py::arg("reason_flags"))
       .def("has_flag", &Debug::Breakpoint::has_flag, py::arg("flag"))
       .def("to_string", &Debug::Breakpoint::to_string);
   py::class_<Debug::Debugger>(m, "Debugger")
       .def(py::init<std::function<Debug::BreakReason()>>(), py::arg("callback"))
-      .def("breakpoint_add", &Debug::Debugger::breakpoint_add, py::arg("addr"),
-           py::arg("reason"))
+      .def("breakpoint_add", &Debug::Debugger::breakpoint_add, py::arg("addr"), py::arg("reason"))
       .def("breakpoint_del", &Debug::Debugger::breakpoint_del, py::arg("addr"))
       .def("get_breakpoints", &Debug::Debugger::get_breakpoints);
 }
@@ -154,14 +148,10 @@ static void bind_gbc(const py::module_ &m) {
       .def("step_cycles", &PyGameBoyColor::step_cycles)
       .def("step", &PyGameBoyColor::step)
       .def("get_frame", &PyGameBoyColor::get_frame)
-      .def("get_bus", &PyGameBoyColor::get_bus,
-           py::return_value_policy::reference_internal)
-      .def("get_cpu", &PyGameBoyColor::get_cpu,
-           py::return_value_policy::reference_internal)
-      .def("get_ppu", &PyGameBoyColor::get_ppu,
-           py::return_value_policy::reference_internal)
-      .def("get_timer", &PyGameBoyColor::get_timer,
-           py::return_value_policy::reference_internal)
+      .def("get_bus", &PyGameBoyColor::get_bus, py::return_value_policy::reference_internal)
+      .def("get_cpu", &PyGameBoyColor::get_cpu, py::return_value_policy::reference_internal)
+      .def("get_ppu", &PyGameBoyColor::get_ppu, py::return_value_policy::reference_internal)
+      .def("get_timer", &PyGameBoyColor::get_timer, py::return_value_policy::reference_internal)
       .def("get_debugger", &PyGameBoyColor::get_debugger,
            py::return_value_policy::reference_internal)
       .def("put_joyp_state", &PyGameBoyColor::put_joyp_state,

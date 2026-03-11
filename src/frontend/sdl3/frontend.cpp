@@ -21,8 +21,7 @@ std::string sha256_hex(const std::span<const byte_t> data) {
 } // namespace
 
 std::int64_t SDL3Frontend::steady_now_ns() {
-  return std::chrono::duration_cast<std::chrono::nanoseconds>(
-             Clock::now().time_since_epoch())
+  return std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now().time_since_epoch())
       .count();
 }
 
@@ -30,18 +29,15 @@ SDL3Frontend::SDL3Frontend() : host(framebuf_width, framebuf_height, scale) {
   host.init_audio();
   gui.init(host);
 
-  const auto bar_height_px =
-      static_cast<int>(std::ceil(ImGui::GetFrameHeight()));
+  const auto bar_height_px = static_cast<int>(std::ceil(ImGui::GetFrameHeight()));
   SDL_SetWindowSize(host.get_window(), framebuf_width * scale,
                     framebuf_height * scale + bar_height_px * 2);
 
   debugger.init();
   SDL_AddEventWatch(reinterpret_cast<SDL_EventFilter>(event_watcher), this);
 
-  framebuffers[0] =
-      std::make_unique<std::uint32_t[]>(framebuf_height * framebuf_width);
-  framebuffers[1] =
-      std::make_unique<std::uint32_t[]>(framebuf_height * framebuf_width);
+  framebuffers[0] = std::make_unique<std::uint32_t[]>(framebuf_height * framebuf_width);
+  framebuffers[1] = std::make_unique<std::uint32_t[]>(framebuf_height * framebuf_width);
 
   running = true;
   clear(black);
@@ -53,8 +49,7 @@ SDL3Frontend::SDL3Frontend() : host(framebuf_width, framebuf_height, scale) {
 
   // The emulation thread has not produced a frame yet, so seed the texture once
   // to avoid presenting uninitialized pixels on startup.
-  host.update_texture(get_front_buffer(), framebuf_width, framebuf_height, false,
-                      false);
+  host.update_texture(get_front_buffer(), framebuf_width, framebuf_height, false, false);
 }
 
 SDL3Frontend::~SDL3Frontend() {
@@ -104,14 +99,12 @@ void SDL3Frontend::queue_audio_samples(const float *samples, const size_t count)
 
 void SDL3Frontend::start() {
   const auto start_emulation =
-      [this](const cart &cart_ctx, const std::string &display_label,
-             const std::string &rom_hash,
+      [this](const cart &cart_ctx, const std::string &display_label, const std::string &rom_hash,
              const std::optional<std::string> &bios_path,
              const std::optional<std::filesystem::path> &initial_save_path) {
         active_rom_hash = rom_hash;
-        emulation_thread = std::jthread(
-            std::bind_front(&SDL3Frontend::emulation_thread_fn, this), cart_ctx,
-            bios_path, initial_save_path);
+        emulation_thread = std::jthread(std::bind_front(&SDL3Frontend::emulation_thread_fn, this),
+                                        cart_ctx, bios_path, initial_save_path);
         {
           std::lock_guard lock(ui_mutex);
           ui_state.load_rom_path = display_label;
@@ -146,8 +139,7 @@ void SDL3Frontend::start() {
         const std::string rom_hash = sha256_hex(cart_ctx.rom_span());
         setup_save_context(cart_ctx, display_label, rom_hash);
         setup_cheat_context(cart_ctx, display_label, rom_hash);
-        start_emulation(cart_ctx, display_label, rom_hash, bios_path,
-                        active_save_path);
+        start_emulation(cart_ctx, display_label, rom_hash, bios_path, active_save_path);
       } catch (const std::exception &e) {
         Logger::push(LogLevel::Warning, "ROM", "Failed to load ROM", e.what());
       }
@@ -158,8 +150,7 @@ void SDL3Frontend::start() {
     process_pending_save();
 
     const auto now_ns = steady_now_ns();
-    const auto last_forced =
-        last_forced_redraw_ns.load(std::memory_order_relaxed);
+    const auto last_forced = last_forced_redraw_ns.load(std::memory_order_relaxed);
     if (now_ns - last_forced > 2'000'000) {
       render_frame();
     }
@@ -181,8 +172,7 @@ bool SDL3Frontend::consume_load_rom_request(std::string &rom_path) {
   return true;
 }
 
-bool SDL3Frontend::consume_load_bios_request(
-    std::optional<std::string> &bios_path) {
+bool SDL3Frontend::consume_load_bios_request(std::optional<std::string> &bios_path) {
   std::lock_guard lock(ui_mutex);
   if (!ui_state.request_load_bios && !ui_state.request_unload_bios) {
     return false;
@@ -201,7 +191,6 @@ bool SDL3Frontend::consume_load_bios_request(
   ui_state.request_load_bios = false;
   bios_path = ui_state.load_bios_path;
   gui.update_bios_path(ui_state.load_bios_path);
-  Logger::push(LogLevel::Status, "BIOS", "BIOS selected",
-               ui_state.load_bios_path);
+  Logger::push(LogLevel::Status, "BIOS", "BIOS selected", ui_state.load_bios_path);
   return true;
 }

@@ -30,9 +30,7 @@ public:
   virtual void tick(std::chrono::seconds) {}
 
   [[nodiscard]] virtual bool has_battery() const noexcept { return false; }
-  [[nodiscard]] virtual std::span<const byte_t> ram() const noexcept {
-    return {};
-  }
+  [[nodiscard]] virtual std::span<const byte_t> ram() const noexcept { return {}; }
   virtual std::span<byte_t> ram() noexcept { return {}; }
 
   /* NOTE: For future maintainability, we ask that an per-mapper implementation

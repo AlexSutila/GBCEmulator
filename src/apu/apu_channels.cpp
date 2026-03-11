@@ -12,14 +12,11 @@ void APU::trigger_channel1() {
   channel1_enabled = true;
   channel1_phase = 0.0;
 
-  length_reload_if_zero<std::uint8_t>(
-    ch1_length_counter, 64,
-    (nr14 & 0x40) != 0,
-    next_step_clocks_length());
+  length_reload_if_zero<std::uint8_t>(ch1_length_counter, 64, (nr14 & 0x40) != 0,
+                                      next_step_clocks_length());
 
   // Envelope
-  trigger_envelope(nr12, ch1_env_volume, ch1_env_period,
-                   ch1_env_timer, ch1_env_increase,
+  trigger_envelope(nr12, ch1_env_volume, ch1_env_period, ch1_env_timer, ch1_env_increase,
                    ch1_env_enabled);
 
   // Sweep
@@ -45,9 +42,7 @@ void APU::disable_channel1() {
   ch1_env_enabled = false;
 }
 
-bool APU::ch1_dac_enabled() const {
-  return dac_enabled_pulse_noise(nr12);
-}
+bool APU::ch1_dac_enabled() const { return dac_enabled_pulse_noise(nr12); }
 
 void APU::ch1_set_frequency(std::uint16_t freq) {
   freq &= 0x7FF;
@@ -72,7 +67,7 @@ bool APU::ch1_sweep_overflow_check() {
   return false;
 }
 
-std::uint16_t APU::ch1_sweep_calculate(bool& overflow) {
+std::uint16_t APU::ch1_sweep_calculate(bool &overflow) {
   overflow = false;
 
   const std::uint16_t shadow = ch1_sweep_shadow_freq;
@@ -82,8 +77,7 @@ std::uint16_t APU::ch1_sweep_calculate(bool& overflow) {
   if (ch1_sweep_negate) {
     next -= delta;
     ch1_sweep_negate_used = true;
-  }
-  else {
+  } else {
     next += delta;
   }
 
@@ -102,8 +96,7 @@ void APU::clock_ch1_length() {
 }
 
 void APU::clock_ch1_envelope() {
-  clock_envelope(ch1_env_volume, ch1_env_period, ch1_env_timer,
-                 ch1_env_increase, ch1_env_enabled);
+  clock_envelope(ch1_env_volume, ch1_env_period, ch1_env_timer, ch1_env_increase, ch1_env_enabled);
 }
 
 void APU::clock_ch1_sweep() {
@@ -165,11 +158,8 @@ float APU::channel1_sample() const {
   return (channel1_phase < duty ? 1.0f : -1.0f) * amp;
 }
 
-
 // --------- Channel 2 Helpers -----------
-bool APU::ch2_dac_enabled() const {
-  return dac_enabled_pulse_noise(nr22);
-}
+bool APU::ch2_dac_enabled() const { return dac_enabled_pulse_noise(nr22); }
 
 std::uint16_t APU::ch2_frequency() const {
   return static_cast<std::uint16_t>(((nr24 & 0x07) << 8) | nr23);
@@ -195,14 +185,11 @@ void APU::trigger_channel2() {
   channel2_enabled = true;
   channel2_phase = 0.0;
 
-  length_reload_if_zero<std::uint8_t>(
-      ch2_length_counter, 64,
-      (nr24 & 0x40) != 0,
-      next_step_clocks_length());
+  length_reload_if_zero<std::uint8_t>(ch2_length_counter, 64, (nr24 & 0x40) != 0,
+                                      next_step_clocks_length());
 
-  trigger_envelope(nr22, ch2_env_volume, ch2_env_period,
-                              ch2_env_timer, ch2_env_increase,
-                              ch2_env_enabled);
+  trigger_envelope(nr22, ch2_env_volume, ch2_env_period, ch2_env_timer, ch2_env_increase,
+                   ch2_env_enabled);
 
   if (!ch2_dac_enabled())
     disable_channel2();
@@ -213,8 +200,7 @@ void APU::clock_ch2_length() {
 }
 
 void APU::clock_ch2_envelope() {
-  clock_envelope(ch2_env_volume, ch2_env_period, ch2_env_timer,
-                             ch2_env_increase, ch2_env_enabled);
+  clock_envelope(ch2_env_volume, ch2_env_period, ch2_env_timer, ch2_env_increase, ch2_env_enabled);
 }
 
 // ------------ Sample Generation ------------
@@ -235,23 +221,18 @@ float APU::channel2_sample() const {
   return (channel2_phase < duty ? 1.0f : -1.0f) * amp;
 }
 
-
 // ----------- Channel 3 Helpers -----------
 void APU::clock_ch3_length() {
   clock_length(nr34, ch3_length_counter, [this] { disable_channel3(); });
 }
 
-bool APU::ch3_dac_enabled() const {
-  return (nr30 & 0x80) != 0;
-}
+bool APU::ch3_dac_enabled() const { return (nr30 & 0x80) != 0; }
 
 std::uint16_t APU::ch3_frequency() const {
   return static_cast<std::uint16_t>(((nr34 & 0x07) << 8) | nr33);
 }
 
-void APU::disable_channel3() {
-  channel3_enabled = false;
-}
+void APU::disable_channel3() { channel3_enabled = false; }
 
 void APU::trigger_channel3() {
   if ((nr52 & 0x80) == 0) {
@@ -271,15 +252,12 @@ void APU::trigger_channel3() {
   const auto period_tcycles = static_cast<std::uint16_t>((2048u - (f & 0x7FFu)) * 2u);
   ch3_timer = static_cast<std::uint16_t>(period_tcycles + 6u);
 
-  length_reload_if_zero<std::uint16_t>(
-    ch3_length_counter, 256,
-    (nr34 & 0x40) != 0,
-    next_step_clocks_length());
+  length_reload_if_zero<std::uint16_t>(ch3_length_counter, 256, (nr34 & 0x40) != 0,
+                                       next_step_clocks_length());
 
   if (!ch3_dac_enabled())
     disable_channel3();
 }
-
 
 // ------------ Sample Generation ------------
 float APU::channel3_sample() const {
@@ -293,8 +271,8 @@ float APU::channel3_sample() const {
 
   // Each wave RAM byte contains two 4-bit samples: high nibble first, then low
   const std::uint8_t raw4 = (ch3_wave_pos & 1u)
-                              ? static_cast<std::uint8_t>(ch3_sample_buffer & 0x0Fu)
-                              : static_cast<std::uint8_t>((ch3_sample_buffer >> 4) & 0x0Fu);
+                                ? static_cast<std::uint8_t>(ch3_sample_buffer & 0x0Fu)
+                                : static_cast<std::uint8_t>((ch3_sample_buffer >> 4) & 0x0Fu);
 
   // Center the 4-bit DAC output around 0, then apply the output level scaling
   float s = (static_cast<float>(raw4) - 7.5f) / 7.5f; // ~[-1, +1]
@@ -306,20 +284,16 @@ float APU::channel3_sample() const {
   return s;
 }
 
-
 // ----------- Channel 4 Helpers -----------
 void APU::clock_ch4_length() {
   clock_length(nr44, ch4_length_counter, [this] { disable_channel4(); });
 }
 
 void APU::clock_ch4_envelope() {
-  clock_envelope(ch4_env_volume, ch4_env_period, ch4_env_timer,
-                 ch4_env_increase, ch4_env_enabled);
+  clock_envelope(ch4_env_volume, ch4_env_period, ch4_env_timer, ch4_env_increase, ch4_env_enabled);
 }
 
-bool APU::ch4_dac_enabled() const {
-  return dac_enabled_pulse_noise(nr42);
-}
+bool APU::ch4_dac_enabled() const { return dac_enabled_pulse_noise(nr42); }
 
 void APU::disable_channel4() {
   channel4_enabled = false;
@@ -336,13 +310,10 @@ void APU::trigger_channel4() {
   ch4_phase = 0.0;
   ch4_lfsr = 0x7FFF; // reset all 1s
 
-  length_reload_if_zero<std::uint8_t>(
-    ch4_length_counter, 64,
-    (nr44 & 0x40) != 0,
-    next_step_clocks_length());
+  length_reload_if_zero<std::uint8_t>(ch4_length_counter, 64, (nr44 & 0x40) != 0,
+                                      next_step_clocks_length());
 
-  trigger_envelope(nr42, ch4_env_volume, ch4_env_period,
-                   ch4_env_timer, ch4_env_increase,
+  trigger_envelope(nr42, ch4_env_volume, ch4_env_period, ch4_env_timer, ch4_env_increase,
                    ch4_env_enabled);
 
   if (!ch4_dac_enabled())

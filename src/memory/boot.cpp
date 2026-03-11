@@ -19,8 +19,7 @@ BootROM::BootROM(const std::string &path) {
   file.seekg(0, std::ios::beg);
 
   rom_data.resize(rom_size);
-  if (!file.read(reinterpret_cast<char *>(rom_data.data()),
-                 static_cast<long long>(rom_size)))
+  if (!file.read(reinterpret_cast<char *>(rom_data.data()), static_cast<long long>(rom_size)))
     throw std::runtime_error("BootROM: Failed to fill buffer");
 }
 

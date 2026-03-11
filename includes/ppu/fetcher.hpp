@@ -42,7 +42,7 @@ public:
    * begun. All BG pixel data is flushed, and window rendering starts. */
   [[nodiscard]] bool is_window_visible(byte_t pixels_rendered) const;
   void sample_window_enable(); // Window enable bit is sampled at end of mode 2
-  void render_window(); // Makes the fetcher begin fetching window tile data
+  void render_window();        // Makes the fetcher begin fetching window tile data
 
   /* Lastly, the window is kind of strange in that it does not use the current
    * scanline register (LY) in the decision to fetch window tiles. It uses an
@@ -104,13 +104,13 @@ private:
   /* Helpers */
   [[nodiscard]] byte_t calc_bgwin_pixel_y() const;
   [[nodiscard]] byte_t calc_bgwin_tile_x() const;
-  [[nodiscard]] byte_t calc_obj_pixel_y(const Sprite& sprite) const;
+  [[nodiscard]] byte_t calc_obj_pixel_y(const Sprite &sprite) const;
   [[nodiscard]] addr_t calc_tilemap_base() const;
   [[nodiscard]] byte_t fetch_bgwin_tile_data(bool high) const;
-  [[nodiscard]] byte_t fetch_obj_tile_data(const Sprite& sprite, bool high) const;
+  [[nodiscard]] byte_t fetch_obj_tile_data(const Sprite &sprite, bool high) const;
   [[nodiscard]] addr_t calc_tile_metadata_addr() const;
-  [[nodiscard]] byte_t calc_sprite_tile_idx(const Sprite& sprite) const;
-  [[nodiscard]] bool has_priority(const pixel& old_px, byte_t new_oam_idx,
+  [[nodiscard]] byte_t calc_sprite_tile_idx(const Sprite &sprite) const;
+  [[nodiscard]] bool has_priority(const pixel &old_px, byte_t new_oam_idx,
                                   byte_t new_color_idx) const;
 
   /* Internal storage that is built up throughout the pixel pushing pipeline.

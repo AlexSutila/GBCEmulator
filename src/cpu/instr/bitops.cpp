@@ -27,8 +27,8 @@ std::size_t CB_PREFIX::exec() {
   // opcodes at all, but eh. Whatever.
   if (!ins) [[unlikely]] {
     std::ostringstream oss;
-    oss << "Unimplemented opcode (0xCB): 0x" << std::uppercase << std::hex
-        << std::setw(2) << std::setfill('0') << static_cast<int>(op);
+    oss << "Unimplemented opcode (0xCB): 0x" << std::uppercase << std::hex << std::setw(2)
+        << std::setfill('0') << static_cast<int>(op);
     throw std::logic_error(oss.str());
   }
 
@@ -42,9 +42,7 @@ std::size_t CB_PREFIX::mem_access_t_cycle() {
 }
 
 // TODO: This could fuck up royally but we ball lmao
-std::string CB_PREFIX::describe() {
-  return IroGB::format("(CB) {}", lookup.at(op)->describe());
-}
+std::string CB_PREFIX::describe() { return IroGB::format("(CB) {}", lookup.at(op)->describe()); }
 
 void CB_PREFIX::parse() {
   op = bus->read_byte(reg_file->reg_pc++);

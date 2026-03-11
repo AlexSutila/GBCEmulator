@@ -22,8 +22,7 @@ static constexpr std::array int_vector_lookup = {
  * them. However, for IE, there is an exception, hence allow pulling the unused
  * bits high to be conditional.
  */
-InterruptBits::InterruptBits(const bool pull_unused_high)
-    : pull_high(pull_unused_high) {}
+InterruptBits::InterruptBits(const bool pull_unused_high) : pull_high(pull_unused_high) {}
 
 void InterruptBits::write(const byte_t value) {
   state_ = value;
@@ -31,9 +30,7 @@ void InterruptBits::write(const byte_t value) {
     state_ |= 0xE0;
 }
 
-byte_t InterruptBits::peek() const {
-  return pull_high ? state_ | 0xE0 : state_;
-}
+byte_t InterruptBits::peek() const { return pull_high ? state_ | 0xE0 : state_; }
 byte_t InterruptBits::read() { return peek(); }
 
 void InterruptBits::put_flag(InterruptFlagMask flag, const bool value) {
@@ -64,13 +61,9 @@ void InterruptMasterEnable::enable(bool delayed) {
  * instruction always occur immediately. */
 void InterruptMasterEnable::disable() { ime_state = IME_DISABLED; }
 
-bool InterruptMasterEnable::is_enabled() const {
-  return ime_state == IME_ENABLED;
-}
+bool InterruptMasterEnable::is_enabled() const { return ime_state == IME_ENABLED; }
 
-byte_t InterruptMasterEnable::raw_state() const {
-  return static_cast<byte_t>(ime_state);
-}
+byte_t InterruptMasterEnable::raw_state() const { return static_cast<byte_t>(ime_state); }
 
 void InterruptMasterEnable::load_raw_state(const byte_t state) {
   switch (state) {

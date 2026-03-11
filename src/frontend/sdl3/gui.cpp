@@ -11,18 +11,18 @@ struct InlineDialogSpec {
   bool UiState::*visible_flag;
 };
 
-constexpr std::array<InlineDialogSpec, 3> kInlineDialogs{{
-    {DialogId::Settings, &UiState::show_settings},
-    {DialogId::Cheats, &UiState::show_cheats},
-    {DialogId::Keybinds, &UiState::show_keybinds},
-}};
+constexpr std::array<InlineDialogSpec, 3> kInlineDialogs{
+    {
+     {DialogId::Settings, &UiState::show_settings},
+     {DialogId::Cheats, &UiState::show_cheats},
+     {DialogId::Keybinds, &UiState::show_keybinds},
+     }
+};
 
-bool should_render_attached_dialog(const GbcImGui &gui, const UiState &state,
-                                   const DialogId id,
+bool should_render_attached_dialog(const GbcImGui &gui, const UiState &state, const DialogId id,
                                    const bool UiState::*visible_flag) {
   return state.*visible_flag &&
-         (!GbcImGui::dialog_is_detached(id) ||
-          !gui.has_detached_dialog_context(id));
+         (!GbcImGui::dialog_is_detached(id) || !gui.has_detached_dialog_context(id));
 }
 } // namespace
 
@@ -34,8 +34,7 @@ void GbcImGui::init(const SDLHost &host) {
   use_main_context();
 
   rom_sel_conf.path = settings.rom_dir;
-  rom_sel_conf.flags =
-      ImGuiFileDialogFlags_Modal | ImGuiFileDialogFlags_ReadOnlyFileNameField;
+  rom_sel_conf.flags = ImGuiFileDialogFlags_Modal | ImGuiFileDialogFlags_ReadOnlyFileNameField;
   bios_sel_conf.path = settings.bios_dir;
   bios_sel_conf.flags = rom_sel_conf.flags;
 
@@ -85,8 +84,7 @@ void GbcImGui::render(UiState &state, SDLHost &host) {
   build_rom_source_window(state);
 
   for (const auto &spec : kInlineDialogs) {
-    if (should_render_attached_dialog(*this, state, spec.id,
-                                      spec.visible_flag)) {
+    if (should_render_attached_dialog(*this, state, spec.id, spec.visible_flag)) {
       render_dialog(spec.id, state, host);
     }
   }
@@ -133,8 +131,7 @@ bool GbcImGui::process_event(const SDL_Event &event, UiState &ui_state) {
 
   if (event.type == SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED) {
     ImGuiContextState *ctx = find_context_for_window(event.window.windowID);
-    SDL_Window *window = ctx ? SDL_GetWindowFromID(event.window.windowID)
-                             : nullptr;
+    SDL_Window *window = ctx ? SDL_GetWindowFromID(event.window.windowID) : nullptr;
     if (ctx && window) {
       activate_context(*ctx);
       if (const float new_scale = SDL_GetWindowDisplayScale(window);
@@ -207,10 +204,8 @@ bool GbcImGui::process_event(const SDL_Event &event, UiState &ui_state) {
   return false;
 }
 
-void GbcImGui::push_notification(UiState &state, const LogLevel level,
-                                 const std::string &type,
-                                 const std::string &summary,
-                                 const std::string &details,
+void GbcImGui::push_notification(UiState &state, const LogLevel level, const std::string &type,
+                                 const std::string &summary, const std::string &details,
                                  const time_t timestamp) {
   Notification notif;
   notif.id = state.next_notify_id++;
@@ -223,16 +218,12 @@ void GbcImGui::push_notification(UiState &state, const LogLevel level,
   state.notifications.push_back(notif);
 }
 
-void GbcImGui::push_transient_status(UiState &state, const LogLevel level,
-                                     const std::string &type,
-                                     const std::string &summary,
-                                     const std::string &details,
+void GbcImGui::push_transient_status(UiState &state, const LogLevel level, const std::string &type,
+                                     const std::string &summary, const std::string &details,
                                      const Uint64 duration_ms) {
   state.transient_status_level = level;
-  state.transient_status_text =
-      type.empty() ? summary : ("[" + type + "] " + summary);
-  state.transient_status_details =
-      details.empty() ? state.transient_status_text : details;
+  state.transient_status_text = type.empty() ? summary : ("[" + type + "] " + summary);
+  state.transient_status_details = details.empty() ? state.transient_status_text : details;
   state.transient_status_until_ticks = SDL_GetTicks() + duration_ms;
 }
 

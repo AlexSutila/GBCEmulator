@@ -32,8 +32,7 @@ enum SpecialMbc {
 
 struct rom_header {
   std::array<byte_t, 4> entry_point{}; // 0100-0103
-  std::array<byte_t, 16>
-      title_area{}; // 0134-0143 (optionally title / manufacturer / cgb_flag)
+  std::array<byte_t, 16> title_area{}; // 0134-0143 (optionally title / manufacturer / cgb_flag)
   std::array<byte_t, 2> new_licensee_code{}; // 0144-0145
   byte_t sgb_flag{};                         // 0146
   byte_t cartridge_type{};                   // 0147
@@ -45,9 +44,7 @@ struct rom_header {
   byte_t header_checksum{};                  // 014D
   std::uint16_t global_checksum{};           // 014E-014F (big-endian)
 
-  [[nodiscard]] byte_t cgb_flag() const noexcept {
-    return title_area[15];
-  } // 0x0143
+  [[nodiscard]] byte_t cgb_flag() const noexcept { return title_area[15]; } // 0x0143
   // Best-effort: extract a title string
   [[nodiscard]] std::string title() const;
   // Best-effort: manufacturer code if it looks like 4 ASCII chars in 013F-0142
@@ -69,33 +66,24 @@ struct cart {
   std::uint16_t computed_global_checksum{};
   SpecialMbc special_mbc{};
 
-  [[nodiscard]] std::span<const byte_t> rom_span() const noexcept {
-    return rom;
-  }
+  [[nodiscard]] std::span<const byte_t> rom_span() const noexcept { return rom; }
   [[nodiscard]] const byte_t *rom_data() const noexcept { return rom.data(); }
   [[nodiscard]] std::size_t rom_size() const noexcept { return rom.size(); }
 };
 
 class Cartridge {
 public:
-  explicit Cartridge(cart image)
-      : image_(std::move(image)), mbc_(make_mbc(image_)) {}
+  explicit Cartridge(cart image) : image_(std::move(image)), mbc_(make_mbc(image_)) {}
   explicit Cartridge() : image_({}), mbc_(make_test_mbc()) {}
   template <typename T> void parse_savestate(T &t);
 
-  [[nodiscard]] byte_t read_byte(const addr_t addr) const {
-    return mbc_->read(addr);
-  }
+  [[nodiscard]] byte_t read_byte(const addr_t addr) const { return mbc_->read(addr); }
   void write(addr_t addr, byte_t v);
 
   [[nodiscard]] const cart &image() const noexcept { return image_; }
 
-  [[nodiscard]] bool has_battery() const noexcept {
-    return mbc_->has_battery();
-  }
-  [[nodiscard]] std::span<const byte_t> ram() const noexcept {
-    return mbc_->ram();
-  }
+  [[nodiscard]] bool has_battery() const noexcept { return mbc_->has_battery(); }
+  [[nodiscard]] std::span<const byte_t> ram() const noexcept { return mbc_->ram(); }
   [[nodiscard]] std::span<byte_t> ram() noexcept { return mbc_->ram(); }
   bool load_save_file(const fs::path &save_path);
   bool write_save_file(const fs::path &save_path) const;

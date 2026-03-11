@@ -49,18 +49,10 @@ public:
     t.eof();
   }
 
-  void parse_savestate(Savestate::Writer &t) override {
-    parse_savestate_impl(t);
-  }
-  void parse_savestate(Savestate::Reader &t) override {
-    parse_savestate_impl(t);
-  }
-  void parse_savestate(Savestate::Sizer &t) override {
-    parse_savestate_impl(t);
-  }
-  void parse_savestate(Savestate::Checker &t) override {
-    parse_savestate_impl(t);
-  }
+  void parse_savestate(Savestate::Writer &t) override { parse_savestate_impl(t); }
+  void parse_savestate(Savestate::Reader &t) override { parse_savestate_impl(t); }
+  void parse_savestate(Savestate::Sizer &t) override { parse_savestate_impl(t); }
+  void parse_savestate(Savestate::Checker &t) override { parse_savestate_impl(t); }
 
 private:
   enum : std::uint16_t { F_BANK = 1, F_LATCHED };
@@ -81,6 +73,4 @@ private:
   }
 };
 
-std::unique_ptr<Mbc> make_m161(const cart &c) {
-  return std::make_unique<M161>(c.rom_span());
-}
+std::unique_ptr<Mbc> make_m161(const cart &c) { return std::make_unique<M161>(c.rom_span()); }

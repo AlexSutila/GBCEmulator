@@ -24,11 +24,9 @@ void sync_text_input_cache(TextInputCache &cache, const std::string &value) {
   cache.synced_value = value;
 }
 
-void build_resettable_path_input(const float dpi_scale, const char *label,
-                                 const char *reset_label,
-                                 const char *helper_text,
-                                 const char *default_value, std::string &value,
-                                 TextInputCache &cache) {
+void build_resettable_path_input(const float dpi_scale, const char *label, const char *reset_label,
+                                 const char *helper_text, const char *default_value,
+                                 std::string &value, TextInputCache &cache) {
   sync_text_input_cache(cache, value);
 
   ImGui::SetNextItemWidth(320.0f * dpi_scale);
@@ -69,9 +67,8 @@ void GbcImGui::build_main_menu_bar(UiState &state) const {
 
   if (ImGui::BeginMenu("File")) {
     if (ImGui::MenuItem("Load ROM...")) {
-      ImGuiFileDialog::Instance()->OpenDialog(
-          "RomFileDialog", "Choose a ROM file", rom_filters.data(),
-          rom_sel_conf);
+      ImGuiFileDialog::Instance()->OpenDialog("RomFileDialog", "Choose a ROM file",
+                                              rom_filters.data(), rom_sel_conf);
     }
     if (ImGui::MenuItem("Load from URL...")) {
       state.show_load_url_popup = true;
@@ -100,8 +97,7 @@ void GbcImGui::build_main_menu_bar(UiState &state) const {
 
     const bool bios_loaded = !settings.prev_bios_path.empty();
     const std::string bios_name =
-        bios_loaded ? fs::path(settings.prev_bios_path).filename().string()
-                    : "None";
+        bios_loaded ? fs::path(settings.prev_bios_path).filename().string() : "None";
     if (ImGui::BeginMenu("BIOS")) {
       ImGui::TextDisabled("Current: %s", bios_name.c_str());
       if (bios_loaded && ImGui::IsItemHovered()) {
@@ -109,9 +105,8 @@ void GbcImGui::build_main_menu_bar(UiState &state) const {
       }
       ImGui::Separator();
       if (ImGui::MenuItem("Select BIOS...")) {
-        ImGuiFileDialog::Instance()->OpenDialog(
-            "BiosFileDialog", "Choose a BIN file", bios_filters.data(),
-            bios_sel_conf);
+        ImGuiFileDialog::Instance()->OpenDialog("BiosFileDialog", "Choose a BIN file",
+                                                bios_filters.data(), bios_sel_conf);
       }
       if (!bios_loaded) {
         ImGui::BeginDisabled();
@@ -182,38 +177,33 @@ void GbcImGui::build_status_bar(UiState &state) const {
 
   const ImGuiViewport *viewport = ImGui::GetMainViewport();
   const Uint64 now_ticks = SDL_GetTicks();
-  if (!state.transient_status_text.empty() &&
-      now_ticks >= state.transient_status_until_ticks) {
+  if (!state.transient_status_text.empty() && now_ticks >= state.transient_status_until_ticks) {
     state.transient_status_text.clear();
     state.transient_status_details.clear();
   }
 
-  ImGui::SetNextWindowPos(
-      ImVec2(viewport->Pos.x, viewport->Pos.y + viewport->Size.y - height));
+  ImGui::SetNextWindowPos(ImVec2(viewport->Pos.x, viewport->Pos.y + viewport->Size.y - height));
   ImGui::SetNextWindowSize(ImVec2(viewport->Size.x, height));
 
   ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
   ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-  ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,
-                      ImVec2(10.0f * dpi_scale, 2.0f * dpi_scale));
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(10.0f * dpi_scale, 2.0f * dpi_scale));
 
-  constexpr ImGuiWindowFlags flags =
-      ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
-      ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
-      ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNav;
+  constexpr ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
+                                     ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
+                                     ImGuiWindowFlags_NoBringToFrontOnFocus |
+                                     ImGuiWindowFlags_NoNav;
 
   if (ImGui::Begin("StatusBar", nullptr, flags)) {
     state.status_bar_height = ImGui::GetWindowHeight();
     if (state.io_busy) {
       if (state.io_progress >= 0.0f) {
-        ImGui::Text("%s (%.0f%%)", state.io_status.c_str(),
-                    state.io_progress * 100.0f);
+        ImGui::Text("%s (%.0f%%)", state.io_status.c_str(), state.io_progress * 100.0f);
       } else {
         ImGui::Text("%s", state.io_status.c_str());
       }
     } else if (!state.transient_status_text.empty()) {
-      ImGui::PushStyleColor(ImGuiCol_Text,
-                            get_level_color(state.transient_status_level));
+      ImGui::PushStyleColor(ImGuiCol_Text, get_level_color(state.transient_status_level));
       ImGui::Text("%s", state.transient_status_text.c_str());
       ImGui::PopStyleColor();
       if (ImGui::IsItemHovered() && !state.transient_status_details.empty() &&
@@ -231,8 +221,7 @@ void GbcImGui::build_status_bar(UiState &state) const {
 
     const bool bios_loaded = !settings.prev_bios_path.empty();
     const std::string bios_name =
-        bios_loaded ? fs::path(settings.prev_bios_path).filename().string()
-                    : "None";
+        bios_loaded ? fs::path(settings.prev_bios_path).filename().string() : "None";
     ImGui::SameLine();
     ImGui::TextDisabled("| BIOS: %s", bios_name.c_str());
     if (bios_loaded && ImGui::IsItemHovered()) {
@@ -249,20 +238,17 @@ void GbcImGui::build_status_bar(UiState &state) const {
       if (highest_level == LogLevel::Error) {
         const auto color = get_level_color(LogLevel::Error);
         ImGui::PushStyleColor(ImGuiCol_Button, color);
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                              get_darkened_color(color, 0.8f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, get_darkened_color(color, 0.8f));
         color_count = 2;
       } else if (highest_level == LogLevel::Warning) {
         const auto color = get_level_color(LogLevel::Warning);
         ImGui::PushStyleColor(ImGuiCol_Button, color);
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
-                              get_darkened_color(color, 0.8f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, get_darkened_color(color, 0.8f));
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 0.0f, 0.0f, 1.0f));
         color_count = 3;
       }
 
-      const std::string label =
-          "Notif (" + std::to_string(state.notifications.size()) + ")";
+      const std::string label = "Notif (" + std::to_string(state.notifications.size()) + ")";
       if (ImGui::SmallButton(label.c_str())) {
         state.show_notifications = !state.show_notifications;
       }
@@ -290,9 +276,8 @@ void GbcImGui::build_status_bar(UiState &state) const {
 void GbcImGui::build_file_dialogs(UiState &state) const {
   auto [max_size, min_size] = get_min_dialog_size();
   const auto display_dialog = [&](const char *dialog_id, auto &&on_accept) {
-    if (ImGuiFileDialog::Instance()->Display(dialog_id,
-                                             ImGuiWindowFlags_NoCollapse,
-                                             min_size, max_size)) {
+    if (ImGuiFileDialog::Instance()->Display(dialog_id, ImGuiWindowFlags_NoCollapse, min_size,
+                                             max_size)) {
       if (ImGuiFileDialog::Instance()->IsOk()) {
         on_accept();
       }
@@ -325,15 +310,12 @@ void GbcImGui::build_rom_source_window(UiState &state) const {
     state.show_load_url_popup = false;
   }
 
-  if (ImGui::BeginPopupModal("Load ROM/ZIP from URL", nullptr,
-                             ImGuiWindowFlags_AlwaysAutoResize)) {
-    ImGui::TextUnformatted(
-        "Enter a link to a .gb/.gbc ROM or a .zip archive");
+  if (ImGui::BeginPopupModal("Load ROM/ZIP from URL", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    ImGui::TextUnformatted("Enter a link to a .gb/.gbc ROM or a .zip archive");
     ImGui::Spacing();
 
     ImGui::SetNextItemWidth(520.0f * dpi_scale);
-    ImGui::InputTextWithHint("##rom_url", "https://example.com/game.zip",
-                             state.load_url_input,
+    ImGui::InputTextWithHint("##rom_url", "https://example.com/game.zip", state.load_url_input,
                              IM_ARRAYSIZE(state.load_url_input));
 
     const bool can_load = state.load_url_input[0] != '\0';
@@ -361,8 +343,7 @@ void GbcImGui::build_rom_source_window(UiState &state) const {
     ImGui::OpenPopup("Choose ROM from ZIP");
   }
 
-  if (ImGui::BeginPopupModal("Choose ROM from ZIP", nullptr,
-                             ImGuiWindowFlags_AlwaysAutoResize)) {
+  if (ImGui::BeginPopupModal("Choose ROM from ZIP", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
     if (!state.zip_picker_title.empty()) {
       ImGui::TextUnformatted(state.zip_picker_title.c_str());
     } else {
@@ -372,8 +353,7 @@ void GbcImGui::build_rom_source_window(UiState &state) const {
 
     const float list_box_width = 520.0f * dpi_scale;
     const float list_box_height = 220.0f * dpi_scale;
-    if (ImGui::BeginListBox("##zip_rom_list",
-                            ImVec2(list_box_width, list_box_height))) {
+    if (ImGui::BeginListBox("##zip_rom_list", ImVec2(list_box_width, list_box_height))) {
       for (int i = 0; i < static_cast<int>(state.zip_rom_entries.size()); ++i) {
         const bool selected = (i == state.zip_rom_selected_idx);
         if (ImGui::Selectable(state.zip_rom_entries[i].c_str(), selected)) {
@@ -429,19 +409,17 @@ void GbcImGui::build_settings_window(UiState &state, SDLHost &host) {
   static TextInputCache savestate_root_cache;
   static TextInputCache cheat_root_cache;
   build_resettable_path_input(dpi_scale, "Save dir", "Reset##save_root",
-                              "Saves: game-name - checksum.sav", "./saves",
-                              settings.save_root_dir, save_root_cache);
-  build_resettable_path_input(
-      dpi_scale, "Savestate dir", "Reset##savestate_root",
-      "Savestate folders: game-name - checksum", "./savestates",
-      settings.savestate_root_dir, savestate_root_cache);
+                              "Saves: game-name - checksum.sav", "./saves", settings.save_root_dir,
+                              save_root_cache);
+  build_resettable_path_input(dpi_scale, "Savestate dir", "Reset##savestate_root",
+                              "Savestate folders: game-name - checksum", "./savestates",
+                              settings.savestate_root_dir, savestate_root_cache);
   build_resettable_path_input(dpi_scale, "Cheat dir", "Reset##cheat_root",
                               "Cheats: game-name - checksum.cht", "./cheats",
                               settings.cheat_root_dir, cheat_root_cache);
 
   ImGui::SetNextItemWidth(120.0f * dpi_scale);
-  if (ImGui::InputInt("Max quicksaves", &settings.max_quicksaves) &&
-      settings.max_quicksaves < 0) {
+  if (ImGui::InputInt("Max quicksaves", &settings.max_quicksaves) && settings.max_quicksaves < 0) {
     settings.max_quicksaves = 0;
   }
   ImGui::SameLine();
@@ -457,8 +435,7 @@ void GbcImGui::build_settings_window(UiState &state, SDLHost &host) {
   }
 
   if (state.audio_device_names.empty()) {
-    SDLHost::refresh_audio_devices(state.audio_device_names,
-                                   state.audio_device_ids);
+    SDLHost::refresh_audio_devices(state.audio_device_names, state.audio_device_ids);
     state.current_audio_dev_idx = 0;
   }
 
@@ -472,21 +449,18 @@ void GbcImGui::build_settings_window(UiState &state, SDLHost &host) {
   const int old_audio_idx = state.current_audio_dev_idx;
   if (ImGui::Combo("Output device", &state.current_audio_dev_idx, items.data(),
                    static_cast<int>(items.size()))) {
-    if (!host.set_audio_device(state.current_audio_dev_idx,
-                               state.audio_device_ids, settings.volume)) {
+    if (!host.set_audio_device(state.current_audio_dev_idx, state.audio_device_ids,
+                               settings.volume)) {
       state.current_audio_dev_idx = old_audio_idx;
-      host.set_audio_device(old_audio_idx, state.audio_device_ids,
-                            settings.volume);
+      host.set_audio_device(old_audio_idx, state.audio_device_ids, settings.volume);
     }
   }
 
   ImGui::SameLine();
   if (ImGui::Button("Refresh")) {
-    SDLHost::refresh_audio_devices(state.audio_device_names,
-                                   state.audio_device_ids);
-    state.current_audio_dev_idx =
-        std::min(state.current_audio_dev_idx,
-                 static_cast<int>(state.audio_device_names.size()) - 1);
+    SDLHost::refresh_audio_devices(state.audio_device_names, state.audio_device_ids);
+    state.current_audio_dev_idx = std::min(state.current_audio_dev_idx,
+                                           static_cast<int>(state.audio_device_names.size()) - 1);
   }
 
   ImGui::End();

@@ -92,18 +92,16 @@ template <typename T> void PixelProcessingUnit::parse_savestate(T &t) {
   t.field_complex(F_OBJ_CRAM, [&](T &t) { obj_cram->parse_savestate(t); });
   t.field_complex(F_BG_CRAM, [&](T &t) { bg_cram->parse_savestate(t); });
   t.field_complex(F_STAT_DELAY, [&](T &t) {
-    stat_delay.parse_savestate(t, [](auto &t, PPU::StatModes &s) {
-      t.field_enum(F_STAT_DELAY_STATE, s);
-    });
+    stat_delay.parse_savestate(
+        t, [](auto &t, PPU::StatModes &s) { t.field_enum(F_STAT_DELAY_STATE, s); });
   });
-  t.field_vector(F_OAM_DATA, oam_data, max_oam_sprite_count,
-                 [&](T &t, auto &s) {
-                   t.field_generic(F_SPRITE_Y, s.y_pos);
-                   t.field_generic(F_SPRITE_X, s.x_pos);
-                   t.field_generic(F_SPRITE_TILE_IDX, s.tile_idx);
-                   t.field_generic(F_SPRITE_TILE_ATTR, s.tile_attr);
-                   t.field_generic(F_SPRITE_OBJ_NO, s.obj_no);
-                 });
+  t.field_vector(F_OAM_DATA, oam_data, max_oam_sprite_count, [&](T &t, auto &s) {
+    t.field_generic(F_SPRITE_Y, s.y_pos);
+    t.field_generic(F_SPRITE_X, s.x_pos);
+    t.field_generic(F_SPRITE_TILE_IDX, s.tile_idx);
+    t.field_generic(F_SPRITE_TILE_ATTR, s.tile_attr);
+    t.field_generic(F_SPRITE_OBJ_NO, s.obj_no);
+  });
 
   // Memory mapped IO registers
   t.field_complex(F_LCDC, [&](T &t) { lcdc_.parse_savestate(t); });
@@ -121,32 +119,27 @@ template <typename T> void PixelProcessingUnit::parse_savestate(T &t) {
   t.eof();
 }
 
-template void
-PixelProcessingUnit::parse_savestate<Savestate::Writer>(Savestate::Writer &);
-template void
-PixelProcessingUnit::parse_savestate<Savestate::Reader>(Savestate::Reader &);
-template void
-PixelProcessingUnit::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
-template void
-PixelProcessingUnit::parse_savestate<Savestate::Checker>(Savestate::Checker &);
+template void PixelProcessingUnit::parse_savestate<Savestate::Writer>(Savestate::Writer &);
+template void PixelProcessingUnit::parse_savestate<Savestate::Reader>(Savestate::Reader &);
+template void PixelProcessingUnit::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
+template void PixelProcessingUnit::parse_savestate<Savestate::Checker>(Savestate::Checker &);
 
-template <typename T>
-T *init_mmio(AddressBus *bus, const IORegisterMapping reg_id) {
+template <typename T> T *init_mmio(AddressBus *bus, const IORegisterMapping reg_id) {
   auto *reg = bus->get_mmio(reg_id);
   if (auto *casted = dynamic_cast<T *>(reg))
     return casted;
   throw std::logic_error(std::string("Failed to configure MMIO (PPU)"));
 }
 
-PixelProcessingUnit::PixelProcessingUnit(
-    AddressBus *bus, Frontend &fe, std::optional<Debug::Debugger> &debugger,
-    runtime_sys_info &sys)
-    : Debuggable(debugger),   // Scanline/frame breakpoints
-      sys_(sys),              // General operating mode info
-      fe_(fe),                // To access frame buffer(s)
-      vram(bus->get_vram()),  // Tile data/map/attribute content
-      oam(bus->get_oam()),    // Object (sprite) attribute memory
-      vdma_(bus->get_vdma()), // Performs GDMA and HDMA in CGB mode
+PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus, Frontend &fe,
+                                         std::optional<Debug::Debugger> &debugger,
+                                         runtime_sys_info &sys)
+    : Debuggable(debugger),                   // Scanline/frame breakpoints
+      sys_(sys),                              // General operating mode info
+      fe_(fe),                                // To access frame buffer(s)
+      vram(bus->get_vram()),                  // Tile data/map/attribute content
+      oam(bus->get_oam()),                    // Object (sprite) attribute memory
+      vdma_(bus->get_vdma()),                 // Performs GDMA and HDMA in CGB mode
       obj_cram(std::make_unique<ColorRam>()), // CGB sprite color RAM
       bg_cram(std::make_unique<ColorRam>())   // CGB background color RAM
 {
@@ -179,19 +172,19 @@ PixelProcessingUnit::PixelProcessingUnit(
   if_reg = init_mmio<InterruptBits>(bus, mmio::MMIO_INT_FLAGS);
 
   /* Initialize the background and object pixel FIFO fetching pipeline */
-  fetcher = std::make_unique<Fetcher>(
-      bus->get_vram(), // VRAM reference for fetching tile data
-      lcdc_,           // Needs to know if certain control bits are set
-      scy_,            // Needed to fetch correct background tile
-      scx_,            // Needed to fetch correct background tile
-      wy_,             // Needed to fetch correct window tile
-      wx_,             // Needed to fetch correct window tile
-      opri_,           // Pixel overwrite in OBJ FIFO is determined by priority
-      ly_,             // Needed to fetch correct background tile
-      obj_fifo,        // Fetcher stalls BG fetch to populate this when needed
-      bg_fifo,         // Fetcher must push rows of pixels into this FIFO
-      sys_             // Fetcher behavior varies between DMG vs CGB mode
-  );
+  fetcher =
+      std::make_unique<Fetcher>(bus->get_vram(), // VRAM reference for fetching tile data
+                                lcdc_,           // Needs to know if certain control bits are set
+                                scy_,            // Needed to fetch correct background tile
+                                scx_,            // Needed to fetch correct background tile
+                                wy_,             // Needed to fetch correct window tile
+                                wx_,             // Needed to fetch correct window tile
+                                opri_,    // Pixel overwrite in OBJ FIFO is determined by priority
+                                ly_,      // Needed to fetch correct background tile
+                                obj_fifo, // Fetcher stalls BG fetch to populate this when needed
+                                bg_fifo,  // Fetcher must push rows of pixels into this FIFO
+                                sys_      // Fetcher behavior varies between DMG vs CGB mode
+      );
 
   /* Initialize OAM search metadata */
   oam_data.reserve(max_oam_sprite_count);
@@ -271,11 +264,9 @@ std::uint32_t PixelProcessingUnit::get_obj_rgb(const pixel &px) const {
     /* If we are running in backwards compatability mode, we have to consult one
      * of the OBP0/OBP1 registers to translate the monochrome color index. */
     const byte_t palette_idx = px.palette_idx & 0x1;
-    const byte_t true_color_idx = (palette_idx == 0)
-                                      ? obp0_.get_color_idx(px.color_idx)
-                                      : obp1_.get_color_idx(px.color_idx);
-    const std::uint32_t rgb =
-        obj_cram->get_cgb_color(true_color_idx, palette_idx);
+    const byte_t true_color_idx =
+        (palette_idx == 0) ? obp0_.get_color_idx(px.color_idx) : obp1_.get_color_idx(px.color_idx);
+    const std::uint32_t rgb = obj_cram->get_cgb_color(true_color_idx, palette_idx);
     return DMG_COLOR_PRESERVE_HACK(rgb, true_color_idx);
   }
   // CGB palette is denoted directly by the attributes themselves
@@ -296,8 +287,7 @@ bool PixelProcessingUnit::next_sprite_visible(std::size_t px_idx) const {
 
 /* Performs the fetcher stepping, FIFO popping, and all the logic behind what
  * happens when regarding the pixel FIFO madness that confuses everyone. */
-std::optional<std::uint32_t>
-PixelProcessingUnit::get_next_pixel(const std::size_t px_idx) {
+std::optional<std::uint32_t> PixelProcessingUnit::get_next_pixel(const std::size_t px_idx) {
 
   // If the window becomes visible, we have to reset the fetcher so it starts
   // fetching window data instead of BG data.
@@ -329,9 +319,8 @@ PixelProcessingUnit::get_next_pixel(const std::size_t px_idx) {
   return std::nullopt;
 }
 
-std::uint32_t
-PixelProcessingUnit::resolve_px_priority(const pixel &bg_px,
-                                         const pixel &obj_px) const {
+std::uint32_t PixelProcessingUnit::resolve_px_priority(const pixel &bg_px,
+                                                       const pixel &obj_px) const {
   const bool lcdc = lcdc_.bg_win_en_priority();
   const bool oam_ = obj_px.take_priority;
   const bool bg = bg_px.take_priority;
@@ -412,9 +401,9 @@ void PixelProcessingUnit::do_oam_scan() {
 
     /* State entry always indicates the start of a new scanline, but if the LY
      * register currently reads zero, we have also begun a new frame too. */
-    const Debug::BreakReason reason =
-        (ly_.peek() == 0) ? Debug::BRK_STEP_SCANLINE | Debug::BRK_STEP_FRAME
-                          : Debug::BRK_STEP_SCANLINE;
+    const Debug::BreakReason reason = (ly_.peek() == 0)
+                                          ? Debug::BRK_STEP_SCANLINE | Debug::BRK_STEP_FRAME
+                                          : Debug::BRK_STEP_SCANLINE;
     try_brk(reason);
 
     /* Keeps track of which sprite we are on being on. If the sprite is visible
@@ -468,9 +457,8 @@ void PixelProcessingUnit::do_oam_scan() {
    * sprites are also rendered in that order during the drawing state as pixels
    * are pushed onto the LCD. Hence, sort by `x_pos`. */
   auto selection_priority = [](const Sprite &a, const Sprite &b) {
-    return (a.x_pos == b.x_pos)
-               ? a.obj_no < b.obj_no // OAM index is used to break any ties
-               : a.x_pos < b.x_pos;  // Otherwise sort based on X-position
+    return (a.x_pos == b.x_pos) ? a.obj_no < b.obj_no // OAM index is used to break any ties
+                                : a.x_pos < b.x_pos;  // Otherwise sort based on X-position
   };
   std::ranges::sort(oam_data, selection_priority);
 
@@ -519,8 +507,7 @@ void PixelProcessingUnit::do_draw() {
   }
 
   // Rendering incomplete
-  if (constexpr std::size_t pixels_per_row = 160;
-      row_pixels_rendered < pixels_per_row)
+  if (constexpr std::size_t pixels_per_row = 160; row_pixels_rendered < pixels_per_row)
     return;
 
   // The window uses an internal scanline counter to track it's vertical
@@ -601,23 +588,21 @@ void PixelProcessingUnit::update_stat(const PPU::StatModes new_mode) {
 
   /* Handle STAT mode bits reading wrong value for first scanline upon the PPU
    * being enabled after not being enabled. */
-  if (ppu_enable_oam_bug && new_mode == PPU::StatModes::MODE_OAM_SCAN)
-      [[unlikely]]
+  if (ppu_enable_oam_bug && new_mode == PPU::StatModes::MODE_OAM_SCAN) [[unlikely]]
     stat_.set_mode(PPU::StatModes::MODE_HBLANK); // Hardware bug
   else [[likely]]
     stat_.set_mode(new_mode);
 
   /* Condition 1: The LY register is equal to the LYC register */
-  const bool cond_a = ly_.peek() == lyc_.peek() &&
-                      stat_.int_enabled(PPU::StatIntFlags::LYC_SEL);
+  const bool cond_a = ly_.peek() == lyc_.peek() && stat_.int_enabled(PPU::StatIntFlags::LYC_SEL);
 
   /* Condition 2: We are in HBLANK and the STAT source bit is set */
-  const bool cond_b = cur_mode == PPU::StatModes::MODE_HBLANK &&
-                      stat_.int_enabled(PPU::StatIntFlags::MODE_0_SEL);
+  const bool cond_b =
+      cur_mode == PPU::StatModes::MODE_HBLANK && stat_.int_enabled(PPU::StatIntFlags::MODE_0_SEL);
 
   /* Condition 3: We are in OAM and the STAT source bit is set */
-  const bool cond_c = cur_mode == PPU::StatModes::MODE_OAM_SCAN &&
-                      stat_.int_enabled(PPU::StatIntFlags::MODE_2_SEL);
+  const bool cond_c =
+      cur_mode == PPU::StatModes::MODE_OAM_SCAN && stat_.int_enabled(PPU::StatIntFlags::MODE_2_SEL);
 
   /* Condition 4: We are in VBLANK and the STAT source bit is set. For some
    * reason, this condition is also met in OAM scan as per TCAGBD. */

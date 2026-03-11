@@ -21,11 +21,8 @@ struct runtime_sys_info;
  */
 class LR35902 final : Debug::Debuggable {
 public:
-  LR35902(AddressBus *bus_ptr, std::optional<Debug::Debugger> &debugger,
-          runtime_sys_info &sys);
-  [[nodiscard]] byte_t cur_opcode() const {
-    return bus->read_byte(ins_base_addr, false);
-  }
+  LR35902(AddressBus *bus_ptr, std::optional<Debug::Debugger> &debugger, runtime_sys_info &sys);
+  [[nodiscard]] byte_t cur_opcode() const { return bus->read_byte(ins_base_addr, false); }
   [[nodiscard]] std::string disasm() const {
     if (ins_)
       return ins_->describe();

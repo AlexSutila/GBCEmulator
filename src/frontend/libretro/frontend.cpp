@@ -49,8 +49,7 @@ void LibretroFrontend::clear(std::uint32_t c) {
   frame_ready = false;
 }
 
-void LibretroFrontend::queue_audio_samples(const float *samples,
-                                           std::size_t sample_count) {
+void LibretroFrontend::queue_audio_samples(const float *samples, std::size_t sample_count) {
   if (!samples || sample_count == 0 || sample_count % 2 != 0)
     return;
   const std::size_t frames = sample_count / 2;
@@ -74,8 +73,7 @@ void LibretroFrontend::restore_snapshot(std::span<const byte_t> snapshot) {
   gbc->savestate_deserialize(snapshot);
 }
 
-void LibretroFrontend::cheat_set(std::size_t index, bool enabled,
-                                 std::string &code) {
+void LibretroFrontend::cheat_set(std::size_t index, bool enabled, std::string &code) {
   if (index >= cheat_codes.size())
     cheat_codes.resize(index + 1);
 
@@ -106,8 +104,7 @@ void LibretroFrontend::try_show_frame() {
   /* Note: Do not use `get_frame()`, we need to point to the framebuffer itself
    * and NOT a copy otherwise we risk displaying use after free heap memory. */
   const auto &frame = frame_buf.at(display_idx);
-  cb.video_cb(frame.data(), fb_width, fb_height,
-              fb_width * sizeof(std::uint32_t));
+  cb.video_cb(frame.data(), fb_width, fb_height, fb_width * sizeof(std::uint32_t));
 }
 
 void LibretroFrontend::try_poll_input() {
@@ -117,9 +114,9 @@ void LibretroFrontend::try_poll_input() {
 
   if (joyp && meta.controller_device == RETRO_DEVICE_JOYPAD) [[likely]] {
     for (const auto &btn : btn_mapping)
-      input_state |= static_cast<std::uint8_t>(
-                         -static_cast<std::uint8_t>(test_input(btn.retro_id))) &
-                     btn.joypad_mask;
+      input_state |=
+          static_cast<std::uint8_t>(-static_cast<std::uint8_t>(test_input(btn.retro_id))) &
+          btn.joypad_mask;
     joyp->set_state(input_state);
   }
 }

@@ -25,8 +25,7 @@
 
 class HuC1 final : public Mbc {
 public:
-  HuC1(std::span<const byte_t> const rom, std::size_t const ram_bytes,
-       bool const battery)
+  HuC1(std::span<const byte_t> const rom, std::size_t const ram_bytes, bool const battery)
       : rom_(rom), ram_(ram_bytes), battery_(battery) {}
 
   byte_t read(addr_t const addr) override {
@@ -81,9 +80,7 @@ public:
   }
 
   [[nodiscard]] bool has_battery() const noexcept override { return battery_; }
-  [[nodiscard]] std::span<const byte_t> ram() const noexcept override {
-    return ram_;
-  }
+  [[nodiscard]] std::span<const byte_t> ram() const noexcept override { return ram_; }
   std::span<byte_t> ram() noexcept override { return ram_; }
 
   template <typename T> void parse_savestate_impl(T &t) {
@@ -97,18 +94,10 @@ public:
     t.eof();
   }
 
-  void parse_savestate(Savestate::Writer &t) override {
-    parse_savestate_impl(t);
-  }
-  void parse_savestate(Savestate::Reader &t) override {
-    parse_savestate_impl(t);
-  }
-  void parse_savestate(Savestate::Sizer &t) override {
-    parse_savestate_impl(t);
-  }
-  void parse_savestate(Savestate::Checker &t) override {
-    parse_savestate_impl(t);
-  }
+  void parse_savestate(Savestate::Writer &t) override { parse_savestate_impl(t); }
+  void parse_savestate(Savestate::Reader &t) override { parse_savestate_impl(t); }
+  void parse_savestate(Savestate::Sizer &t) override { parse_savestate_impl(t); }
+  void parse_savestate(Savestate::Checker &t) override { parse_savestate_impl(t); }
 
 private:
   std::span<const byte_t> rom_;
@@ -122,31 +111,21 @@ private:
   bool ir_tx_on_{false};
   bool ir_light_{false}; // TODO: hook to a simulated IR environment?
 
-  enum : std::uint16_t {
-    F_ROM_BANK = 1,
-    F_RAM_BANK,
-    F_IR_MODE,
-    F_IR_TX_ON,
-    F_IR_LIGHT
-  };
+  enum : std::uint16_t { F_ROM_BANK = 1, F_RAM_BANK, F_IR_MODE, F_IR_TX_ON, F_IR_LIGHT };
 
-  [[nodiscard]] byte_t ram_at(std::size_t const bank,
-                              std::size_t const off) const {
+  [[nodiscard]] byte_t ram_at(std::size_t const bank, std::size_t const off) const {
     if (ram_.empty())
       return open_bus();
-    const std::size_t banks =
-        std::max<std::size_t>(1, ram_.size() / kRamBankSize);
+    const std::size_t banks = std::max<std::size_t>(1, ram_.size() / kRamBankSize);
     const std::size_t b = clamp_bank(bank, banks);
     const std::size_t idx = (b * kRamBankSize + off) % ram_.size();
     return ram_[idx];
   }
 
-  void ram_write(std::size_t const bank, std::size_t const off,
-                 byte_t const v) {
+  void ram_write(std::size_t const bank, std::size_t const off, byte_t const v) {
     if (ram_.empty())
       return;
-    const std::size_t banks =
-        std::max<std::size_t>(1, ram_.size() / kRamBankSize);
+    const std::size_t banks = std::max<std::size_t>(1, ram_.size() / kRamBankSize);
     const std::size_t b = clamp_bank(bank, banks);
     const std::size_t idx = (b * kRamBankSize + off) % ram_.size();
     ram_[idx] = v;

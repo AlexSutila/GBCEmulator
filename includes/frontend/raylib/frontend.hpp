@@ -33,8 +33,7 @@ public:
 
   // samples: interleaved float PCM in [-1, 1]
   // sample_count: number of floats (NOT frames)
-  void queue_audio_samples(const float *samples,
-                           std::size_t sample_count) override;
+  void queue_audio_samples(const float *samples, std::size_t sample_count) override;
 
 private:
   static constexpr auto fb_height = 144;
@@ -49,8 +48,7 @@ private:
   void process_quicksave_request();
   void process_quickload_request();
   [[nodiscard]] std::vector<std::uint8_t> capture_savestate_thumbnail_rgba() const;
-  [[nodiscard]] static std::filesystem::path
-  build_desktop_savestate_path(const cart &c);
+  [[nodiscard]] static std::filesystem::path build_desktop_savestate_path(const cart &c);
 
   static constexpr int savestate_thumb_w = 80;
   static constexpr int savestate_thumb_h = 72;
@@ -66,15 +64,12 @@ private:
   Texture2D texture{};
 
   // ---- Audio ----
-  static constexpr unsigned audio_sample_rate =
-      48000;                                    // sync with APU output rate
-  static constexpr unsigned audio_channels = 2; // assume interleaved stereo
+  static constexpr unsigned audio_sample_rate = 48000; // sync with APU output rate
+  static constexpr unsigned audio_channels = 2;        // assume interleaved stereo
 #ifdef __EMSCRIPTEN__
-  static constexpr unsigned audio_chunk_frames =
-      2048; // frames per UpdateAudioStream() / 21ms
+  static constexpr unsigned audio_chunk_frames = 2048; // frames per UpdateAudioStream() / 21ms
 #else
-  static constexpr unsigned audio_chunk_frames =
-      512; // frames per UpdateAudioStream()
+  static constexpr unsigned audio_chunk_frames = 512; // frames per UpdateAudioStream()
 #endif
 
   AudioStream audio_stream{};
@@ -84,14 +79,11 @@ private:
 // Soft cap queued audio to avoid accumulating large latency
 // (rb_size counts floats, not frames)
 #ifdef __EMSCRIPTEN__
-  static constexpr std::size_t rb_soft_cap_frames =
-      (audio_sample_rate * 120) / 1000; // ~120ms
+  static constexpr std::size_t rb_soft_cap_frames = (audio_sample_rate * 120) / 1000; // ~120ms
 #else
-  static constexpr std::size_t rb_soft_cap_frames =
-      (audio_sample_rate * 60) / 1000; // ~60ms
+  static constexpr std::size_t rb_soft_cap_frames = (audio_sample_rate * 60) / 1000; // ~60ms
 #endif
-  static constexpr std::size_t rb_soft_cap_samples =
-      rb_soft_cap_frames * audio_channels;
+  static constexpr std::size_t rb_soft_cap_samples = rb_soft_cap_frames * audio_channels;
 
   // Time-based stepping accumulator (shared by native and web paths)
   double cycle_accum{0.0};
@@ -109,8 +101,7 @@ private:
   static constexpr std::size_t ring_frames =
       audio_sample_rate * 2; // 2 seconds buffer (extra jitter tolerance)
 #else
-  static constexpr std::size_t ring_frames =
-      audio_sample_rate; // 1 second buffer
+  static constexpr std::size_t ring_frames = audio_sample_rate; // 1 second buffer
 #endif
   static constexpr std::size_t ring_samples = ring_frames * audio_channels;
   std::array<float, ring_samples> audio_rb{};

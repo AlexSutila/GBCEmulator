@@ -36,13 +36,10 @@ template <typename T> void Cartridge::parse_savestate(T &t) {
   t.eof();
 }
 
-template void
-Cartridge::parse_savestate<Savestate::Writer>(Savestate::Writer &);
-template void
-Cartridge::parse_savestate<Savestate::Reader>(Savestate::Reader &);
+template void Cartridge::parse_savestate<Savestate::Writer>(Savestate::Writer &);
+template void Cartridge::parse_savestate<Savestate::Reader>(Savestate::Reader &);
 template void Cartridge::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
-template void
-Cartridge::parse_savestate<Savestate::Checker>(Savestate::Checker &);
+template void Cartridge::parse_savestate<Savestate::Checker>(Savestate::Checker &);
 
 static std::optional<std::vector<byte_t>> read_all_bytes(const fs::path &p) {
   std::ifstream f(p, std::ios::binary | std::ios::ate);
@@ -86,8 +83,7 @@ static std::string ascii_ztrim(const byte_t *p, const std::size_t n) {
 }
 
 // Header checksum algorithm from boot ROM
-static byte_t compute_header_checksum(const std::span<const byte_t> rom,
-                                      const size_t offset) {
+static byte_t compute_header_checksum(const std::span<const byte_t> rom, const size_t offset) {
   byte_t checksum = 0;
   for (addr_t addr = 0x0134; addr <= 0x014C; ++addr) {
     checksum = static_cast<byte_t>(checksum - rom[addr + offset] - 1);
@@ -145,15 +141,13 @@ std::size_t ram_bytes_from_code(const byte_t code) {
 // - 0x80: Is used for games which support both CGB and monochrome systems
 // - 0xC0: Is used for systems which only work on CGBs
 // Any other values will result with monochrome backwards compatability
-bool cgb_enabled(const byte_t cgb_flag) {
-  return (cgb_flag == 0x80 || cgb_flag == 0xC0);
-}
+bool cgb_enabled(const byte_t cgb_flag) { return (cgb_flag == 0x80 || cgb_flag == 0xC0); }
 
 std::string rom_header::manufacturer_code() const {
   // Manufacturer code uses bytes 013F-0142 on "newer" carts
   const byte_t *m = &title_area[0x013F - 0x0134]; // offset within title_area
-  if (is_ascii_upper_alnum(m[0]) && is_ascii_upper_alnum(m[1]) &&
-      is_ascii_upper_alnum(m[2]) && is_ascii_upper_alnum(m[3])) {
+  if (is_ascii_upper_alnum(m[0]) && is_ascii_upper_alnum(m[1]) && is_ascii_upper_alnum(m[2]) &&
+      is_ascii_upper_alnum(m[3])) {
     return {reinterpret_cast<const char *>(m), 4};
   }
   return {};
@@ -171,8 +165,7 @@ std::string rom_header::title() const {
   const bool has_mfg = cgb && !manufacturer_code().empty();
 
   const std::size_t title_len =
-      (!cgb) ? 16
-             : (has_mfg ? mfg_off : (0x0143 - 0x0134)); // 15 bytes up to 0142
+      (!cgb) ? 16 : (has_mfg ? mfg_off : (0x0143 - 0x0134)); // 15 bytes up to 0142
 
   return ascii_ztrim(title_area.data(), title_len);
 }
@@ -200,9 +193,9 @@ static std::optional<rom_header> parse_header(const std::span<const byte_t> rom,
   h.mask_rom_version = rom[0x014C + offset];
   h.header_checksum = rom[0x014D + offset];
 
-  h.global_checksum = static_cast<std::uint16_t>(
-      (static_cast<std::uint16_t>(rom[0x014E + offset]) << 8) |
-      static_cast<std::uint16_t>(rom[0x014F + offset]));
+  h.global_checksum =
+      static_cast<std::uint16_t>((static_cast<std::uint16_t>(rom[0x014E + offset]) << 8) |
+                                 static_cast<std::uint16_t>(rom[0x014F + offset]));
   return h;
 }
 
@@ -245,9 +238,8 @@ bool validate(cart &c) {
     }
   }
   if (fail_count == 2) {
-    Logger::push(
-        LogLevel::Warning, "ROM", "ROM validation failed",
-        "ROM checksum failed. Please make sure the ROM is not corrupted.");
+    Logger::push(LogLevel::Warning, "ROM", "ROM validation failed",
+                 "ROM checksum failed. Please make sure the ROM is not corrupted.");
     return false;
   }
   return true;
@@ -260,8 +252,7 @@ bool maybe_wisdom_tree(const std::span<const byte_t> rom) {
     return false;
 
   // scan the first chunk to catch the init code
-  const std::size_t limit =
-      std::min<std::size_t>(rom.size(), 0x40000); // 256 KiB
+  const std::size_t limit = std::min<std::size_t>(rom.size(), 0x40000); // 256 KiB
 
   std::uint32_t ea_total = 0;
   std::uint32_t ea_cart = 0;
@@ -292,8 +283,7 @@ bool maybe_wisdom_tree(const std::span<const byte_t> rom) {
     return false;
 
   if (ea_total > 0) {
-    const double frac =
-        static_cast<double>(ea_cart) / static_cast<double>(ea_total);
+    const double frac = static_cast<double>(ea_cart) / static_cast<double>(ea_total);
     if (frac < 0.35)
       return false;
   }
@@ -334,23 +324,19 @@ SpecialMbc detect_special_mbc(const cart &c) {
     if (c.rom_size() <= 0x8000)
       return NotSpecial_t; // If strictly <= 32KiB, it's probably safe
     if (c.header.title() == "WISDOM TREE" || maybe_wisdom_tree(c.rom_span())) {
-      Logger::push(
-          LogLevel::Info, "ROM", "Mapper override",
-          IroGB::format("{} header type {:02X} looks inconsistent with "
-                        "ROM size {} and appears to be WT; "
-                        "forcing Wisdom Tree mapper.",
-                        c.header.title(), c.header.cartridge_type,
-                        c.rom_span().size()));
+      Logger::push(LogLevel::Info, "ROM", "Mapper override",
+                   IroGB::format("{} header type {:02X} looks inconsistent with "
+                                 "ROM size {} and appears to be WT; "
+                                 "forcing Wisdom Tree mapper.",
+                                 c.header.title(), c.header.cartridge_type, c.rom_span().size()));
       return WisdomTree_t;
     }
     if (maybe_m161(c.rom_span())) {
-      Logger::push(
-          LogLevel::Info, "ROM", "Mapper override",
-          IroGB::format("{} header type {:02X} looks inconsistent with "
-                        "ROM size {} and appears to be M161; "
-                        "forcing M161 mapper.",
-                        c.header.title(), c.header.cartridge_type,
-                        c.rom_span().size()));
+      Logger::push(LogLevel::Info, "ROM", "Mapper override",
+                   IroGB::format("{} header type {:02X} looks inconsistent with "
+                                 "ROM size {} and appears to be M161; "
+                                 "forcing M161 mapper.",
+                                 c.header.title(), c.header.cartridge_type, c.rom_span().size()));
       return M161_t;
     }
   }
@@ -358,13 +344,11 @@ SpecialMbc detect_special_mbc(const cart &c) {
   case 0x02:
   case 0x03: // MBC1M possibility
     if (maybe_mbc1m(c.rom_span())) {
-      Logger::push(
-          LogLevel::Info, "ROM", "Mapper override",
-          IroGB::format("{} header type {:02X} looks inconsistent with "
-                        "ROM size {} and appears to be MBC1M; "
-                        "forcing MBC1M mapper.",
-                        c.header.title(), c.header.cartridge_type,
-                        c.rom_span().size()));
+      Logger::push(LogLevel::Info, "ROM", "Mapper override",
+                   IroGB::format("{} header type {:02X} looks inconsistent with "
+                                 "ROM size {} and appears to be MBC1M; "
+                                 "forcing MBC1M mapper.",
+                                 c.header.title(), c.header.cartridge_type, c.rom_span().size()));
       return MBC1M_t;
     }
   case 0x0F:

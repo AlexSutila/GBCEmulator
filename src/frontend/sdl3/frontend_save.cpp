@@ -37,22 +37,18 @@ struct SavestateMeta {
   int thumb_w{kSavestateThumbWidth};
   int thumb_h{kSavestateThumbHeight};
 };
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(SavestateMeta, version, kind,
-                                                label, created_unix, thumb_w,
-                                                thumb_h)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(SavestateMeta, version, kind, label, created_unix,
+                                                thumb_w, thumb_h)
 
-std::filesystem::path
-savestate_meta_path(const std::filesystem::path &state_path) {
+std::filesystem::path savestate_meta_path(const std::filesystem::path &state_path) {
   return std::filesystem::path(state_path.string() + ".json");
 }
 
-std::filesystem::path
-savestate_thumb_path(const std::filesystem::path &state_path) {
+std::filesystem::path savestate_thumb_path(const std::filesystem::path &state_path) {
   return std::filesystem::path(state_path.string() + ".thumb");
 }
 
-bool write_blob_file(const std::filesystem::path &path,
-                     const std::vector<byte_t> &data) {
+bool write_blob_file(const std::filesystem::path &path, const std::vector<byte_t> &data) {
   if (path.empty() || data.empty())
     return false;
   if (const auto parent = path.parent_path(); !parent.empty()) {
@@ -62,13 +58,11 @@ bool write_blob_file(const std::filesystem::path &path,
   std::ofstream f(path, std::ios::binary | std::ios::trunc);
   if (!f)
     return false;
-  f.write(reinterpret_cast<const char *>(data.data()),
-          static_cast<std::streamsize>(data.size()));
+  f.write(reinterpret_cast<const char *>(data.data()), static_cast<std::streamsize>(data.size()));
   return static_cast<bool>(f);
 }
 
-bool write_savestate_meta(const std::filesystem::path &path,
-                          const SavestateMeta &meta) {
+bool write_savestate_meta(const std::filesystem::path &path, const SavestateMeta &meta) {
   std::ofstream f(path, std::ios::trunc);
   if (!f)
     return false;
@@ -77,8 +71,7 @@ bool write_savestate_meta(const std::filesystem::path &path,
   return static_cast<bool>(f);
 }
 
-std::optional<SavestateMeta>
-read_savestate_meta(const std::filesystem::path &path) {
+std::optional<SavestateMeta> read_savestate_meta(const std::filesystem::path &path) {
   std::ifstream f(path);
   if (!f)
     return std::nullopt;
@@ -92,18 +85,15 @@ read_savestate_meta(const std::filesystem::path &path) {
 }
 
 std::time_t file_time_to_time_t(const std::filesystem::file_time_type &ft) {
-  const auto sctp =
-      std::chrono::time_point_cast<std::chrono::system_clock::duration>(
-          ft - std::filesystem::file_time_type::clock::now() +
-          std::chrono::system_clock::now());
+  const auto sctp = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
+      ft - std::filesystem::file_time_type::clock::now() + std::chrono::system_clock::now());
   return std::chrono::system_clock::to_time_t(sctp);
 }
 
-std::string sanitize_savestate_label(std::string s,
-                                     const std::size_t max_len = 32) {
+std::string sanitize_savestate_label(std::string s, const std::size_t max_len = 32) {
   for (char &c : s) {
-    const bool keep = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
-                      (c >= '0' && c <= '9') || c == '-' || c == '_';
+    const bool keep = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+                      c == '-' || c == '_';
     c = keep ? c : '_';
   }
   std::erase(s, '\0');
@@ -116,8 +106,7 @@ std::string sanitize_savestate_label(std::string s,
   return s;
 }
 
-std::string shorten_checksum(std::string checksum_hex,
-                             const std::size_t max_len) {
+std::string shorten_checksum(std::string checksum_hex, const std::size_t max_len) {
   checksum_hex = normalize_hex_lower(std::move(checksum_hex));
   if (checksum_hex.size() > max_len)
     checksum_hex.resize(max_len);
@@ -179,12 +168,10 @@ std::string trim_ascii(std::string_view text) {
   std::size_t begin = 0;
   std::size_t end = text.size();
 
-  while (begin < end &&
-         std::isspace(static_cast<unsigned char>(text[begin])) != 0) {
+  while (begin < end && std::isspace(static_cast<unsigned char>(text[begin])) != 0) {
     ++begin;
   }
-  while (end > begin &&
-         std::isspace(static_cast<unsigned char>(text[end - 1])) != 0) {
+  while (end > begin && std::isspace(static_cast<unsigned char>(text[end - 1])) != 0) {
     --end;
   }
   return std::string(text.substr(begin, end - begin));
@@ -284,13 +271,11 @@ std::optional<int> parse_cheat_index(std::string_view key) {
   if (!key.starts_with("cheat"))
     return std::nullopt;
   std::size_t pos = 5;
-  if (pos >= key.size() ||
-      std::isdigit(static_cast<unsigned char>(key[pos])) == 0) {
+  if (pos >= key.size() || std::isdigit(static_cast<unsigned char>(key[pos])) == 0) {
     return std::nullopt;
   }
   const std::size_t begin = pos;
-  while (pos < key.size() &&
-         std::isdigit(static_cast<unsigned char>(key[pos])) != 0) {
+  while (pos < key.size() && std::isdigit(static_cast<unsigned char>(key[pos])) != 0) {
     ++pos;
   }
   if (pos >= key.size() || key[pos] != '_')
@@ -313,8 +298,7 @@ bool load_libretro_cheat_file(const std::filesystem::path &path,
   std::string line;
   bool first_line = true;
   while (std::getline(f, line)) {
-    if (first_line && line.size() >= 3 &&
-        static_cast<unsigned char>(line[0]) == 0xEF &&
+    if (first_line && line.size() >= 3 && static_cast<unsigned char>(line[0]) == 0xEF &&
         static_cast<unsigned char>(line[1]) == 0xBB &&
         static_cast<unsigned char>(line[2]) == 0xBF) {
       line.erase(0, 3);
@@ -340,17 +324,15 @@ bool load_libretro_cheat_file(const std::filesystem::path &path,
 
   int declared_count = -1;
   if (const auto it = kv.find("cheats"); it != kv.end()) {
-    if (const auto parsed = parse_int_value(it->second); parsed.has_value() &&
-                                                       *parsed >= 0) {
+    if (const auto parsed = parse_int_value(it->second); parsed.has_value() && *parsed >= 0) {
       declared_count = *parsed;
     }
   }
 
   int max_seen_index = -1;
-  for (const auto & [key, value] : kv) {
+  for (const auto &[key, value] : kv) {
     static_cast<void>(value);
-    if (const auto idx = parse_cheat_index(key);
-        idx.has_value() && *idx > max_seen_index) {
+    if (const auto idx = parse_cheat_index(key); idx.has_value() && *idx > max_seen_index) {
       max_seen_index = *idx;
     }
   }
@@ -372,10 +354,9 @@ bool load_libretro_cheat_file(const std::filesystem::path &path,
     const auto format_it = kv.find(prefix + "gbc_format");
     const auto format_fallback_it = kv.find(prefix + "format");
 
-    const bool has_any_field =
-        desc_it != kv.end() || code_it != kv.end() || enabled_it != kv.end() ||
-        notes_it != kv.end() || format_it != kv.end() ||
-        format_fallback_it != kv.end();
+    const bool has_any_field = desc_it != kv.end() || code_it != kv.end() ||
+                               enabled_it != kv.end() || notes_it != kv.end() ||
+                               format_it != kv.end() || format_fallback_it != kv.end();
     if (!has_any_field)
       continue;
 
@@ -395,8 +376,7 @@ bool load_libretro_cheat_file(const std::filesystem::path &path,
         format = *parsed;
       }
     } else if (format_fallback_it != kv.end()) {
-      if (const auto parsed =
-              parse_int_value(format_fallback_it->second); parsed.has_value()) {
+      if (const auto parsed = parse_int_value(format_fallback_it->second); parsed.has_value()) {
         format = *parsed;
       }
     }
@@ -432,15 +412,11 @@ bool save_libretro_cheat_file(const std::filesystem::path &path,
     const auto &entry = cheats[i];
     const int format = std::clamp(entry.format, format_min, format_max);
     f << '\n';
-    f << "cheat" << i << "_desc = \""
-      << escape_libretro_value(entry.name) << "\"\n";
-    f << "cheat" << i << "_code = \""
-      << escape_libretro_value(entry.code) << "\"\n";
-    f << "cheat" << i << "_enable = " << (entry.enabled ? "true" : "false")
-      << '\n';
+    f << "cheat" << i << "_desc = \"" << escape_libretro_value(entry.name) << "\"\n";
+    f << "cheat" << i << "_code = \"" << escape_libretro_value(entry.code) << "\"\n";
+    f << "cheat" << i << "_enable = " << (entry.enabled ? "true" : "false") << '\n';
     if (!entry.notes.empty()) {
-      f << "cheat" << i << "_note = \""
-        << escape_libretro_value(entry.notes) << "\"\n";
+      f << "cheat" << i << "_note = \"" << escape_libretro_value(entry.notes) << "\"\n";
     }
     f << "cheat" << i << "_gbc_format = " << format << '\n';
   }
@@ -476,8 +452,7 @@ bool is_savestate_file(const std::filesystem::directory_entry &de) {
 }
 } // namespace
 
-void SDL3Frontend::setup_save_context(const cart &c,
-                                      const std::string &display_label,
+void SDL3Frontend::setup_save_context(const cart &c, const std::string &display_label,
                                       const std::string &rom_hash) {
   active_rom_hash = rom_hash;
   setup_savestate_context(c, display_label, rom_hash);
@@ -493,10 +468,9 @@ void SDL3Frontend::setup_save_context(const cart &c,
   if (stem.empty())
     stem = "cartridge";
 
-  const std::string checksum_short = shorten_checksum(
-      normalize_hex_lower(rom_hash), kSavestateChecksumShortChars);
-  const std::filesystem::path save_root =
-      resolve_save_root_dir(gui.get_settings_c().save_root_dir);
+  const std::string checksum_short =
+      shorten_checksum(normalize_hex_lower(rom_hash), kSavestateChecksumShortChars);
+  const std::filesystem::path save_root = resolve_save_root_dir(gui.get_settings_c().save_root_dir);
   std::error_code ec;
   std::filesystem::create_directories(save_root, ec);
   if (checksum_short.empty()) {
@@ -514,8 +488,7 @@ void SDL3Frontend::setup_save_context(const cart &c,
   deferred_save_pending = false;
 }
 
-void SDL3Frontend::setup_cheat_context(const cart &c,
-                                       const std::string &display_label,
+void SDL3Frontend::setup_cheat_context(const cart &c, const std::string &display_label,
                                        const std::string &rom_hash) {
   std::string stem = c.file_path.stem().string();
   if (stem.empty())
@@ -528,8 +501,8 @@ void SDL3Frontend::setup_cheat_context(const cart &c,
   if (stem.empty())
     stem = "cartridge";
 
-  const std::string checksum_short = shorten_checksum(
-      normalize_hex_lower(rom_hash), kSavestateChecksumShortChars);
+  const std::string checksum_short =
+      shorten_checksum(normalize_hex_lower(rom_hash), kSavestateChecksumShortChars);
   const std::filesystem::path cheat_root =
       resolve_cheat_root_dir(gui.get_settings_c().cheat_root_dir);
   std::error_code ec;
@@ -618,8 +591,7 @@ void SDL3Frontend::process_pending_save() {
     deferred_save_data.clear();
   } else {
     Logger::push(LogLevel::Warning, "Save", "Failed to write save file",
-                 "Could not write save data to: " + active_save_path->string() +
-                     ".");
+                 "Could not write save data to: " + active_save_path->string() + ".");
   }
 }
 
@@ -651,8 +623,7 @@ void SDL3Frontend::reset_savestate_context() {
   next_savestate_scan_ = Clock::now();
 }
 
-void SDL3Frontend::setup_savestate_context(const cart &c,
-                                           const std::string &display_label,
+void SDL3Frontend::setup_savestate_context(const cart &c, const std::string &display_label,
                                            const std::string &rom_hash) {
   release_savestate_textures_locked();
   savestate_entries_.clear();
@@ -670,8 +641,7 @@ void SDL3Frontend::setup_savestate_context(const cart &c,
     stem = "cartridge";
 
   const std::string checksum_full = normalize_hex_lower(rom_hash);
-  const std::string checksum_short =
-      shorten_checksum(checksum_full, kSavestateChecksumShortChars);
+  const std::string checksum_short = shorten_checksum(checksum_full, kSavestateChecksumShortChars);
   const std::filesystem::path root_dir =
       resolve_savestate_root_dir(gui.get_settings_c().savestate_root_dir);
   std::error_code ec;
@@ -693,8 +663,7 @@ void SDL3Frontend::setup_savestate_context(const cart &c,
   next_savestate_scan_ = Clock::now();
 }
 
-void SDL3Frontend::queue_savestate_load_request(
-    const std::filesystem::path &path) {
+void SDL3Frontend::queue_savestate_load_request(const std::filesystem::path &path) {
   if (path.empty())
     return;
   {
@@ -704,8 +673,7 @@ void SDL3Frontend::queue_savestate_load_request(
   }
 }
 
-std::optional<std::filesystem::path>
-SDL3Frontend::consume_savestate_load_request() {
+std::optional<std::filesystem::path> SDL3Frontend::consume_savestate_load_request() {
   std::lock_guard lock(savestate_request_mutex);
   if (!pending_savestate_load_path_.has_value())
     return std::nullopt;
@@ -738,8 +706,7 @@ void SDL3Frontend::clear_quick_savestate_cache() {
   quick_savestate_cache_valid_ = false;
 }
 
-void SDL3Frontend::remove_savestate_triplet(
-    const std::filesystem::path &state_path) {
+void SDL3Frontend::remove_savestate_triplet(const std::filesystem::path &state_path) {
   std::error_code ec;
   std::filesystem::remove(state_path, ec);
   std::filesystem::remove(savestate_meta_path(state_path), ec);
@@ -777,9 +744,7 @@ void SDL3Frontend::sync_quick_savestate_cache_locked() {
     on_disk.insert(p);
 
     const auto it = std::ranges::find_if(
-        quick_savestate_cache_, [&](const SavestateEntry &e) {
-          return e.state_path == p;
-        });
+        quick_savestate_cache_, [&](const SavestateEntry &e) { return e.state_path == p; });
     if (it != quick_savestate_cache_.end())
       continue;
 
@@ -792,8 +757,7 @@ void SDL3Frontend::sync_quick_savestate_cache_locked() {
     std::error_code time_ec;
     entry.created_at = file_time_to_time_t(de.last_write_time(time_ec));
 
-    if (const auto meta = read_savestate_meta(savestate_meta_path(p));
-        meta.has_value()) {
+    if (const auto meta = read_savestate_meta(savestate_meta_path(p)); meta.has_value()) {
       if (meta->kind != "quick")
         continue;
       entry.label = meta->label.empty() ? entry.label : meta->label;
@@ -804,22 +768,19 @@ void SDL3Frontend::sync_quick_savestate_cache_locked() {
     quick_savestate_cache_.push_back(std::move(entry));
   }
 
-  std::erase_if(quick_savestate_cache_, [&](const SavestateEntry &e) {
-    return !on_disk.contains(e.state_path);
-  });
+  std::erase_if(quick_savestate_cache_,
+                [&](const SavestateEntry &e) { return !on_disk.contains(e.state_path); });
 
   quick_savestate_cache_valid_ = true;
 }
 
-void SDL3Frontend::upsert_quick_savestate_cache_locked(
-    const std::filesystem::path &state_path, const std::string &label,
-    const std::time_t created_at) {
+void SDL3Frontend::upsert_quick_savestate_cache_locked(const std::filesystem::path &state_path,
+                                                       const std::string &label,
+                                                       const std::time_t created_at) {
   const auto it = std::ranges::find_if(
-      quick_savestate_cache_,
-      [&](const SavestateEntry &e) { return e.state_path == state_path; });
+      quick_savestate_cache_, [&](const SavestateEntry &e) { return e.state_path == state_path; });
 
-  const std::string resolved_label =
-      label.empty() ? state_path.stem().string() : label;
+  const std::string resolved_label = label.empty() ? state_path.stem().string() : label;
   if (it == quick_savestate_cache_.end()) {
     SavestateEntry entry{};
     entry.state_path = state_path;
@@ -842,13 +803,11 @@ void SDL3Frontend::enforce_max_quicksaves_locked() {
     return;
 
   const auto max_quick = static_cast<std::size_t>(configured_max);
-  std::ranges::sort(quick_savestate_cache_,
-                    [](const SavestateEntry &a, const SavestateEntry &b) {
-                      if (a.created_at != b.created_at)
-                        return a.created_at < b.created_at;
-                      return a.state_path.filename().string() <
-                             b.state_path.filename().string();
-                    });
+  std::ranges::sort(quick_savestate_cache_, [](const SavestateEntry &a, const SavestateEntry &b) {
+    if (a.created_at != b.created_at)
+      return a.created_at < b.created_at;
+    return a.state_path.filename().string() < b.state_path.filename().string();
+  });
 
   while (quick_savestate_cache_.size() > max_quick) {
     remove_savestate_triplet(quick_savestate_cache_.front().state_path);
@@ -856,19 +815,16 @@ void SDL3Frontend::enforce_max_quicksaves_locked() {
   }
 }
 
-void SDL3Frontend::erase_quick_savestate_cache_entry(
-    const std::filesystem::path &state_path) {
+void SDL3Frontend::erase_quick_savestate_cache_entry(const std::filesystem::path &state_path) {
   std::lock_guard lock(quick_savestate_cache_mutex_);
-  std::erase_if(quick_savestate_cache_, [&](const SavestateEntry &entry) {
-    return entry.state_path == state_path;
-  });
+  std::erase_if(quick_savestate_cache_,
+                [&](const SavestateEntry &entry) { return entry.state_path == state_path; });
 }
 
 std::vector<std::uint32_t> SDL3Frontend::capture_savestate_thumbnail() const {
   constexpr int src_w = framebuf_width;
   constexpr int src_h = framebuf_height;
-  std::vector<std::uint32_t> out(
-      kSavestateThumbWidth * kSavestateThumbHeight);
+  std::vector<std::uint32_t> out(kSavestateThumbWidth * kSavestateThumbHeight);
   const std::uint32_t *src = get_front_buffer();
   const bool cgb_mode = is_cgb.load(std::memory_order_relaxed);
   for (int y = 0; y < kSavestateThumbHeight; ++y) {
@@ -883,8 +839,7 @@ std::vector<std::uint32_t> SDL3Frontend::capture_savestate_thumbnail() const {
 }
 
 std::optional<std::filesystem::path>
-SDL3Frontend::write_savestate_bundle(const std::vector<byte_t> &blob,
-                                     const bool quick,
+SDL3Frontend::write_savestate_bundle(const std::vector<byte_t> &blob, const bool quick,
                                      const std::string &label) {
   if (blob.empty() || savestate_dir_.empty())
     return std::nullopt;
@@ -943,8 +898,7 @@ SDL3Frontend::write_savestate_bundle(const std::vector<byte_t> &blob,
   return state_path;
 }
 
-std::optional<std::filesystem::path>
-SDL3Frontend::latest_savestate_path() const {
+std::optional<std::filesystem::path> SDL3Frontend::latest_savestate_path() const {
   if (savestate_dir_.empty())
     return std::nullopt;
   std::error_code ec;
@@ -953,8 +907,7 @@ SDL3Frontend::latest_savestate_path() const {
 
   std::optional<std::filesystem::path> best_path = std::nullopt;
   std::time_t best_time = 0;
-  for (const auto &de :
-       std::filesystem::directory_iterator(savestate_dir_, ec)) {
+  for (const auto &de : std::filesystem::directory_iterator(savestate_dir_, ec)) {
     if (!is_savestate_file(de))
       continue;
     std::time_t created_at = 0;
@@ -992,8 +945,7 @@ void SDL3Frontend::refresh_savestate_entries_locked(const bool force_refresh) {
   if (!std::filesystem::exists(savestate_dir_, ec))
     return;
 
-  for (const auto &de :
-       std::filesystem::directory_iterator(savestate_dir_, ec)) {
+  for (const auto &de : std::filesystem::directory_iterator(savestate_dir_, ec)) {
     if (!is_savestate_file(de))
       continue;
 
@@ -1003,15 +955,12 @@ void SDL3Frontend::refresh_savestate_entries_locked(const bool force_refresh) {
     entry.file_size = de.file_size(ec);
 
     std::time_t fallback_time = file_time_to_time_t(de.last_write_time(ec));
-    if (const auto meta =
-            read_savestate_meta(savestate_meta_path(entry.state_path));
+    if (const auto meta = read_savestate_meta(savestate_meta_path(entry.state_path));
         meta.has_value()) {
       entry.kind = (meta->kind == "quick") ? "Quick" : "Manual";
-      entry.label =
-          meta->label.empty() ? entry.state_path.stem().string() : meta->label;
-      entry.created_at = meta->created_unix > 0
-                             ? static_cast<std::time_t>(meta->created_unix)
-                             : fallback_time;
+      entry.label = meta->label.empty() ? entry.state_path.stem().string() : meta->label;
+      entry.created_at =
+          meta->created_unix > 0 ? static_cast<std::time_t>(meta->created_unix) : fallback_time;
       entry.thumb_w = meta->thumb_w;
       entry.thumb_h = meta->thumb_h;
     } else {
@@ -1031,19 +980,16 @@ void SDL3Frontend::refresh_savestate_entries_locked(const bool force_refresh) {
     savestate_entries_.push_back(std::move(entry));
   }
 
-  std::ranges::sort(savestate_entries_,
-                    [](const SavestateEntry &a, const SavestateEntry &b) {
-                      if (a.created_at != b.created_at)
-                        return a.created_at > b.created_at;
-                      return a.state_path.filename().string() >
-                        b.state_path.filename().string();
-                    });
+  std::ranges::sort(savestate_entries_, [](const SavestateEntry &a, const SavestateEntry &b) {
+    if (a.created_at != b.created_at)
+      return a.created_at > b.created_at;
+    return a.state_path.filename().string() > b.state_path.filename().string();
+  });
 
   if (prev_selected.has_value()) {
-    const auto it =
-        std::ranges::find_if(savestate_entries_, [&](const SavestateEntry &e) {
-          return e.state_path == *prev_selected;
-        });
+    const auto it = std::ranges::find_if(savestate_entries_, [&](const SavestateEntry &e) {
+      return e.state_path == *prev_selected;
+    });
     if (it != savestate_entries_.end()) {
       savestate_selected_path_ = it->state_path;
       return;
@@ -1055,8 +1001,7 @@ void SDL3Frontend::refresh_savestate_entries_locked(const bool force_refresh) {
     savestate_selected_path_.reset();
 }
 
-void SDL3Frontend::build_savestate_manager_window_locked(
-    const bool fill_viewport) {
+void SDL3Frontend::build_savestate_manager_window_locked(const bool fill_viewport) {
   if (!ui_state.show_savestate_manager)
     return;
   refresh_savestate_entries_locked(false);
@@ -1082,11 +1027,9 @@ void SDL3Frontend::build_savestate_manager_window_locked(
   };
 
   gui.build_savestate_manager_window(
-      ui_state, gui.active_renderer() ? gui.active_renderer()
-                                      : host.get_renderer(),
-      static_cast<bool>(gbc), savestate_dir_,
-      savestate_manual_label_input_, savestate_entries_, savestate_selected_path_,
-      callbacks, fill_viewport);
+      ui_state, gui.active_renderer() ? gui.active_renderer() : host.get_renderer(),
+      static_cast<bool>(gbc), savestate_dir_, savestate_manual_label_input_, savestate_entries_,
+      savestate_selected_path_, callbacks, fill_viewport);
 }
 
 [[nodiscard]] bool SDL3Frontend::should_preempt_emu_loop() const {

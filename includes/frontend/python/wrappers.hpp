@@ -28,7 +28,7 @@ public:
    * This constructor configures the debugger and allows for python callbacks to
    * be invoked upon being hit.
    */
-  explicit PyGameBoyColor(const pybind11::function& callback);
+  explicit PyGameBoyColor(const pybind11::function &callback);
   void breakpoint_add(addr_t addr, Debug::BreakReason reason);
   void breakpoint_del(addr_t addr);
 

@@ -20,8 +20,7 @@ public:
   void update_texture(const std::uint32_t *pixels, int width, int height,
                       const std::atomic<bool> &is_cgb, bool force_mono) const;
   void draw_texture(float menu_bar_height, float bottom_bar_height) const;
-  static std::uint32_t format_pixel_data(std::uint32_t px, bool is_cgb,
-                                         bool force_mono);
+  static std::uint32_t format_pixel_data(std::uint32_t px, bool is_cgb, bool force_mono);
   void draw_overlay(ImDrawData *draw_data) const {
     ImGui_ImplSDLRenderer3_RenderDrawData(draw_data, renderer);
   }
@@ -32,8 +31,7 @@ public:
   // Audio
   void init_audio(int freq = 48000, int channels = 2);
   void queue_audio(const float *samples, size_t count) const;
-  bool set_audio_device(int device_index,
-                        const std::vector<SDL_AudioDeviceID> &ids, float vol);
+  bool set_audio_device(int device_index, const std::vector<SDL_AudioDeviceID> &ids, float vol);
   static void refresh_audio_devices(std::vector<std::string> &names,
                                     std::vector<SDL_AudioDeviceID> &ids);
   void set_volume(float volume) const;

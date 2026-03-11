@@ -23,8 +23,7 @@
 
 class Mmm01 final : public Mbc {
 public:
-  Mmm01(std::span<const byte_t> const rom, std::size_t const ram_bytes,
-        bool const battery)
+  Mmm01(std::span<const byte_t> const rom, std::size_t const ram_bytes, bool const battery)
       : rom_(rom), ram_(ram_bytes), battery_(battery) {}
 
   byte_t read(addr_t const addr) override {
@@ -52,8 +51,8 @@ public:
       // In practice, letting it work improves compatibility with the one known
       // RAM-containing MMM01 cart, and doesn't affect most carts
       const std::size_t bank = ram_bank_a000();
-      const std::size_t idx = (bank * kRamBankSize + (addr - 0xA000)) %
-                              std::max<std::size_t>(1, ram_.size());
+      const std::size_t idx =
+          (bank * kRamBankSize + (addr - 0xA000)) % std::max<std::size_t>(1, ram_.size());
       return ram_[idx];
     }
 
@@ -120,17 +119,15 @@ public:
       if (!ram_enabled_ || ram_.empty())
         return;
       const std::size_t bank = ram_bank_a000();
-      const std::size_t idx = (bank * kRamBankSize + (addr - 0xA000)) %
-                              std::max<std::size_t>(1, ram_.size());
+      const std::size_t idx =
+          (bank * kRamBankSize + (addr - 0xA000)) % std::max<std::size_t>(1, ram_.size());
       ram_[idx] = val;
       return;
     }
   }
 
   [[nodiscard]] bool has_battery() const noexcept override { return battery_; }
-  [[nodiscard]] std::span<const byte_t> ram() const noexcept override {
-    return ram_;
-  }
+  [[nodiscard]] std::span<const byte_t> ram() const noexcept override { return ram_; }
   std::span<byte_t> ram() noexcept override { return ram_; }
 
   template <typename T> void parse_savestate_impl(T &t) {
@@ -151,18 +148,10 @@ public:
     t.eof();
   }
 
-  void parse_savestate(Savestate::Writer &t) override {
-    parse_savestate_impl(t);
-  }
-  void parse_savestate(Savestate::Reader &t) override {
-    parse_savestate_impl(t);
-  }
-  void parse_savestate(Savestate::Sizer &t) override {
-    parse_savestate_impl(t);
-  }
-  void parse_savestate(Savestate::Checker &t) override {
-    parse_savestate_impl(t);
-  }
+  void parse_savestate(Savestate::Writer &t) override { parse_savestate_impl(t); }
+  void parse_savestate(Savestate::Reader &t) override { parse_savestate_impl(t); }
+  void parse_savestate(Savestate::Sizer &t) override { parse_savestate_impl(t); }
+  void parse_savestate(Savestate::Checker &t) override { parse_savestate_impl(t); }
 
 private:
   std::span<const byte_t> rom_;
@@ -209,8 +198,7 @@ private:
     // Mask bit0 is always 0, so bit0 is always writable
     const auto lock = static_cast<byte_t>(rom_bank_mask_ & 0x1F);
     const auto keep = static_cast<byte_t>(rom_bank_low_ & lock);
-    const auto take =
-        static_cast<byte_t>(new_low & static_cast<byte_t>(~lock) & 0x1F);
+    const auto take = static_cast<byte_t>(new_low & static_cast<byte_t>(~lock) & 0x1F);
     rom_bank_low_ = static_cast<byte_t>((keep | take) & 0x1F);
   }
 
@@ -218,8 +206,7 @@ private:
     // RAM Bank Mask prevents writes to matching bits of RAM Bank Low
     const auto lock = static_cast<byte_t>(ram_bank_mask_ & 0x03);
     const auto keep = static_cast<byte_t>(ram_bank_low_ & lock);
-    const auto take =
-        static_cast<byte_t>(new_low & static_cast<byte_t>(~lock) & 0x03);
+    const auto take = static_cast<byte_t>(new_low & static_cast<byte_t>(~lock) & 0x03);
     ram_bank_low_ = static_cast<byte_t>((keep | take) & 0x03);
   }
 
@@ -233,8 +220,8 @@ private:
     // 4000-7FFF uses ROM Bank Low (complete), but bank $00/$20/$40/$60 are
     // remapped by forcing low bit if the unmasked bits are 0
     auto low = static_cast<byte_t>(rom_bank_low_ & 0x1F);
-    if (const auto unmasked = static_cast<byte_t>(
-            low & static_cast<byte_t>(~rom_bank_mask_) & 0x1F);
+    if (const auto unmasked =
+            static_cast<byte_t>(low & static_cast<byte_t>(~rom_bank_mask_) & 0x1F);
         unmasked == 0)
       low = static_cast<byte_t>(low | 0x01);
     return low;
@@ -253,9 +240,8 @@ private:
     // in mode1
     const auto rb_mask = static_cast<byte_t>(ram_bank_mask_ & 0x03);
     const std::size_t mid =
-        mbc1_mode_ ? static_cast<std::size_t>(ram_bank_low_ & 0x03) // mode1
-                   : static_cast<std::size_t>((ram_bank_low_ & rb_mask) &
-                                              0x03); // mode0
+        mbc1_mode_ ? static_cast<std::size_t>(ram_bank_low_ & 0x03)              // mode1
+                   : static_cast<std::size_t>((ram_bank_low_ & rb_mask) & 0x03); // mode0
 
     const auto low = static_cast<std::size_t>(rom_bank_low_for_0000());
     return (hi << 7) | (mid << 5) | low;
@@ -287,8 +273,7 @@ private:
       // multiplex enabled: low bits come from ROM Bank Mid
       const auto low = static_cast<std::size_t>(rom_bank_mid_ & 0x03);
       const std::size_t bank = (hi << 2) | low;
-      const std::size_t banks =
-          std::max<std::size_t>(1, ram_.size() / kRamBankSize);
+      const std::size_t banks = std::max<std::size_t>(1, ram_.size() / kRamBankSize);
       return clamp_bank(bank, banks);
     }
 
@@ -296,13 +281,11 @@ private:
     // mode0: RAM Bank Low & RAM Bank Mask
     // mode1: RAM Bank Low full
     const auto rb_mask = static_cast<byte_t>(ram_bank_mask_ & 0x03);
-    const std::size_t low =
-        mbc1_mode_ ? static_cast<std::size_t>(ram_bank_low_ & 0x03)
-                   : static_cast<std::size_t>((ram_bank_low_ & rb_mask) & 0x03);
+    const std::size_t low = mbc1_mode_ ? static_cast<std::size_t>(ram_bank_low_ & 0x03)
+                                       : static_cast<std::size_t>((ram_bank_low_ & rb_mask) & 0x03);
 
     const std::size_t bank = (hi << 2) | low;
-    const std::size_t banks =
-        std::max<std::size_t>(1, ram_.size() / kRamBankSize);
+    const std::size_t banks = std::max<std::size_t>(1, ram_.size() / kRamBankSize);
     return clamp_bank(bank, banks);
   }
 };

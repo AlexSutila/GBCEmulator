@@ -8,8 +8,7 @@
 #include <thread>
 
 namespace {
-std::optional<std::vector<byte_t>>
-read_binary_blob(const std::filesystem::path &path) {
+std::optional<std::vector<byte_t>> read_binary_blob(const std::filesystem::path &path) {
   std::ifstream file(path, std::ios::binary | std::ios::ate);
   if (!file) {
     return std::nullopt;
@@ -29,8 +28,7 @@ read_binary_blob(const std::filesystem::path &path) {
 }
 
 int queued_audio_ms(const SDL_AudioSpec &spec, const int queued_bytes) {
-  const int bytes_per_sample_frame =
-      spec.channels * static_cast<int>(sizeof(float));
+  const int bytes_per_sample_frame = spec.channels * static_cast<int>(sizeof(float));
   const int bytes_per_second = spec.freq * bytes_per_sample_frame;
   return bytes_per_second > 0 ? queued_bytes * 1000 / bytes_per_second : 0;
 }
@@ -60,8 +58,8 @@ SDL3Frontend::build_emulator_instance(
   }
 
   auto *const cart_ptr = bus_ptr->get_cartridge();
-  auto *joyp_ptr = dynamic_cast<Joypad::JOYP *>(
-      gbc->get_bus()->get_mmio(IORegisterMapping::MMIO_JOYPAD));
+  auto *joyp_ptr =
+      dynamic_cast<Joypad::JOYP *>(gbc->get_bus()->get_mmio(IORegisterMapping::MMIO_JOYPAD));
   if (!joyp_ptr) {
     throw std::runtime_error("Failed to acquire Cartridge resource");
   }
@@ -69,9 +67,9 @@ SDL3Frontend::build_emulator_instance(
   return {bus_ptr, cart_ptr, joyp_ptr};
 }
 
-std::vector<byte_t> SDL3Frontend::prime_sram_saves(
-    const std::optional<std::filesystem::path> &initial_save_path,
-    Cartridge *const cart_ptr) {
+std::vector<byte_t>
+SDL3Frontend::prime_sram_saves(const std::optional<std::filesystem::path> &initial_save_path,
+                               Cartridge *const cart_ptr) {
   using namespace std::filesystem;
 
   std::vector<byte_t> save_snapshot;
@@ -101,9 +99,8 @@ void SDL3Frontend::process_sram_save_events(std::vector<byte_t> save_snapshot,
     return;
   }
 
-  const bool altered =
-      ram_view.size() != save_snapshot.size() ||
-      !std::equal(ram_view.begin(), ram_view.end(), save_snapshot.begin());
+  const bool altered = ram_view.size() != save_snapshot.size() ||
+                       !std::equal(ram_view.begin(), ram_view.end(), save_snapshot.begin());
   if (altered) [[unlikely]] {
     save_snapshot.assign(ram_view.begin(), ram_view.end());
     enqueue_save_snapshot(std::vector(ram_view.begin(), ram_view.end()));
@@ -116,31 +113,26 @@ void SDL3Frontend::process_save_state_events() {
   const bool quick_load = quickload_requested.exchange(false, acq);
   const bool manual = manual_preempt_emu_loop.exchange(false, acq);
 
-  const auto save_savestate =
-      [this](const bool quick, const std::string_view label) {
-        try {
-          const auto blob = gbc->savestate_serialize();
-          const auto path = write_savestate_bundle(blob, quick,
-                                                   std::string(label));
-          if (!path.has_value()) {
-            Logger::push(LogLevel::Warning, "Savestate", "Failed to create",
-                         quick
-                             ? "Could not create a quicksave. Check that the "
-                               "savestate directory is accessible."
-                             : "Could not create a savestate. Check that the "
-                               "savestate directory is accessible.");
-            return;
-          }
+  const auto save_savestate = [this](const bool quick, const std::string_view label) {
+    try {
+      const auto blob = gbc->savestate_serialize();
+      const auto path = write_savestate_bundle(blob, quick, std::string(label));
+      if (!path.has_value()) {
+        Logger::push(LogLevel::Warning, "Savestate", "Failed to create",
+                     quick ? "Could not create a quicksave. Check that the "
+                             "savestate directory is accessible."
+                           : "Could not create a savestate. Check that the "
+                             "savestate directory is accessible.");
+        return;
+      }
 
-          if (quick) {
-            Logger::push(LogLevel::Status, "Savestate", "Savestate created",
-                         path->string());
-          }
-        } catch (const std::exception &e) {
-          Logger::push(LogLevel::Warning, "Savestate", "Failed to create",
-                       e.what());
-        }
-      };
+      if (quick) {
+        Logger::push(LogLevel::Status, "Savestate", "Savestate created", path->string());
+      }
+    } catch (const std::exception &e) {
+      Logger::push(LogLevel::Warning, "Savestate", "Failed to create", e.what());
+    }
+  };
 
   const auto load_savestate = [this](const std::filesystem::path &path,
                                      const std::string &missing_summary,
@@ -148,16 +140,14 @@ void SDL3Frontend::process_save_state_events() {
     try {
       const auto blob = read_binary_blob(path);
       if (!blob.has_value()) {
-        Logger::push(LogLevel::Warning, "Savestate", missing_summary,
-                     missing_message);
+        Logger::push(LogLevel::Warning, "Savestate", missing_summary, missing_message);
         return;
       }
 
       gbc->savestate_deserialize(*blob);
       host.clear_audio_stream();
       video_dirty.store(true, std::memory_order_release);
-      Logger::push(LogLevel::Status, "Savestate", "Savestate loaded",
-                   path.string());
+      Logger::push(LogLevel::Status, "Savestate", "Savestate loaded", path.string());
     } catch (const std::exception &e) {
       Logger::push(LogLevel::Warning, "Savestate", "Load failed", e.what());
     }
@@ -176,8 +166,7 @@ void SDL3Frontend::process_save_state_events() {
       return;
     }
 
-    load_savestate(*latest_path,
-                   "Inaccessible",
+    load_savestate(*latest_path, "Inaccessible",
                    "Could not read savestate from: " + latest_path->string() +
                        ". It may have been moved or deleted.");
     return;
@@ -199,8 +188,7 @@ void SDL3Frontend::process_save_state_events() {
   if (const auto manual_load_path = consume_savestate_load_request();
       manual_load_path.has_value()) {
     load_savestate(*manual_load_path, "File not found",
-                   "Could not read savestate from: " +
-                       manual_load_path->string());
+                   "Could not read savestate from: " + manual_load_path->string());
   }
 }
 
@@ -238,8 +226,7 @@ void SDL3Frontend::sync_cheats_to_core(std::uint64_t &last_revision) const {
 }
 
 void SDL3Frontend::emulation_thread_fn(
-    const std::stop_token &st, const cart &cart,
-    const std::optional<std::string> &bios,
+    const std::stop_token &st, const cart &cart, const std::optional<std::string> &bios,
     const std::optional<std::filesystem::path> &initial_save_path) {
   auto next_save_poll = Clock::now();
   std::uint64_t cheat_revision_seen = 0;
@@ -252,25 +239,22 @@ void SDL3Frontend::emulation_thread_fn(
   quicksave_requested.store(false, std::memory_order_relaxed);
   quickload_requested.store(false, std::memory_order_relaxed);
 
-  const auto [bus_ptr, cart_ptr, joyp_ptr] =
-      build_emulator_instance(cart, bios, initial_save_path);
+  const auto [bus_ptr, cart_ptr, joyp_ptr] = build_emulator_instance(cart, bios, initial_save_path);
   (void)bus_ptr;
 
-  gbc->configure_debugger(Debug::Debugger([this, st]() -> Debug::BreakReason {
-    return debugger.on_breakpoint(st, gbc);
-  }));
+  gbc->configure_debugger(Debug::Debugger(
+      [this, st]() -> Debug::BreakReason { return debugger.on_breakpoint(st, gbc); }));
   sync_cheats_to_core(cheat_revision_seen);
 
-  std::vector<byte_t> last_saved_snapshot =
-      prime_sram_saves(initial_save_path, cart_ptr);
+  std::vector<byte_t> last_saved_snapshot = prime_sram_saves(initial_save_path, cart_ptr);
 
   while (!st.stop_requested()) [[likely]] {
     sync_cheats_to_core(cheat_revision_seen);
 
     // The queued audio depth acts as our pacing clock. If audio is already
     // sufficiently buffered, let the host drain it before emulating more time.
-    if (!ff && queued_audio_ms(host.get_audio_spec(),
-                               host.get_queued_audio_bytes()) > target_queue_ms) {
+    if (!ff &&
+        queued_audio_ms(host.get_audio_spec(), host.get_queued_audio_bytes()) > target_queue_ms) {
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
       continue;
     }

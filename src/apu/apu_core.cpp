@@ -3,7 +3,7 @@
 
 #include <array>
 
-APU::APU(AddressBus& bus, Frontend& frontend) : bus_(bus), frontend_(frontend) {
+APU::APU(AddressBus &bus, Frontend &frontend) : bus_(bus), frontend_(frontend) {
   mix_buffer.resize(frames_per_buffer * 2);
   register_mmio();
 
@@ -20,10 +20,8 @@ void APU::set_master_targets_from_nr50() {
   const float master_left = static_cast<float>((nr50 >> 4) & 0x07) / 7.0f;
   const float master_right = static_cast<float>(nr50 & 0x07) / 7.0f;
 
-  set_instant(master_left_cur_, master_left_target_, master_left_step_,
-              master_left);
-  set_instant(master_right_cur_, master_right_target_,
-              master_right_step_, master_right);
+  set_instant(master_left_cur_, master_left_target_, master_left_step_, master_left);
+  set_instant(master_right_cur_, master_right_target_, master_right_step_, master_right);
 }
 
 void APU::set_route_targets_from_nr51() {
@@ -32,17 +30,14 @@ void APU::set_route_targets_from_nr51() {
   for (std::size_t i = 0; i < 4; ++i) {
     const float l = (nr51 & (0x10u << i)) ? 1.0f : 0.0f;
     const float r = (nr51 & (0x01u << i)) ? 1.0f : 0.0f;
-    set_instant(route_l_cur_[i], route_l_target_[i], route_l_step_[i],
-                l);
-    set_instant(route_r_cur_[i], route_r_target_[i], route_r_step_[i],
-                r);
+    set_instant(route_l_cur_[i], route_l_target_[i], route_l_step_[i], l);
+    set_instant(route_r_cur_[i], route_r_target_[i], route_r_step_[i], r);
   }
 }
 
 void APU::advance_mixer_smoothing() {
   advance_ramp(master_left_cur_, master_left_target_, master_left_step_);
-  advance_ramp(master_right_cur_, master_right_target_,
-               master_right_step_);
+  advance_ramp(master_right_cur_, master_right_target_, master_right_step_);
   for (std::size_t i = 0; i < 4; ++i) {
     advance_ramp(route_l_cur_[i], route_l_target_[i], route_l_step_[i]);
     advance_ramp(route_r_cur_[i], route_r_target_[i], route_r_step_[i]);
@@ -150,13 +145,11 @@ void APU::step() {
       // 8-bit sample buffer from the currently selected wave RAM byte. This is
       // also the byte that CPU reads/writes are redirected to on CGB
       const auto f = ch3_frequency();
-      const auto period_tcycles =
-        static_cast<std::uint16_t>((2048u - (f & 0x7FFu)) * 2u);
+      const auto period_tcycles = static_cast<std::uint16_t>((2048u - (f & 0x7FFu)) * 2u);
       ch3_timer = period_tcycles;
 
       ch3_wave_pos = static_cast<std::uint8_t>((ch3_wave_pos + 1u) & 31u);
-      ch3_wave_byte_index =
-        static_cast<std::uint8_t>((ch3_wave_pos >> 1) & 0x0Fu);
+      ch3_wave_byte_index = static_cast<std::uint8_t>((ch3_wave_pos >> 1) & 0x0Fu);
       ch3_sample_buffer = wave_ram_bytes[ch3_wave_byte_index];
     }
   }

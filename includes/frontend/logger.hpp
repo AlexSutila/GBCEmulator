@@ -2,11 +2,11 @@
 #define GBC_LOGGER_HPP
 
 #pragma once
+#include <mutex>
 #include <string>
 #include <vector>
-#include <mutex>
 
-enum class LogLevel {Debug, Info, Status, Warning, Error};
+enum class LogLevel { Debug, Info, Status, Warning, Error };
 
 struct LogMessage {
   LogLevel level;
@@ -19,7 +19,8 @@ struct LogMessage {
 class Logger {
 public:
   // Called by ANY thread (CPU, PPU, Audio)
-  static void push(const LogLevel level, const std::string& type, const std::string& summary, const std::string& message) {
+  static void push(const LogLevel level, const std::string &type, const std::string &summary,
+                   const std::string &message) {
     std::lock_guard lock(m_mutex);
     m_queue.push_back({level, type, summary, message});
   }
@@ -28,7 +29,8 @@ public:
   // Returns all pending messages and clears the internal queue
   static std::vector<LogMessage> consume() {
     std::lock_guard lock(m_mutex);
-    if (m_queue.empty()) return {};
+    if (m_queue.empty())
+      return {};
     std::vector<LogMessage> result = std::move(m_queue);
     m_queue.clear();
     return result;
@@ -39,4 +41,4 @@ private:
   static inline std::mutex m_mutex;
 };
 
-#endif //GBC_LOGGER_HPP
+#endif // GBC_LOGGER_HPP

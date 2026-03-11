@@ -121,8 +121,7 @@ public:
 
     // If we're collecting write data bits
     if (mode_ == Mode::WriteWord || mode_ == Mode::WriteAll) {
-      in_shift_ =
-          static_cast<std::uint16_t>((in_shift_ << 1) | (di_ ? 1u : 0u));
+      in_shift_ = static_cast<std::uint16_t>((in_shift_ << 1) | (di_ ? 1u : 0u));
       ++in_bits_;
       if (in_bits_ == 16) {
         if (ew_enabled_) {
@@ -487,9 +486,7 @@ public:
   }
 
   // Treat the EEPROM as the "RAM" blob for save persistence
-  [[nodiscard]] std::span<const byte_t> ram() const noexcept override {
-    return eeprom_.bytes();
-  }
+  [[nodiscard]] std::span<const byte_t> ram() const noexcept override { return eeprom_.bytes(); }
   std::span<byte_t> ram() noexcept override { return eeprom_.bytes(); }
 
   // Optional accelerometer hook that can be called from frontend/input later:
@@ -515,24 +512,14 @@ public:
     t.eof();
   }
 
-  void parse_savestate(Savestate::Writer &t) override {
-    parse_savestate_impl(t);
-  }
-  void parse_savestate(Savestate::Reader &t) override {
-    parse_savestate_impl(t);
-  }
-  void parse_savestate(Savestate::Sizer &t) override {
-    parse_savestate_impl(t);
-  }
-  void parse_savestate(Savestate::Checker &t) override {
-    parse_savestate_impl(t);
-  }
+  void parse_savestate(Savestate::Writer &t) override { parse_savestate_impl(t); }
+  void parse_savestate(Savestate::Reader &t) override { parse_savestate_impl(t); }
+  void parse_savestate(Savestate::Sizer &t) override { parse_savestate_impl(t); }
+  void parse_savestate(Savestate::Checker &t) override { parse_savestate_impl(t); }
 
 private:
   [[nodiscard]] bool has_battery() const noexcept override { return battery_; }
-  [[nodiscard]] bool regs_enabled() const noexcept {
-    return ram_en1_ && ram_en2_;
-  }
+  [[nodiscard]] bool regs_enabled() const noexcept { return ram_en1_ && ram_en2_; }
 
   std::span<const byte_t> rom_;
   bool battery_{false};
@@ -566,6 +553,5 @@ private:
 };
 
 std::unique_ptr<Mbc> make_mbc7(cart const &c) {
-  return std::make_unique<Mbc7>(c.rom,
-                                type_has_battery(c.header.cartridge_type));
+  return std::make_unique<Mbc7>(c.rom, type_has_battery(c.header.cartridge_type));
 }

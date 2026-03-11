@@ -31,16 +31,12 @@ template <typename T> void TimerUnit::parse_savestate(T &t) {
   t.eof();
 }
 
-template void
-TimerUnit::parse_savestate<Savestate::Writer>(Savestate::Writer &);
-template void
-TimerUnit::parse_savestate<Savestate::Reader>(Savestate::Reader &);
+template void TimerUnit::parse_savestate<Savestate::Writer>(Savestate::Writer &);
+template void TimerUnit::parse_savestate<Savestate::Reader>(Savestate::Reader &);
 template void TimerUnit::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
-template void
-TimerUnit::parse_savestate<Savestate::Checker>(Savestate::Checker &);
+template void TimerUnit::parse_savestate<Savestate::Checker>(Savestate::Checker &);
 
-template <typename T>
-T *init_mmio(AddressBus *bus, const IORegisterMapping reg_id) {
+template <typename T> T *init_mmio(AddressBus *bus, const IORegisterMapping reg_id) {
   auto *reg = bus->get_mmio(reg_id);
   if (auto *casted = dynamic_cast<T *>(reg))
     return casted;
@@ -90,8 +86,7 @@ void TimerUnit::write_div() noexcept {
   sys_counter_ = 0;
 
   // falling edge -> tick
-  if (const bool next_in = edge_input(sys_counter_, tac_);
-      prev_in && !next_in) {
+  if (const bool next_in = edge_input(sys_counter_, tac_); prev_in && !next_in) {
     timer_tick_pulse();
   }
 }
@@ -119,9 +114,7 @@ void TimerUnit::write_tma(const byte_t v) noexcept {
   }
 }
 
-byte_t TimerUnit::read_tac() const noexcept {
-  return static_cast<byte_t>(0xF8 | (tac_ & 0x07));
-}
+byte_t TimerUnit::read_tac() const noexcept { return static_cast<byte_t>(0xF8 | (tac_ & 0x07)); }
 
 void TimerUnit::write_tac(byte_t v) noexcept {
   v &= 0x07;
@@ -129,20 +122,16 @@ void TimerUnit::write_tac(byte_t v) noexcept {
   // "writing to TAC may increase TIMA once"
   const bool prev_in = edge_input(sys_counter_, tac_);
   tac_ = v;
-  if (const bool next_in = edge_input(sys_counter_, tac_);
-      prev_in && !next_in) {
+  if (const bool next_in = edge_input(sys_counter_, tac_); prev_in && !next_in) {
     timer_tick_pulse();
   }
 }
 
-byte_t TimerUnit::tac_sel(const byte_t tac) noexcept {
-  return static_cast<byte_t>(tac & 0x03);
-}
+byte_t TimerUnit::tac_sel(const byte_t tac) noexcept { return static_cast<byte_t>(tac & 0x03); }
 
 bool TimerUnit::tac_en(const byte_t tac) noexcept { return (tac & 0x04) != 0; }
 
-bool TimerUnit::selected_bit(const std::uint16_t sys,
-                             const byte_t sel) noexcept {
+bool TimerUnit::selected_bit(const std::uint16_t sys, const byte_t sel) noexcept {
   // This assumes sys_ increments at the "timer's base clock".
   // Mapping chosen so TAC rates line up with classic implementations:
   // 00: bit 9, 01: bit 3, 10: bit 5, 11: bit 7

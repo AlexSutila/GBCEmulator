@@ -19,11 +19,7 @@ struct pixel {
 };
 
 // NOTE: Only applicable to object/sprite pixels in either CGB or DMG modes
-[[nodiscard]] inline bool is_transparent(const byte_t color_idx) {
-  return color_idx == 0;
-}
-[[nodiscard]] inline bool is_transparent(const pixel &px) {
-  return px.color_idx == 0;
-}
+[[nodiscard]] inline bool is_transparent(const byte_t color_idx) { return color_idx == 0; }
+[[nodiscard]] inline bool is_transparent(const pixel &px) { return px.color_idx == 0; }
 
 #endif // GBC_PIXEL_HPP

@@ -35,27 +35,20 @@ void DebuggerImGui::init() {
 
 // This is a public entry point called from the main GUI render loop
 // Replaces the build_ui functionality
-void DebuggerImGui::render(UiState &state,
-                           const std::unique_ptr<GameBoyColor> &core,
-                           SDL_Renderer *renderer,
-                           const bool fill_viewport) {
+void DebuggerImGui::render(UiState &state, const std::unique_ptr<GameBoyColor> &core,
+                           SDL_Renderer *renderer, const bool fill_viewport) {
   if (state.show_main_debug_viewer)
-    render_dialog(GbcImGui::DialogId::DebugMain, state, core, renderer,
-                  fill_viewport);
+    render_dialog(GbcImGui::DialogId::DebugMain, state, core, renderer, fill_viewport);
   if (state.show_memory_viewer)
-    render_dialog(GbcImGui::DialogId::MemoryViewer, state, core, renderer,
-                  fill_viewport);
+    render_dialog(GbcImGui::DialogId::MemoryViewer, state, core, renderer, fill_viewport);
   if (state.show_breakpoints)
-    render_dialog(GbcImGui::DialogId::Breakpoints, state, core, renderer,
-                  fill_viewport);
+    render_dialog(GbcImGui::DialogId::Breakpoints, state, core, renderer, fill_viewport);
   if (state.show_ppu_viewer)
-    render_dialog(GbcImGui::DialogId::PpuViewer, state, core, renderer,
-                  fill_viewport);
+    render_dialog(GbcImGui::DialogId::PpuViewer, state, core, renderer, fill_viewport);
 }
 
 void DebuggerImGui::render_dialog(const GbcImGui::DialogId id, UiState &state,
-                                  const std::unique_ptr<GameBoyColor> &core,
-                                  SDL_Renderer *renderer,
+                                  const std::unique_ptr<GameBoyColor> &core, SDL_Renderer *renderer,
                                   const bool fill_viewport) {
   switch (id) {
   case GbcImGui::DialogId::DebugMain:
@@ -76,9 +69,8 @@ void DebuggerImGui::render_dialog(const GbcImGui::DialogId id, UiState &state,
 }
 
 // Called by the emulator thread when a breakpoint is hit
-Debug::BreakReason
-DebuggerImGui::on_breakpoint(const std::stop_token &st,
-                             const std::unique_ptr<GameBoyColor> &core) {
+Debug::BreakReason DebuggerImGui::on_breakpoint(const std::stop_token &st,
+                                                const std::unique_ptr<GameBoyColor> &core) {
   std::unique_lock lock(dbg_mutex);
   ctx.stopped = true;
   update_state_from_core(core);
@@ -89,8 +81,7 @@ DebuggerImGui::on_breakpoint(const std::stop_token &st,
 }
 
 // Call from main thread to update visual state
-void DebuggerImGui::update_state_from_core(
-    const std::unique_ptr<GameBoyColor> &core) {
+void DebuggerImGui::update_state_from_core(const std::unique_ptr<GameBoyColor> &core) {
   ctx.sys_state = Debug::to_string(core->get_sys());
   ctx.cpu_state = Debug::to_string(core->get_cpu()->get_state());
   ctx.ppu_state = Debug::to_string(core->get_ppu()->get_state());
@@ -103,10 +94,10 @@ void DebuggerImGui::update_state_from_core(
   read_bus_data(core, ctx.bus_content_base_addr & 0xFF00);
 
   // Interrupt enable bits and flags
-  const InterruptBits *const ie_reg = dynamic_cast<InterruptBits *>(
-      address_bus->get_mmio(IORegisterMapping::MMIO_INT_ENABLE));
-  const InterruptBits *const if_reg = dynamic_cast<InterruptBits *>(
-      address_bus->get_mmio(IORegisterMapping::MMIO_INT_FLAGS));
+  const InterruptBits *const ie_reg =
+      dynamic_cast<InterruptBits *>(address_bus->get_mmio(IORegisterMapping::MMIO_INT_ENABLE));
+  const InterruptBits *const if_reg =
+      dynamic_cast<InterruptBits *>(address_bus->get_mmio(IORegisterMapping::MMIO_INT_FLAGS));
   ctx.ie_state = Debug::to_string(*ie_reg);
   ctx.if_state = Debug::to_string(*if_reg);
 
@@ -115,8 +106,7 @@ void DebuggerImGui::update_state_from_core(
   read_vram_tile_data(core, 1);
 }
 
-void DebuggerImGui::forward_stop(
-    const std::unique_ptr<GameBoyColor> &core) const {
+void DebuggerImGui::forward_stop(const std::unique_ptr<GameBoyColor> &core) const {
   std::lock_guard lock(dbg_mutex);
   if (ctx.stopped)
     core->get_debugger()->request_stop(ctx.reason);
@@ -131,8 +121,7 @@ void DebuggerImGui::request_stop() {
 }
 
 /* ImGui constructions */
-void DebuggerImGui::build_debug_window(UiState &state,
-                                       const bool fill_viewport) {
+void DebuggerImGui::build_debug_window(UiState &state, const bool fill_viewport) {
   ImGuiWindowFlags flags = 0;
   if (fill_viewport) {
     setup_full_viewport_window(flags);
@@ -205,9 +194,9 @@ void DebuggerImGui::build_debug_window(UiState &state,
   teardown_full_viewport_window(fill_viewport);
 }
 
-void DebuggerImGui::build_memory_viewer_window(
-    UiState &state, const std::unique_ptr<GameBoyColor> &core,
-    const bool fill_viewport) {
+void DebuggerImGui::build_memory_viewer_window(UiState &state,
+                                               const std::unique_ptr<GameBoyColor> &core,
+                                               const bool fill_viewport) {
   constexpr auto mask = 0xFF00;
   constexpr auto increment = 0x100;
   std::lock_guard lock(dbg_mutex);
@@ -224,13 +213,12 @@ void DebuggerImGui::build_memory_viewer_window(
 
   // Yeah... you read that right >:)
   ImGui::SeparatorText("Main Address Bus View");
-  const std::string sexy_ahh_hex_view = Debug::create_hex_view(
-      state.hex_view_base_addr & 0xFF00, ctx.bus_content);
+  const std::string sexy_ahh_hex_view =
+      Debug::create_hex_view(state.hex_view_base_addr & 0xFF00, ctx.bus_content);
   ImGui::Text("%s", sexy_ahh_hex_view.c_str());
 
-  ImGui::InputScalar("##mem_view_addr", ImGuiDataType_U16,
-                     &ctx.bus_content_base_addr, nullptr, nullptr, "%04X",
-                     ImGuiInputTextFlags_CharsHexadecimal);
+  ImGui::InputScalar("##mem_view_addr", ImGuiDataType_U16, &ctx.bus_content_base_addr, nullptr,
+                     nullptr, "%04X", ImGuiInputTextFlags_CharsHexadecimal);
   ImGui::SameLine();
   if (ImGui::Button("GoTo")) {
     read_bus_data(core, ctx.bus_content_base_addr & mask);
@@ -254,9 +242,9 @@ void DebuggerImGui::build_memory_viewer_window(
   teardown_full_viewport_window(fill_viewport);
 }
 
-void DebuggerImGui::build_breakpoints_window(
-    UiState &state, const std::unique_ptr<GameBoyColor> &core,
-    const bool fill_viewport) {
+void DebuggerImGui::build_breakpoints_window(UiState &state,
+                                             const std::unique_ptr<GameBoyColor> &core,
+                                             const bool fill_viewport) {
   std::lock_guard lock(dbg_mutex);
   ImGuiWindowFlags flags = 0;
   if (fill_viewport) {
@@ -273,8 +261,7 @@ void DebuggerImGui::build_breakpoints_window(
     return;
   }
 
-  for (const auto bps = debugger->get_breakpoints();
-       const auto &[addr, bp] : bps) {
+  for (const auto bps = debugger->get_breakpoints(); const auto &[addr, bp] : bps) {
     ImGui::PushID(addr);
 
     ImGui::Text("%s", bp.to_string().c_str());
@@ -302,8 +289,7 @@ void DebuggerImGui::build_breakpoints_window(
   teardown_full_viewport_window(fill_viewport);
 }
 
-void DebuggerImGui::build_ppu_viewer_window(UiState &state,
-                                            SDL_Renderer *renderer,
+void DebuggerImGui::build_ppu_viewer_window(UiState &state, SDL_Renderer *renderer,
                                             const bool fill_viewport) {
   std::lock_guard lock(dbg_mutex);
 
@@ -324,13 +310,11 @@ void DebuggerImGui::build_ppu_viewer_window(UiState &state,
   teardown_full_viewport_window(fill_viewport);
 }
 
-void DebuggerImGui::build_config_breakpoint_window(
-    const std::unique_ptr<GameBoyColor> &core) {
-  if (ImGui::BeginPopupModal("Configure breakpoint", nullptr,
-                             ImGuiWindowFlags_AlwaysAutoResize)) {
+void DebuggerImGui::build_config_breakpoint_window(const std::unique_ptr<GameBoyColor> &core) {
+  if (ImGui::BeginPopupModal("Configure breakpoint", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
 
-    ImGui::InputScalar("Address", ImGuiDataType_U16, &bp_prompt.addr, nullptr,
-                       nullptr, "%04X", ImGuiInputTextFlags_CharsHexadecimal);
+    ImGui::InputScalar("Address", ImGuiDataType_U16, &bp_prompt.addr, nullptr, nullptr, "%04X",
+                       ImGuiInputTextFlags_CharsHexadecimal);
     ImGui::Checkbox("Exec", &bp_prompt.execute);
     ImGui::SameLine();
     ImGui::Checkbox("Read", &bp_prompt.read);
@@ -367,8 +351,7 @@ void DebuggerImGui::ensure_tile_data_textures(SDL_Renderer *renderer) {
     return;
   }
 
-  if (tile_data_renderer_ == renderer && tile_data_textures_[0] &&
-      tile_data_textures_[1]) {
+  if (tile_data_renderer_ == renderer && tile_data_textures_[0] && tile_data_textures_[1]) {
     return;
   }
 
@@ -376,8 +359,7 @@ void DebuggerImGui::ensure_tile_data_textures(SDL_Renderer *renderer) {
   tile_data_renderer_ = renderer;
 
   for (auto &texture : tile_data_textures_) {
-    texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
-                                SDL_TEXTUREACCESS_STREAMING,
+    texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING,
                                 tile_data_width_px, tile_data_height_px);
     if (!texture) {
       destroy_tile_data_textures();
@@ -396,11 +378,9 @@ void DebuggerImGui::destroy_tile_data_textures() {
   tile_data_renderer_ = nullptr;
 }
 
-void DebuggerImGui::render_vram_tile_data(const size_t vram_bank_idx,
-                                          SDL_Renderer *renderer) {
+void DebuggerImGui::render_vram_tile_data(const size_t vram_bank_idx, SDL_Renderer *renderer) {
   constexpr float scale = 1.5f; // Lol, hardcoded bc idc
-  constexpr ImVec2 size(tile_data_width_px * scale,
-                        tile_data_height_px * scale);
+  constexpr ImVec2 size(tile_data_width_px * scale, tile_data_height_px * scale);
 
   ensure_tile_data_textures(renderer);
   if (!tile_data_textures_.at(vram_bank_idx)) {
@@ -415,9 +395,8 @@ void DebuggerImGui::render_vram_tile_data(const size_t vram_bank_idx,
   ImGui::Image(tile_data_textures_.at(vram_bank_idx), size);
 }
 
-void DebuggerImGui::read_vram_tile_data(
-    const std::unique_ptr<GameBoyColor> &core,
-    const std::size_t vram_bank_idx) {
+void DebuggerImGui::read_vram_tile_data(const std::unique_ptr<GameBoyColor> &core,
+                                        const std::size_t vram_bank_idx) {
   constexpr std::size_t tiles_per_row = tile_data_width_tiles;
   constexpr std::size_t tile_count = 384;
   assert(vram_bank_idx >= 0 && vram_bank_idx <= 1);
@@ -451,8 +430,7 @@ void DebuggerImGui::read_vram_tile_data(
 
 void DebuggerImGui::read_bus_data(const std::unique_ptr<GameBoyColor> &core,
                                   const addr_t start_addr) {
-  const auto bus =
-      core->get_bus(); // Be sure not to mess with memory mapped regs
+  const auto bus = core->get_bus(); // Be sure not to mess with memory mapped regs
   for (std::size_t offset{0}; offset < hex_viewer_bytes_shown; ++offset) {
     const addr_t cur_addr_full = (start_addr + offset) & 0xFFFF;
     ctx.bus_content.at(offset) = bus->read_byte_safe(cur_addr_full);

@@ -42,8 +42,7 @@ void SDL3Frontend::update_input_buttons(const byte_t mask, const bool pressed) {
   input_state.buttons.store(current, std::memory_order_relaxed);
 }
 
-void SDL3Frontend::handle_controller_press(const SDL_GamepadButton button,
-                                           const bool pressed) {
+void SDL3Frontend::handle_controller_press(const SDL_GamepadButton button, const bool pressed) {
   // Controllers never drive frontend widgets directly. They only update the
   // emulated joypad state seen by the core.
   update_input_buttons(controller_mask_for_button(button), pressed);

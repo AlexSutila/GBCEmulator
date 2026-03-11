@@ -12,8 +12,8 @@ Debugger::Debugger(std::function<BreakReason()> callback)
 
 void Debugger::eval(const addr_t addr, const BreakReason reason) {
   // Short circuit evaluation can prevent lookup to help performance
-  if ((reason & reason_) != 0 ||
-      (bp_map.contains(addr) && bp_map.at(addr).eval(reason))) [[unlikely]]
+  if ((reason & reason_) != 0 || (bp_map.contains(addr) && bp_map.at(addr).eval(reason)))
+      [[unlikely]]
     reason_ = on_brk_callback();
 }
 
@@ -22,10 +22,7 @@ void Debugger::eval(const BreakReason reason) {
     reason_ = on_brk_callback();
 }
 
-const std::unordered_map<addr_t, Breakpoint> &
-Debugger::get_breakpoints() const {
-  return bp_map;
-}
+const std::unordered_map<addr_t, Breakpoint> &Debugger::get_breakpoints() const { return bp_map; }
 
 void Debugger::breakpoint_add(const addr_t addr, const BreakReason reason) {
   bp_map.erase(addr);

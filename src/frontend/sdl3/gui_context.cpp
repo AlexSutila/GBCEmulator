@@ -15,32 +15,25 @@ struct DetachedDialogSpec {
   bool detached;
 };
 
-constexpr std::array<DetachedDialogSpec,
-                     static_cast<std::size_t>(DialogId::Count)>
-    kDetachedDialogSpecs{{
-        {DialogId::Settings, "Settings", &UiState::show_settings, 800, 550,
-         true},
-        {DialogId::Cheats, "Cheats", &UiState::show_cheats, 850, 600, true},
-        {DialogId::Keybinds, "Keybinds", &UiState::show_keybinds, 480, 500,
-         true},
-        {DialogId::Savestates, "Save States",
-         &UiState::show_savestate_manager, 990, 615, true},
-        {DialogId::DebugMain, "Debugger", &UiState::show_main_debug_viewer, 790,
-         460, true},
-        {DialogId::Breakpoints, "Breakpoints", &UiState::show_breakpoints, 360,
-         400, true},
-        {DialogId::MemoryViewer, "Memory Viewer", &UiState::show_memory_viewer,
-         840, 660, true},
-        {DialogId::PpuViewer, "PPU Viewer", &UiState::show_ppu_viewer, 425, 570,
-         true},
-    }};
+constexpr std::array<DetachedDialogSpec, static_cast<std::size_t>(DialogId::Count)>
+    kDetachedDialogSpecs{
+        {
+         {DialogId::Settings, "Settings", &UiState::show_settings, 800, 550, true},
+         {DialogId::Cheats, "Cheats", &UiState::show_cheats, 850, 600, true},
+         {DialogId::Keybinds, "Keybinds", &UiState::show_keybinds, 480, 500, true},
+         {DialogId::Savestates, "Save States", &UiState::show_savestate_manager, 990, 615, true},
+         {DialogId::DebugMain, "Debugger", &UiState::show_main_debug_viewer, 790, 460, true},
+         {DialogId::Breakpoints, "Breakpoints", &UiState::show_breakpoints, 360, 400, true},
+         {DialogId::MemoryViewer, "Memory Viewer", &UiState::show_memory_viewer, 840, 660, true},
+         {DialogId::PpuViewer, "PPU Viewer", &UiState::show_ppu_viewer, 425, 570, true},
+         }
+};
 
 [[nodiscard]] constexpr const DetachedDialogSpec &dialog_spec(const DialogId id) {
   return kDetachedDialogSpecs[static_cast<std::size_t>(id)];
 }
 
-SDL_HitTestResult SDLCALL detached_dialog_hit_test(SDL_Window *window,
-                                                   const SDL_Point *area,
+SDL_HitTestResult SDLCALL detached_dialog_hit_test(SDL_Window *window, const SDL_Point *area,
                                                    void * /*data*/) {
   if (!window || !area) {
     return SDL_HITTEST_NORMAL;
@@ -54,12 +47,9 @@ SDL_HitTestResult SDLCALL detached_dialog_hit_test(SDL_Window *window,
   }
 
   const float scale = SDL_GetWindowDisplayScale(window);
-  const int resize_border =
-      std::max(6, static_cast<int>(std::lround(6.0f * scale)));
-  const int title_bar_height =
-      std::max(28, static_cast<int>(std::lround(28.0f * scale)));
-  const int close_button_width =
-      std::max(48, static_cast<int>(std::lround(48.0f * scale)));
+  const int resize_border = std::max(6, static_cast<int>(std::lround(6.0f * scale)));
+  const int title_bar_height = std::max(28, static_cast<int>(std::lround(28.0f * scale)));
+  const int close_button_width = std::max(48, static_cast<int>(std::lround(48.0f * scale)));
 
   const bool left = area->x < resize_border;
   const bool right = area->x >= width - resize_border;
@@ -93,8 +83,7 @@ SDL_HitTestResult SDLCALL detached_dialog_hit_test(SDL_Window *window,
 
   const bool in_drag_strip = area->y < title_bar_height;
   const bool over_close_button = area->x >= width - close_button_width;
-  return (in_drag_strip && !over_close_button) ? SDL_HITTEST_DRAGGABLE
-                                               : SDL_HITTEST_NORMAL;
+  return (in_drag_strip && !over_close_button) ? SDL_HITTEST_DRAGGABLE : SDL_HITTEST_NORMAL;
 }
 } // namespace
 
@@ -107,8 +96,8 @@ void GbcImGui::activate_context(const ImGuiContextState &ctx) {
   active_renderer_ = ctx.renderer;
 }
 
-void GbcImGui::init_context(ImGuiContextState &ctx, SDL_Window *window,
-                            SDL_Renderer *renderer, const bool owns_window) {
+void GbcImGui::init_context(ImGuiContextState &ctx, SDL_Window *window, SDL_Renderer *renderer,
+                            const bool owns_window) {
   ctx.window = window;
   ctx.renderer = renderer;
   ctx.owns_window = owns_window;
@@ -170,9 +159,7 @@ void GbcImGui::prepare_dialog_windows(const UiState &state) {
   use_main_context();
 }
 
-bool GbcImGui::dialog_is_detached(const DialogId id) {
-  return dialog_spec(id).detached;
-}
+bool GbcImGui::dialog_is_detached(const DialogId id) { return dialog_spec(id).detached; }
 
 bool GbcImGui::has_detached_dialog_context(const DialogId id) const {
   return detached_dialogs_[dialog_index(id)].context != nullptr;
@@ -189,9 +176,8 @@ void GbcImGui::ensure_detached_dialog_context(const DialogId id) {
   }
 
   const auto &spec = dialog_spec(id);
-  SDL_Window *window =
-      SDL_CreateWindow(spec.window_title, spec.default_width,
-                       spec.default_height, kDetachedDialogWindowFlags);
+  SDL_Window *window = SDL_CreateWindow(spec.window_title, spec.default_width, spec.default_height,
+                                        kDetachedDialogWindowFlags);
   if (!window) {
     return;
   }
@@ -253,16 +239,12 @@ bool GbcImGui::rendering_detached_dialog(const DialogId id) const {
   return ctx.context && ImGui::GetCurrentContext() == ctx.context;
 }
 
-GbcImGui::ImGuiContextState *
-GbcImGui::find_context_for_window(const Uint32 window_id) {
-  return const_cast<ImGuiContextState *>(
-      std::as_const(*this).find_context_for_window(window_id));
+GbcImGui::ImGuiContextState *GbcImGui::find_context_for_window(const Uint32 window_id) {
+  return const_cast<ImGuiContextState *>(std::as_const(*this).find_context_for_window(window_id));
 }
 
-const GbcImGui::ImGuiContextState *
-GbcImGui::find_context_for_window(const Uint32 window_id) const {
-  if (main_context_.window &&
-      SDL_GetWindowID(main_context_.window) == window_id) {
+const GbcImGui::ImGuiContextState *GbcImGui::find_context_for_window(const Uint32 window_id) const {
+  if (main_context_.window && SDL_GetWindowID(main_context_.window) == window_id) {
     return &main_context_;
   }
 

@@ -8,8 +8,8 @@ byte_t do_y_px_flip(const byte_t y_px, const bool flip, const bool tall_sprites)
   return y_px & pixel_mask;
 }
 
-byte_t calc_color_idx(const byte_t lo_byte,  // Low data byte
-                      const byte_t hi_byte,  // High data byte
+byte_t calc_color_idx(const byte_t lo_byte,        // Low data byte
+                      const byte_t hi_byte,        // High data byte
                       const std::size_t pixel_idx, // Which pixel?
                       const bool flip)             // Decides flip
 {

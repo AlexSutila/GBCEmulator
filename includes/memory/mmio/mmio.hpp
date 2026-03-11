@@ -83,7 +83,7 @@ public:
    * peak() can be used by other components to read state. */
   virtual void write(byte_t value);
   [[nodiscard]] virtual byte_t peek() const; // Non-state altering read
-  virtual byte_t read(); // Not const, reads could alter internal state
+  virtual byte_t read();                     // Not const, reads could alter internal state
 
   /* Overriding this is entirely optional. The intention is, return true if this
    * should behave as an unused 'open bus - return 0xFF' in CGB mode type

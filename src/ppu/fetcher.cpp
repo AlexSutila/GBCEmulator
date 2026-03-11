@@ -62,13 +62,11 @@ template <typename T> void Fetcher::parse_savestate(T &t) {
 template void Fetcher::parse_savestate<Savestate::Writer>(Savestate::Writer &t);
 template void Fetcher::parse_savestate<Savestate::Reader>(Savestate::Reader &t);
 template void Fetcher::parse_savestate<Savestate::Sizer>(Savestate::Sizer &t);
-template void
-Fetcher::parse_savestate<Savestate::Checker>(Savestate::Checker &t);
+template void Fetcher::parse_savestate<Savestate::Checker>(Savestate::Checker &t);
 
-Fetcher::Fetcher(std::array<std::unique_ptr<byte_t[]>, 2> &vram,
-                 PPU::LCDCtrl &lcdc, MMIORegister &scy, MMIORegister &scx,
-                 MMIORegister &wy, MMIORegister &wx, PPU::OPRI &opri,
-                 PPU::LY &ly, ObjPixelFifo &obj_fifo, BgPixelFifo &bg_fifo,
+Fetcher::Fetcher(std::array<std::unique_ptr<byte_t[]>, 2> &vram, PPU::LCDCtrl &lcdc,
+                 MMIORegister &scy, MMIORegister &scx, MMIORegister &wy, MMIORegister &wx,
+                 PPU::OPRI &opri, PPU::LY &ly, ObjPixelFifo &obj_fifo, BgPixelFifo &bg_fifo,
                  runtime_sys_info &sys)
     : vram_(vram),         // For fetching tile data
       lcdc_(lcdc),         // LCD control register
@@ -122,9 +120,7 @@ bool Fetcher::is_window_visible(byte_t pixels_rendered) const {
   return (wx_px <= pixels_rendered + 7) && (ly_px >= wy_px);
 }
 
-void Fetcher::sample_window_enable() {
-  win_enable_sample = lcdc_.win_enabled();
-}
+void Fetcher::sample_window_enable() { win_enable_sample = lcdc_.win_enabled(); }
 
 void Fetcher::render_window() {
   // Window is already being rendered. Also, if a sprite fetch is in progress,
@@ -163,8 +159,7 @@ byte_t Fetcher::calc_obj_pixel_y(const Sprite &sprite) const {
 }
 
 addr_t Fetcher::calc_tilemap_base() const {
-  const auto base_addr =
-      win_started ? lcdc_.win_tilemap_base() : lcdc_.bg_tilemap_base();
+  const auto base_addr = win_started ? lcdc_.win_tilemap_base() : lcdc_.bg_tilemap_base();
   return static_cast<addr_t>(base_addr);
 }
 
@@ -213,8 +208,7 @@ bool Fetcher::has_priority(const pixel &old_px, const byte_t new_oam_idx,
 }
 
 byte_t Fetcher::calc_sprite_tile_idx(const Sprite &sprite) const {
-  if (const bool tall = lcdc_.obj_size() == PPU::SpriteHeight::TALL_SPRITES;
-      !tall)
+  if (const bool tall = lcdc_.obj_size() == PPU::SpriteHeight::TALL_SPRITES; !tall)
     // Regular 8x8 sprites do not have their LSB set by hardware
     return sprite.tile_idx;
 
@@ -264,13 +258,11 @@ byte_t Fetcher::fetch_bgwin_tile_data(const bool high) const {
     /* The calculation here is much more straight forward, simple offset. */
     return read_vram_byte(0x8000 + data_offset, bank);
   default:
-    throw std::runtime_error(
-        "BgWinFetcher::fetch_tile_data(), Invalid tilemap addressing mode");
+    throw std::runtime_error("BgWinFetcher::fetch_tile_data(), Invalid tilemap addressing mode");
   }
 }
 
-byte_t Fetcher::fetch_obj_tile_data(const Sprite &sprite,
-                                    const bool high) const {
+byte_t Fetcher::fetch_obj_tile_data(const Sprite &sprite, const bool high) const {
   constexpr auto tile_size_bytes = 16;
   constexpr auto tile_row_bytes = 2;
   const byte_t y_px_idx = calc_obj_pixel_y(sprite);
@@ -365,8 +357,7 @@ void Fetcher::do_push_data() {
 
         // If we are rendering the background, we should only push a pixel if
         // the background enable bit is set. Otherwise, just show color zero.
-        const byte_t color_idx =
-            calc_color_idx(data.data_lo, data.data_hi, shift, flip);
+        const byte_t color_idx = calc_color_idx(data.data_lo, data.data_hi, shift, flip);
         if (!discard)
           bg_fifo_.push({
               .color_idx = color_idx,
@@ -411,9 +402,8 @@ bool Fetcher::do_sprite_fetch(const Sprite &sprite) {
   // that a cleared priority bit is what gives sprites higher priority over the
   // background and window, not a set bit. This is NOT THE SAME as object prio!
   const bool take_priority = get_obj_attrib_priority(sprite.tile_attr);
-  const byte_t palette_idx = sys_.cgb_mode
-                                 ? get_obj_attrib_cgb_palette(sprite.tile_attr)
-                                 : get_obj_attrib_dmg_palette(sprite.tile_attr);
+  const byte_t palette_idx = sys_.cgb_mode ? get_obj_attrib_cgb_palette(sprite.tile_attr)
+                                           : get_obj_attrib_dmg_palette(sprite.tile_attr);
   const bool flip = get_obj_attrib_x_flip(sprite.tile_attr);
   obj_fifo_.fill_transparent();
 

@@ -105,11 +105,10 @@ private:
  */
 class ISR final : public Instruction {
 public:
-  ISR(RegisterFile *reg_file_ptr, AddressBus *bus_ptr,
-      InterruptMasterEnable &ime, InterruptBits &if_reg, InterruptBits &ie_reg)
-      : Instruction(reg_file_ptr, bus_ptr),
-        ime_(ime),   // Needed to disable interrupt master enable
-        if_(if_reg), // Determines which vector to jump to
+  ISR(RegisterFile *reg_file_ptr, AddressBus *bus_ptr, InterruptMasterEnable &ime,
+      InterruptBits &if_reg, InterruptBits &ie_reg)
+      : Instruction(reg_file_ptr, bus_ptr), ime_(ime), // Needed to disable interrupt master enable
+        if_(if_reg),                                   // Determines which vector to jump to
         ie_(ie_reg) {}
   std::string describe() override;
   std::size_t exec() override;

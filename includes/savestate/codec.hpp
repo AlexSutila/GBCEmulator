@@ -54,8 +54,7 @@ class Writer {
 public:
   constexpr SavestateOps op() const { return OP_WRITE; }
 
-  template <typename T>
-  void field_generic(const std::uint16_t tag, const T val) {
+  template <typename T> void field_generic(const std::uint16_t tag, const T val) {
     write<std::uint16_t>(tag);
     write<T>(val);
   }
@@ -75,8 +74,8 @@ public:
   }
 
   template <typename T, typename Fn>
-  void field_vector(const std::uint16_t tag, std::vector<T> &vec,
-                    const std::size_t max_size, Fn &&fn) {
+  void field_vector(const std::uint16_t tag, std::vector<T> &vec, const std::size_t max_size,
+                    Fn &&fn) {
     write<std::uint16_t>(tag);
     write<std::size_t>(vec.size());
 
@@ -91,8 +90,7 @@ public:
     buf_.insert(buf_.end(), bytes.begin(), bytes.end());
   }
 
-  template <typename T>
-  void field_optional(const std::uint16_t tag, const std::optional<T> val) {
+  template <typename T> void field_optional(const std::uint16_t tag, const std::optional<T> val) {
     write<std::uint16_t>(tag);
     if (val.has_value()) {
       write<bool>(true);
@@ -144,8 +142,8 @@ public:
   }
 
   template <typename T, typename Fn>
-  void field_vector(const std::uint16_t tag, std::vector<T> &vec,
-                    const std::size_t max_size, Fn &&fn) {
+  void field_vector(const std::uint16_t tag, std::vector<T> &vec, const std::size_t max_size,
+                    Fn &&fn) {
     check_tag(tag);
 
     const std::size_t size = read<std::size_t>();
@@ -170,8 +168,7 @@ public:
     pos_ += bytes.size();
   }
 
-  template <typename T>
-  void field_optional(const std::uint16_t tag, std::optional<T> &val) {
+  template <typename T> void field_optional(const std::uint16_t tag, std::optional<T> &val) {
     check_tag(tag);
     if (read<bool>())
       val = read<T>();
@@ -240,8 +237,8 @@ public:
   }
 
   template <typename T, typename Fn>
-  void field_vector(const std::uint16_t tag, std::vector<T> &,
-                    const std::size_t max_size, Fn &&fn) {
+  void field_vector(const std::uint16_t tag, std::vector<T> &, const std::size_t max_size,
+                    Fn &&fn) {
     check_tag(tag);
 
     const std::size_t size = read<std::size_t>();
@@ -261,8 +258,7 @@ public:
     pos_ += bytes.size();
   }
 
-  template <typename T>
-  void field_optional(const std::uint16_t tag, const std::optional<T>) {
+  template <typename T> void field_optional(const std::uint16_t tag, const std::optional<T>) {
     check_tag(tag);
 
     bool present = read<bool>();
@@ -317,8 +313,7 @@ class Sizer {
 public:
   constexpr SavestateOps op() const { return OP_SIZE; }
 
-  template <typename T>
-  void field_generic(const std::uint16_t tag, const T val) {
+  template <typename T> void field_generic(const std::uint16_t tag, const T val) {
     parse<std::uint16_t>();
     parse<T>();
   }
@@ -335,8 +330,8 @@ public:
   }
 
   template <typename T, typename Fn>
-  void field_vector(const std::uint16_t tag, std::vector<T> &vec,
-                    const std::size_t max_size, Fn &&fn) {
+  void field_vector(const std::uint16_t tag, std::vector<T> &vec, const std::size_t max_size,
+                    Fn &&fn) {
     const T dummy{}; // Need this to have some object to pass, otherwise unused
     parse<std::uint16_t>();
     parse<std::size_t>();
@@ -351,8 +346,7 @@ public:
     max_size_ += bytes.size();
   }
 
-  template <typename T>
-  void field_optional(const std::uint16_t tag, const std::optional<T> val) {
+  template <typename T> void field_optional(const std::uint16_t tag, const std::optional<T> val) {
     parse<std::uint16_t>();
     parse<bool>();
     parse<T>();

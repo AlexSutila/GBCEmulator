@@ -54,8 +54,7 @@ template <typename T> void ColorRam::parse_savestate(T &t) {
 template void ColorRam::parse_savestate<Savestate::Writer>(Savestate::Writer &);
 template void ColorRam::parse_savestate<Savestate::Reader>(Savestate::Reader &);
 template void ColorRam::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
-template void
-ColorRam::parse_savestate<Savestate::Checker>(Savestate::Checker &);
+template void ColorRam::parse_savestate<Savestate::Checker>(Savestate::Checker &);
 
 PPU::PaletteData *ColorRam::get_data_reg() { return &data_reg; }
 PPU::PaletteIdx *ColorRam::get_idx_reg() { return &idx_reg; }
@@ -72,14 +71,12 @@ PPU::PaletteIdx *ColorRam::get_idx_reg() { return &idx_reg; }
  *
  * Bit 15 is unused, but I believe it is still readable/writable.
  */
-std::uint32_t ColorRam::get_cgb_color(const byte_t color_idx,
-                                      const byte_t palette_idx) const {
+std::uint32_t ColorRam::get_cgb_color(const byte_t color_idx, const byte_t palette_idx) const {
   constexpr byte_t bytes_per_palette = 8;
   constexpr byte_t bytes_per_color = 2;
 
   // Extract the low and high bytes of the color data
-  const addr_t base_addr =
-      (palette_idx * bytes_per_palette) + (color_idx * bytes_per_color);
+  const addr_t base_addr = (palette_idx * bytes_per_palette) + (color_idx * bytes_per_color);
   const byte_t lo = mem_.at(base_addr);
   const byte_t hi = mem_.at(base_addr + 1);
 

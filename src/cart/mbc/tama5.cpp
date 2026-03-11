@@ -126,9 +126,7 @@ public:
   // Save layout:
   //   [0..31]   : 32-byte RAM
   //   [32..]    : RTC state (page0-3 regs0-C as nybbles + shared PAGE reg)
-  [[nodiscard]] std::span<const byte_t> ram() const noexcept override {
-    return save_;
-  }
+  [[nodiscard]] std::span<const byte_t> ram() const noexcept override { return save_; }
   std::span<byte_t> ram() noexcept override { return save_; }
 
   template <typename T> void parse_savestate_impl(T &t) {
@@ -145,18 +143,10 @@ public:
     t.eof();
   }
 
-  void parse_savestate(Savestate::Writer &t) override {
-    parse_savestate_impl(t);
-  }
-  void parse_savestate(Savestate::Reader &t) override {
-    parse_savestate_impl(t);
-  }
-  void parse_savestate(Savestate::Sizer &t) override {
-    parse_savestate_impl(t);
-  }
-  void parse_savestate(Savestate::Checker &t) override {
-    parse_savestate_impl(t);
-  }
+  void parse_savestate(Savestate::Writer &t) override { parse_savestate_impl(t); }
+  void parse_savestate(Savestate::Reader &t) override { parse_savestate_impl(t); }
+  void parse_savestate(Savestate::Sizer &t) override { parse_savestate_impl(t); }
+  void parse_savestate(Savestate::Checker &t) override { parse_savestate_impl(t); }
 
 private:
   std::span<const byte_t> rom_;
@@ -184,9 +174,7 @@ private:
       kRamBytes + (kRtcPages * kRtcRegsPerPage) + 1; // + PAGE reg nybble
 
   byte_t &ram_byte_(std::size_t const i) { return save_[i % kRamBytes]; }
-  [[nodiscard]] byte_t ram_byte_(std::size_t const i) const {
-    return save_[i % kRamBytes];
-  }
+  [[nodiscard]] byte_t ram_byte_(std::size_t const i) const { return save_[i % kRamBytes]; }
 
   static std::size_t rtc_base_() { return kRamBytes; }
   static std::size_t rtc_idx_(std::size_t const page, std::size_t const reg) {
@@ -196,8 +184,7 @@ private:
   byte_t &rtc_nyb_(std::size_t const page, std::size_t const reg) {
     return save_[rtc_idx_(page, reg)];
   }
-  [[nodiscard]] byte_t rtc_nyb_(std::size_t const page,
-                                std::size_t const reg) const {
+  [[nodiscard]] byte_t rtc_nyb_(std::size_t const page, std::size_t const reg) const {
     return static_cast<byte_t>(save_[rtc_idx_(page, reg)] & 0x0F);
   }
 
@@ -266,11 +253,10 @@ private:
       0x0  // C
   };
 
-  static constexpr byte_t kMaskFree[kRtcRegsPerPage] = {
-      0xF, 0xF, 0xF, 0xF, 0xF, 0xF, 0xF, 0xF, 0xF, 0xF, 0xF, 0xF, 0xF};
+  static constexpr byte_t kMaskFree[kRtcRegsPerPage] = {0xF, 0xF, 0xF, 0xF, 0xF, 0xF, 0xF,
+                                                        0xF, 0xF, 0xF, 0xF, 0xF, 0xF};
 
-  static constexpr byte_t mask_for_(std::size_t const page,
-                                    std::size_t const reg) {
+  static constexpr byte_t mask_for_(std::size_t const page, std::size_t const reg) {
     if (reg >= kRtcRegsPerPage)
       return 0x0;
     if (page == 0)
@@ -348,8 +334,7 @@ private:
   }
 
   [[nodiscard]] byte_t data_in_byte_() const {
-    return static_cast<byte_t>(((regs_[0x05] & 0x0F) << 4) |
-                               (regs_[0x04] & 0x0F));
+    return static_cast<byte_t>(((regs_[0x05] & 0x0F) << 4) | (regs_[0x04] & 0x0F));
   }
 
   void set_data_out_byte_(byte_t const b) {
@@ -361,8 +346,7 @@ private:
   // Command execution
   // ---------------------------
   void exec_command_() {
-    const auto cmd =
-        static_cast<byte_t>(((regs_[0x06] & 0x0F) << 4) | (regs_[0x07] & 0x0F));
+    const auto cmd = static_cast<byte_t>(((regs_[0x06] & 0x0F) << 4) | (regs_[0x07] & 0x0F));
 
     // 0x70-0x7F: "open bus" echo (place cmd into data-out, maybe sufficient)
     if ((cmd & 0xF0) == 0x70) {
@@ -391,8 +375,7 @@ private:
 
   void ram_op_() {
     const bool is_write = (regs_[0x06] & 0x02) != 0; // per procedure in post
-    const auto addr = static_cast<std::size_t>(((regs_[0x06] & 0x01) << 4) |
-                                               (regs_[0x07] & 0x0F));
+    const auto addr = static_cast<std::size_t>(((regs_[0x06] & 0x01) << 4) | (regs_[0x07] & 0x0F));
     if (is_write) {
       ram_byte_(addr) = data_in_byte_();
       return;
@@ -493,8 +476,7 @@ private:
   // ---------------------------
   // RTC read/write helpers
   // ---------------------------
-  [[nodiscard]] byte_t rtc_read_(std::size_t const page,
-                                 byte_t const regno) const {
+  [[nodiscard]] byte_t rtc_read_(std::size_t const page, byte_t const regno) const {
     const auto r = static_cast<byte_t>(regno & 0x0F);
 
     if (r <= 0x0C) {
@@ -533,8 +515,7 @@ private:
       if (nyb & 0x01) {
         // Reset alarm page registers (best-effort: clear the meaningful fields)
         for (std::size_t i = 0; i < kRtcRegsPerPage; ++i)
-          rtc_nyb_(1, i) =
-              static_cast<byte_t>(rtc_nyb_(1, i) & mask_for_(1, i));
+          rtc_nyb_(1, i) = static_cast<byte_t>(rtc_nyb_(1, i) & mask_for_(1, i));
       }
       if (nyb & 0x02) {
         // Reset timer: clear seconds/minutes/hours to 00:00:00
@@ -553,8 +534,7 @@ private:
   // ---------------------------
   // RTC ticking (calendar)
   // ---------------------------
-  static int days_in_month(int const year, int const month,
-                           int const leap_mod4) {
+  static int days_in_month(int const year, int const month, int const leap_mod4) {
     (void)year;
     const bool leap = (leap_mod4 == 0);
     switch (month) {
@@ -587,8 +567,8 @@ private:
     }
   }
 
-  void decode_time_(int &sec, int &min, int &hour, int &dow, int &day,
-                    int &month, int &year) const {
+  void decode_time_(int &sec, int &min, int &hour, int &dow, int &day, int &month,
+                    int &year) const {
     const int s1 = rtc_nyb_(0, 0x00) & 0xF;
     const int s10 = rtc_nyb_(0, 0x01) & 0x7;
     sec = s10 * 10 + s1;
@@ -628,8 +608,7 @@ private:
     year = y10 * 10 + y1;
   }
 
-  void encode_time_(int sec, int min, int hour, int dow, int day, int month,
-                    int year) {
+  void encode_time_(int sec, int min, int hour, int dow, int day, int month, int year) {
     sec %= 60;
     min %= 60;
     hour %= 24;
@@ -747,6 +726,5 @@ private:
 };
 
 std::unique_ptr<Mbc> make_tama5(const cart &c) {
-  return std::make_unique<Tama5>(c.rom_span(),
-                                 type_has_battery(c.header.cartridge_type));
+  return std::make_unique<Tama5>(c.rom_span(), type_has_battery(c.header.cartridge_type));
 }

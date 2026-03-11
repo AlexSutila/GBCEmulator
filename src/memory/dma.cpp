@@ -45,13 +45,10 @@ template <typename T> void ObjAttrDMA::parse_savestate(T &t) {
   t.eof();
 }
 
-template void
-ObjAttrDMA::parse_savestate<Savestate::Writer>(Savestate::Writer &);
-template void
-ObjAttrDMA::parse_savestate<Savestate::Reader>(Savestate::Reader &);
+template void ObjAttrDMA::parse_savestate<Savestate::Writer>(Savestate::Writer &);
+template void ObjAttrDMA::parse_savestate<Savestate::Reader>(Savestate::Reader &);
 template void ObjAttrDMA::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
-template void
-ObjAttrDMA::parse_savestate<Savestate::Checker>(Savestate::Checker &);
+template void ObjAttrDMA::parse_savestate<Savestate::Checker>(Savestate::Checker &);
 
 ObjAttrDMA::ObjAttrDMA(AddressBus &bus) : dma_(*this), bus_(bus) {
   src_base_addr = data_offset = 0;
@@ -231,9 +228,7 @@ addr_t VDMA::get_src_addr() const {
 }
 void VDMA::set_src_addr(const addr_t addr) { set_addr(vdma2_, vdma1_, addr); }
 
-void VDMA::set_ppu_hblank_signal(bool hblank_enabled) {
-  can_start_hdma = hblank_enabled;
-}
+void VDMA::set_ppu_hblank_signal(bool hblank_enabled) { can_start_hdma = hblank_enabled; }
 
 void VDMA::enable(DMA::VDMATransferMode mode, const byte_t blks) {
   using modes = DMA::VDMATransferMode;

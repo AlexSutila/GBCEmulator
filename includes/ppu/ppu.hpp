@@ -24,8 +24,7 @@ class Frontend;
 
 class PixelProcessingUnit : Debug::Debuggable {
 public:
-  PixelProcessingUnit(AddressBus *bus, Frontend &fe,
-                      std::optional<Debug::Debugger> &debugger,
+  PixelProcessingUnit(AddressBus *bus, Frontend &fe, std::optional<Debug::Debugger> &debugger,
                       runtime_sys_info &sys);
   template <typename T> void parse_savestate(T &t);
   void reset();
@@ -76,8 +75,7 @@ private:
   [[nodiscard]] bool next_sprite_visible(std::size_t px_idx) const;
 
   /* For popping and combining pixel data from both fifos */
-  [[nodiscard]] std::uint32_t resolve_px_priority(const pixel &bg_px,
-                                    const pixel &obj_px) const;
+  [[nodiscard]] std::uint32_t resolve_px_priority(const pixel &bg_px, const pixel &obj_px) const;
   std::optional<std::uint32_t> try_fifo_pop();
 
   /* Tracks the scanline we are currently on, and related hardware bugs */
@@ -116,12 +114,8 @@ private:
   bool blank(); // Returns true when blanking period is complete
 
   /* Interrupt helpers */
-  void request_vblank_irq() const {
-    if_reg->put_flag(InterruptFlagMask::INT_FLAG_VBLANK, true);
-  }
-  void request_lcd_irq() const {
-    if_reg->put_flag(InterruptFlagMask::INT_FLAG_LCD, true);
-  }
+  void request_vblank_irq() const { if_reg->put_flag(InterruptFlagMask::INT_FLAG_VBLANK, true); }
+  void request_lcd_irq() const { if_reg->put_flag(InterruptFlagMask::INT_FLAG_LCD, true); }
   void update_stat(PPU::StatModes new_mode);
   CircularFifo<PPU::StatModes, 4> stat_delay{};
   bool stat_irq_signal_edge{};

@@ -74,8 +74,7 @@ public:
   using WriteCallback = std::function<void(byte_t)>;
   using ReadCallback = std::function<byte_t(byte_t)>;
 
-  void configure(byte_t initial, WriteCallback on_write_cb,
-                 ReadCallback on_read_cb = {});
+  void configure(byte_t initial, WriteCallback on_write_cb, ReadCallback on_read_cb = {});
   void write(byte_t value) override;
   byte_t read() override;
 

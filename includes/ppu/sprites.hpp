@@ -23,21 +23,19 @@ struct Sprite {
   std::size_t obj_no;
 
   // For storing in containers, in case we end up doing that
-  bool operator<(const Sprite &other) const noexcept {
-    return x_pos > other.x_pos;
-  }
+  bool operator<(const Sprite &other) const noexcept { return x_pos > other.x_pos; }
 };
 
 /* These are helpers that determine if a sprite lies along a scanline, and will
  * ultimately decide if a row of pixels from a said sprite will be rendered or
  * not. */
-[[nodiscard]] bool // Helper for exact pixel position during rendering phase
-sprite_visible(byte_t x_pos,      // From object attribute memory
-               byte_t cur_pixel); // Where we're at in the scanline
-[[nodiscard]] bool // Helper for whole scanline checks during OAM memory scan
-sprite_visible(byte_t x_pos,         // From object attribute memory
-               byte_t y_pos,         // From object attribute memory
-               byte_t cur_scanline,  // Basically contents of LY register
-               bool tall_sprites);   // Is 8x16 sprite mode enabled
+[[nodiscard]] bool                  // Helper for exact pixel position during rendering phase
+sprite_visible(byte_t x_pos,        // From object attribute memory
+               byte_t cur_pixel);   // Where we're at in the scanline
+[[nodiscard]] bool                  // Helper for whole scanline checks during OAM memory scan
+sprite_visible(byte_t x_pos,        // From object attribute memory
+               byte_t y_pos,        // From object attribute memory
+               byte_t cur_scanline, // Basically contents of LY register
+               bool tall_sprites);  // Is 8x16 sprite mode enabled
 
 #endif // GBC_SPRITE_HPP

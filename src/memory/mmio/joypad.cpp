@@ -88,8 +88,7 @@ byte_t JOYP::compute_low_bits() const {
 
 void JOYP::update_output(const byte_t next_low) {
   if (if_reg) {
-    if (const auto pressed = static_cast<byte_t>(last_low & ~next_low);
-        pressed != 0)
+    if (const auto pressed = static_cast<byte_t>(last_low & ~next_low); pressed != 0)
       if_reg->put_flag(InterruptFlagMask::INT_FLAG_JOYPAD, true);
   }
   last_low = next_low;

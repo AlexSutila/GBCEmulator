@@ -22,12 +22,10 @@ class SDL3Frontend final : public Frontend {
   static constexpr int scale{4};
   static constexpr std::uint32_t black{0x03000000}; // Alpha bits are index
   static constexpr std::array<Joypad::JoypadButton, 8> button_order{
-      Joypad::JoypadButton::RIGHT,  Joypad::JoypadButton::LEFT,
-      Joypad::JoypadButton::UP,     Joypad::JoypadButton::DOWN,
-      Joypad::JoypadButton::A,      Joypad::JoypadButton::B,
+      Joypad::JoypadButton::RIGHT,  Joypad::JoypadButton::LEFT, Joypad::JoypadButton::UP,
+      Joypad::JoypadButton::DOWN,   Joypad::JoypadButton::A,    Joypad::JoypadButton::B,
       Joypad::JoypadButton::SELECT, Joypad::JoypadButton::START};
-  static constexpr int max_catchup_cycles{
-      70'224 / 4}; // 1/4 second worth of cycles at 4.19MHz
+  static constexpr int max_catchup_cycles{70'224 / 4}; // 1/4 second worth of cycles at 4.19MHz
   static constexpr int target_queue_ms{20};
 
 public:
@@ -71,8 +69,7 @@ private:
   bool consume_load_bios_request(std::optional<std::string> &bios_path);
 
   void start_rom_io_job(const std::string &source);
-  bool consume_rom_io_result(std::string &rom_path_on_disk,
-                             std::string &display_label);
+  bool consume_rom_io_result(std::string &rom_path_on_disk, std::string &display_label);
   void sync_io_status_to_ui();
   void setup_save_context(const cart &c, const std::string &display_label,
                           const std::string &rom_hash);
@@ -155,21 +152,18 @@ private:
 
   // Emulation thread loop and helpers
   std::tuple<AddressBus *const, Cartridge *const, Joypad::JOYP *const>
-  build_emulator_instance(
-      const cart &cart, const std::optional<std::string> &bios,
-      const std::optional<std::filesystem::path> &initial_save_path);
-  static std::vector<byte_t> prime_sram_saves(
-      const std::optional<std::filesystem::path> &initial_save_path,
-      Cartridge *cart_ptr);
-  void process_sram_save_events(std::vector<byte_t> save_snapshot,
-                                Cartridge *cart_ptr);
+  build_emulator_instance(const cart &cart, const std::optional<std::string> &bios,
+                          const std::optional<std::filesystem::path> &initial_save_path);
+  static std::vector<byte_t>
+  prime_sram_saves(const std::optional<std::filesystem::path> &initial_save_path,
+                   Cartridge *cart_ptr);
+  void process_sram_save_events(std::vector<byte_t> save_snapshot, Cartridge *cart_ptr);
   void process_save_state_events();
   std::vector<GameBoyColor::CheatCode> snapshot_cheats_locked() const;
   void sync_cheats_to_core(std::uint64_t &last_revision) const;
-  void emulation_thread_fn(
-      const std::stop_token &st, const cart &cart,
-      const std::optional<std::string> &bios,
-      const std::optional<std::filesystem::path> &initial_save_path);
+  void emulation_thread_fn(const std::stop_token &st, const cart &cart,
+                           const std::optional<std::string> &bios,
+                           const std::optional<std::filesystem::path> &initial_save_path);
   void advance_emulator_core(int cycles);
   void join_emu_thread_if_running();
 
@@ -191,16 +185,14 @@ private:
   void clear_quick_savestate_cache();
   void sync_quick_savestate_cache_locked();
   void upsert_quick_savestate_cache_locked(const std::filesystem::path &state_path,
-                                           const std::string &label,
-                                           std::time_t created_at);
+                                           const std::string &label, std::time_t created_at);
   void enforce_max_quicksaves_locked();
   void erase_quick_savestate_cache_entry(const std::filesystem::path &state_path);
   static void remove_savestate_triplet(const std::filesystem::path &state_path);
   [[nodiscard]] std::optional<std::filesystem::path>
   write_savestate_bundle(const std::vector<byte_t> &blob, bool quick,
                          const std::string &label = {});
-  [[nodiscard]] std::optional<std::filesystem::path>
-  latest_savestate_path() const;
+  [[nodiscard]] std::optional<std::filesystem::path> latest_savestate_path() const;
   [[nodiscard]] bool should_preempt_emu_loop() const;
 
   // Input helpers

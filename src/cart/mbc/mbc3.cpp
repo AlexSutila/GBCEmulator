@@ -14,10 +14,9 @@
 
 class Mbc3 final : public Mbc {
 public:
-  Mbc3(const std::span<const byte_t> rom, std::size_t const ram_bytes,
-       bool const battery, bool const has_rtc, bool const is_mbc30)
-      : rom_(rom), ram_(ram_bytes), battery_(battery), has_rtc_(has_rtc),
-        is_mbc30_(is_mbc30) {}
+  Mbc3(const std::span<const byte_t> rom, std::size_t const ram_bytes, bool const battery,
+       bool const has_rtc, bool const is_mbc30)
+      : rom_(rom), ram_(ram_bytes), battery_(battery), has_rtc_(has_rtc), is_mbc30_(is_mbc30) {}
 
   // TODO: currently there is no mechanism to keep the clock ticking after the
   // emulator is shut down. It is reasonable to calculate the delta between now
@@ -106,9 +105,7 @@ public:
   }
 
   [[nodiscard]] bool has_battery() const noexcept override { return battery_; }
-  [[nodiscard]] std::span<const byte_t> ram() const noexcept override {
-    return ram_;
-  }
+  [[nodiscard]] std::span<const byte_t> ram() const noexcept override { return ram_; }
   std::span<byte_t> ram() noexcept override { return ram_; }
 
   template <typename T> void parse_savestate_impl(T &t) {
@@ -133,18 +130,10 @@ public:
     t.eof();
   }
 
-  void parse_savestate(Savestate::Writer &t) override {
-    parse_savestate_impl(t);
-  }
-  void parse_savestate(Savestate::Reader &t) override {
-    parse_savestate_impl(t);
-  }
-  void parse_savestate(Savestate::Sizer &t) override {
-    parse_savestate_impl(t);
-  }
-  void parse_savestate(Savestate::Checker &t) override {
-    parse_savestate_impl(t);
-  }
+  void parse_savestate(Savestate::Writer &t) override { parse_savestate_impl(t); }
+  void parse_savestate(Savestate::Reader &t) override { parse_savestate_impl(t); }
+  void parse_savestate(Savestate::Sizer &t) override { parse_savestate_impl(t); }
+  void parse_savestate(Savestate::Checker &t) override { parse_savestate_impl(t); }
 
 private:
   std::span<const byte_t> rom_;
@@ -154,10 +143,9 @@ private:
   bool is_mbc30_{};
 
   bool ram_rtc_enabled_{false}; // RAMR? 0b1010 enables RAM and RTC
-  byte_t rom_bank_{
-      0b0000001}; // ROMB except all 7 bits are used; zero value disallowed
-  byte_t sel_{0}; // RAM bank or RTC reg selector
-  byte_t latch_prev_{0}; // Latch clock data
+  byte_t rom_bank_{0b0000001};  // ROMB except all 7 bits are used; zero value disallowed
+  byte_t sel_{0};               // RAM bank or RTC reg selector
+  byte_t latch_prev_{0};        // Latch clock data
 
   struct RtcRegs { // Implements RTC Register 08-0C. Note: this is an
                    // abstraction, not a 1-to-1 replication of hw reg behavior
@@ -223,8 +211,8 @@ private:
       r.day = static_cast<std::uint16_t>((r.day & 0x100) | val);
       break;
     case 0x0C: {
-      r.day = static_cast<std::uint16_t>(
-          (r.day & 0x0FF) | ((val & 0x01) << 8)); // Hope the math is right...
+      r.day = static_cast<std::uint16_t>((r.day & 0x0FF) |
+                                         ((val & 0x01) << 8)); // Hope the math is right...
       r.halt = (val & 0x40) != 0;
       r.carry = (val & 0x80) != 0;
       break;
@@ -259,23 +247,19 @@ private:
     }
   }
 
-  [[nodiscard]] byte_t ram_at(std::size_t const bank,
-                              std::size_t const off) const {
+  [[nodiscard]] byte_t ram_at(std::size_t const bank, std::size_t const off) const {
     if (ram_.empty())
       return open_bus();
-    const std::size_t banks =
-        std::max<std::size_t>(1, ram_.size() / kRamBankSize);
+    const std::size_t banks = std::max<std::size_t>(1, ram_.size() / kRamBankSize);
     const std::size_t b = clamp_bank(bank, banks);
     const std::size_t idx = (b * kRamBankSize + off) % ram_.size();
     return ram_[idx];
   }
 
-  void ram_write(std::size_t const bank, std::size_t const off,
-                 byte_t const v) {
+  void ram_write(std::size_t const bank, std::size_t const off, byte_t const v) {
     if (ram_.empty())
       return;
-    const std::size_t banks =
-        std::max<std::size_t>(1, ram_.size() / kRamBankSize);
+    const std::size_t banks = std::max<std::size_t>(1, ram_.size() / kRamBankSize);
     const std::size_t b = clamp_bank(bank, banks);
     const std::size_t idx = (b * kRamBankSize + off) % ram_.size();
     ram_[idx] = v;
@@ -283,10 +267,9 @@ private:
 };
 
 std::unique_ptr<Mbc> make_mbc3(const cart &c) {
-  const bool has_rtc =
-      c.header.cartridge_type == 0x0F || // MBC3+TIMER+BATTERY
-      c.header.cartridge_type == 0x10;   // MBC3+TIMER+RAM+BATTERY
+  const bool has_rtc = c.header.cartridge_type == 0x0F || // MBC3+TIMER+BATTERY
+                       c.header.cartridge_type == 0x10;   // MBC3+TIMER+RAM+BATTERY
   return std::make_unique<Mbc3>(c.rom_span(), c.declared_ram_bytes,
-                                type_has_battery(c.header.cartridge_type),
-                                has_rtc, c.special_mbc == MBC30_t);
+                                type_has_battery(c.header.cartridge_type), has_rtc,
+                                c.special_mbc == MBC30_t);
 }

@@ -30,26 +30,22 @@ namespace PPU {
 /* LCD Control helpers */
 bool LCDCtrl::lcd_enabled() const { return (state_ & 0x80) != 0; }
 TileMapArea LCDCtrl::win_tilemap_base() const {
-  return (state_ & 0x40) != 0 ? TileMapArea::HI_TILEMAP_BASE
-                              : TileMapArea::LO_TILEMAP_BASE;
+  return (state_ & 0x40) != 0 ? TileMapArea::HI_TILEMAP_BASE : TileMapArea::LO_TILEMAP_BASE;
 }
 
 bool LCDCtrl::win_enabled() const { return (state_ & 0x20) != 0; }
 TileDataArea LCDCtrl::bg_win_data_area() const {
-  return (state_ & 0x10) != 0 ? TileDataArea::HI_TILEDATA_BASE
-                              : TileDataArea::LO_TILEDATA_BASE;
+  return (state_ & 0x10) != 0 ? TileDataArea::HI_TILEDATA_BASE : TileDataArea::LO_TILEDATA_BASE;
 }
 TileMapArea LCDCtrl::bg_tilemap_base() const {
-  return (state_ & 0x08) != 0 ? TileMapArea::HI_TILEMAP_BASE
-                              : TileMapArea::LO_TILEMAP_BASE;
+  return (state_ & 0x08) != 0 ? TileMapArea::HI_TILEMAP_BASE : TileMapArea::LO_TILEMAP_BASE;
 }
 bool LCDCtrl::bg_win_en_priority() const { return (state_ & 0x1) != 0; }
 
 /* The return value here will always be in reference to the height (pixels) of
  * the sprites. Sprites will never not be 8 pixels wide. */
 SpriteHeight LCDCtrl::obj_size() const {
-  return (state_ & 0x04) != 0 ? SpriteHeight::TALL_SPRITES
-                              : SpriteHeight::SHORT_SPRITES;
+  return (state_ & 0x04) != 0 ? SpriteHeight::TALL_SPRITES : SpriteHeight::SHORT_SPRITES;
 }
 bool LCDCtrl::obj_enable() const { return (state_ & 0x02) != 0; }
 
@@ -129,14 +125,10 @@ template <typename T> void BootROMCtrl::parse_savestate(T &t) {
   t.field_generic(1, map_boot_rom); // Not enum worthy
 }
 
-template void
-BootROMCtrl::parse_savestate<Savestate::Writer>(Savestate::Writer &);
-template void
-BootROMCtrl::parse_savestate<Savestate::Reader>(Savestate::Reader &);
-template void
-BootROMCtrl::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
-template void
-BootROMCtrl::parse_savestate<Savestate::Checker>(Savestate::Checker &);
+template void BootROMCtrl::parse_savestate<Savestate::Writer>(Savestate::Writer &);
+template void BootROMCtrl::parse_savestate<Savestate::Reader>(Savestate::Reader &);
+template void BootROMCtrl::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
+template void BootROMCtrl::parse_savestate<Savestate::Checker>(Savestate::Checker &);
 
 /* Writing this register disables the boot ROM */
 void BootROMCtrl::write(const byte_t value) {
@@ -146,9 +138,7 @@ void BootROMCtrl::write(const byte_t value) {
 
 bool BootROMCtrl::boot_rom_enabled() const { return map_boot_rom; }
 
-void BootROMCtrl::set_boot_rom_enabled(const bool enabled) {
-  map_boot_rom = enabled;
-}
+void BootROMCtrl::set_boot_rom_enabled(const bool enabled) { map_boot_rom = enabled; }
 
 namespace Timer {
 

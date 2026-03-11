@@ -34,8 +34,7 @@ bool file_starts_with_zip_magic(const std::filesystem::path &p) {
   return sig[0] == 0x50 && sig[1] == 0x4B && sig[2] == 0x03 && sig[3] == 0x04;
 }
 
-std::filesystem::path make_temp_file(const std::filesystem::path &root,
-                                     std::string_view suffix) {
+std::filesystem::path make_temp_file(const std::filesystem::path &root, std::string_view suffix) {
   std::random_device rd;
   std::mt19937_64 gen(rd());
   std::uniform_int_distribution<std::uint64_t> dis;
@@ -47,11 +46,10 @@ std::filesystem::path make_temp_file(const std::filesystem::path &root,
       return p;
   }
 
-  const auto name = "gbc_" +
-                    std::to_string(std::chrono::high_resolution_clock::now()
-                                       .time_since_epoch()
-                                       .count()) +
-                    std::string(suffix);
+  const auto name =
+      "gbc_" +
+      std::to_string(std::chrono::high_resolution_clock::now().time_since_epoch().count()) +
+      std::string(suffix);
   return root / name;
 }
 
@@ -60,14 +58,13 @@ struct CurlDownloadCtx {
   std::stop_token st;
 };
 
-size_t curl_write_file_cb(const char *ptr, const size_t size,
-                          const size_t nmemb, void *userdata) {
+size_t curl_write_file_cb(const char *ptr, const size_t size, const size_t nmemb, void *userdata) {
   auto *fp = static_cast<FILE *>(userdata);
   return std::fwrite(ptr, size, nmemb, fp) * size;
 }
 
-int curl_xferinfo_cb(void *clientp, const curl_off_t dltotal,
-                     const curl_off_t dlnow, curl_off_t, curl_off_t) {
+int curl_xferinfo_cb(void *clientp, const curl_off_t dltotal, const curl_off_t dlnow, curl_off_t,
+                     curl_off_t) {
   const auto *ctx = static_cast<CurlDownloadCtx *>(clientp);
   if (ctx && ctx->st.stop_requested())
     return 1;
@@ -112,10 +109,9 @@ bool SDL3Frontend::consume_rom_io_result(std::string &rom_path_on_disk,
   return true;
 }
 
-
-int SDL3Frontend::request_zip_choice_blocking(
-    const std::string &zip_label, const std::vector<std::string> &entries,
-    const std::stop_token &st) {
+int SDL3Frontend::request_zip_choice_blocking(const std::string &zip_label,
+                                              const std::vector<std::string> &entries,
+                                              const std::stop_token &st) {
   {
     std::lock_guard lock(ui_mutex);
     ui_state.zip_picker_title = zip_label;
@@ -130,8 +126,7 @@ int SDL3Frontend::request_zip_choice_blocking(
   zip_choice_result = -1;
   zip_choice_cancelled = false;
 
-  zip_choice_cv.wait(
-      lk, [&] { return !zip_choice_pending || st.stop_requested(); });
+  zip_choice_cv.wait(lk, [&] { return !zip_choice_pending || st.stop_requested(); });
 
   if (st.stop_requested() || zip_choice_cancelled)
     return -1;
@@ -215,8 +210,7 @@ void SDL3Frontend::start_rom_io_job(const std::string &source) {
       io_busy.store(false, std::memory_order_relaxed);
     };
 
-    auto succeed = [&](const std::string &rom_on_disk,
-                       const std::string &label) {
+    auto succeed = [&](const std::string &rom_on_disk, const std::string &label) {
       {
         std::lock_guard lk(rom_io_mutex);
         rom_ready_path = rom_on_disk;
@@ -237,12 +231,10 @@ void SDL3Frontend::start_rom_io_job(const std::string &source) {
       std::string suffix = ".bin";
       {
         const auto q = source.find_first_of("?#");
-        const std::string base =
-            (q == std::string::npos) ? source : source.substr(0, q);
+        const std::string base = (q == std::string::npos) ? source : source.substr(0, q);
         const auto slash = base.find_last_of('/');
         const auto dot = base.find_last_of('.');
-        if (dot != std::string::npos &&
-            (slash == std::string::npos || dot > slash)) {
+        if (dot != std::string::npos && (slash == std::string::npos || dot > slash)) {
           suffix = base.substr(dot);
           if (suffix.size() > 16)
             suffix = ".bin";
@@ -307,8 +299,8 @@ void SDL3Frontend::start_rom_io_job(const std::string &source) {
       return;
     }
 
-    const bool is_zip = has_ext(local_path.string(), ".zip") ||
-                        file_starts_with_zip_magic(local_path);
+    const bool is_zip =
+        has_ext(local_path.string(), ".zip") || file_starts_with_zip_magic(local_path);
 
     if (!is_zip) {
       if (looks_like_url(source))
@@ -336,8 +328,7 @@ void SDL3Frontend::start_rom_io_job(const std::string &source) {
         mz_zip_archive_file_stat stt{};
         if (!mz_zip_reader_file_stat(&zip, i, &stt))
           continue;
-        const std::string name =
-            stt.m_filename[0] != '\0' ? stt.m_filename : "";
+        const std::string name = stt.m_filename[0] != '\0' ? stt.m_filename : "";
         if (has_ext(name, ".gb") || has_ext(name, ".gbc")) {
           candidate_indices.push_back(i);
           candidate_names.push_back(name);
@@ -371,8 +362,7 @@ void SDL3Frontend::start_rom_io_job(const std::string &source) {
     set_status("Extracting ROM...");
     io_progress.store(-1.0f, std::memory_order_relaxed);
 
-    const std::string out_suffix =
-        has_ext(chosen_name, ".gbc") ? ".gbc" : ".gb";
+    const std::string out_suffix = has_ext(chosen_name, ".gbc") ? ".gbc" : ".gb";
     const auto out_rom = make_temp_file(tmp_root, out_suffix);
 
     {
@@ -381,8 +371,8 @@ void SDL3Frontend::start_rom_io_job(const std::string &source) {
         fail("Failed to re-open ZIP for extraction");
         return;
       }
-      const bool ok = mz_zip_reader_extract_to_file(
-                          &zip, chosen_idx, out_rom.string().c_str(), 0) != 0;
+      const bool ok =
+          mz_zip_reader_extract_to_file(&zip, chosen_idx, out_rom.string().c_str(), 0) != 0;
       mz_zip_reader_end(&zip);
       if (!ok) {
         std::error_code ec;
@@ -397,4 +387,3 @@ void SDL3Frontend::start_rom_io_job(const std::string &source) {
     succeed(out_rom.string(), label);
   });
 }
-

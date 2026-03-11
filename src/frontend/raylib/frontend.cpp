@@ -22,11 +22,11 @@ EM_JS(int, web_load_active_save, (std::uint8_t *out_ptr, int out_cap), {
     if (!out_ptr || out_cap <= 0)
       return 0;
     const api = globalThis.IroGBSaves;
-    if (!api || typeof api.loadActiveSram !== "function")
+    if (!api || typeof api.loadActiveSram != = "function")
       return 0;
 
     const bytes = api.loadActiveSram();
-    if (!(bytes instanceof Uint8Array) || bytes.length === 0)
+    if (!(bytes instanceof Uint8Array) || bytes.length == = 0)
       return 0;
 
     const n = Math.min(bytes.length, out_cap | 0) | 0;
@@ -43,7 +43,7 @@ EM_JS(int, web_save_active_save, (const std::uint8_t *data_ptr, int len), {
     if (!data_ptr || len <= 0)
       return 0;
     const api = globalThis.IroGBSaves;
-    if (!api || typeof api.saveActiveSram !== "function")
+    if (!api || typeof api.saveActiveSram != = "function")
       return 0;
 
     const start = data_ptr >>> 0;
@@ -56,13 +56,15 @@ EM_JS(int, web_save_active_save, (const std::uint8_t *data_ptr, int len), {
   }
 });
 
-EM_JS(int, web_load_active_state, (std::uint8_t * out_ptr, int out_cap), {
+EM_JS(int, web_load_active_state, (std::uint8_t *out_ptr, int out_cap), {
   try {
     const api = globalThis.IroGBSaves;
-    if (!api || typeof api.loadActiveState !== "function") return 0;
+    if (!api || typeof api.loadActiveState != = "function")
+      return 0;
 
     const bytes = api.loadActiveState();
-    if (!(bytes instanceof Uint8Array) || bytes.length === 0) return 0;
+    if (!(bytes instanceof Uint8Array) || bytes.length == = 0)
+      return 0;
 
     if (!out_ptr || out_cap <= 0) {
       return bytes.length | 0;
@@ -77,11 +79,13 @@ EM_JS(int, web_load_active_state, (std::uint8_t * out_ptr, int out_cap), {
   }
 });
 
-EM_JS(int, web_save_active_state, (const std::uint8_t * data_ptr, int len), {
+EM_JS(int, web_save_active_state, (const std::uint8_t *data_ptr, int len), {
   try {
-    if (!data_ptr || len <= 0) return 0;
+    if (!data_ptr || len <= 0)
+      return 0;
     const api = globalThis.IroGBSaves;
-    if (!api || typeof api.saveActiveState !== "function") return 0;
+    if (!api || typeof api.saveActiveState != = "function")
+      return 0;
 
     const start = data_ptr >>> 0;
     const end = (start + (len | 0)) >>> 0;
@@ -94,20 +98,18 @@ EM_JS(int, web_save_active_state, (const std::uint8_t * data_ptr, int len), {
 });
 
 EM_JS(int, web_set_pending_state_thumb_rgba,
-      (const std::uint8_t * data_ptr, int len, int width, int height), {
+      (const std::uint8_t *data_ptr, int len, int width, int height), {
         try {
           if (!data_ptr || len <= 0 || width <= 0 || height <= 0)
             return 0;
           const api = globalThis.IroGBSaves;
-          if (!api || typeof api.setPendingStateThumbnailRgba !== "function")
+          if (!api || typeof api.setPendingStateThumbnailRgba != = "function")
             return 0;
 
           const start = data_ptr >>> 0;
           const end = (start + (len | 0)) >>> 0;
           const bytes = new Uint8Array(HEAPU8.subarray(start, end));
-          return api.setPendingStateThumbnailRgba(bytes, width | 0, height | 0)
-                     ? 1
-                     : 0;
+          return api.setPendingStateThumbnailRgba(bytes, width | 0, height | 0) ? 1 : 0;
         } catch (err) {
           console.warn("Failed to stage savestate thumbnail:", err);
           return -1;
@@ -120,8 +122,7 @@ static std::uint8_t g_web_input_state = 0;
 
 extern "C" {
 // 0=Right, 1=Left, 2=Up, 3=Down, 4=A, 5=B, 6=Select, 7=Start
-EMSCRIPTEN_KEEPALIVE void emscripten_set_button(const int btn,
-                                                const int pressed) {
+EMSCRIPTEN_KEEPALIVE void emscripten_set_button(const int btn, const int pressed) {
   using JB = Joypad::JoypadButton;
   std::uint8_t mask = 0;
   switch (btn) {
@@ -173,8 +174,8 @@ static void frame_cb(void *user) {
 namespace {
 std::string sanitize_label(std::string s, const std::size_t max_len = 32) {
   for (char &c : s) {
-    const bool keep = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
-                      (c >= '0' && c <= '9') || c == '-' || c == '_';
+    const bool keep = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+                      c == '-' || c == '_';
     c = keep ? c : '_';
   }
 
@@ -191,8 +192,7 @@ std::string sanitize_label(std::string s, const std::size_t max_len = 32) {
   return s;
 }
 
-std::optional<std::vector<byte_t>>
-read_blob_file(const std::filesystem::path &path) {
+std::optional<std::vector<byte_t>> read_blob_file(const std::filesystem::path &path) {
   std::ifstream f(path, std::ios::binary | std::ios::ate);
   if (!f)
     return std::nullopt;
@@ -208,8 +208,7 @@ read_blob_file(const std::filesystem::path &path) {
   return out;
 }
 
-bool write_blob_file(const std::filesystem::path &path,
-                     const std::vector<byte_t> &data) {
+bool write_blob_file(const std::filesystem::path &path, const std::vector<byte_t> &data) {
   if (path.empty() || data.empty())
     return false;
 
@@ -222,19 +221,16 @@ bool write_blob_file(const std::filesystem::path &path,
   if (!f)
     return false;
 
-  f.write(reinterpret_cast<const char *>(data.data()),
-          static_cast<std::streamsize>(data.size()));
+  f.write(reinterpret_cast<const char *>(data.data()), static_cast<std::streamsize>(data.size()));
   return static_cast<bool>(f);
 }
 } // namespace
 
 static std::uint32_t format_color(const std::uint32_t c) {
-  return ((c & 0x00FF0000) >> 16) | ((c & 0x0000FF00)) |
-         ((c & 0x000000FF) << 16) | 0xFF000000;
+  return ((c & 0x00FF0000) >> 16) | ((c & 0x0000FF00)) | ((c & 0x000000FF) << 16) | 0xFF000000;
 }
 
-std::filesystem::path RaylibFrontend::build_desktop_savestate_path(
-    const cart &c) {
+std::filesystem::path RaylibFrontend::build_desktop_savestate_path(const cart &c) {
   std::string stem = c.file_path.stem().string();
   if (stem.empty())
     stem = c.header.title();
@@ -278,8 +274,7 @@ std::array<std::uint32_t, 144 * 160> RaylibFrontend::get_frame() {
   return frame_buf.at(display_idx);
 }
 
-void RaylibFrontend::put_pixel(const int x, const int y,
-                               const std::uint32_t c) {
+void RaylibFrontend::put_pixel(const int x, const int y, const std::uint32_t c) {
   if (x < 0 || x >= fb_width || y < 0 || y >= fb_height) [[unlikely]]
     return;
   frame_buf.at(write_idx).at(y * fb_width + x) = format_color(c);
@@ -366,8 +361,8 @@ void RaylibFrontend::read_inputs() {
     read_controller_inputs(input_state);
 
   // Transfer button state to internal joypad register
-  auto *const joyp = dynamic_cast<Joypad::JOYP *>(
-      gbc->get_bus()->get_mmio(IORegisterMapping::MMIO_JOYPAD));
+  auto *const joyp =
+      dynamic_cast<Joypad::JOYP *>(gbc->get_bus()->get_mmio(IORegisterMapping::MMIO_JOYPAD));
   if (!joyp)
     throw std::runtime_error("RaylibFrontend::read_inputs()");
   joyp->set_state(input_state);
@@ -391,10 +386,8 @@ std::vector<std::uint8_t> RaylibFrontend::capture_savestate_thumbnail_rgba() con
     const int sy = (y * fb_height) / savestate_thumb_h;
     for (int x = 0; x < savestate_thumb_w; ++x) {
       const int sx = (x * fb_width) / savestate_thumb_w;
-      const std::uint32_t px =
-          src[static_cast<std::size_t>(sy) * fb_width + sx];
-      const std::size_t out_i =
-          static_cast<std::size_t>(y * savestate_thumb_w + x) * 4;
+      const std::uint32_t px = src[static_cast<std::size_t>(sy) * fb_width + sx];
+      const std::size_t out_i = static_cast<std::size_t>(y * savestate_thumb_w + x) * 4;
       out[out_i + 0] = static_cast<std::uint8_t>(px & 0xFF);         // R
       out[out_i + 1] = static_cast<std::uint8_t>((px >> 8) & 0xFF);  // G
       out[out_i + 2] = static_cast<std::uint8_t>((px >> 16) & 0xFF); // B
@@ -414,17 +407,14 @@ void RaylibFrontend::process_quicksave_request() {
 
 #ifdef __EMSCRIPTEN__
     if (const auto thumb = capture_savestate_thumbnail_rgba(); !thumb.empty()) {
-      (void)web_set_pending_state_thumb_rgba(
-          thumb.data(), static_cast<int>(thumb.size()), savestate_thumb_w,
-          savestate_thumb_h);
+      (void)web_set_pending_state_thumb_rgba(thumb.data(), static_cast<int>(thumb.size()),
+                                             savestate_thumb_w, savestate_thumb_h);
     }
-    const int rc =
-        web_save_active_state(blob.data(), static_cast<int>(blob.size()));
+    const int rc = web_save_active_state(blob.data(), static_cast<int>(blob.size()));
     if (rc > 0) {
       TraceLog(LOG_INFO, "Savestate quicksave created (web localStorage)");
     } else {
-      TraceLog(LOG_WARNING,
-               "Savestate save failed: localStorage backend unavailable");
+      TraceLog(LOG_WARNING, "Savestate save failed: localStorage backend unavailable");
     }
 #else
     if (quick_savestate_path_.empty()) {
@@ -433,11 +423,9 @@ void RaylibFrontend::process_quicksave_request() {
     }
 
     if (write_blob_file(quick_savestate_path_, blob)) {
-      TraceLog(LOG_INFO, "Savestate quicksave created: %s",
-               quick_savestate_path_.string().c_str());
+      TraceLog(LOG_INFO, "Savestate quicksave created: %s", quick_savestate_path_.string().c_str());
     } else {
-      TraceLog(LOG_WARNING, "Savestate save failed: %s",
-               quick_savestate_path_.string().c_str());
+      TraceLog(LOG_WARNING, "Savestate save failed: %s", quick_savestate_path_.string().c_str());
     }
 #endif
   } catch (const std::exception &e) {
@@ -457,8 +445,7 @@ void RaylibFrontend::process_quickload_request() {
     }
 
     blob.resize(static_cast<std::size_t>(size));
-    const int copied =
-        web_load_active_state(blob.data(), static_cast<int>(blob.size()));
+    const int copied = web_load_active_state(blob.data(), static_cast<int>(blob.size()));
     if (copied <= 0 || copied > size) {
       TraceLog(LOG_WARNING, "Savestate quickload failed: invalid payload");
       return;
@@ -530,18 +517,15 @@ void RaylibFrontend::present() {
   // Rendering
   UpdateTexture(texture, frame_buf.at(display_idx).data());
   BeginDrawing();
-  DrawTexturePro(texture,
-                 Rectangle{0, 0, static_cast<float>(fb_width),
-                           static_cast<float>(fb_height)},
-                 Rectangle{0, 0, static_cast<float>(GetScreenWidth()),
-                           static_cast<float>(GetScreenHeight())},
-                 Vector2{0, 0}, 0.0f, WHITE);
+  DrawTexturePro(
+      texture, Rectangle{0, 0, static_cast<float>(fb_width), static_cast<float>(fb_height)},
+      Rectangle{0, 0, static_cast<float>(GetScreenWidth()), static_cast<float>(GetScreenHeight())},
+      Vector2{0, 0}, 0.0f, WHITE);
   EndDrawing();
 }
 
 // ---- Audio ring buffer helpers (rb_size counts floats) ----
-void RaylibFrontend::queue_audio_samples(const float *samples,
-                                         std::size_t sample_count) {
+void RaylibFrontend::queue_audio_samples(const float *samples, std::size_t sample_count) {
   if (!samples || sample_count == 0)
     return;
 
@@ -588,8 +572,8 @@ void RaylibFrontend::pump_audio() {
 #endif
 
   int refills = 0;
-  while (audio_prime > 0 || (refills < max_refills_per_pump &&
-                             IsAudioStreamProcessed(audio_stream))) {
+  while (audio_prime > 0 ||
+         (refills < max_refills_per_pump && IsAudioStreamProcessed(audio_stream))) {
 
     constexpr std::size_t need = audio_chunk_frames * audio_channels; // floats
     std::size_t got = 0;
@@ -631,8 +615,7 @@ void RaylibFrontend::tick_common(double dt_ms) {
     process_pending_savestate_request();
 
   while (cycles_to_run) {
-    const std::size_t block =
-        std::min<std::size_t>(cycles_to_run, cycles_per_frame);
+    const std::size_t block = std::min<std::size_t>(cycles_to_run, cycles_per_frame);
     advance_cycles_with_preemption(block);
     cycles_to_run -= block;
     pump_audio();

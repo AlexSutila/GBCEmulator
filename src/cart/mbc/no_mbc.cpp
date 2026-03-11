@@ -9,8 +9,7 @@
 // logic
 class NoMbc final : public Mbc {
 public:
-  NoMbc(const std::span<const byte_t> rom, const std::size_t ram_bytes,
-        const bool battery)
+  NoMbc(const std::span<const byte_t> rom, const std::size_t ram_bytes, const bool battery)
       : rom_(rom), ram_(ram_bytes), battery_(battery) {}
 
   byte_t read(const addr_t addr) override {
@@ -35,9 +34,7 @@ public:
   }
 
   [[nodiscard]] bool has_battery() const noexcept override { return battery_; }
-  [[nodiscard]] std::span<const byte_t> ram() const noexcept override {
-    return ram_;
-  }
+  [[nodiscard]] std::span<const byte_t> ram() const noexcept override { return ram_; }
   std::span<byte_t> ram() noexcept override { return ram_; }
 
   // Not needed, left blank intentionally

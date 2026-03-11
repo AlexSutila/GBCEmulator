@@ -74,8 +74,7 @@ template <typename T> void LR35902::parse_savestate(T &t) {
 template void LR35902::parse_savestate<Savestate::Writer>(Savestate::Writer &);
 template void LR35902::parse_savestate<Savestate::Reader>(Savestate::Reader &);
 template void LR35902::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
-template void
-LR35902::parse_savestate<Savestate::Checker>(Savestate::Checker &);
+template void LR35902::parse_savestate<Savestate::Checker>(Savestate::Checker &);
 
 LR35902::LR35902(AddressBus *bus_ptr, std::optional<Debug::Debugger> &debugger,
                  runtime_sys_info &sys)
@@ -152,9 +151,7 @@ LR35902::ProcessorState LR35902::get_state() const {
   return state_;
 }
 
-bool LR35902::savestate_ready() const {
-  return state == STATE_FETCH || state == STATE_HALTED;
-}
+bool LR35902::savestate_ready() const { return state == STATE_FETCH || state == STATE_HALTED; }
 
 // Lower bits get higher priority, return true if interrupted
 bool LR35902::should_interrupt() const {
@@ -180,8 +177,8 @@ void LR35902::do_fetch() {
   // Handle un-implemented opcodes
   if (!ins) [[unlikely]] {
     std::ostringstream oss;
-    oss << "Unimplemented opcode: 0x" << std::uppercase << std::hex
-        << std::setw(2) << std::setfill('0') << static_cast<int>(op);
+    oss << "Unimplemented opcode: 0x" << std::uppercase << std::hex << std::setw(2)
+        << std::setfill('0') << static_cast<int>(op);
     throw std::logic_error(oss.str());
   }
   ins_ = ins.get();

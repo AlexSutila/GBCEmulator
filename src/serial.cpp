@@ -21,13 +21,10 @@ template <typename T> void SerialUnit::parse_savestate(T &t) {
   t.eof();
 }
 
-template void
-SerialUnit::parse_savestate<Savestate::Writer>(Savestate::Writer &);
-template void
-SerialUnit::parse_savestate<Savestate::Reader>(Savestate::Reader &);
+template void SerialUnit::parse_savestate<Savestate::Writer>(Savestate::Writer &);
+template void SerialUnit::parse_savestate<Savestate::Reader>(Savestate::Reader &);
 template void SerialUnit::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
-template void
-SerialUnit::parse_savestate<Savestate::Checker>(Savestate::Checker &);
+template void SerialUnit::parse_savestate<Savestate::Checker>(Savestate::Checker &);
 
 /*
  * TODO: We do not actually implement serial data transfers. The idea of doing
@@ -36,7 +33,7 @@ SerialUnit::parse_savestate<Savestate::Checker>(Savestate::Checker &);
  * systems... hence, the serial unit doesn't actually do anything as of now.
  */
 SerialUnit::SerialUnit(AddressBus *const bus)
-    : serial_data(0), // Should be initialized first because of SC dependency
+    : serial_data(0),          // Should be initialized first because of SC dependency
       serial_ctrl(serial_data) // Fires the interrupt immediately for now
 {
   using mmio = IORegisterMapping;
@@ -47,8 +44,8 @@ SerialUnit::SerialUnit(AddressBus *const bus)
 
   /* Configure connection between SC and IF. This really shouldn't happen but
    * we're doing this because we just fire the interrupt on SC writes. */
-  auto *const if_reg = dynamic_cast<InterruptBits *>(
-      bus->get_mmio(IORegisterMapping::MMIO_INT_FLAGS));
+  auto *const if_reg =
+      dynamic_cast<InterruptBits *>(bus->get_mmio(IORegisterMapping::MMIO_INT_FLAGS));
   if (!if_reg)
     throw std::runtime_error("Failed to configure serial MMIO");
   serial_ctrl.set_interrupt_reg(if_reg);

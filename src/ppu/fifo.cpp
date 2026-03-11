@@ -33,14 +33,10 @@ template <typename T> void BgPixelFifo::parse_savestate(T &t) {
   });
 }
 
-template void
-BgPixelFifo::parse_savestate<Savestate::Writer>(Savestate::Writer &);
-template void
-BgPixelFifo::parse_savestate<Savestate::Reader>(Savestate::Reader &);
-template void
-BgPixelFifo::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
-template void
-BgPixelFifo::parse_savestate<Savestate::Checker>(Savestate::Checker &);
+template void BgPixelFifo::parse_savestate<Savestate::Writer>(Savestate::Writer &);
+template void BgPixelFifo::parse_savestate<Savestate::Reader>(Savestate::Reader &);
+template void BgPixelFifo::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
+template void BgPixelFifo::parse_savestate<Savestate::Checker>(Savestate::Checker &);
 
 template <typename T> void ObjPixelFifo::parse_savestate(T &t) {
   t.field_complex(1, [&](auto &t) {
@@ -53,14 +49,10 @@ template <typename T> void ObjPixelFifo::parse_savestate(T &t) {
   });
 }
 
-template void
-ObjPixelFifo::parse_savestate<Savestate::Writer>(Savestate::Writer &);
-template void
-ObjPixelFifo::parse_savestate<Savestate::Reader>(Savestate::Reader &);
-template void
-ObjPixelFifo::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
-template void
-ObjPixelFifo::parse_savestate<Savestate::Checker>(Savestate::Checker &);
+template void ObjPixelFifo::parse_savestate<Savestate::Writer>(Savestate::Writer &);
+template void ObjPixelFifo::parse_savestate<Savestate::Reader>(Savestate::Reader &);
+template void ObjPixelFifo::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
+template void ObjPixelFifo::parse_savestate<Savestate::Checker>(Savestate::Checker &);
 
 /* ======================================================================
  * Background pixel fifo implementation
@@ -102,7 +94,5 @@ bool ObjPixelFifo::can_pop() const { return !fifo.empty(); }
 pixel ObjPixelFifo::pop() { return fifo.pop(); }
 
 /* Lol #notafifo, poke the data in instead in transparent locations */
-const pixel &ObjPixelFifo::at(const std::size_t index) const {
-  return fifo.at(index);
-}
+const pixel &ObjPixelFifo::at(const std::size_t index) const { return fifo.at(index); }
 pixel &ObjPixelFifo::at(const std::size_t index) { return fifo.at(index); }

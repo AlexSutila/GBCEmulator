@@ -11,8 +11,7 @@
 
 class Mbc2 final : public Mbc {
 public:
-  Mbc2(std::span<const byte_t> const rom, bool const battery)
-      : rom_(rom), battery_(battery) {
+  Mbc2(std::span<const byte_t> const rom, bool const battery) : rom_(rom), battery_(battery) {
     ram_.fill(0x00);
   }
 
@@ -26,8 +25,7 @@ public:
     if (addr >= 0xA000 && addr <= 0xBFFF) {
       if (!ram_enabled_)
         return open_bus();
-      const std::size_t idx =
-          (addr - 0xA000) & 0x01FF; // bottom 9 bits (echo behavior)
+      const std::size_t idx = (addr - 0xA000) & 0x01FF; // bottom 9 bits (echo behavior)
       const byte_t nib = (ram_[idx] & 0x0F);
       return static_cast<byte_t>(0xF0 | nib); // upper nibble undefined
     }
@@ -37,8 +35,7 @@ public:
   void write(addr_t const addr, byte_t const val) override {
     if (addr <= 0x3FFF) {
       if (const bool bit8 = (addr & 0x0100) != 0; !bit8) {
-        ram_enabled_ =
-            ((val & 0x0F) == 0x0A); // low nibble A (0101) enables RAM
+        ram_enabled_ = ((val & 0x0F) == 0x0A); // low nibble A (0101) enables RAM
       } else {
         byte_t bank = (val & 0x0F);
         if (bank == 0)
@@ -61,9 +58,7 @@ public:
   [[nodiscard]] std::span<const byte_t> ram() const noexcept override {
     return {ram_.data(), ram_.size()};
   }
-  std::span<byte_t> ram() noexcept override {
-    return {ram_.data(), ram_.size()};
-  }
+  std::span<byte_t> ram() noexcept override { return {ram_.data(), ram_.size()}; }
 
   template <typename T> void parse_savestate_impl(T &t) {
     constexpr auto version = 1; // Schema revision
@@ -73,18 +68,10 @@ public:
     t.eof();
   }
 
-  void parse_savestate(Savestate::Writer &t) override {
-    parse_savestate_impl(t);
-  }
-  void parse_savestate(Savestate::Reader &t) override {
-    parse_savestate_impl(t);
-  }
-  void parse_savestate(Savestate::Sizer &t) override {
-    parse_savestate_impl(t);
-  }
-  void parse_savestate(Savestate::Checker &t) override {
-    parse_savestate_impl(t);
-  }
+  void parse_savestate(Savestate::Writer &t) override { parse_savestate_impl(t); }
+  void parse_savestate(Savestate::Reader &t) override { parse_savestate_impl(t); }
+  void parse_savestate(Savestate::Sizer &t) override { parse_savestate_impl(t); }
+  void parse_savestate(Savestate::Checker &t) override { parse_savestate_impl(t); }
 
 private:
   enum : std::uint16_t { F_RAM_ENABLED = 1, F_ROM_BANK };

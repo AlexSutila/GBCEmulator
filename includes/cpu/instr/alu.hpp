@@ -15,8 +15,7 @@
  */
 template <Register8Bit src> class ADD_A_X final : public Instruction {
 public:
-  ADD_A_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  ADD_A_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
     const byte_t x = read_reg<src>();
@@ -34,9 +33,7 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 4;
   }
-  std::string describe() override {
-    return IroGB::format("ADD A, {}", to_string<src>());
-  }
+  std::string describe() override { return IroGB::format("ADD A, {}", to_string<src>()); }
 };
 
 /*
@@ -62,9 +59,7 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 8;
   }
-  std::string describe() override {
-    return IroGB::format("ADD A, {}", static_cast<int>(imm));
-  }
+  std::string describe() override { return IroGB::format("ADD A, {}", static_cast<int>(imm)); }
   void parse() override { imm = bus->read_byte(reg_file->reg_pc++); }
 
 private:
@@ -76,8 +71,7 @@ private:
  */
 class ADD_A_HL final : public Instruction {
 public:
-  ADD_A_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  ADD_A_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const byte_t n = bus->read_byte(read_reg<Register16Bit::REG_HL>());
     const byte_t a = read_reg<Register8Bit::REG_A>();
@@ -104,17 +98,14 @@ public:
  */
 template <Register8Bit src> class ADC_A_X final : public Instruction {
 public:
-  ADC_A_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  ADC_A_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
     const byte_t x = read_reg<src>();
-    const byte_t carry =
-        reg_file->reg_af.get_flag(StatusFlagMask::FLAG_C_MASK) ? 1 : 0;
+    const byte_t carry = reg_file->reg_af.get_flag(StatusFlagMask::FLAG_C_MASK) ? 1 : 0;
 
     // Compute sum including carry flag
-    const addr_t sum = static_cast<addr_t>(a) + static_cast<addr_t>(x) +
-                       static_cast<addr_t>(carry);
+    const addr_t sum = static_cast<addr_t>(a) + static_cast<addr_t>(x) + static_cast<addr_t>(carry);
     const auto result = static_cast<byte_t>(sum);
 
     // Update flags
@@ -128,9 +119,7 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 4;
   }
-  std::string describe() override {
-    return IroGB::format("ADC A, {}", to_string<src>());
-  }
+  std::string describe() override { return IroGB::format("ADC A, {}", to_string<src>()); }
 };
 
 /*
@@ -142,12 +131,11 @@ public:
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
-    const byte_t carry =
-        reg_file->reg_af.get_flag(StatusFlagMask::FLAG_C_MASK) ? 1 : 0;
+    const byte_t carry = reg_file->reg_af.get_flag(StatusFlagMask::FLAG_C_MASK) ? 1 : 0;
 
     // Compute sum including carry flag
-    const addr_t sum = static_cast<addr_t>(a) + static_cast<addr_t>(imm) +
-                       static_cast<addr_t>(carry);
+    const addr_t sum =
+        static_cast<addr_t>(a) + static_cast<addr_t>(imm) + static_cast<addr_t>(carry);
     const auto result = static_cast<byte_t>(sum);
 
     // Update flags
@@ -161,9 +149,7 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 8;
   }
-  std::string describe() override {
-    return IroGB::format("ADC A, {}", static_cast<int>(imm));
-  }
+  std::string describe() override { return IroGB::format("ADC A, {}", static_cast<int>(imm)); }
   void parse() override { imm = bus->read_byte(reg_file->reg_pc++); }
 
 private:
@@ -175,17 +161,14 @@ private:
  */
 class ADC_A_HL final : public Instruction {
 public:
-  ADC_A_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  ADC_A_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
     const byte_t n = bus->read_byte(read_reg<Register16Bit::REG_HL>());
-    const byte_t carry =
-        reg_file->reg_af.get_flag(StatusFlagMask::FLAG_C_MASK) ? 1 : 0;
+    const byte_t carry = reg_file->reg_af.get_flag(StatusFlagMask::FLAG_C_MASK) ? 1 : 0;
 
     // Compute sum including carry flag
-    const addr_t sum = static_cast<addr_t>(a) + static_cast<addr_t>(n) +
-                       static_cast<addr_t>(carry);
+    const addr_t sum = static_cast<addr_t>(a) + static_cast<addr_t>(n) + static_cast<addr_t>(carry);
     const auto result = static_cast<byte_t>(sum);
 
     // Update flags
@@ -208,8 +191,7 @@ public:
  */
 template <Register8Bit src> class SUB_A_X final : public Instruction {
 public:
-  SUB_A_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  SUB_A_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
     const byte_t x = read_reg<src>();
@@ -226,9 +208,7 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 4;
   }
-  std::string describe() override {
-    return IroGB::format("SUB A, {}", to_string<src>());
-  }
+  std::string describe() override { return IroGB::format("SUB A, {}", to_string<src>()); }
 };
 
 /*
@@ -253,9 +233,7 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 8;
   }
-  std::string describe() override {
-    return IroGB::format("SUB A, {}", static_cast<int>(imm));
-  }
+  std::string describe() override { return IroGB::format("SUB A, {}", static_cast<int>(imm)); }
   void parse() override { imm = bus->read_byte(reg_file->reg_pc++); }
 
 private:
@@ -267,8 +245,7 @@ private:
  */
 class SUB_A_HL final : public Instruction {
 public:
-  SUB_A_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  SUB_A_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const byte_t n = bus->read_byte(read_reg<Register16Bit::REG_HL>());
     const byte_t a = read_reg<Register8Bit::REG_A>();
@@ -294,17 +271,15 @@ public:
  */
 template <Register8Bit src> class SBC_A_X final : public Instruction {
 public:
-  SBC_A_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  SBC_A_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
     const byte_t x = read_reg<src>();
-    const byte_t carry =
-        reg_file->reg_af.get_flag(StatusFlagMask::FLAG_C_MASK) ? 1 : 0;
+    const byte_t carry = reg_file->reg_af.get_flag(StatusFlagMask::FLAG_C_MASK) ? 1 : 0;
 
     // Compute difference including carry flag
-    const addr_t diff = static_cast<addr_t>(a) - static_cast<addr_t>(x) -
-                        static_cast<addr_t>(carry);
+    const addr_t diff =
+        static_cast<addr_t>(a) - static_cast<addr_t>(x) - static_cast<addr_t>(carry);
     const auto result = static_cast<byte_t>(diff);
 
     // Update flags
@@ -319,9 +294,7 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 4;
   }
-  std::string describe() override {
-    return IroGB::format("SBC A, {}", to_string<src>());
-  }
+  std::string describe() override { return IroGB::format("SBC A, {}", to_string<src>()); }
 };
 
 /*
@@ -333,12 +306,11 @@ public:
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
-    const byte_t carry =
-        reg_file->reg_af.get_flag(StatusFlagMask::FLAG_C_MASK) ? 1 : 0;
+    const byte_t carry = reg_file->reg_af.get_flag(StatusFlagMask::FLAG_C_MASK) ? 1 : 0;
 
     // Compute difference including carry flag
-    const addr_t diff = static_cast<addr_t>(a) - static_cast<addr_t>(imm) -
-                        static_cast<addr_t>(carry);
+    const addr_t diff =
+        static_cast<addr_t>(a) - static_cast<addr_t>(imm) - static_cast<addr_t>(carry);
     const auto result = static_cast<byte_t>(diff);
 
     // Update flags
@@ -353,9 +325,7 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 8;
   }
-  std::string describe() override {
-    return IroGB::format("SBC A, {}", static_cast<int>(imm));
-  }
+  std::string describe() override { return IroGB::format("SBC A, {}", static_cast<int>(imm)); }
   void parse() override { imm = bus->read_byte(reg_file->reg_pc++); }
 
 private:
@@ -367,17 +337,15 @@ private:
  */
 class SBC_A_HL final : public Instruction {
 public:
-  SBC_A_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  SBC_A_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
     const byte_t n = bus->read_byte(read_reg<Register16Bit::REG_HL>());
-    const byte_t carry =
-        reg_file->reg_af.get_flag(StatusFlagMask::FLAG_C_MASK) ? 1 : 0;
+    const byte_t carry = reg_file->reg_af.get_flag(StatusFlagMask::FLAG_C_MASK) ? 1 : 0;
 
     // Compute difference including carry flag
-    const addr_t diff = static_cast<addr_t>(a) - static_cast<addr_t>(n) -
-                        static_cast<addr_t>(carry);
+    const addr_t diff =
+        static_cast<addr_t>(a) - static_cast<addr_t>(n) - static_cast<addr_t>(carry);
     const auto result = static_cast<byte_t>(diff);
 
     // Update flags
@@ -401,8 +369,7 @@ public:
  */
 template <Register8Bit src> class AND_A_X final : public Instruction {
 public:
-  AND_A_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  AND_A_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
     const byte_t x = read_reg<src>();
@@ -418,9 +385,7 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 4;
   }
-  std::string describe() override {
-    return IroGB::format("AND A, {}", to_string<src>());
-  }
+  std::string describe() override { return IroGB::format("AND A, {}", to_string<src>()); }
 };
 
 /*
@@ -444,9 +409,7 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 8;
   }
-  std::string describe() override {
-    return IroGB::format("AND A, {}", static_cast<int>(imm));
-  }
+  std::string describe() override { return IroGB::format("AND A, {}", static_cast<int>(imm)); }
   void parse() override { imm = bus->read_byte(reg_file->reg_pc++); }
 
 private:
@@ -458,8 +421,7 @@ private:
  */
 class AND_A_HL final : public Instruction {
 public:
-  AND_A_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  AND_A_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const byte_t n = bus->read_byte(read_reg<Register16Bit::REG_HL>());
     const byte_t a = read_reg<Register8Bit::REG_A>();
@@ -484,8 +446,7 @@ public:
  */
 template <Register8Bit src> class XOR_A_X final : public Instruction {
 public:
-  XOR_A_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  XOR_A_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
     const byte_t x = read_reg<src>();
@@ -501,9 +462,7 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 4;
   }
-  std::string describe() override {
-    return IroGB::format("XOR A, {}", to_string<src>());
-  }
+  std::string describe() override { return IroGB::format("XOR A, {}", to_string<src>()); }
 };
 
 /*
@@ -527,9 +486,7 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 8;
   }
-  std::string describe() override {
-    return IroGB::format("XOR A, {}", static_cast<int>(imm));
-  }
+  std::string describe() override { return IroGB::format("XOR A, {}", static_cast<int>(imm)); }
   void parse() override { imm = bus->read_byte(reg_file->reg_pc++); }
 
 private:
@@ -541,8 +498,7 @@ private:
  */
 class XOR_A_HL final : public Instruction {
 public:
-  XOR_A_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  XOR_A_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const byte_t n = bus->read_byte(read_reg<Register16Bit::REG_HL>());
     const byte_t a = read_reg<Register8Bit::REG_A>();
@@ -567,8 +523,7 @@ public:
  */
 template <Register8Bit src> class OR_A_X final : public Instruction {
 public:
-  OR_A_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  OR_A_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
     const byte_t x = read_reg<src>();
@@ -584,9 +539,7 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 4;
   }
-  std::string describe() override {
-    return IroGB::format("OR A, {}", to_string<src>());
-  }
+  std::string describe() override { return IroGB::format("OR A, {}", to_string<src>()); }
 };
 
 /*
@@ -594,8 +547,7 @@ public:
  */
 class OR_A_imm8 final : public Instruction {
 public:
-  OR_A_imm8(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  OR_A_imm8(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
     const byte_t result = a | imm;
@@ -610,9 +562,7 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 8;
   }
-  std::string describe() override {
-    return IroGB::format("OR A, {}", static_cast<int>(imm));
-  }
+  std::string describe() override { return IroGB::format("OR A, {}", static_cast<int>(imm)); }
   void parse() override { imm = bus->read_byte(reg_file->reg_pc++); }
 
 private:
@@ -624,8 +574,7 @@ private:
  */
 class OR_A_HL final : public Instruction {
 public:
-  OR_A_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  OR_A_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const byte_t n = bus->read_byte(read_reg<Register16Bit::REG_HL>());
     const byte_t a = read_reg<Register8Bit::REG_A>();
@@ -651,8 +600,7 @@ public:
  */
 template <Register8Bit src> class CP_A_X final : public Instruction {
 public:
-  CP_A_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  CP_A_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
     const byte_t x = read_reg<src>();
@@ -665,9 +613,7 @@ public:
     reg_file->reg_af.put_flag(StatusFlagMask::FLAG_C_MASK, a < x);
     return 4;
   }
-  std::string describe() override {
-    return IroGB::format("CP A, {}", to_string<src>());
-  }
+  std::string describe() override { return IroGB::format("CP A, {}", to_string<src>()); }
 };
 
 /*
@@ -676,8 +622,7 @@ public:
  */
 class CP_A_imm8 final : public Instruction {
 public:
-  CP_A_imm8(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  CP_A_imm8(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
 
@@ -689,9 +634,7 @@ public:
     reg_file->reg_af.put_flag(StatusFlagMask::FLAG_C_MASK, a < imm);
     return 8;
   }
-  std::string describe() override {
-    return IroGB::format("CP A, {}", static_cast<int>(imm));
-  }
+  std::string describe() override { return IroGB::format("CP A, {}", static_cast<int>(imm)); }
   void parse() override { imm = bus->read_byte(reg_file->reg_pc++); }
 
 private:
@@ -704,8 +647,7 @@ private:
  */
 class CP_A_HL final : public Instruction {
 public:
-  CP_A_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  CP_A_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const byte_t n = bus->read_byte(read_reg<Register16Bit::REG_HL>());
     const byte_t a = read_reg<Register8Bit::REG_A>();
@@ -727,8 +669,7 @@ public:
  */
 template <Register8Bit src> class INC_X final : public Instruction {
 public:
-  INC_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  INC_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const byte_t x = read_reg<src>();
     const byte_t result = x + 1;
@@ -743,9 +684,7 @@ public:
     write_reg<src>(result);
     return 4;
   }
-  std::string describe() override {
-    return IroGB::format("INC {}", to_string<src>());
-  }
+  std::string describe() override { return IroGB::format("INC {}", to_string<src>()); }
 };
 
 /*
@@ -753,8 +692,7 @@ public:
  */
 class INC_HL final : public Instruction {
 public:
-  INC_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  INC_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     switch (state) {
     case InstrStates::INSTR_STATE_READ:
@@ -792,8 +730,7 @@ private:
  */
 template <Register8Bit src> class DEC_X final : public Instruction {
 public:
-  DEC_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  DEC_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const byte_t x = read_reg<src>();
     const byte_t result = x - 1;
@@ -808,9 +745,7 @@ public:
     write_reg<src>(result);
     return 4;
   }
-  std::string describe() override {
-    return IroGB::format("DEC {}", to_string<src>());
-  }
+  std::string describe() override { return IroGB::format("DEC {}", to_string<src>()); }
 };
 
 /*
@@ -818,8 +753,7 @@ public:
  */
 class DEC_HL final : public Instruction {
 public:
-  DEC_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  DEC_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     switch (state) {
     case InstrStates::INSTR_STATE_READ:
@@ -857,8 +791,7 @@ private:
  */
 class DAA final : public Instruction {
 public:
-  DAA(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  DAA(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     byte_t a = read_reg<Register8Bit::REG_A>();
 
@@ -901,8 +834,7 @@ public:
  */
 template <Register16Bit src> class ADD_HL_XX final : public Instruction {
 public:
-  ADD_HL_XX(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  ADD_HL_XX(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const addr_t hl = read_reg<Register16Bit::REG_HL>();
     const addr_t xx = read_reg<src>();
@@ -918,9 +850,7 @@ public:
     write_reg<Register16Bit::REG_HL>(static_cast<addr_t>(sum));
     return 8;
   }
-  std::string describe() override {
-    return IroGB::format("ADD HL, {}", to_string<src>());
-  }
+  std::string describe() override { return IroGB::format("ADD HL, {}", to_string<src>()); }
 };
 
 /*
@@ -928,16 +858,13 @@ public:
  */
 template <Register16Bit dst> class INC_XX final : public Instruction {
 public:
-  INC_XX(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  INC_XX(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const addr_t xx = read_reg<dst>();
     write_reg<dst>(xx + 1);
     return 8;
   }
-  std::string describe() override {
-    return IroGB::format("INC {}", to_string<dst>());
-  }
+  std::string describe() override { return IroGB::format("INC {}", to_string<dst>()); }
 };
 
 /*
@@ -945,16 +872,13 @@ public:
  */
 template <Register16Bit dst> class DEC_XX final : public Instruction {
 public:
-  DEC_XX(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  DEC_XX(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
     const addr_t xx = read_reg<dst>();
     write_reg<dst>(xx - 1);
     return 8;
   }
-  std::string describe() override {
-    return IroGB::format("DEC {}", to_string<dst>());
-  }
+  std::string describe() override { return IroGB::format("DEC {}", to_string<dst>()); }
 };
 
 /*
@@ -980,12 +904,8 @@ public:
     reg_file->reg_sp.write(sp + nn);
     return 16;
   }
-  std::string describe() override {
-    return IroGB::format("ADD SP, {}", static_cast<int>(imm));
-  }
-  void parse() override {
-    imm = static_cast<int8_t>(bus->read_byte(reg_file->reg_pc++));
-  }
+  std::string describe() override { return IroGB::format("ADD SP, {}", static_cast<int>(imm)); }
+  void parse() override { imm = static_cast<int8_t>(bus->read_byte(reg_file->reg_pc++)); }
 
 private:
   std::int8_t imm{}; // Signed intentionally
@@ -1016,12 +936,8 @@ public:
     write_reg<Register16Bit::REG_HL>(sp + nn);
     return 12;
   }
-  std::string describe() override {
-    return IroGB::format("LD HL, SP+{}", static_cast<int>(imm));
-  }
-  void parse() override {
-    imm = static_cast<std::int8_t>(bus->read_byte(reg_file->reg_pc, false));
-  }
+  std::string describe() override { return IroGB::format("LD HL, SP+{}", static_cast<int>(imm)); }
+  void parse() override { imm = static_cast<std::int8_t>(bus->read_byte(reg_file->reg_pc, false)); }
   std::size_t mem_access_t_cycle() override { return 4; }
 
 private:

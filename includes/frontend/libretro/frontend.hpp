@@ -14,22 +14,14 @@ struct ButtonMap {
 };
 
 static constexpr ButtonMap btn_mapping[] = {
-    {RETRO_DEVICE_ID_JOYPAD_A,
-     static_cast<std::uint8_t>(Joypad::JoypadButton::A)},
-    {RETRO_DEVICE_ID_JOYPAD_B,
-     static_cast<std::uint8_t>(Joypad::JoypadButton::B)},
-    {RETRO_DEVICE_ID_JOYPAD_START,
-     static_cast<std::uint8_t>(Joypad::JoypadButton::START)},
-    {RETRO_DEVICE_ID_JOYPAD_SELECT,
-     static_cast<std::uint8_t>(Joypad::JoypadButton::SELECT)},
-    {RETRO_DEVICE_ID_JOYPAD_UP,
-     static_cast<std::uint8_t>(Joypad::JoypadButton::UP)},
-    {RETRO_DEVICE_ID_JOYPAD_DOWN,
-     static_cast<std::uint8_t>(Joypad::JoypadButton::DOWN)},
-    {RETRO_DEVICE_ID_JOYPAD_LEFT,
-     static_cast<std::uint8_t>(Joypad::JoypadButton::LEFT)},
-    {RETRO_DEVICE_ID_JOYPAD_RIGHT,
-     static_cast<std::uint8_t>(Joypad::JoypadButton::RIGHT)},
+    {     RETRO_DEVICE_ID_JOYPAD_A,      static_cast<std::uint8_t>(Joypad::JoypadButton::A)},
+    {     RETRO_DEVICE_ID_JOYPAD_B,      static_cast<std::uint8_t>(Joypad::JoypadButton::B)},
+    { RETRO_DEVICE_ID_JOYPAD_START,  static_cast<std::uint8_t>(Joypad::JoypadButton::START)},
+    {RETRO_DEVICE_ID_JOYPAD_SELECT, static_cast<std::uint8_t>(Joypad::JoypadButton::SELECT)},
+    {    RETRO_DEVICE_ID_JOYPAD_UP,     static_cast<std::uint8_t>(Joypad::JoypadButton::UP)},
+    {  RETRO_DEVICE_ID_JOYPAD_DOWN,   static_cast<std::uint8_t>(Joypad::JoypadButton::DOWN)},
+    {  RETRO_DEVICE_ID_JOYPAD_LEFT,   static_cast<std::uint8_t>(Joypad::JoypadButton::LEFT)},
+    { RETRO_DEVICE_ID_JOYPAD_RIGHT,  static_cast<std::uint8_t>(Joypad::JoypadButton::RIGHT)},
 };
 
 class LibretroFrontend : public Frontend {
@@ -59,8 +51,7 @@ public:
   LibretroMeta &get_meta() { return meta; }
 
   std::array<std::uint32_t, 144 * 160> get_frame() override;
-  void queue_audio_samples(const float *samples,
-                           std::size_t sample_count) override;
+  void queue_audio_samples(const float *samples, std::size_t sample_count) override;
   void put_pixel(int x, int y, std::uint32_t c) override;
   void clear(std::uint32_t c) override;
   void start() override;

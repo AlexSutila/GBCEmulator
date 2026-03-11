@@ -3,9 +3,9 @@
 #include <ctime>
 #include <fstream>
 #include <iomanip>
+#include <misc/cpp/imgui_stdlib.h>
 #include <ranges>
 #include <sstream>
-#include <misc/cpp/imgui_stdlib.h>
 
 namespace {
 std::string format_timestamp_local_gui(const std::time_t timestamp) {
@@ -26,8 +26,7 @@ std::string format_timestamp_local_gui(const std::time_t timestamp) {
 }
 
 std::optional<std::vector<std::uint32_t>>
-read_thumb_raw_argb_gui(const std::filesystem::path &path, const int width,
-                        const int height) {
+read_thumb_raw_argb_gui(const std::filesystem::path &path, const int width, const int height) {
   if (width <= 0 || height <= 0) {
     return std::nullopt;
   }
@@ -39,26 +38,22 @@ read_thumb_raw_argb_gui(const std::filesystem::path &path, const int width,
   if (!file) {
     return std::nullopt;
   }
-  if (const auto size = static_cast<std::size_t>(file.tellg());
-      size != byte_count) {
+  if (const auto size = static_cast<std::size_t>(file.tellg()); size != byte_count) {
     return std::nullopt;
   }
 
   std::vector<std::uint32_t> out(pixel_count);
   file.seekg(0, std::ios::beg);
-  if (!file.read(reinterpret_cast<char *>(out.data()),
-                 static_cast<std::streamsize>(byte_count))) {
+  if (!file.read(reinterpret_cast<char *>(out.data()), static_cast<std::streamsize>(byte_count))) {
     return std::nullopt;
   }
   return out;
 }
 
-constexpr std::array kCheatFormatLabels{
-    "Auto detect", "GameShark/Xploder", "Game Genie",
-    "Raw (addr[?cmp]:value)", "CodeBreaker"};
+constexpr std::array kCheatFormatLabels{"Auto detect", "GameShark/Xploder", "Game Genie",
+                                        "Raw (addr[?cmp]:value)", "CodeBreaker"};
 
-std::string cheat_display_name(const Settings::CheatEntry &entry,
-                               const std::size_t index) {
+std::string cheat_display_name(const Settings::CheatEntry &entry, const std::size_t index) {
   if (!entry.name.empty()) {
     return entry.name;
   }
@@ -88,8 +83,7 @@ void GbcImGui::build_cheats_window(UiState &state) {
   bool settings_dirty = false;
   auto &cheats = settings.cheats;
   if (state.selected_cheat_idx >= static_cast<int>(cheats.size())) {
-    state.selected_cheat_idx =
-        cheats.empty() ? -1 : static_cast<int>(cheats.size()) - 1;
+    state.selected_cheat_idx = cheats.empty() ? -1 : static_cast<int>(cheats.size()) - 1;
   }
 
   ImGui::Separator();
@@ -103,8 +97,7 @@ void GbcImGui::build_cheats_window(UiState &state) {
 
   ImGui::SameLine();
   const bool can_edit_selected =
-      state.selected_cheat_idx >= 0 &&
-      state.selected_cheat_idx < static_cast<int>(cheats.size());
+      state.selected_cheat_idx >= 0 && state.selected_cheat_idx < static_cast<int>(cheats.size());
   if (!can_edit_selected) {
     ImGui::BeginDisabled();
   }
@@ -145,21 +138,17 @@ void GbcImGui::build_cheats_window(UiState &state) {
 
   ImGui::Spacing();
   if (ImGui::BeginTable("cheat_layout", 2,
-                        ImGuiTableFlags_Resizable |
-                            ImGuiTableFlags_BordersInnerV)) {
-    ImGui::TableSetupColumn("Cheat List", ImGuiTableColumnFlags_WidthStretch,
-                            0.43f);
+                        ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersInnerV)) {
+    ImGui::TableSetupColumn("Cheat List", ImGuiTableColumnFlags_WidthStretch, 0.43f);
     ImGui::TableSetupColumn("Editor", ImGuiTableColumnFlags_WidthStretch, 0.57f);
     ImGui::TableNextRow();
 
     ImGui::TableSetColumnIndex(0);
     if (ImGui::BeginTable("cheat_entries", 2,
                           ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders |
-                              ImGuiTableFlags_SizingStretchProp |
-                              ImGuiTableFlags_ScrollY,
+                              ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_ScrollY,
                           ImVec2(0.0f, 0.0f))) {
-      ImGui::TableSetupColumn("On", ImGuiTableColumnFlags_WidthFixed,
-                              40.0f * dpi_scale);
+      ImGui::TableSetupColumn("On", ImGuiTableColumnFlags_WidthFixed, 40.0f * dpi_scale);
       ImGui::TableSetupColumn("Cheat", ImGuiTableColumnFlags_WidthStretch);
       ImGui::TableHeadersRow();
 
@@ -176,8 +165,7 @@ void GbcImGui::build_cheats_window(UiState &state) {
 
         ImGui::TableSetColumnIndex(1);
         if (const auto label = cheat_display_name(entry, i);
-            ImGui::Selectable(label.c_str(), selected,
-                              ImGuiSelectableFlags_SpanAllColumns)) {
+            ImGui::Selectable(label.c_str(), selected, ImGuiSelectableFlags_SpanAllColumns)) {
           state.selected_cheat_idx = static_cast<int>(i);
         }
         if (ImGui::IsItemHovered() && !entry.code.empty()) {
@@ -198,11 +186,9 @@ void GbcImGui::build_cheats_window(UiState &state) {
 
     ImGui::TableSetColumnIndex(1);
     const bool has_selection =
-        state.selected_cheat_idx >= 0 &&
-        state.selected_cheat_idx < static_cast<int>(cheats.size());
+        state.selected_cheat_idx >= 0 && state.selected_cheat_idx < static_cast<int>(cheats.size());
     if (!has_selection) {
-      ImGui::TextDisabled(
-          "Select a cheat from the list to edit.\nCheat codes are tied to ROMs.");
+      ImGui::TextDisabled("Select a cheat from the list to edit.\nCheat codes are tied to ROMs.");
     } else {
       auto &entry = cheats[static_cast<std::size_t>(state.selected_cheat_idx)];
 
@@ -213,9 +199,7 @@ void GbcImGui::build_cheats_window(UiState &state) {
         settings_dirty = true;
       }
 
-      int format =
-          std::clamp(entry.format, 0,
-                     static_cast<int>(kCheatFormatLabels.size()) - 1);
+      int format = std::clamp(entry.format, 0, static_cast<int>(kCheatFormatLabels.size()) - 1);
       if (format != entry.format) {
         entry.format = format;
         settings_dirty = true;
@@ -230,13 +214,11 @@ void GbcImGui::build_cheats_window(UiState &state) {
         settings_dirty = true;
       }
       ImGui::Text("Notes");
-      if (ImGui::InputTextMultiline("Notes", &entry.notes,
-                                    ImVec2(-1.0f, 180.0f * dpi_scale))) {
+      if (ImGui::InputTextMultiline("Notes", &entry.notes, ImVec2(-1.0f, 180.0f * dpi_scale))) {
         settings_dirty = true;
       }
 
-      ImGui::TextDisabled(
-          "Compare is supported in Game Genie and Raw (AAAA?CC:VV).");
+      ImGui::TextDisabled("Compare is supported in Game Genie and Raw (AAAA?CC:VV).");
     }
 
     ImGui::EndTable();
@@ -252,8 +234,7 @@ void GbcImGui::build_cheats_window(UiState &state) {
 
 void GbcImGui::build_savestate_manager_window(
     UiState &state, SDL_Renderer *renderer, const bool emulator_ready,
-    const std::filesystem::path &savestate_dir,
-    std::array<char, 96> &manual_label_input,
+    const std::filesystem::path &savestate_dir, std::array<char, 96> &manual_label_input,
     std::vector<SavestateEntry> &savestate_entries,
     std::optional<std::filesystem::path> &savestate_selected_path,
     const SavestateManagerCallbacks &callbacks, const bool fill_viewport) {
@@ -308,49 +289,42 @@ void GbcImGui::build_savestate_manager_window(
   std::optional<std::filesystem::path> load_path;
 
   if (ImGui::BeginTable("savestate_manager_layout", 2,
-                        ImGuiTableFlags_Resizable |
-                            ImGuiTableFlags_BordersInnerV)) {
+                        ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersInnerV)) {
     ImGui::TableSetupColumn("List", ImGuiTableColumnFlags_WidthStretch, 0.62f);
-    ImGui::TableSetupColumn("Preview", ImGuiTableColumnFlags_WidthStretch,
-                            0.38f);
+    ImGui::TableSetupColumn("Preview", ImGuiTableColumnFlags_WidthStretch, 0.38f);
     ImGui::TableNextRow();
 
     ImGui::TableSetColumnIndex(0);
     if (ImGui::BeginTable("savestate_table", 4,
                           ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders |
-                              ImGuiTableFlags_SizingStretchProp |
-                              ImGuiTableFlags_ScrollY,
+                              ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_ScrollY,
                           ImVec2(0.0f, 0.0f))) {
       ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 70.0f);
-      ImGui::TableSetupColumn("Taken", ImGuiTableColumnFlags_WidthFixed,
-                              170.0f);
+      ImGui::TableSetupColumn("Taken", ImGuiTableColumnFlags_WidthFixed, 170.0f);
       ImGui::TableSetupColumn("Label");
       ImGui::TableSetupColumn("Size", ImGuiTableColumnFlags_WidthFixed, 80.0f);
       ImGui::TableHeadersRow();
 
       for (std::size_t i = 0; i < savestate_entries.size(); ++i) {
         auto &entry = savestate_entries[i];
-        const bool selected = savestate_selected_path.has_value() &&
-                              *savestate_selected_path == entry.state_path;
+        const bool selected =
+            savestate_selected_path.has_value() && *savestate_selected_path == entry.state_path;
 
         ImGui::PushID(static_cast<int>(i));
         ImGui::TableNextRow();
         ImGui::TableSetColumnIndex(0);
-        if (ImGui::Selectable(entry.kind.c_str(), selected,
-                              ImGuiSelectableFlags_SpanAllColumns)) {
+        if (ImGui::Selectable(entry.kind.c_str(), selected, ImGuiSelectableFlags_SpanAllColumns)) {
           savestate_selected_path = entry.state_path;
         }
         ImGui::TableSetColumnIndex(1);
-        ImGui::TextUnformatted(
-            format_timestamp_local_gui(entry.created_at).c_str());
+        ImGui::TextUnformatted(format_timestamp_local_gui(entry.created_at).c_str());
         ImGui::TableSetColumnIndex(2);
         ImGui::TextUnformatted(entry.label.c_str());
         if (ImGui::IsItemHovered()) {
           ImGui::SetTooltip("%s", entry.state_path.filename().string().c_str());
         }
         ImGui::TableSetColumnIndex(3);
-        ImGui::Text("%zu KB",
-                    static_cast<std::size_t>((entry.file_size + 1023u) / 1024u));
+        ImGui::Text("%zu KB", static_cast<std::size_t>((entry.file_size + 1023u) / 1024u));
         ImGui::PopID();
       }
       ImGui::EndTable();
@@ -359,10 +333,9 @@ void GbcImGui::build_savestate_manager_window(
     ImGui::TableSetColumnIndex(1);
     auto selected_it = savestate_entries.end();
     if (savestate_selected_path.has_value()) {
-      selected_it =
-          std::ranges::find_if(savestate_entries, [&](const SavestateEntry &e) {
-            return e.state_path == *savestate_selected_path;
-          });
+      selected_it = std::ranges::find_if(savestate_entries, [&](const SavestateEntry &e) {
+        return e.state_path == *savestate_selected_path;
+      });
     }
 
     if (selected_it == savestate_entries.end()) {
@@ -370,8 +343,7 @@ void GbcImGui::build_savestate_manager_window(
     } else {
       auto &entry = *selected_it;
       ImGui::Text("Type: %s", entry.kind.c_str());
-      ImGui::Text("Taken: %s",
-                  format_timestamp_local_gui(entry.created_at).c_str());
+      ImGui::Text("Taken: %s", format_timestamp_local_gui(entry.created_at).c_str());
       ImGui::Text("File: %s", entry.state_path.filename().string().c_str());
       ImGui::Text("Size: %zu bytes", static_cast<std::size_t>(entry.file_size));
       ImGui::Spacing();
@@ -403,19 +375,17 @@ void GbcImGui::build_savestate_manager_window(
       if (renderer && !entry.thumb_texture && !entry.thumb_texture_attempted) {
         entry.thumb_texture_attempted = true;
         if (std::filesystem::exists(entry.thumb_path)) {
-          if (const auto pixels = read_thumb_raw_argb_gui(
-                  entry.thumb_path, entry.thumb_w, entry.thumb_h);
+          if (const auto pixels =
+                  read_thumb_raw_argb_gui(entry.thumb_path, entry.thumb_w, entry.thumb_h);
               pixels.has_value()) {
-            entry.thumb_texture = SDL_CreateTexture(
-                renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC,
-                entry.thumb_w, entry.thumb_h);
+            entry.thumb_texture =
+                SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC,
+                                  entry.thumb_w, entry.thumb_h);
             if (entry.thumb_texture) {
               entry.thumb_renderer = renderer;
               SDL_UpdateTexture(entry.thumb_texture, nullptr, pixels->data(),
-                                entry.thumb_w *
-                                    static_cast<int>(sizeof(std::uint32_t)));
-              SDL_SetTextureScaleMode(entry.thumb_texture,
-                                      SDL_SCALEMODE_NEAREST);
+                                entry.thumb_w * static_cast<int>(sizeof(std::uint32_t)));
+              SDL_SetTextureScaleMode(entry.thumb_texture, SDL_SCALEMODE_NEAREST);
             }
           }
         }
@@ -423,11 +393,9 @@ void GbcImGui::build_savestate_manager_window(
 
       if (entry.thumb_texture) {
         constexpr float max_width = 260.0f;
-        const float scale =
-            std::min(max_width / static_cast<float>(entry.thumb_w), 4.0f);
-        ImGui::Image(entry.thumb_texture,
-                     ImVec2(static_cast<float>(entry.thumb_w) * scale,
-                       static_cast<float>(entry.thumb_h) * scale));
+        const float scale = std::min(max_width / static_cast<float>(entry.thumb_w), 4.0f);
+        ImGui::Image(entry.thumb_texture, ImVec2(static_cast<float>(entry.thumb_w) * scale,
+                                                 static_cast<float>(entry.thumb_h) * scale));
       } else {
         ImGui::TextDisabled("No thumbnail available.");
       }
@@ -487,8 +455,7 @@ void GbcImGui::build_keybinds_window(UiState &state) {
       const std::size_t bind_index = base_index + i;
       const bool waiting = state.waiting_for_bind == bind_index;
       const std::string button_label =
-          waiting ? "Press a key..."
-                  : std::string("Bind##") + std::string(labels[i]);
+          waiting ? "Press a key..." : std::string("Bind##") + std::string(labels[i]);
       if (ImGui::Button(button_label.c_str())) {
         state.waiting_for_bind = bind_index;
       }
@@ -512,31 +479,26 @@ void GbcImGui::build_about_window(UiState &state) {
   if (ImGui::Begin("About", &state.show_about)) {
     ImGui::SeparatorText("Project");
     ImGui::TextUnformatted("IroGB");
-    ImGui::TextLinkOpenURL("https://kaze.moe/TismForge/IroGB",
-                           "https://kaze.moe/TismForge/IroGB");
+    ImGui::TextLinkOpenURL("https://kaze.moe/TismForge/IroGB", "https://kaze.moe/TismForge/IroGB");
 
     ImGui::SeparatorText("Authors");
     ImGui::BulletText("Alex Sutila");
     ImGui::SameLine();
-    ImGui::TextLinkOpenURL("https://github.com/alexsutila",
-                           "https://github.com/alexsutila");
+    ImGui::TextLinkOpenURL("https://github.com/alexsutila", "https://github.com/alexsutila");
     ImGui::BulletText("Xuanli Lin");
     ImGui::SameLine();
-    ImGui::TextLinkOpenURL("https://github.com/kazum1kun",
-                           "https://github.com/kazum1kun");
+    ImGui::TextLinkOpenURL("https://github.com/kazum1kun", "https://github.com/kazum1kun");
 
     ImGui::SeparatorText("Credits");
-    ImGui::TextWrapped(
-        "We would like to thank the following open source projects for "
-        "providing tools and resources that were instrumental in the "
-        "development of IroGB:");
+    ImGui::TextWrapped("We would like to thank the following open source projects for "
+                       "providing tools and resources that were instrumental in the "
+                       "development of IroGB:");
     populate_credits();
 
     ImGui::SeparatorText("License");
     ImGui::Text("IroGB is licensed under the GPLv3 License. See ");
-    ImGui::TextLinkOpenURL(
-        "LICENSE",
-        "https://kaze.moe/TismForge/IroGB/raw/branch/release/LICENSE");
+    ImGui::TextLinkOpenURL("LICENSE",
+                           "https://kaze.moe/TismForge/IroGB/raw/branch/release/LICENSE");
     ImGui::SameLine(0.0f, 0.0f);
     ImGui::Text(" in the repository for details.");
   }
@@ -558,8 +520,7 @@ void GbcImGui::build_cart_info_window(UiState &state) {
 }
 
 void GbcImGui::build_notification_window(UiState &state) const {
-  ImGui::SetNextWindowSize(ImVec2(400 * dpi_scale, 300 * dpi_scale),
-                           ImGuiCond_FirstUseEver);
+  ImGui::SetNextWindowSize(ImVec2(400 * dpi_scale, 300 * dpi_scale), ImGuiCond_FirstUseEver);
 
   if (ImGui::Begin("Notifications", &state.show_notifications)) {
     if (state.notifications.empty()) {
@@ -577,17 +538,14 @@ void GbcImGui::build_notification_window(UiState &state) const {
     for (auto &notification : std::ranges::reverse_view(state.notifications)) {
       ImGui::PushID(notification.id);
       ImGui::PushStyleColor(ImGuiCol_Text, get_level_color(notification.level));
-      const std::string header =
-          "[" + notification.type + "] " + notification.summary;
+      const std::string header = "[" + notification.type + "] " + notification.summary;
       const bool open = ImGui::TreeNode("##Node", "%s", header.c_str());
       ImGui::PopStyleColor();
 
       if (open) {
         ImGui::Indent();
         ImGui::TextWrapped("%s", notification.details.c_str());
-        ImGui::TextDisabled("Time: %s",
-                            format_timestamp_local_gui(notification.timestamp)
-                                .c_str());
+        ImGui::TextDisabled("Time: %s", format_timestamp_local_gui(notification.timestamp).c_str());
         if (ImGui::Button("Dismiss")) {
           id_to_delete = notification.id;
         }
@@ -598,10 +556,9 @@ void GbcImGui::build_notification_window(UiState &state) const {
     }
 
     if (id_to_delete != -1) {
-      std::erase_if(state.notifications,
-                    [id_to_delete](const Notification &notification) {
-                      return notification.id == id_to_delete;
-                    });
+      std::erase_if(state.notifications, [id_to_delete](const Notification &notification) {
+        return notification.id == id_to_delete;
+      });
     }
     ImGui::End();
   }
@@ -609,8 +566,7 @@ void GbcImGui::build_notification_window(UiState &state) const {
 
 void GbcImGui::apply_keybind_preset(std::array<SDL_Keycode, 8> &array,
                                     const int keybind_preset_index) {
-  if (keybind_preset_index < 0 ||
-      keybind_preset_index >= static_cast<int>(kPresets.size()) ||
+  if (keybind_preset_index < 0 || keybind_preset_index >= static_cast<int>(kPresets.size()) ||
       keybind_preset_index == kCustomPresetIndex) {
     return;
   }

@@ -42,25 +42,15 @@ static constexpr bool is_cart_range(const addr_t a) noexcept {
   return a <= 0x7FFF || (a >= 0xA000 && a <= 0xBFFF);
 }
 
-static constexpr bool is_vram_range(const addr_t a) noexcept {
-  return a >= 0x8000 && a <= 0x9FFF;
-}
+static constexpr bool is_vram_range(const addr_t a) noexcept { return a >= 0x8000 && a <= 0x9FFF; }
 
-static constexpr bool is_wram_range(const addr_t a) noexcept {
-  return a >= 0xC000 && a <= 0xDFFF;
-}
+static constexpr bool is_wram_range(const addr_t a) noexcept { return a >= 0xC000 && a <= 0xDFFF; }
 
-static constexpr bool is_echo_range(const addr_t a) noexcept {
-  return a >= 0xE000 && a <= 0xFDFF;
-}
+static constexpr bool is_echo_range(const addr_t a) noexcept { return a >= 0xE000 && a <= 0xFDFF; }
 
-static constexpr bool is_oam_range(const addr_t a) noexcept {
-  return a >= 0xFE00 && a <= 0xFE9F;
-}
+static constexpr bool is_oam_range(const addr_t a) noexcept { return a >= 0xFE00 && a <= 0xFE9F; }
 
-static constexpr bool is_hram_range(const addr_t a) noexcept {
-  return a >= 0xFF80 && a <= 0xFFFE;
-}
+static constexpr bool is_hram_range(const addr_t a) noexcept { return a >= 0xFF80 && a <= 0xFFFE; }
 
 enum : std::uint16_t {
   F_CART = 1,
@@ -97,12 +87,9 @@ template <typename T> void AddressBus::parse_savestate(T &t) {
   t.field_enum(F_BUS_CONFLICTS, bus_conflicts);
 
   // Memory banking memory mapped registers
-  t.field_complex(F_BOOT_ROM_CTRL,
-                  [&](T &t) { boot_rom_ctrl.parse_savestate(t); });
-  t.field_complex(F_WRAM_BANK,
-                  [&](T &t) { wram_bank_ctrl.parse_savestate(t); });
-  t.field_complex(F_VRAM_BANK,
-                  [&](T &t) { vram_bank_ctrl.parse_savestate(t); });
+  t.field_complex(F_BOOT_ROM_CTRL, [&](T &t) { boot_rom_ctrl.parse_savestate(t); });
+  t.field_complex(F_WRAM_BANK, [&](T &t) { wram_bank_ctrl.parse_savestate(t); });
+  t.field_complex(F_VRAM_BANK, [&](T &t) { vram_bank_ctrl.parse_savestate(t); });
 
   // Miscellaneous memory mapped registers (nowhere else to put them)
   t.field_complex(F_JOYPAD, [&](T &t) { joypad_.parse_savestate(t); });
@@ -118,15 +105,12 @@ template <typename T> void AddressBus::parse_savestate(T &t) {
   t.eof();
 }
 
-template void
-AddressBus::parse_savestate<Savestate::Writer>(Savestate::Writer &);
-template void
-AddressBus::parse_savestate<Savestate::Reader>(Savestate::Reader &);
+template void AddressBus::parse_savestate<Savestate::Writer>(Savestate::Writer &);
+template void AddressBus::parse_savestate<Savestate::Reader>(Savestate::Reader &);
 template void AddressBus::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
 template void AddressBus::parse_savestate<Savestate::Checker>(Savestate::Checker &);
 
-AddressBus::AddressBus(runtime_sys_info &sys,
-                       std::optional<Debug::Debugger> &debugger,
+AddressBus::AddressBus(runtime_sys_info &sys, std::optional<Debug::Debugger> &debugger,
                        std::optional<BootROM> &bios)
     : Debuggable(debugger), // Bus read/write breakpoints
       key0(sys),            // Controls backwards compatability
@@ -200,16 +184,11 @@ byte_t &AddressBus::echo_byte(const addr_t addr) const {
   return wram.at(bank)[(addr - 0xF000) & WRAM_MASK];
 }
 
-byte_t &AddressBus::oam_byte(const addr_t addr) const {
-  return oam[addr - 0xFE00];
-}
+byte_t &AddressBus::oam_byte(const addr_t addr) const { return oam[addr - 0xFE00]; }
 
-byte_t &AddressBus::hram_byte(const addr_t addr) const {
-  return hram[(addr - 0xFF80) & HRAM_MASK];
-}
+byte_t &AddressBus::hram_byte(const addr_t addr) const { return hram[(addr - 0xFF80) & HRAM_MASK]; }
 
-byte_t AddressBus::read_byte_no_cheat(const addr_t addr,
-                                      const bool safe) const {
+byte_t AddressBus::read_byte_no_cheat(const addr_t addr, const bool safe) const {
   /* Read from boot ROM if it is mapped (boot ROM overrides reads only) */
   if (is_boot_rom_range(addr))
     return bios_->read_byte(addr);

@@ -25,14 +25,12 @@ enum BusConflictTypes : std::uint32_t {
   BUS_CONFLICT_OAM_DMA = 1 << 1,
 };
 
-constexpr BusConflictTypes operator|(const BusConflictTypes a,
-                                     const BusConflictTypes b) {
+constexpr BusConflictTypes operator|(const BusConflictTypes a, const BusConflictTypes b) {
   return static_cast<BusConflictTypes>(static_cast<std::uint32_t>(a) |
                                        static_cast<std::uint32_t>(b));
 }
 
-constexpr BusConflictTypes operator&(const BusConflictTypes a,
-                                     const BusConflictTypes b) {
+constexpr BusConflictTypes operator&(const BusConflictTypes a, const BusConflictTypes b) {
   return static_cast<BusConflictTypes>(static_cast<std::uint32_t>(a) &
                                        static_cast<std::uint32_t>(b));
 }
@@ -101,9 +99,7 @@ public:
   void eject_cartridge();
   void init_test_bed();
   [[nodiscard]] Cartridge *get_cartridge() noexcept { return cart_.get(); }
-  [[nodiscard]] const Cartridge *get_cartridge() const noexcept {
-    return cart_.get();
-  }
+  [[nodiscard]] const Cartridge *get_cartridge() const noexcept { return cart_.get(); }
 
   /* Convenience getters for PixelProcessor */
   std::array<std::unique_ptr<byte_t[]>, 2> &get_vram() { return vram; }

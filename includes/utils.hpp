@@ -16,8 +16,7 @@ void collect_args(std::ostringstream &oss, T &&value, Args &&...args) {
   collect_args(oss, std::forward<Args>(args)...);
 }
 
-template <typename... Args>
-std::string format(const std::string &fmt, Args &&...args) {
+template <typename... Args> std::string format(const std::string &fmt, Args &&...args) {
   std::ostringstream arg_stream{};
   collect_args(arg_stream, std::forward<Args>(args)...);
 

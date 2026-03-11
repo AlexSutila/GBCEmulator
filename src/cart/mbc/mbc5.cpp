@@ -14,8 +14,8 @@
 
 class Mbc5 final : public Mbc {
 public:
-  Mbc5(std::span<const byte_t> const rom, std::size_t const ram_bytes,
-       bool const battery, bool const rumble)
+  Mbc5(std::span<const byte_t> const rom, std::size_t const ram_bytes, bool const battery,
+       bool const rumble)
       : rom_(rom), ram_(ram_bytes), battery_(battery), rumble_(rumble) {}
 
   byte_t read(addr_t const addr) override {
@@ -27,8 +27,8 @@ public:
     if (addr >= 0xA000 && addr <= 0xBFFF) {
       if (!ram_enabled_ || ram_.empty())
         return open_bus();
-      const std::size_t bank = clamp_bank(
-          ram_bank_, std::max<std::size_t>(1, ram_.size() / kRamBankSize));
+      const std::size_t bank =
+          clamp_bank(ram_bank_, std::max<std::size_t>(1, ram_.size() / kRamBankSize));
       return ram_[(bank * kRamBankSize + (addr - 0xA000)) % ram_.size()];
     }
     return open_bus();
@@ -36,14 +36,12 @@ public:
 
   void write(addr_t const addr, byte_t const val) override {
     if (addr <= 0x1FFF) {
-      ram_enabled_ =
-          ((val & 0x0F) == 0x0A); // Real MBCs accept any low-nibble A
+      ram_enabled_ = ((val & 0x0F) == 0x0A); // Real MBCs accept any low-nibble A
       return;
     }
     if (addr <= 0x2FFF) {
       rom_bank_ =
-          (rom_bank_ & 0x100) |
-          val; // low 8 bits        // Writing zero is OK unlike other MBCs
+          (rom_bank_ & 0x100) | val; // low 8 bits        // Writing zero is OK unlike other MBCs
       return;
     }
     if (addr <= 0x3FFF) {
@@ -63,17 +61,14 @@ public:
     if (addr >= 0xA000 && addr <= 0xBFFF) {
       if (!ram_enabled_ || ram_.empty())
         return;
-      const std::size_t banks =
-          std::max<std::size_t>(1, ram_.size() / kRamBankSize);
+      const std::size_t banks = std::max<std::size_t>(1, ram_.size() / kRamBankSize);
       const std::size_t bank = clamp_bank(ram_bank_, banks);
       ram_[(bank * kRamBankSize + (addr - 0xA000)) % ram_.size()] = val;
     }
   }
 
   [[nodiscard]] bool has_battery() const noexcept override { return battery_; }
-  [[nodiscard]] std::span<const byte_t> ram() const noexcept override {
-    return ram_;
-  }
+  [[nodiscard]] std::span<const byte_t> ram() const noexcept override { return ram_; }
   std::span<byte_t> ram() noexcept override { return ram_; }
 
   template <typename T> void parse_savestate_impl(T &t) {
@@ -86,18 +81,10 @@ public:
     t.eof();
   }
 
-  void parse_savestate(Savestate::Writer &t) override {
-    parse_savestate_impl(t);
-  }
-  void parse_savestate(Savestate::Reader &t) override {
-    parse_savestate_impl(t);
-  }
-  void parse_savestate(Savestate::Sizer &t) override {
-    parse_savestate_impl(t);
-  }
-  void parse_savestate(Savestate::Checker &t) override {
-    parse_savestate_impl(t);
-  }
+  void parse_savestate(Savestate::Writer &t) override { parse_savestate_impl(t); }
+  void parse_savestate(Savestate::Reader &t) override { parse_savestate_impl(t); }
+  void parse_savestate(Savestate::Sizer &t) override { parse_savestate_impl(t); }
+  void parse_savestate(Savestate::Checker &t) override { parse_savestate_impl(t); }
 
 private:
   std::span<const byte_t> rom_;
@@ -114,22 +101,15 @@ private:
                           // has no effect. If we somehow port it to a handset
                           // then this can be hooked up to some motors
 
-  enum : std::uint16_t {
-    F_RAM_ENABLED = 1,
-    F_ROM_BANK,
-    F_RAM_BANK,
-    F_RUMBLE_ON
-  };
+  enum : std::uint16_t { F_RAM_ENABLED = 1, F_ROM_BANK, F_RAM_BANK, F_RUMBLE_ON };
 };
 
 std::unique_ptr<Mbc> make_mbc5(const cart &c) {
   const bool battery = type_has_battery(c.header.cartridge_type);
-  const bool rumble =
-      (c.header.cartridge_type == 0x1C || // MBC5+RUMBLE
-       c.header.cartridge_type == 0x1D || // MBC5+RUMBLE+RAM
-       c.header.cartridge_type == 0x1E || // MBC5+RUMBLE+RAM+BATTERY
-       c.header.cartridge_type == 0x22);  // MBC7+SENSOR+RUMBLE+RAM+BATTERY
+  const bool rumble = (c.header.cartridge_type == 0x1C || // MBC5+RUMBLE
+                       c.header.cartridge_type == 0x1D || // MBC5+RUMBLE+RAM
+                       c.header.cartridge_type == 0x1E || // MBC5+RUMBLE+RAM+BATTERY
+                       c.header.cartridge_type == 0x22);  // MBC7+SENSOR+RUMBLE+RAM+BATTERY
 
-  return std::make_unique<Mbc5>(c.rom_span(), c.declared_ram_bytes, battery,
-                                rumble);
+  return std::make_unique<Mbc5>(c.rom_span(), c.declared_ram_bytes, battery, rumble);
 }

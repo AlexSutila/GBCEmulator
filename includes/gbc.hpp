@@ -72,9 +72,7 @@ public:
   [[nodiscard]] bool savestate_ready() const;
 
   /* Optional debugger configurable by frontend */
-  void configure_debugger(Debug::Debugger debugger) {
-    debugger_ = std::move(debugger);
-  }
+  void configure_debugger(Debug::Debugger debugger) { debugger_ = std::move(debugger); }
   std::optional<Debug::Debugger> &get_debugger() { return debugger_; }
 
   /* Getters mainly for python bindings */

@@ -33,11 +33,10 @@ struct Settings {
   std::string savestate_root_dir{"./savestates"};
   std::string cheat_root_dir{"./cheats"};
   int max_quicksaves{default_max_quicksaves};
-  std::array<SDL_Keycode, 8> keybinds{SDLK_D,         SDLK_A,     SDLK_W,
-                                      SDLK_S,         SDLK_J,     SDLK_K,
-                                      SDLK_BACKSPACE, SDLK_RETURN};
-  std::array<SDL_Keycode, 7> general_keybinds{
-      SDLK_G, SDLK_F, SDLK_EQUALS, SDLK_MINUS, SDLK_M, SDLK_F5, SDLK_F8};
+  std::array<SDL_Keycode, 8> keybinds{SDLK_D, SDLK_A, SDLK_W,         SDLK_S,
+                                      SDLK_J, SDLK_K, SDLK_BACKSPACE, SDLK_RETURN};
+  std::array<SDL_Keycode, 7> general_keybinds{SDLK_G, SDLK_F,  SDLK_EQUALS, SDLK_MINUS,
+                                              SDLK_M, SDLK_F5, SDLK_F8};
   std::vector<std::string> recent_roms;
   struct CheatEntry {
     bool enabled{true};
@@ -51,18 +50,13 @@ struct Settings {
   void save(const std::string &filename = ".gbc.config.json") const;
   void add_recent_rom(const std::string &path);
 };
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Settings::CheatEntry, enabled,
-                                                name, code, notes, format)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Settings, volume,
-                                                force_mono_dmg,
-                                                keybind_preset_index, rom_dir,
-                                                prev_bios_path, bios_dir,
-                                                save_root_dir,
-                                                savestate_root_dir,
-                                                cheat_root_dir,
-                                                max_quicksaves,
-                                                keybinds, general_keybinds,
-                                                recent_roms)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Settings::CheatEntry, enabled, name, code, notes,
+                                                format)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(Settings, volume, force_mono_dmg,
+                                                keybind_preset_index, rom_dir, prev_bios_path,
+                                                bios_dir, save_root_dir, savestate_root_dir,
+                                                cheat_root_dir, max_quicksaves, keybinds,
+                                                general_keybinds, recent_roms)
 
 inline Settings Settings::load(const std::string &filename) {
   Settings s = {};
@@ -118,20 +112,17 @@ struct KeybindPreset {
   std::array<SDL_Keycode, KCount> keys;
 };
 
-static constexpr std::array<KeybindPreset, 4> kPresets{{
-    {"WASD",
-     {SDLK_D, SDLK_A, SDLK_W, SDLK_S, SDLK_J, SDLK_K, SDLK_BACKSPACE,
-      SDLK_RETURN}},
-    {"Arrows",
-     {SDLK_RIGHT, SDLK_LEFT, SDLK_UP, SDLK_DOWN, SDLK_Z, SDLK_X, SDLK_RSHIFT,
-      SDLK_RETURN}},
-    {"IJKL",
-     {SDLK_L, SDLK_J, SDLK_I, SDLK_K, SDLK_Z, SDLK_X, SDLK_BACKSPACE,
-      SDLK_RETURN}},
-    {"Custom", // Just a placeholder for custom bindings
-     {SDLK_UNKNOWN, SDLK_UNKNOWN, SDLK_UNKNOWN, SDLK_UNKNOWN, SDLK_UNKNOWN,
-      SDLK_UNKNOWN, SDLK_UNKNOWN, SDLK_UNKNOWN}},
-}};
+static constexpr std::array<KeybindPreset, 4> kPresets{
+    {
+     {"WASD", {SDLK_D, SDLK_A, SDLK_W, SDLK_S, SDLK_J, SDLK_K, SDLK_BACKSPACE, SDLK_RETURN}},
+     {"Arrows",
+         {SDLK_RIGHT, SDLK_LEFT, SDLK_UP, SDLK_DOWN, SDLK_Z, SDLK_X, SDLK_RSHIFT, SDLK_RETURN}},
+     {"IJKL", {SDLK_L, SDLK_J, SDLK_I, SDLK_K, SDLK_Z, SDLK_X, SDLK_BACKSPACE, SDLK_RETURN}},
+     {"Custom", // Just a placeholder for custom bindings
+         {SDLK_UNKNOWN, SDLK_UNKNOWN, SDLK_UNKNOWN, SDLK_UNKNOWN, SDLK_UNKNOWN, SDLK_UNKNOWN,
+          SDLK_UNKNOWN, SDLK_UNKNOWN}},
+     }
+};
 static constexpr int kCustomPresetIndex = static_cast<int>(kPresets.size()) - 1;
 
 struct InputState {

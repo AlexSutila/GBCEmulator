@@ -45,8 +45,7 @@ private:
  */
 class Debuggable {
 public:
-  explicit Debuggable(std::optional<Debugger> &debugger)
-      : debugger_(debugger) {}
+  explicit Debuggable(std::optional<Debugger> &debugger) : debugger_(debugger) {}
   void try_brk(addr_t addr, BreakReason reason) const;
   void try_brk(BreakReason reason) const;
 

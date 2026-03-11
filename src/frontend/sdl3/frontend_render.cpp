@@ -6,19 +6,18 @@ struct DebugDialogSpec {
   bool UiState::*visible_flag;
 };
 
-constexpr std::array<DebugDialogSpec, 4> kDebuggerDialogs{{
-    {GbcImGui::DialogId::DebugMain, &UiState::show_main_debug_viewer},
-    {GbcImGui::DialogId::Breakpoints, &UiState::show_breakpoints},
-    {GbcImGui::DialogId::MemoryViewer, &UiState::show_memory_viewer},
-    {GbcImGui::DialogId::PpuViewer, &UiState::show_ppu_viewer},
-}};
+constexpr std::array<DebugDialogSpec, 4> kDebuggerDialogs{
+    {
+     {GbcImGui::DialogId::DebugMain, &UiState::show_main_debug_viewer},
+     {GbcImGui::DialogId::Breakpoints, &UiState::show_breakpoints},
+     {GbcImGui::DialogId::MemoryViewer, &UiState::show_memory_viewer},
+     {GbcImGui::DialogId::PpuViewer, &UiState::show_ppu_viewer},
+     }
+};
 
-bool should_render_attached_dialog(const GbcImGui &gui,
-                                   const GbcImGui::DialogId id,
+bool should_render_attached_dialog(const GbcImGui &gui, const GbcImGui::DialogId id,
                                    const bool visible) {
-  return visible &&
-         (!GbcImGui::dialog_is_detached(id) ||
-          !gui.has_detached_dialog_context(id));
+  return visible && (!GbcImGui::dialog_is_detached(id) || !gui.has_detached_dialog_context(id));
 }
 } // namespace
 
@@ -87,20 +86,16 @@ void SDL3Frontend::render_frame() {
   }
 
   if (video_dirty.exchange(false, std::memory_order_acq_rel)) {
-    host.update_texture(get_front_buffer(), framebuf_width, framebuf_height,
-                        cgb_mode, force_mono);
+    host.update_texture(get_front_buffer(), framebuf_width, framebuf_height, cgb_mode, force_mono);
   }
 
   const auto now = Clock::now();
   const auto elapsed_ms =
-      std::chrono::duration_cast<std::chrono::milliseconds>(now - last_fps_check)
-          .count();
+      std::chrono::duration_cast<std::chrono::milliseconds>(now - last_fps_check).count();
   if (elapsed_ms >= 500) {
-    const uint64_t current_count =
-        emulated_frame_count.load(std::memory_order_relaxed);
+    const uint64_t current_count = emulated_frame_count.load(std::memory_order_relaxed);
     const uint64_t frames = current_count - last_frame_count;
-    ui_state.current_fps =
-        static_cast<double>(frames) * 1000.0 / static_cast<double>(elapsed_ms);
+    ui_state.current_fps = static_cast<double>(frames) * 1000.0 / static_cast<double>(elapsed_ms);
     last_frame_count = current_count;
     last_fps_check = now;
   }
@@ -136,8 +131,7 @@ void SDL3Frontend::render_frame() {
     }
 
     for (const auto &spec : kDebuggerDialogs) {
-      if (!should_render_attached_dialog(gui, spec.id,
-                                         ui_state.*(spec.visible_flag))) {
+      if (!should_render_attached_dialog(gui, spec.id, ui_state.*(spec.visible_flag))) {
         continue;
       }
       debugger.render_dialog(spec.id, ui_state, gbc, host.get_renderer(), false);
@@ -158,15 +152,13 @@ void SDL3Frontend::render_frame() {
     running = false;
   }
 
-  if (!startup_window_size_adjusted && menu_bar_height > 0.0f &&
-      status_bar_height > 0.0f) {
+  if (!startup_window_size_adjusted && menu_bar_height > 0.0f && status_bar_height > 0.0f) {
     if (SDL_Window *window = host.get_window()) {
       const Uint32 flags = SDL_GetWindowFlags(window);
       if (!(flags & (SDL_WINDOW_MAXIMIZED | SDL_WINDOW_FULLSCREEN))) {
         constexpr int target_w = framebuf_width * scale;
-        const int target_h =
-            framebuf_height * scale +
-            static_cast<int>(std::lround(menu_bar_height + status_bar_height));
+        const int target_h = framebuf_height * scale +
+                             static_cast<int>(std::lround(menu_bar_height + status_bar_height));
         int cur_w = 0;
         int cur_h = 0;
         SDL_GetWindowSize(window, &cur_w, &cur_h);
@@ -185,36 +177,31 @@ void SDL3Frontend::render_frame() {
   host.draw_overlay(ImGui::GetDrawData());
   host.present();
 
-  const auto render_detached_dialog =
-      [this]<typename RenderFn>(const GbcImGui::DialogId id,
-                                RenderFn &&render_fn) {
-        std::lock_guard lock(ui_mutex);
-        if (!gui.use_detached_dialog_context(id, ui_state)) {
-          return;
-        }
+  const auto render_detached_dialog = [this]<typename RenderFn>(const GbcImGui::DialogId id,
+                                                                RenderFn &&render_fn) {
+    std::lock_guard lock(ui_mutex);
+    if (!gui.use_detached_dialog_context(id, ui_state)) {
+      return;
+    }
 
-        GbcImGui::new_frame();
-        render_fn();
-        GbcImGui::end_frame();
-        gui.present_detached_dialog(id);
-      };
+    GbcImGui::new_frame();
+    render_fn();
+    GbcImGui::end_frame();
+    gui.present_detached_dialog(id);
+  };
 
-  render_detached_dialog(
-      GbcImGui::DialogId::Settings,
-      [&] { gui.render_dialog(GbcImGui::DialogId::Settings, ui_state, host); });
-  render_detached_dialog(
-      GbcImGui::DialogId::Cheats,
-      [&] { gui.render_dialog(GbcImGui::DialogId::Cheats, ui_state, host); });
-  render_detached_dialog(
-      GbcImGui::DialogId::Keybinds,
-      [&] { gui.render_dialog(GbcImGui::DialogId::Keybinds, ui_state, host); });
+  render_detached_dialog(GbcImGui::DialogId::Settings,
+                         [&] { gui.render_dialog(GbcImGui::DialogId::Settings, ui_state, host); });
+  render_detached_dialog(GbcImGui::DialogId::Cheats,
+                         [&] { gui.render_dialog(GbcImGui::DialogId::Cheats, ui_state, host); });
+  render_detached_dialog(GbcImGui::DialogId::Keybinds,
+                         [&] { gui.render_dialog(GbcImGui::DialogId::Keybinds, ui_state, host); });
   render_detached_dialog(GbcImGui::DialogId::Savestates,
                          [&] { build_savestate_manager_window_locked(true); });
 
   for (const auto &spec : kDebuggerDialogs) {
     render_detached_dialog(spec.id, [&] {
-      debugger.render_dialog(spec.id, ui_state, gbc, gui.active_renderer(),
-                             true);
+      debugger.render_dialog(spec.id, ui_state, gbc, gui.active_renderer(), true);
     });
   }
 
@@ -222,20 +209,17 @@ void SDL3Frontend::render_frame() {
 }
 
 bool SDLCALL SDL3Frontend::event_watcher(void *userdata, const SDL_Event *event) {
-  if (event->type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED ||
-      event->type == SDL_EVENT_WINDOW_MOVED ||
+  if (event->type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED || event->type == SDL_EVENT_WINDOW_MOVED ||
       event->type == SDL_EVENT_WINDOW_EXPOSED) {
     static auto last_draw = Clock::now();
-    const int min_interval_ms =
-        (event->type == SDL_EVENT_WINDOW_MOVED) ? 33 : 16;
+    const int min_interval_ms = (event->type == SDL_EVENT_WINDOW_MOVED) ? 33 : 16;
 
     if (const auto now = Clock::now();
-        std::chrono::duration_cast<std::chrono::milliseconds>(now - last_draw)
-                .count() >= min_interval_ms) {
+        std::chrono::duration_cast<std::chrono::milliseconds>(now - last_draw).count() >=
+        min_interval_ms) {
       auto *self = static_cast<SDL3Frontend *>(userdata);
-      const auto now_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                              now.time_since_epoch())
-                              .count();
+      const auto now_ns =
+          std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count();
 
       // The watcher runs inside SDL's event dispatch path, so it should never
       // block waiting for UI work. If the UI thread is mid-update, skip the
