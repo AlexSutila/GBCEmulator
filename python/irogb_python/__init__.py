@@ -25,16 +25,13 @@ __all__ = [
     "GameBoyColor",
     "BreakReason",
     "StatModes",
-
     # Cartridge sources
     "Cartridge",
     "make_cart_bytes",
     "load_cart_filesystem",
-
     # Pixel processor sources
     "RenderedFrame",
     "PPUState",
-
     # Utilities
     "run_mooneye_test",
     "eval_mooneye_cpu_state",

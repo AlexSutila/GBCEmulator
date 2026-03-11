@@ -49,7 +49,7 @@ class Cartridge:
 
     @property
     def _raw(self) -> core.Cart:
-        '''Internal use only: underlying core.Cart object'''
+        """Internal use only: underlying core.Cart object"""
         return self._cart
 
 

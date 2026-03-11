@@ -150,7 +150,7 @@ def run_acid_test_suite():
         titles=[i[0] for i in ACID_CASES],
         rows=1,
         cols=2,
-        out_path='assets/acid_tests.png'
+        out_path="assets/acid_tests.png",
     )
 
 
@@ -160,7 +160,7 @@ def run_blargg_cpu_tests():
         titles=[i[0] for i in BLARGG_CASES],
         rows=2,
         cols=4,
-        out_path='assets/blargg_cpu_mem.png'
+        out_path="assets/blargg_cpu_mem.png",
     )
 
 
@@ -178,6 +178,6 @@ def test_blargg_suite(title: str, url: str, expected_md5: str):
     assert digest == expected_md5, f"{title} failed (got {digest})"
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     run_acid_test_suite()
     run_blargg_cpu_tests()

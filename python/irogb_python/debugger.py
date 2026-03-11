@@ -24,7 +24,4 @@ class Debugger:
 
     @property
     def breakpoints(self) -> dict:
-        return {
-            k: v.to_string()
-            for k, v in self._debug.get_breakpoints().items()
-        }
+        return {k: v.to_string() for k, v in self._debug.get_breakpoints().items()}
