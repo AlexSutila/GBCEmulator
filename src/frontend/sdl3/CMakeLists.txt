@@ -115,10 +115,6 @@ target_compile_options(irogb_full
     PRIVATE ${GBC_COMPILE_OPTIONS}
 )
 
-set_target_properties(irogb_full PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
-)
-
 install(TARGETS irogb_full
         RUNTIME_DEPENDENCIES
         PRE_EXCLUDE_REGEXES "api-ms-" "ext-ms-"

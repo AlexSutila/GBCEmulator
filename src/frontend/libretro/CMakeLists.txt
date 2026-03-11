@@ -4,20 +4,6 @@
 project(gbc LANGUAGES C) # Allow C since API is C-based
 include(FetchContent)
 
-FetchContent_Declare(
-    libretro_api
-    GIT_REPOSITORY https://github.com/libretro/libretro-common
-    GIT_TAG master
-)
-FetchContent_MakeAvailable(libretro_api)
-add_library(libretro_api INTERFACE)
-
-target_include_directories(libretro_api
-    INTERFACE
-        ${libretro_api_SOURCE_DIR}/include
-)
-
-
 # ===========================================================================
 # Core build
 # ===========================================================================
@@ -30,9 +16,6 @@ add_library(irogb_libretro SHARED
 
 set_target_properties(irogb_libretro PROPERTIES
     PREFIX ""
-    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
-    LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
-    ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 
 target_compile_options(irogb_libretro
@@ -43,12 +26,4 @@ target_compile_options(irogb_libretro
 
 target_include_directories(irogb_libretro
     PRIVATE ${GBC_INCLUDE_DIR}
-)
-
-target_link_libraries(irogb_libretro
-    PRIVATE libretro_api
-)
-
-target_include_directories(irogb_libretro
-    PRIVATE ${CMAKE_SOURCE_DIR}/include
 )

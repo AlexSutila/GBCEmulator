@@ -36,7 +36,7 @@ extern "C" {
 /* ======================================================================
  * Start implementation of C-header (exposed directly to libretro)
  * ====================================================================== */
-#include "libretro.h" // Critical: Leave inside the `extern "C"` scope
+#include "frontend/libretro/libretro.h"
 
 void retro_init(void) {}
 

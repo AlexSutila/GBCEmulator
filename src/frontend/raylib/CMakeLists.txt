@@ -115,8 +115,5 @@ if(BUILD_SIMPLE)
         target_compile_options(irogb_simple
             PRIVATE ${GBC_COMPILE_OPTIONS}
         )
-        set_target_properties(irogb_simple PROPERTIES
-            RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
-        )
     endif() # EMSCRIPTEN
 endif() # BUILD_SIMPLE

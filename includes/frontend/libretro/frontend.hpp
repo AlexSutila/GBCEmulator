@@ -2,8 +2,8 @@
 #define GBC_LIBRETRO_FRONTEND_HPP
 
 #include "frontend/frontend.hpp"
+#include "frontend/libretro/libretro.h"
 #include "gbc.hpp"
-#include "libretro.h"
 #include "memory/mmio/dmg.hpp"
 #include <array>
 #include <cstddef>

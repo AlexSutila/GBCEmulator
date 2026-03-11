@@ -2,8 +2,8 @@
 
 // Emulator core includes
 #include "cart/cart.hpp"
+#include "frontend/libretro/libretro.h"
 #include "gbc.hpp"
-#include "libretro.h"
 #include "memory/mmio/dmg.hpp"
 #include "memory/mmio/mmio.hpp"
 
