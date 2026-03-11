@@ -6,9 +6,9 @@
 #include "cpu/registers/regfile.hpp"
 #include "emu_types.hpp"
 #include "memory/bus.hpp"
+#include "utils.hpp"
 
 #include <cstdint>
-#include <format>
 
 /*
  * Absolute jump
@@ -34,7 +34,7 @@ public:
   }
   std::string describe() override {
     const addr_t imm = make_addr(lo, hi);
-    return std::format("JP {}", static_cast<int>(imm));
+    return IroGB::format("JP {}", static_cast<int>(imm));
   }
   void parse() override {
     lo = bus->read_byte(reg_file->reg_pc, false);
@@ -61,7 +61,7 @@ public:
     reg_file->reg_pc = read_reg<Register16Bit::REG_HL>();
     return 4;
   }
-  std::string describe() override { return std::format("JP HL"); }
+  std::string describe() override { return IroGB::format("JP HL"); }
 };
 
 /*
@@ -89,8 +89,8 @@ public:
     return cond ? 16 : 12; // Four extra cycles when jump is taken
   }
   std::string describe() override {
-    return std::format("JP {}, {}", to_string<flag, expect>(),
-                       static_cast<int>(make_addr(lo, hi)));
+    return IroGB::format("JP {}, {}", to_string<flag, expect>(),
+                         static_cast<int>(make_addr(lo, hi)));
   }
   void parse() override {
     cond = reg_file->reg_af.get_flag(flag) == expect;
@@ -120,7 +120,7 @@ public:
     return 12;
   }
   std::string describe() override {
-    return std::format("JP {}", static_cast<int>(imm));
+    return IroGB::format("JP {}", static_cast<int>(imm));
   }
   void parse() override {
     imm = static_cast<int8_t>(bus->read_byte(reg_file->reg_pc++));
@@ -146,8 +146,8 @@ public:
     return 12;
   }
   std::string describe() override {
-    return std::format("JP {}, {}", to_string<flag, expect>(),
-                       static_cast<int>(imm));
+    return IroGB::format("JP {}, {}", to_string<flag, expect>(),
+                         static_cast<int>(imm));
   }
   void parse() override {
     imm = static_cast<int8_t>(bus->read_byte(reg_file->reg_pc++));
@@ -193,7 +193,7 @@ public:
   }
   std::string describe() override {
     const addr_t imm = make_addr(lo, hi);
-    return std::format("CALL {}", static_cast<int>(imm));
+    return IroGB::format("CALL {}", static_cast<int>(imm));
   }
   void parse() override {
     state = InstrStates::INSTR_STATE_READ;
@@ -261,8 +261,8 @@ public:
     return cond ? 24 : 12;
   }
   std::string describe() override {
-    return std::format("CALL {}, {}", to_string<flag, expect>(),
-                       static_cast<int>(make_addr(lo, hi)));
+    return IroGB::format("CALL {}, {}", to_string<flag, expect>(),
+                         static_cast<int>(make_addr(lo, hi)));
   }
   void parse() override {
     cond = reg_file->reg_af.get_flag(flag) == expect;
@@ -323,7 +323,7 @@ public:
     state = InstrStates::INSTR_STATE_READ;
     sp = reg_file->reg_sp.read();
   }
-  std::string describe() override { return std::format("RET"); }
+  std::string describe() override { return IroGB::format("RET"); }
 
 private:
   InstrStates state{};
@@ -356,7 +356,7 @@ public:
     return state == InstrStates::INSTR_STATE_DEAD ? 8 : 20;
   }
   std::string describe() override {
-    return std::format("RET {}", to_string<flag, expect>());
+    return IroGB::format("RET {}", to_string<flag, expect>());
   }
   void parse() override {
     cond = reg_file->reg_af.get_flag(flag) == expect;
@@ -412,7 +412,7 @@ public:
     state = InstrStates::INSTR_STATE_READ;
     sp = reg_file->reg_sp.read();
   }
-  std::string describe() override { return std::format("RETI"); }
+  std::string describe() override { return IroGB::format("RETI"); }
 
 private:
   InterruptMasterEnable *const ime;
@@ -449,7 +449,7 @@ public:
     return state == InstrStates::INSTR_STATE_WRITE ? 8 : 12;
   }
   std::string describe() override {
-    return std::format("RST {}", static_cast<int>(vec));
+    return IroGB::format("RST {}", static_cast<int>(vec));
   }
   void parse() override {
     state = InstrStates::INSTR_STATE_WRITE;

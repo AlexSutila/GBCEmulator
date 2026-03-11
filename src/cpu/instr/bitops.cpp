@@ -1,9 +1,9 @@
 #include "cpu/instr/bitops.hpp"
 #include "cpu/instr/instr.hpp"
 #include "cpu/lr35902.hpp"
+#include "utils.hpp"
 
 #include <array>
-#include <format>
 #include <iomanip>
 #include <memory>
 #include <sstream>
@@ -43,7 +43,7 @@ std::size_t CB_PREFIX::mem_access_t_cycle() {
 
 // TODO: This could fuck up royally but we ball lmao
 std::string CB_PREFIX::describe() {
-  return std::format("(CB) {}", lookup.at(op)->describe());
+  return IroGB::format("(CB) {}", lookup.at(op)->describe());
 }
 
 void CB_PREFIX::parse() {

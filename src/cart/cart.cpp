@@ -1,6 +1,8 @@
 #include "cart/cart.hpp"
 #include "frontend/logger.hpp"
 #include "savestate/codec.hpp"
+#include "utils.hpp"
+
 #include <algorithm>
 #include <bitset>
 #include <cstring>
@@ -332,21 +334,23 @@ SpecialMbc detect_special_mbc(const cart &c) {
     if (c.rom_size() <= 0x8000)
       return NotSpecial_t; // If strictly <= 32KiB, it's probably safe
     if (c.header.title() == "WISDOM TREE" || maybe_wisdom_tree(c.rom_span())) {
-      Logger::push(LogLevel::Info, "ROM", "Mapper override",
-                   std::format("{} header type {:02X} looks inconsistent with "
-                               "ROM size {} and appears to be WT; "
-                               "forcing Wisdom Tree mapper.",
-                               c.header.title(), c.header.cartridge_type,
-                               c.rom_span().size()));
+      Logger::push(
+          LogLevel::Info, "ROM", "Mapper override",
+          IroGB::format("{} header type {:02X} looks inconsistent with "
+                        "ROM size {} and appears to be WT; "
+                        "forcing Wisdom Tree mapper.",
+                        c.header.title(), c.header.cartridge_type,
+                        c.rom_span().size()));
       return WisdomTree_t;
     }
     if (maybe_m161(c.rom_span())) {
-      Logger::push(LogLevel::Info, "ROM", "Mapper override",
-                   std::format("{} header type {:02X} looks inconsistent with "
-                               "ROM size {} and appears to be M161; "
-                               "forcing M161 mapper.",
-                               c.header.title(), c.header.cartridge_type,
-                               c.rom_span().size()));
+      Logger::push(
+          LogLevel::Info, "ROM", "Mapper override",
+          IroGB::format("{} header type {:02X} looks inconsistent with "
+                        "ROM size {} and appears to be M161; "
+                        "forcing M161 mapper.",
+                        c.header.title(), c.header.cartridge_type,
+                        c.rom_span().size()));
       return M161_t;
     }
   }
@@ -354,12 +358,13 @@ SpecialMbc detect_special_mbc(const cart &c) {
   case 0x02:
   case 0x03: // MBC1M possibility
     if (maybe_mbc1m(c.rom_span())) {
-      Logger::push(LogLevel::Info, "ROM", "Mapper override",
-                   std::format("{} header type {:02X} looks inconsistent with "
-                               "ROM size {} and appears to be MBC1M; "
-                               "forcing MBC1M mapper.",
-                               c.header.title(), c.header.cartridge_type,
-                               c.rom_span().size()));
+      Logger::push(
+          LogLevel::Info, "ROM", "Mapper override",
+          IroGB::format("{} header type {:02X} looks inconsistent with "
+                        "ROM size {} and appears to be MBC1M; "
+                        "forcing MBC1M mapper.",
+                        c.header.title(), c.header.cartridge_type,
+                        c.rom_span().size()));
       return MBC1M_t;
     }
   case 0x0F:
