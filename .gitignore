@@ -11,3 +11,5 @@ __pycache__/
 saves/
 savestates/
 cheats/
+uv.lock
+.venv/

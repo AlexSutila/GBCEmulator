@@ -1,0 +1,8 @@
+format:
+  line_width: 100
+  dangle_parens: true
+  command_case: lower
+  keyword_case: upper
+
+markup:
+  enable_markup: false
