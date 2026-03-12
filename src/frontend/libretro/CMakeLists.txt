@@ -15,6 +15,6 @@ add_library(
 
 set_target_properties(irogb_libretro PROPERTIES PREFIX "")
 
-target_compile_options(irogb_libretro PRIVATE ${GBC_COMPILE_OPTIONS} -fPIC)
+target_compile_options(irogb_libretro PRIVATE -fPIC -DNO_FILESYSTEM ${GBC_COMPILE_OPTIONS})
 
 target_include_directories(irogb_libretro PRIVATE ${GBC_INCLUDE_DIR})
