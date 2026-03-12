@@ -15,8 +15,10 @@
 #include <sstream>
 #include <stdexcept>
 
-/* We do not save the CPU state (fetch/decode/exec/halt) because we always align
- * save states with instruction fetches. */
+/**
+ * Note that even though we force alignment of savestates with CPU instruction fetches,
+ * we still have to save the stateful information to know if we are in halt mode or not.
+ */
 enum : std::uint16_t {
   F_PC = 1,
   F_SP,
@@ -31,6 +33,7 @@ enum : std::uint16_t {
   F_IME_RAW,
   F_HALT_BUG,
   F_INS_BASE,
+  F_STATE,
 
   // CPU owns these registers (presumably), so we parse them here
   F_IF_FLAGS,
@@ -41,29 +44,30 @@ template <typename T> void LR35902::parse_savestate(T &t) {
   constexpr auto version = 1; // Schema revision
   t.chunk_header(version, Savestate::C_CPU);
 
-  ProcessorState state{};
+  ProcessorState cpu_state{};
   if (t.op() == Savestate::OP_WRITE)
-    state = get_state();
+    cpu_state = get_state();
 
   // Exploiting public API exposed to pybindings here
-  t.field_generic(F_PC, state.pc);
-  t.field_generic(F_SP, state.sp);
-  t.field_generic(F_A, state.a);
-  t.field_generic(F_B, state.b);
-  t.field_generic(F_C, state.c);
-  t.field_generic(F_D, state.d);
-  t.field_generic(F_E, state.e);
-  t.field_generic(F_F, state.f);
-  t.field_generic(F_H, state.h);
-  t.field_generic(F_L, state.l);
-  t.field_generic(F_IME_RAW, state.ime_enabled);
+  t.field_generic(F_PC, cpu_state.pc);
+  t.field_generic(F_SP, cpu_state.sp);
+  t.field_generic(F_A, cpu_state.a);
+  t.field_generic(F_B, cpu_state.b);
+  t.field_generic(F_C, cpu_state.c);
+  t.field_generic(F_D, cpu_state.d);
+  t.field_generic(F_E, cpu_state.e);
+  t.field_generic(F_F, cpu_state.f);
+  t.field_generic(F_H, cpu_state.h);
+  t.field_generic(F_L, cpu_state.l);
+  t.field_generic(F_IME_RAW, cpu_state.ime_enabled);
 
   if (t.op() == Savestate::OP_READ)
-    load_state(state);
+    load_state(cpu_state);
 
   // These are not manipulated by the data exposed via public API
   t.field_generic(F_HALT_BUG, reg_file.halt_bug_triggered);
   t.field_generic(F_INS_BASE, ins_base_addr);
+  t.field_enum(F_STATE, state);
 
   // Memory mapped registers for interrupts
   t.field_complex(F_IF_FLAGS, [&](T &t) { if_reg.parse_savestate(t); });

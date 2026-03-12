@@ -2,6 +2,7 @@
 #include "emu_types.hpp"
 #include "gbc.hpp"
 #include "memory/dma.hpp"
+#include "savestate/codec.hpp"
 
 namespace SYS {
 
@@ -51,6 +52,15 @@ void PaletteIdx::write(const byte_t value) {
   // Fourth bit is unused
   state_ = value | 0x40;
 }
+
+template <typename T> void PaletteData::parse_savestate_impl(T &t) {
+  t.field_bytes(1, {mem_.data(), mem_.size()});
+  t.field_generic(2, state_);
+}
+void PaletteData::parse_savestate(Savestate::Reader &t) { parse_savestate_impl(t); }
+void PaletteData::parse_savestate(Savestate::Writer &t) { parse_savestate_impl(t); }
+void PaletteData::parse_savestate(Savestate::Sizer &t) { parse_savestate_impl(t); }
+void PaletteData::parse_savestate(Savestate::Checker &t) { parse_savestate_impl(t); }
 
 /* Writes to color RAM can increase the value stored in this register */
 void PaletteIdx::inc() {
