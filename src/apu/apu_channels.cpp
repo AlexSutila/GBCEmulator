@@ -9,15 +9,15 @@ void APU::trigger_channel1() {
     return;
   }
 
-  channel1_enabled = true;
-  channel1_phase = 0.0;
+  channel1.enabled = true;
+  channel1.phase = 0.0;
 
   length_reload_if_zero<std::uint8_t>(ch1_length_counter, 64, (nr14 & 0x40) != 0,
                                       next_step_clocks_length());
 
   // Envelope
-  trigger_envelope(nr12, ch1_env_volume, ch1_env_period, ch1_env_timer, ch1_env_increase,
-                   ch1_env_enabled);
+  trigger_envelope(nr12, ch1_env.volume, ch1_env.period, ch1_env.timer, ch1_env.increase,
+                   ch1_env.enabled);
 
   // Sweep
   ch1_sweep_shadow_freq = ch1_frequency();
@@ -37,9 +37,9 @@ void APU::trigger_channel1() {
 }
 
 void APU::disable_channel1() {
-  channel1_enabled = false;
+  channel1.enabled = false;
   ch1_sweep_enabled = false;
-  ch1_env_enabled = false;
+  ch1_env.enabled = false;
 }
 
 bool APU::ch1_dac_enabled() const { return dac_enabled_pulse_noise(nr12); }
@@ -96,7 +96,7 @@ void APU::clock_ch1_length() {
 }
 
 void APU::clock_ch1_envelope() {
-  clock_envelope(ch1_env_volume, ch1_env_period, ch1_env_timer, ch1_env_increase, ch1_env_enabled);
+  clock_envelope(ch1_env.volume, ch1_env.period, ch1_env.timer, ch1_env.increase, ch1_env.enabled);
 }
 
 void APU::clock_ch1_sweep() {
@@ -141,10 +141,10 @@ void APU::clock_ch1_sweep() {
 
 // ------------ Sample Generation ------------
 float APU::channel1_sample() const {
-  if ((nr52 & 0x80) == 0 || !channel1_enabled || !ch1_dac_enabled())
+  if ((nr52 & 0x80) == 0 || !channel1.enabled || !ch1_dac_enabled())
     return 0.0f;
 
-  const byte_t volume = ch1_env_volume;
+  const byte_t volume = ch1_env.volume;
   if (volume == 0)
     return 0.0f;
 
@@ -155,7 +155,7 @@ float APU::channel1_sample() const {
   const float duty = duty_table[duty_index];
 
   const float amp = static_cast<float>(volume) / 15.0f;
-  return (channel1_phase < duty ? 1.0f : -1.0f) * amp;
+  return (channel1.phase < duty ? 1.0f : -1.0f) * amp;
 }
 
 // --------- Channel 2 Helpers -----------
@@ -172,8 +172,8 @@ void APU::ch2_set_frequency(std::uint16_t freq) {
 }
 
 void APU::disable_channel2() {
-  channel2_enabled = false;
-  ch2_env_enabled = false;
+  channel2.enabled = false;
+  ch2_env.enabled = false;
 }
 
 void APU::trigger_channel2() {
@@ -182,14 +182,14 @@ void APU::trigger_channel2() {
     return;
   }
 
-  channel2_enabled = true;
-  channel2_phase = 0.0;
+  channel2.enabled = true;
+  channel2.phase = 0.0;
 
   length_reload_if_zero<std::uint8_t>(ch2_length_counter, 64, (nr24 & 0x40) != 0,
                                       next_step_clocks_length());
 
-  trigger_envelope(nr22, ch2_env_volume, ch2_env_period, ch2_env_timer, ch2_env_increase,
-                   ch2_env_enabled);
+  trigger_envelope(nr22, ch2_env.volume, ch2_env.period, ch2_env.timer, ch2_env.increase,
+                   ch2_env.enabled);
 
   if (!ch2_dac_enabled())
     disable_channel2();
@@ -200,12 +200,12 @@ void APU::clock_ch2_length() {
 }
 
 void APU::clock_ch2_envelope() {
-  clock_envelope(ch2_env_volume, ch2_env_period, ch2_env_timer, ch2_env_increase, ch2_env_enabled);
+  clock_envelope(ch2_env.volume, ch2_env.period, ch2_env.timer, ch2_env.increase, ch2_env.enabled);
 }
 
 // ------------ Sample Generation ------------
 float APU::channel2_sample() const {
-  if ((nr52 & 0x80) == 0 || !channel2_enabled || !ch2_dac_enabled())
+  if ((nr52 & 0x80) == 0 || !channel2.enabled || !ch2_dac_enabled())
     return 0.0f;
 
   if (const std::uint16_t frequency = ch2_frequency(); frequency >= 2048)
@@ -214,11 +214,11 @@ float APU::channel2_sample() const {
   const auto duty_index = static_cast<std::uint8_t>((nr21 >> 6) & 0x03);
   const float duty = duty_table[duty_index];
 
-  const float amp = static_cast<float>(ch2_env_volume) / 15.0f;
+  const float amp = static_cast<float>(ch2_env.volume) / 15.0f;
   if (amp <= 0.0f)
     return 0.0f;
 
-  return (channel2_phase < duty ? 1.0f : -1.0f) * amp;
+  return (channel2.phase < duty ? 1.0f : -1.0f) * amp;
 }
 
 // ----------- Channel 3 Helpers -----------
@@ -290,14 +290,14 @@ void APU::clock_ch4_length() {
 }
 
 void APU::clock_ch4_envelope() {
-  clock_envelope(ch4_env_volume, ch4_env_period, ch4_env_timer, ch4_env_increase, ch4_env_enabled);
+  clock_envelope(ch4_env.volume, ch4_env.period, ch4_env.timer, ch4_env.increase, ch4_env.enabled);
 }
 
 bool APU::ch4_dac_enabled() const { return dac_enabled_pulse_noise(nr42); }
 
 void APU::disable_channel4() {
-  channel4_enabled = false;
-  ch4_env_enabled = false;
+  channel4.enabled = false;
+  ch4_env.enabled = false;
 }
 
 void APU::trigger_channel4() {
@@ -306,15 +306,15 @@ void APU::trigger_channel4() {
     return;
   }
 
-  channel4_enabled = true;
-  ch4_phase = 0.0;
+  channel4.enabled = true;
+  channel4.phase = 0.0;
   ch4_lfsr = 0x7FFF; // reset all 1s
 
   length_reload_if_zero<std::uint8_t>(ch4_length_counter, 64, (nr44 & 0x40) != 0,
                                       next_step_clocks_length());
 
-  trigger_envelope(nr42, ch4_env_volume, ch4_env_period, ch4_env_timer, ch4_env_increase,
-                   ch4_env_enabled);
+  trigger_envelope(nr42, ch4_env.volume, ch4_env.period, ch4_env.timer, ch4_env.increase,
+                   ch4_env.enabled);
 
   if (!ch4_dac_enabled())
     disable_channel4();
@@ -342,10 +342,10 @@ void APU::ch4_clock_lfsr() {
 
 // ------------ Sample Generation ------------
 float APU::channel4_sample() const {
-  if ((nr52 & 0x80) == 0 || !channel4_enabled || !ch4_dac_enabled())
+  if ((nr52 & 0x80) == 0 || !channel4.enabled || !ch4_dac_enabled())
     return 0.0f;
 
-  const float amp = static_cast<float>(ch4_env_volume) / 15.0f;
+  const float amp = static_cast<float>(ch4_env.volume) / 15.0f;
   if (amp <= 0.0f)
     return 0.0f;
 

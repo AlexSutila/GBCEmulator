@@ -567,7 +567,7 @@ enum : std::uint16_t {
 };
 
 template <typename T> void GameBoyColor::parse_savestate(T &t) {
-  constexpr auto version = 1; // Schema revision
+  constexpr auto version = 2; // Schema revision
   t.chunk_header(version, Savestate::C_GBC);
 
   t.field_generic(F_ELAPSED_CLOCKS, sys_.elapsed_clocks);
@@ -582,7 +582,7 @@ template <typename T> void GameBoyColor::parse_savestate(T &t) {
   timer->parse_savestate(t);
   serial->parse_savestate(t);
   ppu->parse_savestate(t);
-
+  apu->parse_savestate(t);
   t.eof();
 }
 
@@ -592,7 +592,7 @@ template void GameBoyColor::parse_savestate<Savestate::Sizer>(Savestate::Sizer &
 template void GameBoyColor::parse_savestate<Savestate::Checker>(Savestate::Checker &);
 
 std::vector<byte_t> GameBoyColor::savestate_serialize() {
-  if (!bus || !cpu || !ppu || !timer || !serial)
+  if (!bus || !cpu || !ppu || !timer || !serial || !apu)
     throw std::runtime_error("GameBoyColor::serialize_savestate() uninitialized");
 
   // Align saves to instruction fetches
@@ -606,7 +606,7 @@ std::vector<byte_t> GameBoyColor::savestate_serialize() {
 }
 
 void GameBoyColor::savestate_deserialize(const std::span<const byte_t> data) {
-  if (!bus || !cpu || !ppu || !timer || !serial)
+  if (!bus || !cpu || !ppu || !timer || !serial || !apu)
     throw std::runtime_error("GameBoyColor::serialize_savestate() uninitialized");
 
   // First pass does a check on the buffer content to make sure the save is in
@@ -620,7 +620,7 @@ void GameBoyColor::savestate_deserialize(const std::span<const byte_t> data) {
 }
 
 std::size_t GameBoyColor::savestate_size() {
-  if (!bus || !cpu || !ppu || !timer || !serial)
+  if (!bus || !cpu || !ppu || !timer || !serial || !apu)
     throw std::runtime_error("GameBoyColor::serialize_savestate() uninitialized");
 
   // Sizer computes size to estimate space needed for memory allocation. The

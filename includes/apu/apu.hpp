@@ -19,8 +19,26 @@ public:
   // When disabled, extra length clocking only happens on a 0->1 transition of
   // NRx4 bit 6
   void set_cgb02_length_quirk(const bool enable) { cgb02_length_quirk_ = enable; }
+  template <typename T> void parse_savestate(T &t);
 
 private:
+  /**
+   * Not used for channel 3 because it is slightly different, but used for all other
+   * channels to reduce redundancy.
+   */
+  struct ChannelState {
+    bool enabled{};
+    double phase{};
+  };
+
+  struct Envelope {
+    std::uint8_t volume{};
+    std::uint8_t period{};
+    std::uint8_t timer{};
+    bool increase{};
+    bool enabled{};
+  };
+
   [[nodiscard]] bool apu_on_() const { return (nr52 & 0x80) != 0; }
   void power_off_reset_regs_();
 
@@ -129,18 +147,15 @@ private:
   byte_t nr52{};
 
   // Channel state
-  bool channel1_enabled{};
-  double channel1_phase{};
-  bool channel2_enabled{};
-  double channel2_phase{};
+  ChannelState channel1{};
+  ChannelState channel2{};
   bool channel3_enabled{};
   std::uint8_t ch3_wave_pos{};        // 0..31 (4-bit samples)
   std::uint16_t ch3_timer{};          // t-cycles until next sample step
   std::uint8_t ch3_wave_byte_index{}; // 0..15, last wave RAM byte read by CH3
   byte_t ch3_sample_buffer{};         // last byte fetched from wave RAM (persists
                                       // across retriggers)
-  bool channel4_enabled{};
-  double ch4_phase{}; // fractional clocks accumulator
+  ChannelState channel4{};            // phase -> fractional clocks accumulator
 
   // Length (0..64)
   std::uint8_t ch1_length_counter{};
@@ -149,24 +164,9 @@ private:
   std::uint8_t ch4_length_counter{};
 
   // Envelope
-  // Ch1
-  std::uint8_t ch1_env_volume{};
-  std::uint8_t ch1_env_period{};
-  std::uint8_t ch1_env_timer{};
-  bool ch1_env_increase{};
-  bool ch1_env_enabled{};
-  // Ch2
-  std::uint8_t ch2_env_volume{};
-  std::uint8_t ch2_env_period{};
-  std::uint8_t ch2_env_timer{};
-  bool ch2_env_increase{};
-  bool ch2_env_enabled{};
-  // Ch4
-  std::uint8_t ch4_env_volume{};
-  std::uint8_t ch4_env_period{};
-  std::uint8_t ch4_env_timer{};
-  bool ch4_env_increase{};
-  bool ch4_env_enabled{};
+  Envelope ch1_env{};
+  Envelope ch2_env{};
+  Envelope ch4_env{};
 
   // Sweep
   std::uint16_t ch1_sweep_shadow_freq{};
