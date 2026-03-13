@@ -13,7 +13,12 @@ add_library(
                         ${CMAKE_SOURCE_DIR}/src/frontend/libretro/frontend.cpp ${GBC_CORE_SOURCES}
 )
 
-set_target_properties(irogb_libretro PROPERTIES PREFIX "")
+set_target_properties(irogb_libretro PROPERTIES
+        PREFIX ""
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}"
+        ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}"
+        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}"
+)
 
 target_compile_options(irogb_libretro PRIVATE -fPIC -DNO_FILESYSTEM ${GBC_COMPILE_OPTIONS})
 
