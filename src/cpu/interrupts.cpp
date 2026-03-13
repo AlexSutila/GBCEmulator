@@ -1,7 +1,7 @@
 #include "cpu/interrupts.hpp"
-#include "utils.hpp"
 
 #include <array>
+#include <format>
 #include <stdexcept>
 
 using isr_metadata = std::tuple<InterruptFlagMask, InterruptVector>;
@@ -84,7 +84,7 @@ void InterruptMasterEnable::step() {
     ime_state = IME_ENABLED;
 }
 
-std::string ISR::describe() { return IroGB::format("ISR"); }
+std::string ISR::describe() { return std::format("ISR"); }
 
 void ISR::incur_halt_delay() { halt_delay = true; }
 

@@ -1,8 +1,9 @@
+#include <format>
+
 #include "cart/cart.hpp"
 #include "cart/mbc.hpp"
 #include "cart/mbc_creator.hpp"
 #include "frontend/logger.hpp"
-#include "utils.hpp"
 
 std::unique_ptr<Mbc> make_mbc(const cart &c) {
   switch (c.special_mbc) {
@@ -69,8 +70,8 @@ std::unique_ptr<Mbc> make_mbc(const cart &c) {
 
   default:
     Logger::push(LogLevel::Error, "ROM", "Unknown MBC Type",
-                 IroGB::format("{} uses an unknown MBC type {:x}, and the ROM cannot be loaded.",
-                               c.header.title(), c.header.cartridge_type));
+                 std::format("{} uses an unknown MBC type {:x}, and the ROM cannot be loaded.",
+                             c.header.title(), c.header.cartridge_type));
     return nullptr;
   }
 }
