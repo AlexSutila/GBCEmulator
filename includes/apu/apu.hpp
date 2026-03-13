@@ -19,6 +19,7 @@ public:
   // When disabled, extra length clocking only happens on a 0->1 transition of
   // NRx4 bit 6
   void set_cgb02_length_quirk(const bool enable) { cgb02_length_quirk_ = enable; }
+  template <typename T> void parse_savestate(T &t);
 
 private:
   /**

@@ -1,7 +1,10 @@
 #ifndef GBC_SCHEMA_HPP
 #define GBC_SCHEMA_HPP
 
+#include <array>
+#include <bit>
 #include <cstdint>
+#include <cstring>
 #include <optional>
 #include <span>
 #include <stdexcept>
@@ -18,6 +21,7 @@ enum SavestateOps {
 
 enum ChunkTags : std::uint16_t {
   C_GBC = 1,
+  C_APU,
   C_CPU,
   C_SERIAL,
   C_TIMER,
@@ -110,8 +114,8 @@ public:
 
 private:
   template <typename T> void write(const T val) {
-    for (std::size_t i = 0; i < sizeof(T); ++i)
-      buf_.push_back(static_cast<std::uint8_t>((val >> (i * 8)) & 0xFF));
+    auto bytes = std::bit_cast<std::array<std::uint8_t, sizeof(T)>>(val);
+    buf_.insert(buf_.end(), bytes.begin(), bytes.end());
   }
 
   std::vector<std::uint8_t> buf_{};
@@ -202,10 +206,11 @@ private:
   template <typename T> T read() {
     require(sizeof(T));
 
-    T val{0};
-    for (std::size_t i{0}; i < sizeof(T); ++i)
-      val |= static_cast<T>(buf_[pos_++] << (i * 8));
-    return val;
+    std::array<std::uint8_t, sizeof(T)> bytes{};
+    std::memcpy(bytes.data(), &buf_[pos_], sizeof(T));
+
+    pos_ += sizeof(T);
+    return std::bit_cast<T>(bytes);
   }
 
   std::span<const std::uint8_t> buf_;

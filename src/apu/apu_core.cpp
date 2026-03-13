@@ -2,6 +2,191 @@
 #include "frontend/frontend.hpp"
 
 #include <array>
+#include <cstdint>
+
+enum : std::uint16_t {
+  F_AUDIO_REGISTERS = 1,
+  F_AUDIO_UNUSED,
+  F_WAVE_RAM,
+  F_WAVE_RAM_BYTES,
+
+  F_FRAME_SEQ_ACCUM_TCYCLES,
+  F_FRAME_SEQ_STEP,
+  F_CGB02_LENGTH_QUIRK,
+
+  F_NR10,
+  F_NR11,
+  F_NR12,
+  F_NR13,
+  F_NR14,
+  F_NR21,
+  F_NR22,
+  F_NR23,
+  F_NR24,
+  F_NR31,
+  F_NR32,
+  F_NR33,
+  F_NR34,
+  F_NR41,
+  F_NR42,
+  F_NR43,
+  F_NR44,
+  F_NR50,
+  F_NR51,
+  F_NR52,
+
+  F_CH1,
+  F_CH2,
+  F_CH4,
+
+  F_CH3_EN,
+  F_CH3_TIMER,
+  F_CH3_WAVE_BYTE_IDX,
+  F_CH3_SAMPLE_BUFFER,
+
+  F_CH1_LENGTH_COUNTER,
+  F_CH2_LENGTH_COUNTER,
+  F_CH3_LENGTH_COUNTER,
+  F_CH4_LENGTH_COUNTER,
+
+  F_CH1_ENV,
+  F_CH2_ENV,
+  F_CH4_ENV,
+
+  F_CH1_SWEEP_SHADOW_FREQ,
+  F_CH1_SWEEP_PERIOD,
+  F_CH1_SWEEP_TIMER,
+  F_CH1_SWEEP_SHIFT,
+  F_CH1_SWEEP_NEGATE,
+  F_CH1_SWEEP_ENABLED,
+  F_CH1_SWEEP_NEGATE_USED,
+
+  F_CH4_LFSR,
+  F_MASTER_LEFT_CUR,
+  F_MASTER_LEFT_TARGET,
+  F_MASTER_LEFT_STEP,
+  F_MASTER_RIGHT_CUR,
+  F_MASTER_RIGHT_TARGET,
+  F_MASTER_RIGHT_STEP,
+
+  F_ROUTE_L_CUR,
+  F_ROUTE_L_TARGET,
+  F_ROUTE_L_STEP,
+  F_ROUTE_R_CUR,
+  F_ROUTE_R_TARGET,
+  F_ROUTE_R_STEP,
+
+  F_DC_X1_L,
+  F_DC_Y1_L,
+  F_DC_X1_R,
+  F_DC_Y1_R,
+};
+
+template <typename T> void APU::parse_savestate(T &t) {
+  constexpr auto version = 1; // Schema revision
+  t.chunk_header(version, Savestate::C_APU);
+
+  for (auto reg : audio_registers)
+    t.field_complex(F_AUDIO_REGISTERS, [&](T &t) { reg.parse_savestate(t); });
+  for (auto reg : audio_unused)
+    t.field_complex(F_AUDIO_UNUSED, [&](T &t) { reg.parse_savestate(t); });
+  for (auto reg : wave_ram)
+    t.field_complex(F_WAVE_RAM, [&](T &t) { reg.parse_savestate(t); });
+  t.field_bytes(F_WAVE_RAM_BYTES, {wave_ram_bytes.data(), wave_ram_bytes.size()});
+
+  t.field_generic(F_FRAME_SEQ_ACCUM_TCYCLES, frame_seq_accum_tcycles);
+  t.field_generic(F_FRAME_SEQ_STEP, frame_seq_step);
+  t.field_generic(F_CGB02_LENGTH_QUIRK, cgb02_length_quirk_);
+
+  t.field_generic(F_NR10, nr10);
+  t.field_generic(F_NR11, nr11);
+  t.field_generic(F_NR12, nr12);
+  t.field_generic(F_NR13, nr13);
+  t.field_generic(F_NR14, nr14);
+  t.field_generic(F_NR21, nr21);
+  t.field_generic(F_NR22, nr22);
+  t.field_generic(F_NR23, nr23);
+  t.field_generic(F_NR24, nr24);
+  t.field_generic(F_NR31, nr31);
+  t.field_generic(F_NR32, nr32);
+  t.field_generic(F_NR33, nr33);
+  t.field_generic(F_NR34, nr34);
+  t.field_generic(F_NR41, nr41);
+  t.field_generic(F_NR42, nr42);
+  t.field_generic(F_NR43, nr43);
+  t.field_generic(F_NR44, nr44);
+  t.field_generic(F_NR50, nr50);
+  t.field_generic(F_NR51, nr51);
+  t.field_generic(F_NR52, nr52);
+
+  auto parse_ch = [&](T &t, ChannelState &c) {
+    t.field_generic(1, c.enabled);
+    t.field_generic(2, c.phase);
+  };
+
+  auto parse_env = [&](T &t, Envelope &e) {
+    t.field_generic(1, e.volume);
+    t.field_generic(1, e.period);
+    t.field_generic(1, e.timer);
+    t.field_generic(1, e.increase);
+    t.field_generic(1, e.enabled);
+  };
+
+  auto parse_route = [&](T &t, std::array<float, 4> &arr) {
+    // This is absolutely awful but hell with it lmao
+    t.field_generic(1, arr.at(0));
+    t.field_generic(2, arr.at(1));
+    t.field_generic(3, arr.at(2));
+    t.field_generic(4, arr.at(3));
+  };
+
+  t.field_complex(F_CH1, [&](T &t) { parse_ch(t, channel1); });
+  t.field_complex(F_CH2, [&](T &t) { parse_ch(t, channel2); });
+  t.field_complex(F_CH4, [&](T &t) { parse_ch(t, channel4); });
+
+  t.field_generic(F_CH3_EN, channel3_enabled);
+  t.field_generic(F_CH3_TIMER, ch3_timer);
+  t.field_generic(F_CH3_WAVE_BYTE_IDX, ch3_wave_byte_index);
+  t.field_generic(F_CH3_SAMPLE_BUFFER, ch3_sample_buffer);
+
+  t.field_complex(F_CH1_ENV, [&](T &t) { parse_env(t, ch1_env); });
+  t.field_complex(F_CH2_ENV, [&](T &t) { parse_env(t, ch2_env); });
+  t.field_complex(F_CH4_ENV, [&](T &t) { parse_env(t, ch4_env); });
+
+  t.field_generic(F_CH1_SWEEP_SHADOW_FREQ, ch1_sweep_shadow_freq);
+  t.field_generic(F_CH1_SWEEP_PERIOD, ch1_sweep_period);
+  t.field_generic(F_CH1_SWEEP_TIMER, ch1_sweep_timer);
+  t.field_generic(F_CH1_SWEEP_SHIFT, ch1_sweep_shift);
+  t.field_generic(F_CH1_SWEEP_NEGATE, ch1_sweep_negate);
+  t.field_generic(F_CH1_SWEEP_ENABLED, ch1_sweep_enabled);
+  t.field_generic(F_CH1_SWEEP_NEGATE_USED, ch1_sweep_negate_used);
+
+  t.field_generic(F_CH4_LFSR, ch4_lfsr);
+  t.field_generic(F_MASTER_LEFT_CUR, master_left_cur_);
+  t.field_generic(F_MASTER_LEFT_STEP, master_left_step_);
+  t.field_generic(F_MASTER_LEFT_TARGET, master_left_target_);
+  t.field_generic(F_MASTER_RIGHT_CUR, master_right_cur_);
+  t.field_generic(F_MASTER_RIGHT_STEP, master_right_step_);
+  t.field_generic(F_MASTER_RIGHT_TARGET, master_right_target_);
+
+  t.field_complex(F_ROUTE_L_CUR, [&](T &t) { parse_route(t, route_l_cur_); });
+  t.field_complex(F_ROUTE_L_TARGET, [&](T &t) { parse_route(t, route_l_target_); });
+  t.field_complex(F_ROUTE_L_STEP, [&](T &t) { parse_route(t, route_l_step_); });
+  t.field_complex(F_ROUTE_R_CUR, [&](T &t) { parse_route(t, route_r_cur_); });
+  t.field_complex(F_ROUTE_R_TARGET, [&](T &t) { parse_route(t, route_r_target_); });
+  t.field_complex(F_ROUTE_R_STEP, [&](T &t) { parse_route(t, route_r_step_); });
+
+  t.field_generic(F_DC_X1_L, dc_x1_l);
+  t.field_generic(F_DC_Y1_L, dc_y1_l);
+  t.field_generic(F_DC_X1_R, dc_x1_r);
+  t.field_generic(F_DC_Y1_R, dc_y1_r);
+  t.eof();
+}
+
+template void APU::parse_savestate<Savestate::Writer>(Savestate::Writer &);
+template void APU::parse_savestate<Savestate::Reader>(Savestate::Reader &);
+template void APU::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
+template void APU::parse_savestate<Savestate::Checker>(Savestate::Checker &);
 
 APU::APU(AddressBus &bus, Frontend &frontend) : bus_(bus), frontend_(frontend) {
   mix_buffer.resize(frames_per_buffer * 2);
