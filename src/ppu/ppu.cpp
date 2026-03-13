@@ -106,14 +106,15 @@ template <typename T> void PixelProcessingUnit::parse_savestate(T &t) {
   // Memory mapped IO registers
   t.field_complex(F_LCDC, [&](T &t) { lcdc_.parse_savestate(t); });
   t.field_complex(F_STAT, [&](T &t) { stat_.parse_savestate(t); });
-  t.field_complex(F_LYC, [&](T &t) { lyc_.parse_savestate(t); });
   t.field_complex(F_SCY, [&](T &t) { scy_.parse_savestate(t); });
   t.field_complex(F_SCX, [&](T &t) { scx_.parse_savestate(t); });
-  t.field_complex(F_WY, [&](T &t) { wy_.parse_savestate(t); });
-  t.field_complex(F_WX, [&](T &t) { wx_.parse_savestate(t); });
+  t.field_complex(F_LY, [&](T &t) { ly_.parse_savestate(t); });
+  t.field_complex(F_LYC, [&](T &t) { lyc_.parse_savestate(t); });
   t.field_complex(F_BGP, [&](T &t) { bgp_.parse_savestate(t); });
   t.field_complex(F_OBP0, [&](T &t) { obp0_.parse_savestate(t); });
   t.field_complex(F_OBP1, [&](T &t) { obp1_.parse_savestate(t); });
+  t.field_complex(F_WY, [&](T &t) { wy_.parse_savestate(t); });
+  t.field_complex(F_WX, [&](T &t) { wx_.parse_savestate(t); });
   t.field_complex(F_OPRI, [&](T &t) { opri_.parse_savestate(t); });
 
   t.eof();

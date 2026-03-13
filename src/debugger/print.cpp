@@ -537,7 +537,9 @@ std::string describe_cart(const cart &c) {
   const std::uint16_t glob_chk = c.computed_global_checksum;
 
   std::ostringstream os;
+#ifndef NO_FILESYSTEM
   os << "File: " << c.file_path.string() << "\n";
+#endif // NO_FILESYSTEM
   os << "ROM bytes: " << c.rom.size() << "\n\n";
 
   os << "[Header]\n";

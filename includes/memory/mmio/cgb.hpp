@@ -3,6 +3,7 @@
 
 #include "emu_types.hpp"
 #include "memory/mmio/mmio.hpp"
+#include "savestate/codec.hpp"
 #include <array>
 
 struct runtime_sys_info;
@@ -113,6 +114,12 @@ public:
   [[nodiscard]] byte_t peek() const override;
   byte_t read() override;
   PaletteData(std::array<byte_t, 64> &mem, PaletteIdx &idx);
+
+  template <typename T> void parse_savestate_impl(T &t);
+  void parse_savestate(Savestate::Reader &t);
+  void parse_savestate(Savestate::Writer &t);
+  void parse_savestate(Savestate::Sizer &t);
+  void parse_savestate(Savestate::Checker &t);
 
 private:
   std::array<byte_t, 64> &mem_;

@@ -41,35 +41,6 @@ template void Cartridge::parse_savestate<Savestate::Reader>(Savestate::Reader &)
 template void Cartridge::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
 template void Cartridge::parse_savestate<Savestate::Checker>(Savestate::Checker &);
 
-static std::optional<std::vector<byte_t>> read_all_bytes(const fs::path &p) {
-  std::ifstream f(p, std::ios::binary | std::ios::ate);
-  if (!f) {
-    Logger::push(LogLevel::Error, "ROM", "Failed to open ROM file",
-                 "Failed to open the ROM file: " + p.string() +
-                     ". Please make sure the file exists and is accessible.");
-    return std::nullopt;
-  }
-
-  const std::streamsize size = f.tellg();
-  if (size < 0) {
-    Logger::push(LogLevel::Error, "ROM", "Failed read ROM size",
-                 "Failed read the size of the ROM file : " + p.string() +
-                     ". Please make sure the file exists and is accessible.");
-    return std::nullopt;
-  }
-
-  std::vector<byte_t> buf(static_cast<std::size_t>(size));
-  f.seekg(0, std::ios::beg);
-  if (!f.read(reinterpret_cast<char *>(buf.data()), size)) {
-    Logger::push(LogLevel::Error, "ROM", "Failed to load ROM content",
-                 "Failed to read the content of the ROM file: " + p.string() +
-                     ". Please make sure the file exists and is accessible.");
-    return std::nullopt;
-  }
-
-  return buf;
-}
-
 static bool is_ascii_upper_alnum(const byte_t b) {
   const unsigned c = b;
   return (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9');
@@ -370,25 +341,13 @@ SpecialMbc detect_special_mbc(const cart &c) {
   }
 }
 
-cart load_cart_fs(const fs::path &rom_path) {
-  cart c{};
-  c.file_path = rom_path;
-  if (const auto rom = read_all_bytes(rom_path); rom != std::nullopt)
-    c.rom = rom.value();
-  else {
-    throw std::runtime_error{"Cannot read cartridge content"};
-  }
-
-  // We will load the cart even if it fails; the user should know what they are
-  // doing
-  validate(c);
-  c.special_mbc = detect_special_mbc(c);
-  return c;
-}
-
 cart load_cart_raw(std::vector<byte_t> rom_bytes) {
   cart c{};
+
+#ifndef NO_FILESYSTEM
   c.file_path.clear();
+#endif // NO_FILESYSTEM
+
   c.rom = std::move(rom_bytes);
   validate(c);
   c.special_mbc = detect_special_mbc(c);
@@ -402,7 +361,67 @@ void Cartridge::write(const addr_t addr, const byte_t v) {
     save_dirty_ = true;
 }
 
-bool Cartridge::load_save_file(const fs::path &save_path) {
+bool Cartridge::consume_sram_save() noexcept {
+  if (save_dirty_) {
+    save_dirty_ = false;
+    return true;
+  }
+
+  // SRAM is not dirty, so ignore
+  return false;
+}
+
+#ifndef NO_FILESYSTEM
+static std::optional<std::vector<byte_t>> read_all_bytes(const std::filesystem::path &p) {
+  std::ifstream f(p, std::ios::binary | std::ios::ate);
+  if (!f) {
+    Logger::push(LogLevel::Error, "ROM", "Failed to open ROM file",
+                 "Failed to open the ROM file: " + p.string() +
+                     ". Please make sure the file exists and is accessible.");
+    return std::nullopt;
+  }
+
+  const std::streamsize size = f.tellg();
+  if (size < 0) {
+    Logger::push(LogLevel::Error, "ROM", "Failed read ROM size",
+                 "Failed read the size of the ROM file : " + p.string() +
+                     ". Please make sure the file exists and is accessible.");
+    return std::nullopt;
+  }
+
+  std::vector<byte_t> buf(static_cast<std::size_t>(size));
+  f.seekg(0, std::ios::beg);
+  if (!f.read(reinterpret_cast<char *>(buf.data()), size)) {
+    Logger::push(LogLevel::Error, "ROM", "Failed to load ROM content",
+                 "Failed to read the content of the ROM file: " + p.string() +
+                     ". Please make sure the file exists and is accessible.");
+    return std::nullopt;
+  }
+
+  return buf;
+}
+
+cart load_cart_fs(const std::filesystem::path &rom_path) {
+  cart c{};
+
+#ifndef NO_FILESYSTEM
+  c.file_path = rom_path;
+#endif // NO_FILESYSTEM
+
+  if (const auto rom = read_all_bytes(rom_path); rom != std::nullopt)
+    c.rom = rom.value();
+  else {
+    throw std::runtime_error{"Cannot read cartridge content"};
+  }
+
+  // We will load the cart even if it fails; the user should know what they are
+  // doing
+  validate(c);
+  c.special_mbc = detect_special_mbc(c);
+  return c;
+}
+
+bool Cartridge::load_save_file(const std::filesystem::path &save_path) {
   if (!has_battery() || save_path.empty())
     return false;
 
@@ -429,7 +448,7 @@ bool Cartridge::load_save_file(const fs::path &save_path) {
   return true;
 }
 
-bool Cartridge::write_save_file(const fs::path &save_path) const {
+bool Cartridge::write_save_file(const std::filesystem::path &save_path) const {
   if (!has_battery() || save_path.empty())
     return false;
 
@@ -440,7 +459,7 @@ bool Cartridge::write_save_file(const fs::path &save_path) const {
   const auto parent = save_path.parent_path();
   if (!parent.empty()) {
     std::error_code ec;
-    fs::create_directories(parent, ec);
+    std::filesystem::create_directories(parent, ec);
   }
 
   std::ofstream f(save_path, std::ios::binary | std::ios::trunc);
@@ -451,13 +470,4 @@ bool Cartridge::write_save_file(const fs::path &save_path) const {
           static_cast<std::streamsize>(ram_view.size()));
   return static_cast<bool>(f);
 }
-
-bool Cartridge::consume_sram_save() noexcept {
-  if (save_dirty_) {
-    save_dirty_ = false;
-    return true;
-  }
-
-  // SRAM is not dirty, so ignore
-  return false;
-}
+#endif // NO_FILESYSTEM
