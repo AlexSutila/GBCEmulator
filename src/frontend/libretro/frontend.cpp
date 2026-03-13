@@ -25,6 +25,14 @@ LibretroFrontend::LibretroFrontend() {
 
 LibretroFrontend::~LibretroFrontend() {}
 
+void LibretroFrontend::make_gbc(std::optional<BootROM> bios) {
+  if (bios.has_value()) {
+    gbc = std::make_unique<GameBoyColor>(*this, bios.value());
+  } else {
+    gbc = std::make_unique<GameBoyColor>(*this);
+  }
+}
+
 std::array<std::uint32_t, 144 * 160> LibretroFrontend::get_frame() {
   return frame_buf.at(display_idx);
 }

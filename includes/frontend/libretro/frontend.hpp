@@ -4,6 +4,7 @@
 #include "frontend/frontend.hpp"
 #include "frontend/libretro/libretro.h"
 #include "gbc.hpp"
+#include "memory/boot.hpp"
 #include "memory/mmio/dmg.hpp"
 #include <array>
 #include <cstddef>
@@ -34,6 +35,7 @@ public:
     static LibretroFrontend instance;
     return instance;
   };
+  void make_gbc(std::optional<BootROM> bios);
 
   struct LibretroCallbacks {
     retro_video_refresh_t video_cb;
