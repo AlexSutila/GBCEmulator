@@ -296,7 +296,7 @@ SpecialMbc detect_special_mbc(const cart &c) {
       return NotSpecial_t; // If strictly <= 32KiB, it's probably safe
     if (c.header.title() == "WISDOM TREE" || maybe_wisdom_tree(c.rom_span())) {
       Logger::push(LogLevel::Info, "ROM", "Mapper override",
-                   IroGB::format("{} header type {:02X} looks inconsistent with "
+                   IroGB::format("{} header type {} looks inconsistent with "
                                  "ROM size {} and appears to be WT; "
                                  "forcing Wisdom Tree mapper.",
                                  c.header.title(), c.header.cartridge_type, c.rom_span().size()));
@@ -304,7 +304,7 @@ SpecialMbc detect_special_mbc(const cart &c) {
     }
     if (maybe_m161(c.rom_span())) {
       Logger::push(LogLevel::Info, "ROM", "Mapper override",
-                   IroGB::format("{} header type {:02X} looks inconsistent with "
+                   IroGB::format("{} header type {} looks inconsistent with "
                                  "ROM size {} and appears to be M161; "
                                  "forcing M161 mapper.",
                                  c.header.title(), c.header.cartridge_type, c.rom_span().size()));
@@ -316,7 +316,7 @@ SpecialMbc detect_special_mbc(const cart &c) {
   case 0x03: // MBC1M possibility
     if (maybe_mbc1m(c.rom_span())) {
       Logger::push(LogLevel::Info, "ROM", "Mapper override",
-                   IroGB::format("{} header type {:02X} looks inconsistent with "
+                   IroGB::format("{} header type {} looks inconsistent with "
                                  "ROM size {} and appears to be MBC1M; "
                                  "forcing MBC1M mapper.",
                                  c.header.title(), c.header.cartridge_type, c.rom_span().size()));

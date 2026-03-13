@@ -3,10 +3,12 @@
 #include "frontend/python/testing.hpp"
 #include "frontend/python/wrappers.hpp"
 #include "ppu/ppu.hpp"
+#include <filesystem>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/stl/filesystem.h>
 
+namespace fs = std::filesystem;
 namespace py = pybind11;
 
 static void bind_cart(py::module_ &m) {

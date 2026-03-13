@@ -42,9 +42,9 @@ void APU::power_off_reset_regs_() {
   disable_channel3();
   disable_channel4();
 
-  channel1_phase = 0.0;
-  channel2_phase = 0.0;
-  ch4_phase = 0.0;
+  channel1.phase = 0.0;
+  channel2.phase = 0.0;
+  channel4.phase = 0.0;
   ch4_lfsr = 0x7FFF;
 
   ch3_wave_pos = 0;
@@ -57,15 +57,13 @@ void APU::power_off_reset_regs_() {
   ch3_length_counter = 0;
   ch4_length_counter = 0;
 
-  ch1_env_volume = ch1_env_period = ch1_env_timer = 0;
-  ch1_env_increase = false;
-  ch1_env_enabled = false;
-  ch2_env_volume = ch2_env_period = ch2_env_timer = 0;
-  ch2_env_increase = false;
-  ch2_env_enabled = false;
-  ch4_env_volume = ch4_env_period = ch4_env_timer = 0;
-  ch4_env_increase = false;
-  ch4_env_enabled = false;
+  ch1_env = ch2_env = ch4_env = {
+      .volume = 0,
+      .period = 0,
+      .timer = 0,
+      .increase = false,
+      .enabled = false,
+  };
 
   ch1_sweep_shadow_freq = 0;
   ch1_sweep_period = ch1_sweep_timer = ch1_sweep_shift = 0;
@@ -129,7 +127,7 @@ void APU::register_mmio() {
 
         // Sweep negate quirk: if negation was used, clearing negate disables
         // CH1
-        if (channel1_enabled) {
+        if (channel1.enabled) {
           const bool old_neg = (old & 0x08) != 0;
           const bool new_neg = (value & 0x08) != 0;
           if (ch1_sweep_negate_used && old_neg && !new_neg) {
@@ -416,8 +414,8 @@ void APU::register_mmio() {
       },
       [this](byte_t) {
         const auto status = static_cast<byte_t>(
-            (channel1_enabled ? 0x01 : 0x00) | (channel2_enabled ? 0x02 : 0x00) |
-            (channel3_enabled ? 0x04 : 0x00) | (channel4_enabled ? 0x08 : 0x00));
+            (channel1.enabled ? 0x01 : 0x00) | (channel2.enabled ? 0x02 : 0x00) |
+            (channel3_enabled ? 0x04 : 0x00) | (channel4.enabled ? 0x08 : 0x00));
         return static_cast<byte_t>(0x70 | (nr52 & 0x80) | status);
       });
 }

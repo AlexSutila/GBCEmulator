@@ -163,31 +163,31 @@ void APU::step() {
 
   if ((nr52 & 0x80) != 0) {
     // CH1 phase
-    if (channel1_enabled) {
+    if (channel1.enabled) {
       if (const std::uint16_t f = ch1_frequency(); f < 2048) {
         const double hz = 131072.0 / (2048.0 - f);
-        channel1_phase += hz / sample_rate_hz;
-        if (channel1_phase >= 1.0)
-          channel1_phase -= 1.0;
+        channel1.phase += hz / sample_rate_hz;
+        if (channel1.phase >= 1.0)
+          channel1.phase -= 1.0;
       }
     }
 
     // CH2 phase
-    if (channel2_enabled) {
+    if (channel2.enabled) {
       if (const std::uint16_t f = ch2_frequency(); f < 2048) {
         const double hz = 131072.0 / (2048.0 - f);
-        channel2_phase += hz / sample_rate_hz;
-        if (channel2_phase >= 1.0)
-          channel2_phase -= 1.0;
+        channel2.phase += hz / sample_rate_hz;
+        if (channel2.phase >= 1.0)
+          channel2.phase -= 1.0;
       }
     }
 
     // CH4 phase
-    if (channel4_enabled) {
+    if (channel4.enabled) {
       if (const double hz = ch4_clock_hz(); hz > 0.0) {
-        ch4_phase += hz / sample_rate_hz;
-        while (ch4_phase >= 1.0) {
-          ch4_phase -= 1.0;
+        channel4.phase += hz / sample_rate_hz;
+        while (channel4.phase >= 1.0) {
+          channel4.phase -= 1.0;
           ch4_clock_lfsr();
         }
       }
