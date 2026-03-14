@@ -41,6 +41,18 @@ extern "C" {
  * ====================================================================== */
 #include "frontend/libretro/libretro.h"
 
+static std::string get_bios_option() {
+  retro_variable var = {
+      .key = "irogb_bios",
+      .value = nullptr,
+  };
+
+  auto &callbacks = LibretroFrontend::get_instance().get_callbacks();
+  if (callbacks.environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+    return var.value;
+  return "auto";
+}
+
 static std::string get_system_dir() {
   auto &callbacks = LibretroFrontend::get_instance().get_callbacks();
 
@@ -108,6 +120,28 @@ void retro_set_environment(retro_environment_t cb) {
   auto &callbacks = LibretroFrontend::get_instance().get_callbacks();
   callbacks.environ_cb = cb;
 
+  static struct retro_core_option_v2_definition option_defs[] = {
+      {.key = "irogb_bios",
+       .desc = "Select which BIOS to use (if available).",
+       .desc_categorized = NULL,
+       .info_categorized = NULL,
+       .category_key = NULL,
+       .values =
+           {
+               {"auto", "Auto"},
+               {"dmg", "DMG BIOS"},
+               {"cgb", "CGB BIOS"},
+               {"none", "Skip BIOS"},
+               {NULL, NULL},
+           }, // ...
+       .default_value = "auto"},
+      {0}
+  };
+  static struct retro_core_options_v2 options = {
+      NULL,
+      option_defs,
+  };
+
   static const retro_controller_description port1[] = {
       {"Game Boy Joypad", RETRO_DEVICE_JOYPAD},
       {          nullptr,                   0}
@@ -120,6 +154,7 @@ void retro_set_environment(retro_environment_t cb) {
 
   enum retro_pixel_format fmt = RETRO_PIXEL_FORMAT_XRGB8888;
   callbacks.environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &fmt);
+  callbacks.environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_V2, (void *)&options);
 }
 
 void retro_set_audio_sample(retro_audio_sample_t cb) {
@@ -169,15 +204,26 @@ bool retro_load_game(const struct retro_game_info *info) {
   if (!data_ptr || size == 0)
     return false;
 
-  /* Attempt to load a BIOS file, we check two locations. */
-  auto bios = load_bios("cgb_boot.bin");
-  if (!bios.has_value())
-    bios = load_bios("dmg_boot.bin");
-
   /* Our interface requires a `std::vector()`, construct accordingly. */
   std::vector<byte_t> raw(data_ptr, data_ptr + size);
   auto &instance = LibretroFrontend::get_instance();
-  instance.make_gbc(bios);
+
+  /* Attempt to load a BIOS file, we check two locations. If any of these fail,
+   * for any reason, it is equivalent to starting without a BIOS file. */
+  auto mode = get_bios_option();
+  if (mode == "dmg") {
+    auto bios = load_bios("dmg_boot.bin");
+    instance.make_gbc(bios);
+  } else if (mode == "cgb") {
+    auto bios = load_bios("cgb_boot.bin");
+    instance.make_gbc(bios);
+  } else if (mode == "auto") {
+    auto bios = load_bios("cgb_boot.bin");
+    if (!bios.has_value())
+      bios = load_bios("dmg_boot.bin");
+    instance.make_gbc(bios);
+  } else
+    instance.make_gbc(std::nullopt);
 
   try {
     cart c = load_cart_raw(raw);
