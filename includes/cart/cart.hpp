@@ -6,19 +6,11 @@
 #include "mbc_creator.hpp"
 
 #include <array>
+#include <filesystem>
 #include <memory>
 #include <span>
 #include <string>
 #include <vector>
-
-/**
- * For builds that do not need to interact with the filesystem, we exclude such operations from
- * the build. For example, libretro handles all filesystem interactions, so the core has no reason
- * to include or use this header.
- */
-#ifndef NO_FILESYSTEM
-#include <filesystem>
-#endif // NO_FILESYSTEM
 
 constexpr std::size_t kHeaderStart = 0x0100;
 constexpr std::size_t kHeaderEnd = 0x014F;
@@ -60,11 +52,7 @@ struct rom_header {
 };
 
 struct cart {
-
-#ifndef NO_FILESYSTEM
   std::filesystem::path file_path{};
-#endif // NO_FILESYSTEM
-
   std::vector<byte_t> rom{};
   rom_header header{};
 
@@ -96,12 +84,10 @@ public:
   [[nodiscard]] bool has_battery() const noexcept { return mbc_->has_battery(); }
   [[nodiscard]] std::span<const byte_t> ram() const noexcept { return mbc_->ram(); }
   [[nodiscard]] std::span<byte_t> ram() noexcept { return mbc_->ram(); }
-  bool consume_sram_save() noexcept;
 
-#ifndef NO_FILESYSTEM
   bool load_save_file(const std::filesystem::path &save_path);
   bool write_save_file(const std::filesystem::path &save_path) const;
-#endif // NO_FILESYSTEM
+  bool consume_sram_save() noexcept;
 
 private:
   cart image_;
@@ -110,9 +96,7 @@ private:
 };
 
 [[nodiscard]] cart load_cart_raw(std::vector<byte_t> rom_bytes);
-#ifndef NO_FILESYSTEM
 [[nodiscard]] cart load_cart_fs(const std::filesystem::path &rom_path);
-#endif // NO_FILESYSTEM
 
 // helpers
 [[nodiscard]] std::size_t rom_bytes_from_code(byte_t code);

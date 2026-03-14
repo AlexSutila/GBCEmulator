@@ -1,7 +1,7 @@
 #include "memory/boot.hpp"
-#include "utils.hpp"
 
 #include <cstddef>
+#include <format>
 #include <fstream>
 #include <ios>
 #include <stdexcept>
@@ -10,7 +10,7 @@
 BootROM::BootROM(const std::string &path) {
   std::ifstream file(path, std::ios::binary | std::ios::ate);
   if (!file)
-    throw std::runtime_error(IroGB::format("BootROM: Failed to open {}", path));
+    throw std::runtime_error(std::format("BootROM: Failed to open {}", path));
 
   /* BIOS must be one of two known sizes */
   rom_size = static_cast<std::size_t>(file.tellg());

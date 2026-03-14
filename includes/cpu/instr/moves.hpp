@@ -1,11 +1,12 @@
 #ifndef GBC_MOVES_HPP
 #define GBC_MOVES_HPP
 
+#include <format>
+
 #include "cpu/instr/instr.hpp"
 #include "cpu/registers/regfile.hpp"
 #include "emu_types.hpp"
 #include "memory/bus.hpp"
-#include "utils.hpp"
 
 /*
  * Copies value from Y into X, operates only on 8-bit registers
@@ -19,7 +20,7 @@ public:
     return 4;
   }
   std::string describe() override {
-    return IroGB::format("LD {}, {}", to_string<dst>(), to_string<src>());
+    return std::format("LD {}, {}", to_string<dst>(), to_string<src>());
   }
 };
 
@@ -34,7 +35,7 @@ public:
     return 8;
   }
   std::string describe() override {
-    return IroGB::format("LD {}, {}", to_string<dst>(), static_cast<int>(imm));
+    return std::format("LD {}, {}", to_string<dst>(), static_cast<int>(imm));
   }
   void parse() override {
     const addr_t addr = reg_file->reg_pc++;
@@ -57,7 +58,7 @@ public:
     write_reg<dst>(mem_byte);
     return 8;
   }
-  std::string describe() override { return IroGB::format("LD {}, HL", to_string<dst>()); }
+  std::string describe() override { return std::format("LD {}, HL", to_string<dst>()); }
   std::size_t mem_access_t_cycle() override { return 4; }
 };
 
@@ -73,7 +74,7 @@ public:
     bus->write_byte(addr, reg_byte);
     return 8;
   }
-  std::string describe() override { return IroGB::format("LD {}, HL", to_string<src>()); }
+  std::string describe() override { return std::format("LD {}, HL", to_string<src>()); }
   std::size_t mem_access_t_cycle() override { return 4; }
 };
 
@@ -89,7 +90,7 @@ public:
     bus->write_byte(addr, imm);
     return 12;
   }
-  std::string describe() override { return IroGB::format("LD HL, {}", static_cast<int>(imm)); }
+  std::string describe() override { return std::format("LD HL, {}", static_cast<int>(imm)); }
   void parse() override {
     const addr_t addr = reg_file->reg_pc++;
     imm = bus->read_byte(addr);
@@ -112,7 +113,7 @@ public:
     reg_file->reg_af.write_hi(mem_byte);
     return 8;
   }
-  std::string describe() override { return IroGB::format("LD A, {}", to_string<src>()); }
+  std::string describe() override { return std::format("LD A, {}", to_string<src>()); }
   std::size_t mem_access_t_cycle() override { return 4; }
 };
 
@@ -128,7 +129,7 @@ public:
     reg_file->reg_af.write_hi(mem_byte);
     return 16;
   }
-  std::string describe() override { return IroGB::format("LD A, {}", static_cast<int>(addr)); }
+  std::string describe() override { return std::format("LD A, {}", static_cast<int>(addr)); }
   void parse() override {
     const byte_t lsb = bus->read_byte(reg_file->reg_pc++);
     const byte_t msb = bus->read_byte(reg_file->reg_pc++);
@@ -152,7 +153,7 @@ public:
     bus->write_byte(addr, reg_byte);
     return 8;
   }
-  std::string describe() override { return IroGB::format("LD {}, A", to_string<dst>()); }
+  std::string describe() override { return std::format("LD {}, A", to_string<dst>()); }
   std::size_t mem_access_t_cycle() override { return 4; }
 };
 
@@ -168,7 +169,7 @@ public:
     bus->write_byte(addr, reg_byte);
     return 16;
   }
-  std::string describe() override { return IroGB::format("LD {}, A", static_cast<int>(addr)); }
+  std::string describe() override { return std::format("LD {}, A", static_cast<int>(addr)); }
   void parse() override {
     const byte_t lsb = bus->read_byte(reg_file->reg_pc++);
     const byte_t msb = bus->read_byte(reg_file->reg_pc++);
@@ -192,7 +193,7 @@ public:
     reg_file->reg_af.write_hi(mem_byte);
     return 12;
   }
-  std::string describe() override { return IroGB::format("LD A, {}", static_cast<int>(addr)); }
+  std::string describe() override { return std::format("LD A, {}", static_cast<int>(addr)); }
   void parse() override { addr = 0xFF00 | bus->read_byte(reg_file->reg_pc++); }
   std::size_t mem_access_t_cycle() override { return 8; }
 
@@ -212,7 +213,7 @@ public:
     bus->write_byte(addr, reg_byte);
     return 12;
   }
-  std::string describe() override { return IroGB::format("LD {}, A", static_cast<int>(addr)); }
+  std::string describe() override { return std::format("LD {}, A", static_cast<int>(addr)); }
   void parse() override { addr = 0xFF00 | bus->read_byte(reg_file->reg_pc++); }
   std::size_t mem_access_t_cycle() override { return 8; }
 
@@ -231,7 +232,7 @@ public:
     bus->write_byte(0xFF00 | read_reg<Register8Bit::REG_C>(), reg_byte);
     return 8;
   }
-  std::string describe() override { return IroGB::format("LD C, A"); }
+  std::string describe() override { return std::format("LD C, A"); }
   std::size_t mem_access_t_cycle() override { return 4; }
 };
 
@@ -246,7 +247,7 @@ public:
     reg_file->reg_af.write_hi(mem_byte);
     return 8;
   }
-  std::string describe() override { return IroGB::format("LDH A, C"); }
+  std::string describe() override { return std::format("LDH A, C"); }
   std::size_t mem_access_t_cycle() override { return 4; }
 };
 
@@ -265,7 +266,7 @@ public:
     write_reg<Register16Bit::REG_HL>(addr + 1);
     return 8;
   }
-  std::string describe() override { return IroGB::format("LDI HL, A"); }
+  std::string describe() override { return std::format("LDI HL, A"); }
   std::size_t mem_access_t_cycle() override { return 4; }
 };
 
@@ -284,7 +285,7 @@ public:
     write_reg<Register16Bit::REG_HL>(addr + 1);
     return 8;
   }
-  std::string describe() override { return IroGB::format("LDI A, HL"); }
+  std::string describe() override { return std::format("LDI A, HL"); }
   std::size_t mem_access_t_cycle() override { return 4; }
 };
 
@@ -303,7 +304,7 @@ public:
     write_reg<Register16Bit::REG_HL>(addr - 1);
     return 8;
   }
-  std::string describe() override { return IroGB::format("LDD HL, A"); }
+  std::string describe() override { return std::format("LDD HL, A"); }
   std::size_t mem_access_t_cycle() override { return 4; }
 };
 
@@ -322,7 +323,7 @@ public:
     write_reg<Register16Bit::REG_HL>(addr - 1);
     return 8;
   }
-  std::string describe() override { return IroGB::format("LDD A, HL"); }
+  std::string describe() override { return std::format("LDD A, HL"); }
   std::size_t mem_access_t_cycle() override { return 4; }
 };
 
@@ -338,7 +339,7 @@ public:
     return 12;
   }
   std::string describe() override {
-    return IroGB::format("LD {}, {}", to_string<src>(), static_cast<int>(addr));
+    return std::format("LD {}, {}", to_string<src>(), static_cast<int>(addr));
   }
   void parse() override {
     addr = bus->read_byte(reg_file->reg_pc++);
@@ -361,7 +362,7 @@ public:
     bus->write_byte(addr + 1, reg_file->reg_sp.read_hi());
     return 20;
   }
-  std::string describe() override { return IroGB::format("LD {}, sp", static_cast<int>(addr)); }
+  std::string describe() override { return std::format("LD {}, sp", static_cast<int>(addr)); }
   void parse() override {
     addr = bus->read_byte(reg_file->reg_pc++);
     addr |= static_cast<addr_t>(bus->read_byte(reg_file->reg_pc++)) << 8;
@@ -382,7 +383,7 @@ public:
     reg_file->reg_sp.write(addr);
     return 8;
   }
-  std::string describe() override { return IroGB::format("LD SP, HL"); }
+  std::string describe() override { return std::format("LD SP, HL"); }
 };
 
 /*
@@ -406,7 +407,7 @@ public:
     }
     return 16;
   }
-  std::string describe() override { return IroGB::format("PUSH {}", to_string<src>()); }
+  std::string describe() override { return std::format("PUSH {}", to_string<src>()); }
   void parse() override {
     state = InstrStates::INSTR_STATE_WRITE;
     sp = reg_file->reg_sp.read();
@@ -441,7 +442,7 @@ public:
     }
     return 12;
   }
-  std::string describe() override { return IroGB::format("POP {}", to_string<dst>()); }
+  std::string describe() override { return std::format("POP {}", to_string<dst>()); }
   void parse() override {
     state = InstrStates::INSTR_STATE_READ;
     sp = reg_file->reg_sp.read();

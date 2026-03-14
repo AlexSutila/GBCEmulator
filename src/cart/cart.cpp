@@ -1,12 +1,11 @@
 #include "cart/cart.hpp"
-#include "debugger/print.hpp"
 #include "frontend/logger.hpp"
 #include "savestate/codec.hpp"
-#include "utils.hpp"
 
 #include <algorithm>
 #include <bitset>
 #include <cstring>
+#include <format>
 #include <fstream>
 #include <stdexcept>
 
@@ -296,21 +295,19 @@ SpecialMbc detect_special_mbc(const cart &c) {
     if (c.rom_size() <= 0x8000)
       return NotSpecial_t; // If strictly <= 32KiB, it's probably safe
     if (c.header.title() == "WISDOM TREE" || maybe_wisdom_tree(c.rom_span())) {
-      const auto cart_type = Debug::hex8(c.header.cartridge_type, true);
       Logger::push(LogLevel::Info, "ROM", "Mapper override",
-                   IroGB::format("{} header type {} looks inconsistent with "
-                                 "ROM size {} and appears to be WT; "
-                                 "forcing Wisdom Tree mapper.",
-                                 c.header.title(), cart_type, c.rom_span().size()));
+                   std::format("{} header type {:02X} looks inconsistent with "
+                               "ROM size {} and appears to be WT; "
+                               "forcing Wisdom Tree mapper.",
+                               c.header.title(), c.header.cartridge_type, c.rom_span().size()));
       return WisdomTree_t;
     }
     if (maybe_m161(c.rom_span())) {
-      const auto cart_type = Debug::hex8(c.header.cartridge_type, true);
       Logger::push(LogLevel::Info, "ROM", "Mapper override",
-                   IroGB::format("{} header type {} looks inconsistent with "
-                                 "ROM size {} and appears to be M161; "
-                                 "forcing M161 mapper.",
-                                 c.header.title(), cart_type, c.rom_span().size()));
+                   std::format("{} header type {:02X} looks inconsistent with "
+                               "ROM size {} and appears to be M161; "
+                               "forcing M161 mapper.",
+                               c.header.title(), c.header.cartridge_type, c.rom_span().size()));
       return M161_t;
     }
   }
@@ -318,12 +315,11 @@ SpecialMbc detect_special_mbc(const cart &c) {
   case 0x02:
   case 0x03: // MBC1M possibility
     if (maybe_mbc1m(c.rom_span())) {
-      const auto cart_type = Debug::hex8(c.header.cartridge_type, true);
       Logger::push(LogLevel::Info, "ROM", "Mapper override",
-                   IroGB::format("{} header type {} looks inconsistent with "
-                                 "ROM size {} and appears to be MBC1M; "
-                                 "forcing MBC1M mapper.",
-                                 c.header.title(), cart_type, c.rom_span().size()));
+                   std::format("{} header type {:02X} looks inconsistent with "
+                               "ROM size {} and appears to be MBC1M; "
+                               "forcing MBC1M mapper.",
+                               c.header.title(), c.header.cartridge_type, c.rom_span().size()));
       return MBC1M_t;
     }
   case 0x0F:
@@ -347,11 +343,7 @@ SpecialMbc detect_special_mbc(const cart &c) {
 
 cart load_cart_raw(std::vector<byte_t> rom_bytes) {
   cart c{};
-
-#ifndef NO_FILESYSTEM
   c.file_path.clear();
-#endif // NO_FILESYSTEM
-
   c.rom = std::move(rom_bytes);
   validate(c);
   c.special_mbc = detect_special_mbc(c);
@@ -375,7 +367,6 @@ bool Cartridge::consume_sram_save() noexcept {
   return false;
 }
 
-#ifndef NO_FILESYSTEM
 static std::optional<std::vector<byte_t>> read_all_bytes(const std::filesystem::path &p) {
   std::ifstream f(p, std::ios::binary | std::ios::ate);
   if (!f) {
@@ -407,11 +398,7 @@ static std::optional<std::vector<byte_t>> read_all_bytes(const std::filesystem::
 
 cart load_cart_fs(const std::filesystem::path &rom_path) {
   cart c{};
-
-#ifndef NO_FILESYSTEM
   c.file_path = rom_path;
-#endif // NO_FILESYSTEM
-
   if (const auto rom = read_all_bytes(rom_path); rom != std::nullopt)
     c.rom = rom.value();
   else {
@@ -474,4 +461,3 @@ bool Cartridge::write_save_file(const std::filesystem::path &save_path) const {
           static_cast<std::streamsize>(ram_view.size()));
   return static_cast<bool>(f);
 }
-#endif // NO_FILESYSTEM

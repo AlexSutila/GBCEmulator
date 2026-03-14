@@ -4,6 +4,7 @@
 #include "frontend/frontend.hpp"
 #include "frontend/libretro/libretro.h"
 #include "gbc.hpp"
+#include "memory/boot.hpp"
 #include "memory/mmio/dmg.hpp"
 #include <array>
 #include <cstddef>
@@ -34,6 +35,7 @@ public:
     static LibretroFrontend instance;
     return instance;
   };
+  void make_gbc(std::optional<BootROM> bios);
 
   struct LibretroCallbacks {
     retro_video_refresh_t video_cb;
@@ -52,6 +54,7 @@ public:
 
   std::array<std::uint32_t, 144 * 160> get_frame() override;
   void queue_audio_samples(const float *samples, std::size_t sample_count) override;
+  std::uint32_t format_pixel_data(std::uint32_t px);
   void put_pixel(int x, int y, std::uint32_t c) override;
   void clear(std::uint32_t c) override;
   void start() override;
@@ -59,6 +62,9 @@ public:
   [[nodiscard]] std::vector<byte_t> take_snapshot() const;
   void restore_snapshot(std::span<const byte_t> snapshot);
   std::size_t get_state_size() const { return state_size; }
+
+  const std::string get_bios_option();
+  const bool get_force_mono_option();
 
   void cheat_set(std::size_t index, bool enabled, std::string &code);
   void cheat_reset();
@@ -72,6 +78,9 @@ private:
   static constexpr auto fb_height = 144;
   static constexpr auto fb_width = 160;
   static constexpr auto nbuf = 2;
+
+  // Rendering options
+  bool force_mono_dmg{false};
 
   // Input polling and helpers
   bool test_input(unsigned id) const;

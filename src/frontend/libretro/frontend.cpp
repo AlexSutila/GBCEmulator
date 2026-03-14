@@ -6,11 +6,13 @@
 #include "gbc.hpp"
 #include "memory/mmio/dmg.hpp"
 #include "memory/mmio/mmio.hpp"
+#include "ppu/palette.hpp"
 
 // Standard includes
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <memory>
 #include <vector>
 
@@ -25,19 +27,41 @@ LibretroFrontend::LibretroFrontend() {
 
 LibretroFrontend::~LibretroFrontend() {}
 
+void LibretroFrontend::make_gbc(std::optional<BootROM> bios) {
+  if (bios.has_value()) {
+    gbc = std::make_unique<GameBoyColor>(*this, bios.value());
+  } else {
+    gbc = std::make_unique<GameBoyColor>(*this);
+  }
+}
+
 std::array<std::uint32_t, 144 * 160> LibretroFrontend::get_frame() {
   return frame_buf.at(display_idx);
+}
+
+std::uint32_t LibretroFrontend::format_pixel_data(const std::uint32_t px) {
+  constexpr std::uint32_t alpha_mask = 0xFF000000; // Still abusing alpha bits lol
+  const bool is_cgb = gbc->get_sys().cgb_mode;
+
+  if (!is_cgb && force_mono_dmg) {
+    const auto mono_pal_idx = static_cast<byte_t>((px >> 24) & 0xFF);
+    return get_mono_color(mono_pal_idx) | alpha_mask;
+  }
+  return px | alpha_mask;
 }
 
 void LibretroFrontend::put_pixel(int x, int y, std::uint32_t c) {
   if (x < 0 || x >= fb_width || y < 0 || y >= fb_height) [[unlikely]]
     return;
-  frame_buf.at(write_idx).at(y * fb_width + x) = c;
+  frame_buf.at(write_idx).at(y * fb_width + x) = format_pixel_data(c);
 
   // Swap as frame becomes ready to avoid screen tears
   if (x == fb_width - 1 && y == fb_height - 1) {
     display_idx = write_idx;
     write_idx = (write_idx + 1) % nbuf;
+
+    // We try to apply this option between frames to prevent ugly torn frames
+    force_mono_dmg = get_force_mono_option();
     frame_ready = true;
   }
 }
@@ -71,6 +95,30 @@ void LibretroFrontend::queue_audio_samples(const float *samples, std::size_t sam
 
 void LibretroFrontend::restore_snapshot(std::span<const byte_t> snapshot) {
   gbc->savestate_deserialize(snapshot);
+}
+
+const std::string LibretroFrontend::get_bios_option() {
+  retro_variable var = {
+      .key = "irogb_bios",
+      .value = nullptr,
+  };
+
+  auto &callbacks = LibretroFrontend::get_instance().get_callbacks();
+  if (callbacks.environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+    return var.value;
+  return "auto";
+}
+
+const bool LibretroFrontend::get_force_mono_option() {
+  retro_variable var = {
+      .key = "irogb_monochrome_dmg",
+      .value = nullptr,
+  };
+
+  auto &callbacks = LibretroFrontend::get_instance().get_callbacks();
+  if (callbacks.environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+    return strcmp(var.value, "enabled") == 0; // hate it but whatever lol
+  return false;
 }
 
 void LibretroFrontend::cheat_set(std::size_t index, bool enabled, std::string &code) {
