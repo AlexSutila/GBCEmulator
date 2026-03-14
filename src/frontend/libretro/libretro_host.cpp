@@ -41,18 +41,6 @@ extern "C" {
  * ====================================================================== */
 #include "frontend/libretro/libretro.h"
 
-static std::string get_bios_option() {
-  retro_variable var = {
-      .key = "irogb_bios",
-      .value = nullptr,
-  };
-
-  auto &callbacks = LibretroFrontend::get_instance().get_callbacks();
-  if (callbacks.environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-    return var.value;
-  return "auto";
-}
-
 static std::string get_system_dir() {
   auto &callbacks = LibretroFrontend::get_instance().get_callbacks();
 
@@ -135,6 +123,18 @@ void retro_set_environment(retro_environment_t cb) {
                {NULL, NULL},
            }, // ...
        .default_value = "auto"},
+      {.key = "irogb_monochrome_dmg",
+       .desc = "Disable re-coloring of DMG games (only applicable with CGB BIOS)",
+       .desc_categorized = NULL,
+       .info_categorized = NULL,
+       .category_key = NULL,
+       .values =
+           {
+               {"enabled", "enabled"},
+               {"disabled", "disabled"},
+               {NULL, NULL},
+           }, // ...
+       .default_value = "disabled"},
       {0}
   };
   static struct retro_core_options_v2 options = {
@@ -210,7 +210,7 @@ bool retro_load_game(const struct retro_game_info *info) {
 
   /* Attempt to load a BIOS file, we check two locations. If any of these fail,
    * for any reason, it is equivalent to starting without a BIOS file. */
-  auto mode = get_bios_option();
+  auto mode = instance.get_bios_option();
   if (mode == "dmg") {
     auto bios = load_bios("dmg_boot.bin");
     instance.make_gbc(bios);
