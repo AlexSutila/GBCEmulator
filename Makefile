@@ -4,42 +4,30 @@ NPROC := $(shell nproc 2>/dev/null || sysctl -n hw.ncpu)
 
 BUILD_ROOT := build
 BIN := bin
+BUILD_DIR := $(BUILD_ROOT)
+BUILD_TYPE ?= Release
 
-FULL_BUILD := $(BUILD_ROOT)/full
-SIMPLE_BUILD := $(BUILD_ROOT)/simple
+BUILD_FULL     := $(if $(filter full,$(MAKECMDGOALS)),ON,OFF)
+BUILD_SIMPLE   := $(if $(filter simple,$(MAKECMDGOALS)),ON,OFF)
+BUILD_LIBRETRO := $(if $(filter libretro,$(MAKECMDGOALS)),ON,OFF)
 
-BOOTROMS_DIR ?= bootroms
-WARNINGS ?=
+.PHONY: full simple clean libretro clean
 
-.PHONY: all full simple clean
-all:
-	$(MAKE) -f Makefile.libretro
+full simple libretro: build
 
-
-$(FULL_BUILD)/CMakeCache.txt:
-	mkdir -p $(FULL_BUILD) $(BIN)
-	cmake -S . -B $(FULL_BUILD) \
+build:
+	mkdir -p $(BUILD_DIR) $(BIN)
+	cmake -S . -B $(BUILD_DIR) \
 		-DCMAKE_BUILD_TYPE=Release \
-		-DBUILD_FULL=ON \
+		-DBUILD_FULL=$(BUILD_FULL) \
+		-DBUILD_SIMPLE=$(BUILD_SIMPLE) \
+		-DBUILD_LIBRETRO=$(BUILD_LIBRETRO) \
 		-DCMAKE_RUNTIME_OUTPUT_DIRECTORY=$(abspath $(BIN)) \
+		-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$(abspath $(BIN)) \
+		-DCMAKE_ARCHIVE_OUTPUT_DIRECTORY=$(abspath $(BIN)) \
 		-DCMAKE_C_COMPILER=$(CC) \
 		-DCMAKE_CXX_COMPILER=$(CXX)
-
-$(SIMPLE_BUILD)/CMakeCache.txt:
-	mkdir -p $(SIMPLE_BUILD) $(BIN)
-	cmake -S . -B $(SIMPLE_BUILD) \
-		-DCMAKE_BUILD_TYPE=Release \
-		-DBUILD_SIMPLE=ON \
-		-DCMAKE_RUNTIME_OUTPUT_DIRECTORY=$(abspath $(BIN)) \
-		-DCMAKE_C_COMPILER=$(CC) \
-		-DCMAKE_CXX_COMPILER=$(CXX)
-
-
-simple: $(SIMPLE_BUILD)/CMakeCache.txt
-	cmake --build $(SIMPLE_BUILD) -- -j$(NPROC)
-
-full: $(FULL_BUILD)/CMakeCache.txt
-	cmake --build $(FULL_BUILD) -- -j$(NPROC)
+	cmake --build $(BUILD_DIR) --parallel $(NPROC)
 
 clean:
 	rm -rf $(BUILD_ROOT) $(BIN)
