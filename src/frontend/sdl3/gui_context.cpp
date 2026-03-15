@@ -121,7 +121,9 @@ void GbcImGui::init_context(ImGuiContextState &ctx, SDL_Window *window, SDL_Rend
   ctx.dpi_scale = 1.0f;
   update_dpi_scale(ctx, SDL_GetWindowDisplayScale(window));
 
-  const ImGuiIO &io = ImGui::GetIO();
+  ImGuiIO &io = ImGui::GetIO();
+  io.IniFilename = nullptr;
+
   if (std::filesystem::exists(font)) {
     io.Fonts->AddFontFromFileTTF(font.c_str(), base_font_size);
   }
