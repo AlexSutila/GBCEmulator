@@ -7,52 +7,42 @@
 # Core definitions
 .core-defs:
   variables:
-    MAKEFILE_PATH: .
     CORENAME: irogb
+    CORE_ARGS: "-DBUILD_LIBRETRO=ON"
+    EXTRA_PATH: "src/frontend/libretro"
 
 # Inclusion templates, required for the build to work
 include:
   ################################## DESKTOPS ################################
-  # Windows 64-bit
+  # Windows
   - project: 'libretro-infrastructure/ci-templates'
-    file: '/windows-x64-mingw.yml'
-
-  # Windows 32-bit
-  - project: 'libretro-infrastructure/ci-templates'
-    file: '/windows-i686-mingw.yml'
+    file: '/windows-cmake-mingw.yml'
 
   # Linux 64-bit
   - project: 'libretro-infrastructure/ci-templates'
-    file: '/linux-x64.yml'
+    file: '/linux-cmake.yml'
 
-  # Linux 32-bit
+  # MacOS x64
   - project: 'libretro-infrastructure/ci-templates'
-    file: '/linux-i686.yml'
+    file: 'osx-cmake-x86.yml'
 
-  # MacOS 64-bit
+  # MacOS arm64
   - project: 'libretro-infrastructure/ci-templates'
-    file: '/osx-x64.yml'
-
-  # MacOS ARM 64-bit
-  - project: 'libretro-infrastructure/ci-templates'
-    file: '/osx-arm64.yml'
+    file: 'osx-cmake-arm64.yml'
 
   ################################## CELLULAR ################################
-  # iOS
+  # Android
   - project: 'libretro-infrastructure/ci-templates'
-    file: '/ios-arm64.yml'
+    file: '/android-cmake.yml'
 
-  # iOS (armv7)
+  # iOS arm64
   - project: 'libretro-infrastructure/ci-templates'
-    file: '/ios9.yml'
-
-  #################################### MISC ##################################
+    file: '/ios-cmake.yml'
 
 # Stages for building
 stages:
   - build-prepare
   - build-shared
-  - build-static
 
 ##############################################################################
 #################################### STAGES ##################################
@@ -62,48 +52,44 @@ stages:
 # Windows 64-bit
 libretro-build-windows-x64:
   extends:
-    - .libretro-windows-x64-mingw-make-default
-    - .core-defs
-
-# Windows 32-bit
-libretro-build-windows-i686:
-  extends:
-    - .libretro-windows-i686-mingw-make-default
+    - .libretro-windows-cmake-x86_64
     - .core-defs
 
 # Linux 64-bit
 libretro-build-linux-x64:
   extends:
-    - .libretro-linux-x64-make-default
+    - .libretro-linux-cmake-x86_64
     - .core-defs
+  variables:
+    CC: /usr/bin/gcc-20
+    CXX: /usr/bin/g++-20
 
-# Linux 32-bit
-libretro-build-linux-i686:
-  extends:
-    - .libretro-linux-i686-make-default
-    - .core-defs
-
-# MacOS 64-bit
+# macOS Intel
 libretro-build-osx-x64:
+  tags:
+    - mac-apple-silicon
   extends:
-    - .libretro-osx-x64-make-10-7
+    - .libretro-osx-cmake-x86
     - .core-defs
 
-# MacOS ARM 64-bit
+# macOS arm64
 libretro-build-osx-arm64:
   extends:
-    - .libretro-osx-arm64-make-default
+    - .libretro-osx-cmake-arm64
     - .core-defs
 
 ################################### CELLULAR #################################
-# iOS
+# Android ARMv8a
+android-arm64-v8a:
+  extends:
+    - .libretro-android-cmake-arm64-v8a
+    - .core-defs
+  variables:
+    ANDROID_NDK_VERSION: 26.2.11394342
+    NDK_ROOT: /android-sdk-linux/ndk/$ANDROID_NDK_VERSION
+
+# iOS arm64
 libretro-build-ios-arm64:
   extends:
-    - .libretro-ios-arm64-make-default
-    - .core-defs
-
-# iOS (armv7) [iOS 9 and up]
-libretro-build-ios9:
-  extends:
-    - .libretro-ios9-make-default
+    - .libretro-ios-cmake-arm64
     - .core-defs
