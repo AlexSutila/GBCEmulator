@@ -1,5 +1,4 @@
 #include "frontend/libretro/frontend.hpp"
-#include <filesystem>
 #include <memory>
 #include <optional>
 #include <stdarg.h>
@@ -57,9 +56,17 @@ static std::optional<BootROM> load_bios(const std::string &name) {
   if (system_dir.empty())
     return std::nullopt;
 
-  const auto path = std::filesystem::path(system_dir) / name;
+  // const auto path = std::filesystem::path(system_dir) / name;
+  std::string path = system_dir;
+  if (!path.empty() && path.back() != '/')
+    path += '/';
+  path += name;
+
+  /* Really wish I could leverage std::filesystem here, but we run into problems
+   * when compiling for older iOS versions, so we do this for the pure sake of
+   * maintaining compatability */
   try {
-    auto bios = BootROM(path.string());
+    auto bios = BootROM(path);
     return bios;
   }
 
