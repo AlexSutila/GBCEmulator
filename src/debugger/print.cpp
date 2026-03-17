@@ -535,11 +535,13 @@ std::string describe_cart(const cart &c) {
 
   const byte_t hdr_chk = c.computed_header_checksum;
   const std::uint16_t glob_chk = c.computed_global_checksum;
-
   std::ostringstream os;
-  os << "File: " << c.file_path.string() << "\n";
-  os << "ROM bytes: " << c.rom.size() << "\n\n";
 
+#ifndef NO_CORE_FILESYSTEM
+  os << "File: " << c.file_path.string() << "\n";
+#endif // NO_CORE_FILESYSTEM
+
+  os << "ROM bytes: " << c.rom.size() << "\n\n";
   os << "[Header]\n";
   os << "Title: " << h.title() << "\n";
   {
