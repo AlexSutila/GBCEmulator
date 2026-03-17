@@ -347,11 +347,7 @@ SpecialMbc detect_special_mbc(const cart &c) {
 
 cart load_cart_raw(std::vector<byte_t> rom_bytes) {
   cart c{};
-
-#ifndef NO_CORE_FILESYSTEM
   c.file_path.clear();
-#endif // NO_CORE_FILESYSTEM
-
   c.rom = std::move(rom_bytes);
   validate(c);
   c.special_mbc = detect_special_mbc(c);
@@ -375,7 +371,6 @@ bool Cartridge::consume_sram_save() noexcept {
   return false;
 }
 
-#ifndef NO_CORE_FILESYSTEM
 static std::optional<std::vector<byte_t>> read_all_bytes(const std::filesystem::path &p) {
   std::ifstream f(p, std::ios::binary | std::ios::ate);
   if (!f) {
@@ -470,4 +465,3 @@ bool Cartridge::write_save_file(const std::filesystem::path &save_path) const {
           static_cast<std::streamsize>(ram_view.size()));
   return static_cast<bool>(f);
 }
-#endif // NO_CORE_FILESYSTEM

@@ -6,14 +6,11 @@
 #include "mbc_creator.hpp"
 
 #include <array>
+#include <filesystem>
 #include <memory>
 #include <span>
 #include <string>
 #include <vector>
-
-#ifndef NO_CORE_FILESYSTEM
-#include <filesystem>
-#endif // NO_CORE_FILESYSTEM
 
 constexpr std::size_t kHeaderStart = 0x0100;
 constexpr std::size_t kHeaderEnd = 0x014F;
@@ -55,11 +52,7 @@ struct rom_header {
 };
 
 struct cart {
-
-#ifndef NO_CORE_FILESYSTEM
   std::filesystem::path file_path{};
-#endif // NO_CORE_FILESYSTEM
-
   std::vector<byte_t> rom{};
   rom_header header{};
 
@@ -91,12 +84,10 @@ public:
   [[nodiscard]] bool has_battery() const noexcept { return mbc_->has_battery(); }
   [[nodiscard]] std::span<const byte_t> ram() const noexcept { return mbc_->ram(); }
   [[nodiscard]] std::span<byte_t> ram() noexcept { return mbc_->ram(); }
-  bool consume_sram_save() noexcept;
 
-#ifndef NO_CORE_FILESYSTEM
   bool load_save_file(const std::filesystem::path &save_path);
   bool write_save_file(const std::filesystem::path &save_path) const;
-#endif // NO_CORE_FILESYSTEM
+  bool consume_sram_save() noexcept;
 
 private:
   cart image_;
@@ -104,10 +95,8 @@ private:
   bool save_dirty_{false};
 };
 
-#ifndef NO_CORE_FILESYSTEM
-[[nodiscard]] cart load_cart_fs(const std::filesystem::path &rom_path);
-#endif // NO_CORE_FILESYSTEM
 [[nodiscard]] cart load_cart_raw(std::vector<byte_t> rom_bytes);
+[[nodiscard]] cart load_cart_fs(const std::filesystem::path &rom_path);
 
 // helpers
 [[nodiscard]] std::size_t rom_bytes_from_code(byte_t code);
