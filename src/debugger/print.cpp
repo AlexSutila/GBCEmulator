@@ -1,6 +1,7 @@
 #include "debugger/print.hpp"
 #include "cpu/interrupts.hpp"
 #include "cpu/lr35902.hpp"
+#include <iomanip>
 #include <sstream>
 
 namespace Debug {
