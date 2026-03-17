@@ -5,10 +5,10 @@
 #include "cpu/registers/flags.hpp"
 #include "cpu/registers/regfile.hpp"
 #include "emu_types.hpp"
+#include "format.hpp"
 #include "memory/bus.hpp"
 
 #include <cstdint>
-#include <format>
 
 /*
  * Add value in 8-bit register X to A
@@ -33,7 +33,7 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 4;
   }
-  std::string describe() override { return std::format("ADD A, {}", to_string<src>()); }
+  std::string describe() override { return IroGB::format("ADD A, {}", to_string<src>()); }
 };
 
 /*
@@ -59,7 +59,7 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 8;
   }
-  std::string describe() override { return std::format("ADD A, {}", static_cast<int>(imm)); }
+  std::string describe() override { return IroGB::format("ADD A, {}", static_cast<int>(imm)); }
   void parse() override { imm = bus->read_byte(reg_file->reg_pc++); }
 
 private:
@@ -89,7 +89,7 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 8;
   }
-  std::string describe() override { return std::format("ADD A, HL"); }
+  std::string describe() override { return IroGB::format("ADD A, HL"); }
   std::size_t mem_access_t_cycle() override { return 4; }
 };
 
@@ -119,7 +119,7 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 4;
   }
-  std::string describe() override { return std::format("ADC A, {}", to_string<src>()); }
+  std::string describe() override { return IroGB::format("ADC A, {}", to_string<src>()); }
 };
 
 /*
@@ -149,7 +149,7 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 8;
   }
-  std::string describe() override { return std::format("ADC A, {}", static_cast<int>(imm)); }
+  std::string describe() override { return IroGB::format("ADC A, {}", static_cast<int>(imm)); }
   void parse() override { imm = bus->read_byte(reg_file->reg_pc++); }
 
 private:
@@ -182,7 +182,7 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 8;
   }
-  std::string describe() override { return std::format("ADC A, HL"); }
+  std::string describe() override { return IroGB::format("ADC A, HL"); }
   std::size_t mem_access_t_cycle() override { return 4; }
 };
 
@@ -208,7 +208,7 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 4;
   }
-  std::string describe() override { return std::format("SUB A, {}", to_string<src>()); }
+  std::string describe() override { return IroGB::format("SUB A, {}", to_string<src>()); }
 };
 
 /*
@@ -233,7 +233,7 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 8;
   }
-  std::string describe() override { return std::format("SUB A, {}", static_cast<int>(imm)); }
+  std::string describe() override { return IroGB::format("SUB A, {}", static_cast<int>(imm)); }
   void parse() override { imm = bus->read_byte(reg_file->reg_pc++); }
 
 private:
@@ -262,7 +262,7 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 8;
   }
-  std::string describe() override { return std::format("SUB A, HL"); }
+  std::string describe() override { return IroGB::format("SUB A, HL"); }
   std::size_t mem_access_t_cycle() override { return 4; }
 };
 
@@ -294,7 +294,7 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 4;
   }
-  std::string describe() override { return std::format("SBC A, {}", to_string<src>()); }
+  std::string describe() override { return IroGB::format("SBC A, {}", to_string<src>()); }
 };
 
 /*
@@ -325,7 +325,7 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 8;
   }
-  std::string describe() override { return std::format("SBC A, {}", static_cast<int>(imm)); }
+  std::string describe() override { return IroGB::format("SBC A, {}", static_cast<int>(imm)); }
   void parse() override { imm = bus->read_byte(reg_file->reg_pc++); }
 
 private:
@@ -360,7 +360,7 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 8;
   }
-  std::string describe() override { return std::format("SBC A, HL"); }
+  std::string describe() override { return IroGB::format("SBC A, HL"); }
   std::size_t mem_access_t_cycle() override { return 4; }
 };
 
@@ -385,7 +385,7 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 4;
   }
-  std::string describe() override { return std::format("AND A, {}", to_string<src>()); }
+  std::string describe() override { return IroGB::format("AND A, {}", to_string<src>()); }
 };
 
 /*
@@ -409,7 +409,7 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 8;
   }
-  std::string describe() override { return std::format("AND A, {}", static_cast<int>(imm)); }
+  std::string describe() override { return IroGB::format("AND A, {}", static_cast<int>(imm)); }
   void parse() override { imm = bus->read_byte(reg_file->reg_pc++); }
 
 private:
@@ -437,7 +437,7 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 8;
   }
-  std::string describe() override { return std::format("AND A, HL"); }
+  std::string describe() override { return IroGB::format("AND A, HL"); }
   std::size_t mem_access_t_cycle() override { return 4; }
 };
 
@@ -462,7 +462,7 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 4;
   }
-  std::string describe() override { return std::format("XOR A, {}", to_string<src>()); }
+  std::string describe() override { return IroGB::format("XOR A, {}", to_string<src>()); }
 };
 
 /*
@@ -486,7 +486,7 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 8;
   }
-  std::string describe() override { return std::format("XOR A, {}", static_cast<int>(imm)); }
+  std::string describe() override { return IroGB::format("XOR A, {}", static_cast<int>(imm)); }
   void parse() override { imm = bus->read_byte(reg_file->reg_pc++); }
 
 private:
@@ -514,7 +514,7 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 8;
   }
-  std::string describe() override { return std::format("XOR A, HL"); }
+  std::string describe() override { return IroGB::format("XOR A, HL"); }
   std::size_t mem_access_t_cycle() override { return 4; }
 };
 
@@ -539,7 +539,7 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 4;
   }
-  std::string describe() override { return std::format("OR A, {}", to_string<src>()); }
+  std::string describe() override { return IroGB::format("OR A, {}", to_string<src>()); }
 };
 
 /*
@@ -562,7 +562,7 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 8;
   }
-  std::string describe() override { return std::format("OR A, {}", static_cast<int>(imm)); }
+  std::string describe() override { return IroGB::format("OR A, {}", static_cast<int>(imm)); }
   void parse() override { imm = bus->read_byte(reg_file->reg_pc++); }
 
 private:
@@ -590,7 +590,7 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 8;
   }
-  std::string describe() override { return std::format("OR A, HL"); }
+  std::string describe() override { return IroGB::format("OR A, HL"); }
   std::size_t mem_access_t_cycle() override { return 4; }
 };
 
@@ -613,7 +613,7 @@ public:
     reg_file->reg_af.put_flag(StatusFlagMask::FLAG_C_MASK, a < x);
     return 4;
   }
-  std::string describe() override { return std::format("CP A, {}", to_string<src>()); }
+  std::string describe() override { return IroGB::format("CP A, {}", to_string<src>()); }
 };
 
 /*
@@ -634,7 +634,7 @@ public:
     reg_file->reg_af.put_flag(StatusFlagMask::FLAG_C_MASK, a < imm);
     return 8;
   }
-  std::string describe() override { return std::format("CP A, {}", static_cast<int>(imm)); }
+  std::string describe() override { return IroGB::format("CP A, {}", static_cast<int>(imm)); }
   void parse() override { imm = bus->read_byte(reg_file->reg_pc++); }
 
 private:
@@ -660,7 +660,7 @@ public:
     reg_file->reg_af.put_flag(StatusFlagMask::FLAG_C_MASK, a < n);
     return 8;
   }
-  std::string describe() override { return std::format("CP A, HL"); }
+  std::string describe() override { return IroGB::format("CP A, HL"); }
   std::size_t mem_access_t_cycle() override { return 4; }
 };
 
@@ -684,7 +684,7 @@ public:
     write_reg<src>(result);
     return 4;
   }
-  std::string describe() override { return std::format("INC {}", to_string<src>()); }
+  std::string describe() override { return IroGB::format("INC {}", to_string<src>()); }
 };
 
 /*
@@ -716,7 +716,7 @@ public:
   std::size_t mem_access_t_cycle() override {
     return state == InstrStates::INSTR_STATE_READ ? 4 : 8;
   }
-  std::string describe() override { return std::format("INC HL"); }
+  std::string describe() override { return IroGB::format("INC HL"); }
   void parse() override { state = InstrStates::INSTR_STATE_READ; }
 
 private:
@@ -745,7 +745,7 @@ public:
     write_reg<src>(result);
     return 4;
   }
-  std::string describe() override { return std::format("DEC {}", to_string<src>()); }
+  std::string describe() override { return IroGB::format("DEC {}", to_string<src>()); }
 };
 
 /*
@@ -777,7 +777,7 @@ public:
   std::size_t mem_access_t_cycle() override {
     return state == InstrStates::INSTR_STATE_READ ? 4 : 8;
   }
-  std::string describe() override { return std::format("DEC HL"); }
+  std::string describe() override { return IroGB::format("DEC HL"); }
   void parse() override { state = InstrStates::INSTR_STATE_READ; }
 
 private:
@@ -826,7 +826,7 @@ public:
     write_reg<Register8Bit::REG_A>(a);
     return 4;
   }
-  std::string describe() override { return std::format("DAA"); }
+  std::string describe() override { return IroGB::format("DAA"); }
 };
 
 /*
@@ -850,7 +850,7 @@ public:
     write_reg<Register16Bit::REG_HL>(static_cast<addr_t>(sum));
     return 8;
   }
-  std::string describe() override { return std::format("ADD HL, {}", to_string<src>()); }
+  std::string describe() override { return IroGB::format("ADD HL, {}", to_string<src>()); }
 };
 
 /*
@@ -864,7 +864,7 @@ public:
     write_reg<dst>(xx + 1);
     return 8;
   }
-  std::string describe() override { return std::format("INC {}", to_string<dst>()); }
+  std::string describe() override { return IroGB::format("INC {}", to_string<dst>()); }
 };
 
 /*
@@ -878,7 +878,7 @@ public:
     write_reg<dst>(xx - 1);
     return 8;
   }
-  std::string describe() override { return std::format("DEC {}", to_string<dst>()); }
+  std::string describe() override { return IroGB::format("DEC {}", to_string<dst>()); }
 };
 
 /*
@@ -904,7 +904,7 @@ public:
     reg_file->reg_sp.write(sp + nn);
     return 16;
   }
-  std::string describe() override { return std::format("ADD SP, {}", static_cast<int>(imm)); }
+  std::string describe() override { return IroGB::format("ADD SP, {}", static_cast<int>(imm)); }
   void parse() override { imm = static_cast<int8_t>(bus->read_byte(reg_file->reg_pc++)); }
 
 private:
@@ -936,7 +936,7 @@ public:
     write_reg<Register16Bit::REG_HL>(sp + nn);
     return 12;
   }
-  std::string describe() override { return std::format("LD HL, SP+{}", static_cast<int>(imm)); }
+  std::string describe() override { return IroGB::format("LD HL, SP+{}", static_cast<int>(imm)); }
   void parse() override { imm = static_cast<std::int8_t>(bus->read_byte(reg_file->reg_pc, false)); }
   std::size_t mem_access_t_cycle() override { return 4; }
 

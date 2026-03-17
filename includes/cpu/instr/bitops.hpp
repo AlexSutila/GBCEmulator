@@ -5,10 +5,10 @@
 #include "cpu/registers/flags.hpp"
 #include "cpu/registers/regfile.hpp"
 #include "emu_types.hpp"
+#include "format.hpp"
 #include "memory/bus.hpp"
 
 #include <array>
-#include <format>
 #include <memory>
 
 /*
@@ -35,7 +35,7 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 4;
   }
-  std::string describe() override { return std::format("RLCA"); }
+  std::string describe() override { return IroGB::format("RLCA"); }
 };
 
 /*
@@ -62,7 +62,7 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 4;
   }
-  std::string describe() override { return std::format("RRCA"); }
+  std::string describe() override { return IroGB::format("RRCA"); }
 };
 
 /*
@@ -90,7 +90,7 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 4;
   }
-  std::string describe() override { return std::format("RLA"); }
+  std::string describe() override { return IroGB::format("RLA"); }
 };
 
 /*
@@ -118,7 +118,7 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 4;
   }
-  std::string describe() override { return std::format("RRA"); }
+  std::string describe() override { return IroGB::format("RRA"); }
 };
 
 /*
@@ -161,7 +161,7 @@ public:
     write_reg<dst>(result);
     return 8;
   }
-  std::string describe() override { return std::format("RLC {}", to_string<dst>()); }
+  std::string describe() override { return IroGB::format("RLC {}", to_string<dst>()); }
 };
 
 class RLC_HL final : public Instruction {
@@ -193,7 +193,7 @@ public:
   std::size_t mem_access_t_cycle() override {
     return state == InstrStates::INSTR_STATE_READ ? 8 : 12;
   }
-  std::string describe() override { return std::format("RLC HL"); }
+  std::string describe() override { return IroGB::format("RLC HL"); }
   void parse() override { state = InstrStates::INSTR_STATE_READ; }
 
 private:
@@ -222,7 +222,7 @@ public:
     write_reg<dst>(result);
     return 8;
   }
-  std::string describe() override { return std::format("RL {}", to_string<dst>()); }
+  std::string describe() override { return IroGB::format("RL {}", to_string<dst>()); }
 };
 
 class RL_HL final : public Instruction {
@@ -254,7 +254,7 @@ public:
   std::size_t mem_access_t_cycle() override {
     return state == InstrStates::INSTR_STATE_READ ? 8 : 12;
   }
-  std::string describe() override { return std::format("RL HL"); }
+  std::string describe() override { return IroGB::format("RL HL"); }
   void parse() override { state = InstrStates::INSTR_STATE_READ; }
 
 private:
@@ -282,7 +282,7 @@ public:
     write_reg<dst>(result);
     return 8;
   }
-  std::string describe() override { return std::format("RRC {}", to_string<dst>()); }
+  std::string describe() override { return IroGB::format("RRC {}", to_string<dst>()); }
 };
 
 class RRC_HL final : public Instruction {
@@ -314,7 +314,7 @@ public:
   std::size_t mem_access_t_cycle() override {
     return state == InstrStates::INSTR_STATE_READ ? 8 : 12;
   }
-  std::string describe() override { return std::format("RRC HL"); }
+  std::string describe() override { return IroGB::format("RRC HL"); }
   void parse() override { state = InstrStates::INSTR_STATE_READ; }
 
 private:
@@ -343,7 +343,7 @@ public:
     write_reg<dst>(result);
     return 8;
   }
-  std::string describe() override { return std::format("RR {}", to_string<dst>()); }
+  std::string describe() override { return IroGB::format("RR {}", to_string<dst>()); }
 };
 
 class RR_HL final : public Instruction {
@@ -375,7 +375,7 @@ public:
   std::size_t mem_access_t_cycle() override {
     return state == InstrStates::INSTR_STATE_READ ? 8 : 12;
   }
-  std::string describe() override { return std::format("RR HL"); }
+  std::string describe() override { return IroGB::format("RR HL"); }
   void parse() override { state = InstrStates::INSTR_STATE_READ; }
 
 private:
@@ -403,7 +403,7 @@ public:
     write_reg<dst>(result);
     return 8;
   }
-  std::string describe() override { return std::format("SLA {}", to_string<dst>()); }
+  std::string describe() override { return IroGB::format("SLA {}", to_string<dst>()); }
 };
 
 class SLA_HL final : public Instruction {
@@ -434,7 +434,7 @@ public:
   std::size_t mem_access_t_cycle() override {
     return state == InstrStates::INSTR_STATE_READ ? 8 : 12;
   }
-  std::string describe() override { return std::format("SLA HL"); }
+  std::string describe() override { return IroGB::format("SLA HL"); }
   void parse() override { state = InstrStates::INSTR_STATE_READ; }
 
 private:
@@ -461,7 +461,7 @@ public:
     write_reg<dst>(result);
     return 8;
   }
-  std::string describe() override { return std::format("SLA {}", to_string<dst>()); }
+  std::string describe() override { return IroGB::format("SLA {}", to_string<dst>()); }
 };
 
 class SRA_HL final : public Instruction {
@@ -492,7 +492,7 @@ public:
   std::size_t mem_access_t_cycle() override {
     return state == InstrStates::INSTR_STATE_READ ? 8 : 12;
   }
-  std::string describe() override { return std::format("SLA HL"); }
+  std::string describe() override { return IroGB::format("SLA HL"); }
   void parse() override { state = InstrStates::INSTR_STATE_READ; }
 
 private:
@@ -518,7 +518,7 @@ public:
     write_reg<dst>(result);
     return 8;
   }
-  std::string describe() override { return std::format("SWAP {}", to_string<dst>()); }
+  std::string describe() override { return IroGB::format("SWAP {}", to_string<dst>()); }
 };
 
 class SWAP_HL final : public Instruction {
@@ -549,7 +549,7 @@ public:
   std::size_t mem_access_t_cycle() override {
     return state == InstrStates::INSTR_STATE_READ ? 8 : 12;
   }
-  std::string describe() override { return std::format("SWAP HL"); }
+  std::string describe() override { return IroGB::format("SWAP HL"); }
   void parse() override { state = InstrStates::INSTR_STATE_READ; }
 
 private:
@@ -576,7 +576,7 @@ public:
     write_reg<dst>(result);
     return 8;
   }
-  std::string describe() override { return std::format("SRL {}", to_string<dst>()); }
+  std::string describe() override { return IroGB::format("SRL {}", to_string<dst>()); }
 };
 
 class SRL_HL final : public Instruction {
@@ -607,7 +607,7 @@ public:
   std::size_t mem_access_t_cycle() override {
     return state == InstrStates::INSTR_STATE_READ ? 8 : 12;
   }
-  std::string describe() override { return std::format("SRL HL"); }
+  std::string describe() override { return IroGB::format("SRL HL"); }
   void parse() override { state = InstrStates::INSTR_STATE_READ; }
 
 private:
@@ -630,7 +630,7 @@ public:
     return 8;
   }
   std::string describe() override {
-    return std::format("BIT {}, {}", static_cast<int>(bit), to_string<dst>());
+    return IroGB::format("BIT {}, {}", static_cast<int>(bit), to_string<dst>());
   }
 };
 
@@ -648,7 +648,7 @@ public:
     reg_file->reg_af.put_flag(StatusFlagMask::FLAG_H_MASK, true);
     return 12;
   }
-  std::string describe() override { return std::format("BIT {}, HL", static_cast<int>(bit)); }
+  std::string describe() override { return IroGB::format("BIT {}, HL", static_cast<int>(bit)); }
   std::size_t mem_access_t_cycle() override { return 8; }
 };
 
@@ -662,7 +662,7 @@ public:
     return 8;
   }
   std::string describe() override {
-    return std::format("RES {}, {}", static_cast<int>(bit), to_string<dst>());
+    return IroGB::format("RES {}, {}", static_cast<int>(bit), to_string<dst>());
   }
 };
 
@@ -687,7 +687,7 @@ public:
   std::size_t mem_access_t_cycle() override {
     return state == InstrStates::INSTR_STATE_READ ? 8 : 12;
   }
-  std::string describe() override { return std::format("RST {}, HL", static_cast<int>(bit)); }
+  std::string describe() override { return IroGB::format("RST {}, HL", static_cast<int>(bit)); }
   void parse() override { state = InstrStates::INSTR_STATE_READ; }
 
 private:
@@ -705,7 +705,7 @@ public:
     return 8;
   }
   std::string describe() override {
-    return std::format("SET {}, {}", static_cast<int>(bit), to_string<dst>());
+    return IroGB::format("SET {}, {}", static_cast<int>(bit), to_string<dst>());
   }
 };
 
@@ -730,7 +730,7 @@ public:
   std::size_t mem_access_t_cycle() override {
     return state == InstrStates::INSTR_STATE_READ ? 8 : 12;
   }
-  std::string describe() override { return std::format("SET {}, HL", static_cast<int>(bit)); }
+  std::string describe() override { return IroGB::format("SET {}, HL", static_cast<int>(bit)); }
   void parse() override { state = InstrStates::INSTR_STATE_READ; }
 
 private:

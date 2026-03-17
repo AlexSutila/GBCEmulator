@@ -1,12 +1,11 @@
 #ifndef GBC_CONTROL_HPP
 #define GBC_CONTROL_HPP
 
-#include <format>
-
 #include "cpu/instr/instr.hpp"
 #include "cpu/interrupts.hpp"
 #include "cpu/registers/regfile.hpp"
 #include "emu_types.hpp"
+#include "format.hpp"
 #include "gbc.hpp"
 #include "memory/bus.hpp"
 
@@ -23,7 +22,7 @@ public:
     reg_file->reg_af.set_flag(StatusFlagMask::FLAG_H_MASK);
     return 4;
   }
-  std::string describe() override { return std::format("CPL"); }
+  std::string describe() override { return IroGB::format("CPL"); }
 };
 
 /*
@@ -38,7 +37,7 @@ public:
     reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_H_MASK);
     return 4;
   }
-  std::string describe() override { return std::format("SCF"); }
+  std::string describe() override { return IroGB::format("SCF"); }
 };
 
 /*
@@ -54,7 +53,7 @@ public:
     reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_H_MASK);
     return 4;
   }
-  std::string describe() override { return std::format("CCF"); }
+  std::string describe() override { return IroGB::format("CCF"); }
 };
 
 /*
@@ -63,7 +62,7 @@ public:
 class NOP final : public Instruction {
 public:
   NOP(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
-  std::string describe() override { return std::format("NOP"); }
+  std::string describe() override { return IroGB::format("NOP"); }
   std::size_t exec() override { return 4; }
 };
 
@@ -78,7 +77,7 @@ public:
     ime->disable();
     return 4;
   }
-  std::string describe() override { return std::format("DI"); }
+  std::string describe() override { return IroGB::format("DI"); }
 
 private:
   InterruptMasterEnable *const ime;
@@ -95,7 +94,7 @@ public:
     ime->enable(true);
     return 4;
   }
-  std::string describe() override { return std::format("EI"); }
+  std::string describe() override { return IroGB::format("EI"); }
 
 private:
   InterruptMasterEnable *const ime;
@@ -125,7 +124,7 @@ public:
       reg_file->halt_bug_triggered = true;
     return 4;
   }
-  std::string describe() override { return std::format("HALT"); }
+  std::string describe() override { return IroGB::format("HALT"); }
 
   /* NOTE: This instruction does not access memory. However, we still do not
    * want this instruction to take effect and actually place the processor in
@@ -155,7 +154,7 @@ public:
     }
     return 4;
   }
-  std::string describe() override { return std::format("STOP"); }
+  std::string describe() override { return IroGB::format("STOP"); }
 
   // Subject to change??? But same rationale as HALT timing for now.
   std::size_t mem_access_t_cycle() override { return 4; }
