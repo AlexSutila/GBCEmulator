@@ -8,13 +8,28 @@ include(FetchContent)
 # Core build
 # ===========================================================================
 
-add_library(
-  irogb_libretro SHARED ${CMAKE_SOURCE_DIR}/src/frontend/libretro/libretro_host.cpp
-                        ${CMAKE_SOURCE_DIR}/src/frontend/libretro/frontend.cpp ${GBC_CORE_SOURCES}
-)
+if(EMSCRIPTEN)
+  add_library(
+    irogb_libretro STATIC
+    ${CMAKE_SOURCE_DIR}/src/frontend/libretro/libretro_host.cpp
+    ${CMAKE_SOURCE_DIR}/src/frontend/libretro/frontend.cpp ${GBC_CORE_SOURCES}
+  )
+else()
+  add_library(
+    irogb_libretro SHARED
+    ${CMAKE_SOURCE_DIR}/src/frontend/libretro/libretro_host.cpp
+    ${CMAKE_SOURCE_DIR}/src/frontend/libretro/frontend.cpp ${GBC_CORE_SOURCES}
+  )
+endif()
 
 set_target_properties(irogb_libretro PROPERTIES PREFIX "")
 
-target_compile_options(irogb_libretro PRIVATE -fPIC -DNO_CORE_FILESYSTEM ${GBC_COMPILE_OPTIONS})
+if(EMSCRIPTEN)
+  set_target_properties(
+    irogb_libretro PROPERTIES SUFFIX ".bc" OUTPUT_NAME "irogb_libretro_emscripten"
+  )
+endif()
+
+target_compile_options(irogb_libretro PRIVATE -fPIC -DNO_CORE_FILESYSTEM=ON ${GBC_COMPILE_OPTIONS})
 
 target_include_directories(irogb_libretro PRIVATE ${GBC_INCLUDE_DIR})
