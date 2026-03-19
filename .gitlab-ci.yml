@@ -119,3 +119,4 @@ libretro-build-emscripten:
   extends:
     - .libretro-emscripten-static-cmake-retroarch-master
     - .core-defs
+  variables:
