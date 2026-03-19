@@ -407,7 +407,7 @@ static std::optional<std::vector<byte_t>> read_all_bytes(const std::filesystem::
 
 cart load_cart_fs(const std::filesystem::path &rom_path) {
   cart c{};
-  c.file_path = rom_path;
+  c.file_path = rom_path; // This is wrapped in NO_CORE_FILESYSTEM so we good
   if (const auto rom = read_all_bytes(rom_path); rom != std::nullopt)
     c.rom = rom.value();
   else {

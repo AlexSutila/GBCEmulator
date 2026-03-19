@@ -39,6 +39,16 @@ include:
   - project: 'libretro-infrastructure/ci-templates'
     file: '/ios-cmake.yml'
 
+  ################################## CONSOLES ################################
+  # tvOS (AppleTV)
+  - project: 'libretro-infrastructure/ci-templates'
+    file: '/tvos-cmake.yml'
+
+  #################################### MISC ##################################
+  # Emscripten (WASM)
+  - project: 'libretro-infrastructure/ci-templates'
+    file: '/emscripten-static-cmake.yml'
+
 # Stages for building
 stages:
   - build-prepare
@@ -93,4 +103,18 @@ android-arm64-v8a:
 libretro-build-ios-arm64:
   extends:
     - .libretro-ios-cmake-arm64
+    - .core-defs
+
+################################## CONSOLES ################################
+# tvOS (AppleTC)
+libretro-build-tvos-arm64:
+  extends:
+    - .libretro-tvos-cmake-arm64
+    - .core-defs
+
+#################################### MISC ##################################
+# Emscripten (WASM)
+libretro-build-emscripten:
+  extends:
+    - .libretro-emscripten-static-cmake-retroarch-master
     - .core-defs
