@@ -1,8 +1,6 @@
 #ifndef GBC_SCHEMA_HPP
 #define GBC_SCHEMA_HPP
 
-#include <array>
-#include <bit>
 #include <cstdint>
 #include <cstring>
 #include <optional>
@@ -114,8 +112,9 @@ public:
 
 private:
   template <typename T> void write(const T val) {
-    auto bytes = std::bit_cast<std::array<std::uint8_t, sizeof(T)>>(val);
-    buf_.insert(buf_.end(), bytes.begin(), bytes.end());
+    static_assert(std::is_trivially_constructible_v<T>, "T must be trivially copyable");
+    const auto *ptr = reinterpret_cast<const std::uint8_t *>(&val);
+    buf_.insert(buf_.end(), ptr, ptr + sizeof(T));
   }
 
   std::vector<std::uint8_t> buf_{};
@@ -204,13 +203,14 @@ private:
   }
 
   template <typename T> T read() {
+    static_assert(std::is_trivially_constructible_v<T>, "T must be trivially copyable");
     require(sizeof(T));
 
-    std::array<std::uint8_t, sizeof(T)> bytes{};
-    std::memcpy(bytes.data(), &buf_[pos_], sizeof(T));
-
+    T val;
+    std::memcpy(&val, &buf_[pos_], sizeof(T));
     pos_ += sizeof(T);
-    return std::bit_cast<T>(bytes);
+
+    return val;
   }
 
   std::span<const std::uint8_t> buf_;
