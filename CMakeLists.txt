@@ -117,6 +117,12 @@ if(NOT EMSCRIPTEN)
     set(ipo_err "MinGW + GCC combo is known to have issues with LTO")
   endif()
 
+  # Handle platform-level edge cases that complain LTO
+  if(VITA)
+    set(ipo_ok OFF)
+    set(ipo_err "VitaSDK toolchain does not support IPO/LTO")
+  endif()
+
   if(ipo_ok AND NOT mingw_gcc)
     if(BUILD_FULL)
       set_property(TARGET imgui PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
