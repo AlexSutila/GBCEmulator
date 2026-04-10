@@ -24,11 +24,11 @@ include:
 
   # MacOS x64
   - project: 'libretro-infrastructure/ci-templates'
-    file: 'osx-cmake-x86.yml'
+    file: '/osx-cmake-x86.yml'
 
   # MacOS arm64
   - project: 'libretro-infrastructure/ci-templates'
-    file: 'osx-cmake-arm64.yml'
+    file: '/osx-cmake-arm64.yml'
 
   ################################## CELLULAR ################################
   # Android

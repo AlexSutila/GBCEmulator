@@ -14,7 +14,7 @@ if(EMSCRIPTEN)
     ${CMAKE_SOURCE_DIR}/src/frontend/libretro/libretro_host.cpp
     ${CMAKE_SOURCE_DIR}/src/frontend/libretro/frontend.cpp ${GBC_CORE_SOURCES}
   )
-elseif(VITASDK_BUILD)
+elseif(VITA)
   add_library(
     irogb_libretro STATIC
     ${CMAKE_SOURCE_DIR}/src/frontend/libretro/libretro_host.cpp
@@ -34,7 +34,7 @@ if(EMSCRIPTEN)
   set_target_properties(
     irogb_libretro PROPERTIES SUFFIX ".bc" OUTPUT_NAME "irogb_libretro_emscripten"
   )
-elseif(VITASDK_BUILD)
+elseif(VITA)
   set_target_properties(irogb_libretro PROPERTIES SUFFIX ".a" OUTPUT_NAME "irogb_libretro_vita")
 endif()
 
