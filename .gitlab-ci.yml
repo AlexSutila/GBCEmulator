@@ -40,6 +40,10 @@ include:
     file: '/ios-cmake.yml'
 
   ################################## CONSOLES ################################
+  # PlayStation Vita
+  - project: 'libretro-infrastructure/ci-templates'
+    file: '/vita-static.yml'
+
   # tvOS (AppleTV)
   - project: 'libretro-infrastructure/ci-templates'
     file: '/tvos-cmake.yml'
