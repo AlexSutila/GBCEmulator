@@ -44,7 +44,7 @@ include:
   ################################## CONSOLES ################################
   # PlayStation Vita
   - project: 'libretro-infrastructure/ci-templates'
-    file: '/vita-static.yml'
+    file: '/vita-static-cmake.yml'
 
   # tvOS (AppleTV)
   - project: 'libretro-infrastructure/ci-templates'
@@ -116,7 +116,7 @@ libretro-build-ios-arm64:
 # PlayStation Vita
 libretro-build-vita:
   extends:
-    - .libretro-vita-static-retroarch-master
+    - .libretro-vita-static-cmake-retroarch-master
     - .core-defs
 
 # tvOS (AppleTV)
