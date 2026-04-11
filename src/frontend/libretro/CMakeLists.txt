@@ -23,17 +23,9 @@ elseif(VITA)
 
   target_compile_options(
     irogb_libretro
-    PRIVATE -fno-exceptions
-            -fno-rtti
-            -fno-unwind-tables
-            -fno-asynchronous-unwind-tables
-            -fno-threadsafe-statics
-            -fno-use-cxa-atexit
-            -fno-sized-deallocation
-            -fno-lto
+    PRIVATE -fno-unwind-tables -fno-asynchronous-unwind-tables -fno-threadsafe-statics
+            -fno-use-cxa-atexit -fno-sized-deallocation -fno-lto
   )
-
-  target_link_options(irogb_libretro PRIVATE -fno-exceptions -fno-rtti)
 else()
   add_library(
     irogb_libretro SHARED
