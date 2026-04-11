@@ -109,6 +109,7 @@ if(NOT EMSCRIPTEN)
     OUTPUT ipo_err
     LANGUAGES CXX
   )
+
   message("LTO: compiler: ${CMAKE_CXX_COMPILER_ID}, IPO/LTO support: ${ipo_ok}, mingw: ${MINGW}")
 
   set(mingw_gcc OFF)
@@ -121,6 +122,14 @@ if(NOT EMSCRIPTEN)
   if(VITA)
     set(ipo_ok OFF)
     set(ipo_err "VitaSDK toolchain does not support IPO/LTO")
+
+    # Force-disable globally
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION
+        OFF
+        CACHE BOOL "" FORCE
+    )
+    add_compile_options(-fno-lto)
+    add_compile_options(f-no-lto)
   endif()
 
   if(ipo_ok AND NOT mingw_gcc)
