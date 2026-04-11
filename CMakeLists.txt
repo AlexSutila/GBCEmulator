@@ -128,8 +128,7 @@ if(NOT EMSCRIPTEN)
         OFF
         CACHE BOOL "" FORCE
     )
-    add_compile_options(-fno-lto)
-    add_compile_options(f-no-lto)
+    add_compile_options(irogb_libretro PRIVATE -fno-lto)
   endif()
 
   if(ipo_ok AND NOT mingw_gcc)

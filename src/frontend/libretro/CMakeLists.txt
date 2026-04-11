@@ -20,6 +20,20 @@ elseif(VITA)
     ${CMAKE_SOURCE_DIR}/src/frontend/libretro/libretro_host.cpp
     ${CMAKE_SOURCE_DIR}/src/frontend/libretro/frontend.cpp ${GBC_CORE_SOURCES}
   )
+
+  target_compile_options(
+    irogb_libretro
+    PRIVATE -fno-exceptions
+            -fno-rtti
+            -fno-unwind-tables
+            -fno-asynchronous-unwind-tables
+            -fno-threadsafe-statics
+            -fno-use-cxa-atexit
+            -fno-sized-deallocation
+            -fno-lto
+  )
+
+  target_link_options(irogb_libretro PRIVATE -fno-exceptions -fno-rtti)
 else()
   add_library(
     irogb_libretro SHARED
@@ -39,6 +53,10 @@ elseif(VITA)
   set_target_properties(irogb_libretro PROPERTIES SUFFIX ".a" OUTPUT_NAME "irogb_libretro_vita")
 endif()
 
-target_compile_options(irogb_libretro PRIVATE -fPIC -DNO_CORE_FILESYSTEM=ON ${GBC_COMPILE_OPTIONS})
+if(NOT VITA)
+  target_compile_options(irogb_libretro PRIVATE -fPIC)
+endif()
+
+target_compile_options(irogb_libretro PRIVATE -DNO_CORE_FILESYSTEM=ON ${GBC_COMPILE_OPTIONS})
 
 target_include_directories(irogb_libretro PRIVATE ${GBC_INCLUDE_DIR})
