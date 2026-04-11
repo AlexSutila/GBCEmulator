@@ -21,11 +21,28 @@ elseif(VITA)
     ${CMAKE_SOURCE_DIR}/src/frontend/libretro/frontend.cpp ${GBC_CORE_SOURCES}
   )
 
+  # The VITA has a literal pile of junk 333MHz clock speed (by default), so we
+  # need to go pretty aggressive with platform specific compiler optimizations
   target_compile_options(
     irogb_libretro
-    PRIVATE -fno-unwind-tables -fno-asynchronous-unwind-tables -fno-threadsafe-statics
-            -fno-use-cxa-atexit -fno-sized-deallocation -fno-lto
+    PRIVATE -march=armv7-a
+            -mfpu=neon
+            -mfloat-abi=hard
+            -Ofast
+            -flto # probably redundant, but gotta make sure
+            -ftree-vectorize
+            -funroll-loops
+            -funswitch-loops
+            -ftree-sra
+            -ftree-ter
+            -ftree-loop-im
+            -ftree-loop-distribution
+            -fomit-frame-pointer
+            -ffunction-sections
+            -fdata-sections
+            -Wl,--gc-sections
   )
+  target_link_options(irogb_libretro PRIVATE -flto -Wl,--gc-sections)
 else()
   add_library(
     irogb_libretro SHARED
