@@ -35,6 +35,7 @@ if(EMSCRIPTEN)
     irogb_libretro PROPERTIES SUFFIX ".bc" OUTPUT_NAME "irogb_libretro_emscripten"
   )
 elseif(VITA)
+  set(CMAKE_POSITION_INDEPENDENT_CODE OFF)
   set_target_properties(irogb_libretro PROPERTIES SUFFIX ".a" OUTPUT_NAME "irogb_libretro_vita")
 endif()
 
