@@ -15,6 +15,7 @@
 | testing/test_mooneye.py | test_mooneye      | mts-20240926-1737-443f6e1/acceptance/jp_cc_timing.gb                                                                                          |      1 |      0 |        1 |
 | testing/test_mooneye.py | test_mooneye      | mts-20240926-1737-443f6e1/acceptance/jp_timing.gb                                                                                             |      1 |      0 |        1 |
 | testing/test_mooneye.py | test_mooneye      | mts-20240926-1737-443f6e1/acceptance/ld_hl_sp_e_timing.gb                                                                                     |      1 |      0 |        1 |
+| testing/test_mooneye.py | test_mooneye      | mts-20240926-1737-443f6e1/acceptance/add_sp_e_timing.gb                                                                                       |      1 |      0 |        1 |
 | testing/test_mooneye.py | test_mooneye      | mts-20240926-1737-443f6e1/acceptance/pop_timing.gb                                                                                            |      1 |      0 |        1 |
 | testing/test_mooneye.py | test_mooneye      | mts-20240926-1737-443f6e1/acceptance/push_timing.gb                                                                                           |      1 |      0 |        1 |
 | testing/test_mooneye.py | test_mooneye      | mts-20240926-1737-443f6e1/acceptance/rapid_di_ei.gb                                                                                           |      1 |      0 |        1 |
@@ -91,4 +92,4 @@
 | testing/test_mooneye.py | test_mooneye      | mts-20240926-1737-443f6e1/acceptance/ppu/intr_2_mode0_timing_sprites.gb                                                                       |      0 |      1 |        1 |
 | testing/test_mooneye.py | test_mooneye      | mts-20240926-1737-443f6e1/acceptance/ppu/intr_2_oam_ok_timing.gb                                                                              |      0 |      1 |        1 |
 | testing/test_visual.py  | test_blargg_suite | oam_bug-https://github.com/retrio/gb-test-roms/raw/refs/heads/master/oam_bug/oam_bug.gb-00000000000000000000000000000000                      |      0 |      1 |        1 |
-| TOTAL                   |                   |                                                                                                                                               |     87 |      4 |       91 |
+| TOTAL                   |                   |                                                                                                                                               |     88 |      4 |       92 |

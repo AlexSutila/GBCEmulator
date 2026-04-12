@@ -54,6 +54,7 @@ def load_cart_from_url(url: str, *, rom_name: str | None = None) -> Cartridge:
         f"{RELEASE}/acceptance/jp_cc_timing.gb",
         f"{RELEASE}/acceptance/jp_timing.gb",
         f"{RELEASE}/acceptance/ld_hl_sp_e_timing.gb",
+        f"{RELEASE}/acceptance/add_sp_e_timing.gb",
         f"{RELEASE}/acceptance/pop_timing.gb",
         f"{RELEASE}/acceptance/push_timing.gb",
         f"{RELEASE}/acceptance/rapid_di_ei.gb",
