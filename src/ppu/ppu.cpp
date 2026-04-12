@@ -247,6 +247,7 @@ bool PixelProcessingUnit::should_advance_ly() {
  * To support both colored and monochrome modes in DMG mode, we abuse the alpha
  * bits here to save some storage space and store the index into a monochrome
  * palette in addition to the actual RGB color. */
+
 std::uint32_t PixelProcessingUnit::get_bgwin_rgb(const pixel &px) const {
   if (!sys_.cgb_mode) {
     if (!lcdc_.bg_win_en_priority()) // DMG renders white when bg enable is off
@@ -260,6 +261,7 @@ std::uint32_t PixelProcessingUnit::get_bgwin_rgb(const pixel &px) const {
   // CGB palette is denoted directly by the attributes themselves
   return bg_cram->get_cgb_color(px.color_idx, px.palette_idx);
 }
+
 std::uint32_t PixelProcessingUnit::get_obj_rgb(const pixel &px) const {
   if (!sys_.cgb_mode) {
     /* If we are running in backwards compatability mode, we have to consult one

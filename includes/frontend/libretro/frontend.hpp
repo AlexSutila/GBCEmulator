@@ -25,7 +25,7 @@ static constexpr ButtonMap btn_mapping[] = {
     { RETRO_DEVICE_ID_JOYPAD_RIGHT,  static_cast<std::uint8_t>(Joypad::JoypadButton::RIGHT)},
 };
 
-class LibretroFrontend : public Frontend {
+class LibretroFrontend final : public Frontend {
 public:
   LibretroFrontend(const LibretroFrontend &) = delete;
   LibretroFrontend &operator=(const LibretroFrontend &) = delete;

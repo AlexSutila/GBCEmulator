@@ -14,6 +14,8 @@
 template <typename T, std::size_t cap> class CircularFifo {
 public:
   static_assert(cap > 0);
+  static_assert((cap & (cap - 1)) == 0, "cap must be power of two");
+  static constexpr std::size_t mask = cap - 1;
 
   [[nodiscard]] static constexpr std::size_t capacity() noexcept { return cap; }
   [[nodiscard]] std::size_t size() const noexcept { return count; }
@@ -44,7 +46,7 @@ public:
   }
 
   T pop() {
-    if (empty())
+    if (empty()) [[unlikely]]
       throw std::runtime_error("CircularFifo::pop() called on empty");
 
     T value = std::move(buf[tail]);
@@ -54,25 +56,25 @@ public:
   }
 
   T &front() {
-    if (empty())
+    if (empty()) [[unlikely]]
       throw std::runtime_error("CircularFifo::front() called on empty");
     return buf[tail];
   }
 
   [[nodiscard]] const T &front() const {
-    if (empty())
+    if (empty()) [[unlikely]]
       throw std::runtime_error("CircularFifo::front() called on empty");
     return buf[tail];
   }
 
   T &at(const std::size_t index) {
-    if (index >= count)
+    if (index >= count) [[unlikely]]
       throw std::out_of_range("CircularFifo::at() index out of range");
     return buf[(tail + index) % cap];
   }
 
   [[nodiscard]] const T &at(const std::size_t index) const {
-    if (index >= count)
+    if (index >= count) [[unlikely]]
       throw std::out_of_range("CircularFifo::at() index out of range");
     return buf[(tail + index) % cap];
   }
@@ -81,12 +83,12 @@ public:
 
 private:
   void advance_head() {
-    head = (head + 1) % cap;
+    head = (head + 1) & mask;
 
     if (count < cap) {
       ++count;
     } else {
-      tail = (tail + 1) % cap;
+      tail = (tail + 1) & mask;
     }
   }
 
