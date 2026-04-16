@@ -397,6 +397,10 @@ void PixelProcessingUnit::do_oam_scan() {
     total_mode_clks = oam_t_cycles;
     scanline_153_bug = false;
 
+    // TODO: I am not 100% sure about the sample timing of this, but I do know
+    // with a high degree of certainty that it is only sampled once per scanline
+    fetcher->sample_window_enable();
+
     /* Handle strange timing on first scanline of PPU being enabled. The modes
      * which follow OAM are supposedly unimpacted. */
     if (ppu_enable_oam_bug) [[unlikely]]
@@ -520,10 +524,6 @@ void PixelProcessingUnit::do_draw() {
     fetcher->reset_win_ly();
   else if (fetcher->was_window_visible())
     fetcher->inc_win_ly();
-
-  // TODO: I am not 100% sure about the sample timing of this, but I do know
-  // with a high degree of certainty that it is only sampled once per scanline
-  fetcher->sample_window_enable();
 
   /* Signal that HDMA can start running if it has been requested or started
    * previously. If HBLANK is partially complete, it can also be triggered. */
