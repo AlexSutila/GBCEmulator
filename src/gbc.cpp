@@ -330,6 +330,10 @@ GameBoyColor::GameBoyColor(Frontend &frontend, const BootROM &rom)
     : Debuggable(debugger_), debugger_(std::nullopt), fe_(frontend) {
   system_init();
   bios_ = rom; // We assume rom is already valid
+
+  /* Here, we gauge whether or not the BIOS is the DMG bios, or the CGB bios by
+   * seeing how large it is. We do this because running the DMG BIOS in CGB mode
+   * does not make much sense, this isn't possible on real hardware anyway. */
   sys_.cgb_mode = bios_->is_large_rom();
   cram_init_mono();
 }
@@ -351,6 +355,7 @@ void GameBoyColor::system_init() {
       .halted = false,
       .speed_switch_armed = false,
       .double_speed = false,
+      .unmap_key0 = false,
   };
 
   /* Component initialization */
@@ -375,7 +380,7 @@ void GameBoyColor::system_init() {
   joypad_reg->set_interrupt_reg(if_reg);
 }
 
-void GameBoyColor::skip_bios() const {
+void GameBoyColor::skip_bios() {
   using mmio = IORegisterMapping;
 
   /* We cannot simply start executing without a BIOS for numerous reasons. So,
@@ -431,6 +436,10 @@ void GameBoyColor::skip_bios() const {
   // Color ram has to be initialized for both sprites and background
   cram_init_mono(mmio::MMIO_LCD_BGPI, mmio::MMIO_LCD_BGPD);
   cram_init_mono(mmio::MMIO_LCD_OBPI, mmio::MMIO_LCD_OBPD);
+
+  // Unmap KEY0 so CGB/DMG mode cannot be tampered with during runtime. We
+  // can still set this mode ourselves through the 'sys' struct.
+  sys_.unmap_key0 = true;
 }
 
 void GameBoyColor::cram_init_mono() const {
@@ -564,10 +573,11 @@ enum : std::uint16_t {
   F_HALTED,
   F_SPEED_SWITCH_ARMED,
   F_DOUBLE_SPEED,
+  F_UNMAP_KEY0,
 };
 
 template <typename T> void GameBoyColor::parse_savestate(T &t) {
-  constexpr auto version = 2; // Schema revision
+  constexpr auto version = 3; // Schema revision
   t.chunk_header(version, Savestate::C_GBC);
 
   t.field_generic(F_ELAPSED_CLOCKS, sys_.elapsed_clocks);
@@ -575,6 +585,7 @@ template <typename T> void GameBoyColor::parse_savestate(T &t) {
   t.field_generic(F_HALTED, sys_.halted);
   t.field_generic(F_SPEED_SWITCH_ARMED, sys_.speed_switch_armed);
   t.field_generic(F_DOUBLE_SPEED, sys_.double_speed);
+  t.field_generic(F_UNMAP_KEY0, sys_.unmap_key0);
 
   // Begin recursive descent into each component
   cpu->parse_savestate(t);

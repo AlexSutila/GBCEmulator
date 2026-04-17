@@ -90,6 +90,7 @@
 | testing/test_visual.py  | test_blargg_suite | halt_bug                                     |      1 |      0 |        1 |
 | testing/test_visual.py  | test_magen_suite  | bg_oam_priority                              |      1 |      0 |        1 |
 | testing/test_visual.py  | test_magen_suite  | hblank_vram_dma                              |      1 |      0 |        1 |
+| testing/test_visual.py  | test_magen_suite  | key0_lock_after_boot                         |      1 |      0 |        1 |
 | testing/test_visual.py  | test_magen_suite  | mbc_oob_sram_mbc1                            |      1 |      0 |        1 |
 | testing/test_visual.py  | test_magen_suite  | mbc_oob_sram_mbc3                            |      1 |      0 |        1 |
 | testing/test_visual.py  | test_magen_suite  | mbc_oob_sram_mbc5                            |      1 |      0 |        1 |
@@ -99,5 +100,4 @@
 | testing/test_mooneye.py | test_mooneye      | acceptance::ppu::intr_2_mode0_timing_sprites |      0 |      1 |        1 |
 | testing/test_mooneye.py | test_mooneye      | acceptance::ppu::intr_2_oam_ok_timing        |      0 |      1 |        1 |
 | testing/test_visual.py  | test_blargg_suite | oam_bug                                      |      0 |      1 |        1 |
-| testing/test_visual.py  | test_magen_suite  | key0_lock_after_boot                         |      0 |      1 |        1 |
-| TOTAL                   |                   |                                              |     95 |      5 |      100 |
+| TOTAL                   |                   |                                              |     96 |      4 |      100 |
