@@ -14,6 +14,12 @@ import io
 RELEASE = "mts-20240926-1737-443f6e1"
 
 
+def make_id(path: str) -> str:
+    path = path.split("/", 1)[-1]
+    path = path.removesuffix(".gb")
+    return path.replace("/", "::")
+
+
 def load_cart_from_url(url: str, *, rom_name: str | None = None) -> Cartridge:
     resp = requests.get(url, timeout=30)
     resp.raise_for_status()
@@ -121,6 +127,7 @@ def load_cart_from_url(url: str, *, rom_name: str | None = None) -> Cartridge:
         f"{RELEASE}/emulator-only/mbc5/rom_64Mb.gb",
         f"{RELEASE}/emulator-only/mbc5/rom_8Mb.gb",
     ],
+    ids=make_id,
 )
 def test_mooneye(path: str):
     url = f"https://gekkio.fi/files/mooneye-test-suite/{RELEASE}/{RELEASE}.zip"

@@ -216,21 +216,35 @@ def run_magen_tests():
     )
 
 
-@pytest.mark.parametrize("title,url,expected_md5", ACID_CASES)
+def cases_with_ids(cases):
+    return [pytest.param(title, url, md5, id=title) for title, url, md5 in cases]
+
+
+@pytest.mark.parametrize(
+    "title,url,expected_md5",
+    cases_with_ids(ACID_CASES),
+)
 def test_acid_suite(title: str, url: str, expected_md5: str):
     img = run_and_get_frame(url)
     digest = to_digest(img)
     assert digest == expected_md5, f"{title} failed (got {digest})"
 
 
-@pytest.mark.parametrize("title,url,expected_md5", BLARGG_CASES)
+@pytest.mark.parametrize(
+    "title,url,expected_md5",
+    cases_with_ids(BLARGG_CASES),
+)
 def test_blargg_suite(title: str, url: str, expected_md5: str):
     img = run_and_get_frame(url)
     digest = to_digest(img)
     assert digest == expected_md5, f"{title} failed (got {digest})"
 
 
-@pytest.mark.parametrize("title,url,expected_md5", MAGEN_CASES)
+@pytest.mark.parametrize(
+    "title,url,expected_md5",
+    cases_with_ids(MAGEN_CASES),
+    ids=lambda title, url, expected: title,
+)
 def test_magen_suite(title: str, url: str, expected_md5: str):
     img = run_and_get_frame(url)
     digest = to_digest(img)
