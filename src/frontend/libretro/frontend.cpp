@@ -51,17 +51,12 @@ std::uint32_t LibretroFrontend::format_pixel_data(const std::uint32_t px) {
 }
 
 void LibretroFrontend::put_pixel(int x, int y, std::uint32_t c) {
-  if (x < 0 || x >= fb_width || y < 0 || y >= fb_height) [[unlikely]]
-    return;
-  frame_buf.at(write_idx).at(y * fb_width + x) = format_pixel_data(c);
+  frame_buf.at(write_idx).at(y * fb_width + x) = c;
 
   // Swap as frame becomes ready to avoid screen tears
-  if (x == fb_width - 1 && y == fb_height - 1) {
+  if (x == fb_width - 1 && y == fb_height - 1) [[unlikely]] {
     display_idx = write_idx;
-    write_idx = (write_idx + 1) % nbuf;
-
-    // We try to apply this option between frames to prevent ugly torn frames
-    force_mono_dmg = get_force_mono_option();
+    write_idx = (write_idx + 1) & (nbuf - 1);
     frame_ready = true;
   }
 }
@@ -147,11 +142,26 @@ void LibretroFrontend::load_game(cart &c) {
 void LibretroFrontend::try_show_frame() {
   if (!frame_ready)
     return;
+
+  // We modify the frame in place to update replace the colors based on
+  // configurable color palette options.
+  auto &frame = frame_buf.at(display_idx);
   frame_ready = false;
 
-  /* Note: Do not use `get_frame()`, we need to point to the framebuffer itself
-   * and NOT a copy otherwise we risk displaying use after free heap memory. */
-  const auto &frame = frame_buf.at(display_idx);
+  // Apply the color transformation to the entire frame once its complete
+  std::transform(frame.begin(), frame.end(), frame.begin(), [&](std::uint32_t px) {
+    constexpr std::uint32_t alpha_mask = 0xFF000000;
+    const bool is_cgb = gbc->get_sys().cgb_mode;
+
+    if (!is_cgb && get_force_mono_option()) {
+      const auto mono_pal_idx = static_cast<byte_t>((px >> 24) & 0xFF);
+      px = get_mono_color(mono_pal_idx); // Substitution
+    }
+
+    // Always bring the alpha bits back
+    return px | alpha_mask;
+  });
+
   cb.video_cb(frame.data(), fb_width, fb_height, fb_width * sizeof(std::uint32_t));
 }
 
@@ -168,9 +178,6 @@ void LibretroFrontend::try_poll_input() {
     joyp->set_state(input_state);
   }
 }
-
-/* Super simple workaround for a soft reset mechanism */
-void LibretroFrontend::reset() { gbc->savestate_deserialize(initial_state); }
 
 bool LibretroFrontend::test_input(unsigned id) const {
   return cb.input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, id);

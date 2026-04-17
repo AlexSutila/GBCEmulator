@@ -7,18 +7,29 @@
 namespace SYS {
 
 void KEY0::write(const byte_t value) {
-  /* Two is the only bit this emulator concerns itself with, though others are
-   * rumored to have other purposes. */
-  state_ = (value & dmg_mode_mask) | ~dmg_mode_mask;
-  /* This will be visible to components that need to be aware about the current
-   * speed mode the system is operating in. */
-  sys_.cgb_mode = (state_ & dmg_mode_mask) == 0;
+  if (!sys_.unmap_key0) {
+    /* Two is the only bit this emulator concerns itself with, though others are
+     * rumored to have other purposes. */
+    state_ = (value & dmg_mode_mask) | ~dmg_mode_mask;
+
+    /* This will be visible to components that need to be aware about the current
+     * speed mode the system is operating in. */
+    sys_.cgb_mode = (state_ & dmg_mode_mask) == 0;
+
+    /* Finally, once this register is written by the BIOS (only happens once), it
+     * will be mapped out of memory until reset manually via rebooting the system */
+    sys_.unmap_key0 = true;
+  }
 }
+
 byte_t KEY0::peek() const {
   constexpr byte_t dmg_mode = dmg_mode_mask;
   constexpr byte_t cgb_mode = 0x00; // Bit cleared
+  if (sys_.unmap_key0)              // Locked by BIOS
+    return 0xFF;
   return sys_.cgb_mode ? cgb_mode : dmg_mode;
 }
+
 byte_t KEY0::read() { return peek(); }
 
 void KEY1::write(const byte_t value) {
@@ -26,6 +37,7 @@ void KEY1::write(const byte_t value) {
   sys_.speed_switch_armed = ((value & 0x1) != 0);
   state_ = value & unused_bits_mask;
 }
+
 byte_t KEY1::peek() const {
   byte_t value = state_ & unused_bits_mask;
   if (sys_.speed_switch_armed)
@@ -34,6 +46,7 @@ byte_t KEY1::peek() const {
     value = value | 0x80;
   return value;
 }
+
 byte_t KEY1::read() { return peek(); }
 
 } // namespace SYS

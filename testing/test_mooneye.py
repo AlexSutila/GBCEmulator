@@ -14,6 +14,12 @@ import io
 RELEASE = "mts-20240926-1737-443f6e1"
 
 
+def make_id(path: str) -> str:
+    path = path.split("/", 1)[-1]
+    path = path.removesuffix(".gb")
+    return path.replace("/", "::")
+
+
 def load_cart_from_url(url: str, *, rom_name: str | None = None) -> Cartridge:
     resp = requests.get(url, timeout=30)
     resp.raise_for_status()
@@ -54,6 +60,7 @@ def load_cart_from_url(url: str, *, rom_name: str | None = None) -> Cartridge:
         f"{RELEASE}/acceptance/jp_cc_timing.gb",
         f"{RELEASE}/acceptance/jp_timing.gb",
         f"{RELEASE}/acceptance/ld_hl_sp_e_timing.gb",
+        f"{RELEASE}/acceptance/add_sp_e_timing.gb",
         f"{RELEASE}/acceptance/pop_timing.gb",
         f"{RELEASE}/acceptance/push_timing.gb",
         f"{RELEASE}/acceptance/rapid_di_ei.gb",
@@ -104,6 +111,13 @@ def load_cart_from_url(url: str, *, rom_name: str | None = None) -> Cartridge:
         f"{RELEASE}/emulator-only/mbc1/rom_4Mb.gb",
         f"{RELEASE}/emulator-only/mbc1/rom_512kb.gb",
         f"{RELEASE}/emulator-only/mbc1/rom_8Mb.gb",
+        f"{RELEASE}/emulator-only/mbc2/bits_ramg.gb",
+        f"{RELEASE}/emulator-only/mbc2/bits_romb.gb",
+        f"{RELEASE}/emulator-only/mbc2/bits_unused.gb",
+        f"{RELEASE}/emulator-only/mbc2/ram.gb",
+        f"{RELEASE}/emulator-only/mbc2/rom_1Mb.gb",
+        f"{RELEASE}/emulator-only/mbc2/rom_2Mb.gb",
+        f"{RELEASE}/emulator-only/mbc2/rom_512kb.gb",
         f"{RELEASE}/emulator-only/mbc5/rom_16Mb.gb",
         f"{RELEASE}/emulator-only/mbc5/rom_1Mb.gb",
         f"{RELEASE}/emulator-only/mbc5/rom_2Mb.gb",
@@ -113,6 +127,7 @@ def load_cart_from_url(url: str, *, rom_name: str | None = None) -> Cartridge:
         f"{RELEASE}/emulator-only/mbc5/rom_64Mb.gb",
         f"{RELEASE}/emulator-only/mbc5/rom_8Mb.gb",
     ],
+    ids=make_id,
 )
 def test_mooneye(path: str):
     url = f"https://gekkio.fi/files/mooneye-test-suite/{RELEASE}/{RELEASE}.zip"

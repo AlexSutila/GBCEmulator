@@ -247,6 +247,7 @@ bool PixelProcessingUnit::should_advance_ly() {
  * To support both colored and monochrome modes in DMG mode, we abuse the alpha
  * bits here to save some storage space and store the index into a monochrome
  * palette in addition to the actual RGB color. */
+
 std::uint32_t PixelProcessingUnit::get_bgwin_rgb(const pixel &px) const {
   if (!sys_.cgb_mode) {
     if (!lcdc_.bg_win_en_priority()) // DMG renders white when bg enable is off
@@ -260,6 +261,7 @@ std::uint32_t PixelProcessingUnit::get_bgwin_rgb(const pixel &px) const {
   // CGB palette is denoted directly by the attributes themselves
   return bg_cram->get_cgb_color(px.color_idx, px.palette_idx);
 }
+
 std::uint32_t PixelProcessingUnit::get_obj_rgb(const pixel &px) const {
   if (!sys_.cgb_mode) {
     /* If we are running in backwards compatability mode, we have to consult one
@@ -395,6 +397,10 @@ void PixelProcessingUnit::do_oam_scan() {
     total_mode_clks = oam_t_cycles;
     scanline_153_bug = false;
 
+    // TODO: I am not 100% sure about the sample timing of this, but I do know
+    // with a high degree of certainty that it is only sampled once per scanline
+    fetcher->sample_window_enable();
+
     /* Handle strange timing on first scanline of PPU being enabled. The modes
      * which follow OAM are supposedly unimpacted. */
     if (ppu_enable_oam_bug) [[unlikely]]
@@ -518,10 +524,6 @@ void PixelProcessingUnit::do_draw() {
     fetcher->reset_win_ly();
   else if (fetcher->was_window_visible())
     fetcher->inc_win_ly();
-
-  // TODO: I am not 100% sure about the sample timing of this, but I do know
-  // with a high degree of certainty that it is only sampled once per scanline
-  fetcher->sample_window_enable();
 
   /* Signal that HDMA can start running if it has been requested or started
    * previously. If HBLANK is partially complete, it can also be triggered. */

@@ -31,6 +31,7 @@ struct runtime_sys_info {
   // For double speed mode, see KEY1 register in `cgb.hpp` for details
   bool speed_switch_armed{};
   bool double_speed{};
+  bool unmap_key0{};
 };
 
 class GameBoyColor final : Debug::Debuggable {
@@ -91,8 +92,8 @@ private:
   std::unique_ptr<SerialUnit> serial{};
 
   /* Top-level system initialization helpers */
-  void system_init();     // Connects all components in the system
-  void skip_bios() const; // Skips bios when unconfigured
+  void system_init(); // Connects all components in the system
+  void skip_bios();   // Skips bios when unconfigured
 
   /* Helpers for initializing emulator state to skip the BIOS */
   void cram_init_mono(IORegisterMapping index, IORegisterMapping data) const;

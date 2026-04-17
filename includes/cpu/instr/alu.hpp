@@ -889,8 +889,11 @@ public:
   ADD_SP_imm8(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
   std::size_t exec() override {
-    const addr_t nn = static_cast<std::int16_t>(static_cast<std::int8_t>(imm));
     const addr_t sp = reg_file->reg_sp.read();
+
+    // Need to re-fetch this value since it may have changed arbitrarily
+    imm = static_cast<std::int8_t>(bus->read_byte(reg_file->reg_pc++, false));
+    const addr_t nn = static_cast<std::int16_t>(static_cast<std::int8_t>(imm));
 
     // Update flags
     const bool half_carry = ((sp & 0x0F) + (nn & 0x0F)) > 0x0F;
@@ -905,7 +908,8 @@ public:
     return 16;
   }
   std::string describe() override { return IroGB::format("ADD SP, {}", static_cast<int>(imm)); }
-  void parse() override { imm = static_cast<int8_t>(bus->read_byte(reg_file->reg_pc++)); }
+  void parse() override { imm = static_cast<std::int8_t>(bus->read_byte(reg_file->reg_pc, false)); }
+  std::size_t mem_access_t_cycle() override { return 4; }
 
 private:
   std::int8_t imm{}; // Signed intentionally

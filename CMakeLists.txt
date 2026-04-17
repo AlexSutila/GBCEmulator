@@ -1,5 +1,5 @@
-cmake_minimum_required(VERSION 3.21)
-set(CMAKE_POLICY_VERSION_MINIMUM 3.21)
+cmake_minimum_required(VERSION 3.16)
+set(CMAKE_POLICY_VERSION_MINIMUM 3.16)
 project(gbc LANGUAGES CXX)
 
 # ===========================================================================
@@ -109,6 +109,7 @@ if(NOT EMSCRIPTEN)
     OUTPUT ipo_err
     LANGUAGES CXX
   )
+
   message("LTO: compiler: ${CMAKE_CXX_COMPILER_ID}, IPO/LTO support: ${ipo_ok}, mingw: ${MINGW}")
 
   set(mingw_gcc OFF)

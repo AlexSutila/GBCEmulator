@@ -1,5 +1,7 @@
 # DESCRIPTION: GitLab CI/CD for libRetro (NOT FOR GitLab-proper)
 
+before_script:
+  - mkdir -p retroarch-precompiled
 ##############################################################################
 ################################# BOILERPLATE ################################
 ##############################################################################
@@ -24,11 +26,11 @@ include:
 
   # MacOS x64
   - project: 'libretro-infrastructure/ci-templates'
-    file: 'osx-cmake-x86.yml'
+    file: '/osx-cmake-x86.yml'
 
   # MacOS arm64
   - project: 'libretro-infrastructure/ci-templates'
-    file: 'osx-cmake-arm64.yml'
+    file: '/osx-cmake-arm64.yml'
 
   ################################## CELLULAR ################################
   # Android
@@ -40,6 +42,10 @@ include:
     file: '/ios-cmake.yml'
 
   ################################## CONSOLES ################################
+  # PlayStation Vita
+  - project: 'libretro-infrastructure/ci-templates'
+    file: '/vita-static-cmake.yml'
+
   # tvOS (AppleTV)
   - project: 'libretro-infrastructure/ci-templates'
     file: '/tvos-cmake.yml'
@@ -107,7 +113,13 @@ libretro-build-ios-arm64:
     - .core-defs
 
 ################################## CONSOLES ################################
-# tvOS (AppleTC)
+# PlayStation Vita
+libretro-build-vita:
+  extends:
+    - .libretro-vita-static-cmake-retroarch-master
+    - .core-defs
+
+# tvOS (AppleTV)
 libretro-build-tvos-arm64:
   extends:
     - .libretro-tvos-cmake-arm64

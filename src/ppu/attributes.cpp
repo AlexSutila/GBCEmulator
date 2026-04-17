@@ -13,14 +13,11 @@ byte_t calc_color_idx(const byte_t lo_byte,        // Low data byte
                       const std::size_t pixel_idx, // Which pixel?
                       const bool flip)             // Decides flip
 {
-  byte_t hi_bit{}, lo_bit{};
-  if (flip) {
-    hi_bit = (hi_byte & (0x01 << pixel_idx)) != 0 ? 1 : 0;
-    lo_bit = (lo_byte & (0x01 << pixel_idx)) != 0 ? 1 : 0;
-  } else {
-    hi_bit = (hi_byte & (0x80 >> pixel_idx)) != 0 ? 1 : 0;
-    lo_bit = (lo_byte & (0x80 >> pixel_idx)) != 0 ? 1 : 0;
-  }
+  const byte_t f = static_cast<byte_t>(flip);
+  const byte_t base = static_cast<byte_t>(f * pixel_idx + (1u - f) * (7u - pixel_idx));
+
+  const byte_t hi_bit = (hi_byte >> base) & 0x01;
+  const byte_t lo_bit = (lo_byte >> base) & 0x01;
   return (hi_bit << 1) | lo_bit;
 }
 
