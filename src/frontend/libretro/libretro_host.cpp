@@ -1,4 +1,5 @@
 #include "frontend/libretro/frontend.hpp"
+#include <algorithm>
 #include <memory>
 #include <optional>
 #include <stdarg.h>
@@ -23,12 +24,6 @@ static Cartridge *const get_cart(void) {
 
   // Caller should check for `NULL` or `nullptr`
   return bus->get_cartridge();
-}
-
-std::span<byte_t> get_sram_data() {
-  if (auto cart = get_cart(); cart)
-    return cart->ram();
-  throw std::runtime_error("Failed to acquire SRAM");
 }
 
 #ifdef __cplusplus
@@ -74,6 +69,35 @@ static std::optional<BootROM> load_bios(const std::string &name) {
   catch (std::runtime_error &e) {
     return std::nullopt;
   }
+}
+
+static void initialize_gbc_instance(LibretroFrontend &instance) {
+  auto mode = instance.get_bios_option();
+
+  // DMG bios, or custom stand-in
+  if (mode == "dmg") {
+    auto bios = load_bios("dmg_boot.bin");
+    instance.make_gbc(bios);
+  }
+
+  // CGB bios, or custom stand-in
+  else if (mode == "cgb") {
+    auto bios = load_bios("cgb_boot.bin");
+    instance.make_gbc(bios);
+  }
+
+  // Select between CGB and DMG based on what is available, could fallback to
+  // none, prefers CGB over DMG if it is present (coloring could get bizzare).
+  else if (mode == "auto") {
+    auto bios = load_bios("cgb_boot.bin");
+    if (!bios.has_value())
+      bios = load_bios("dmg_boot.bin");
+    instance.make_gbc(bios);
+  }
+
+  // Ignore BIOS entirely, just uses our "faked" built-in initialization state
+  else
+    instance.make_gbc(std::nullopt);
 }
 
 void retro_init(void) {}
@@ -189,7 +213,38 @@ void retro_set_video_refresh(retro_video_refresh_t cb) {
   callbacks.video_cb = cb;
 }
 
-void retro_reset(void) { LibretroFrontend::get_instance().reset(); }
+void retro_reset(void) {
+  Cartridge *cartridge = get_cart();
+  if (cartridge == nullptr)
+    return;
+  std::vector<byte_t> sram_backup{};
+  cart c = cartridge->image();
+
+  /* Here, we back up the existing SRAM content so that the save data is not lost
+   * in case libretro's periodic sampling misses it or samples fresh SRAM */
+  if (cartridge->has_battery()) {
+    std::span<byte_t> src_sram = cartridge->ram();
+    sram_backup.assign(src_sram.begin(), src_sram.end());
+  }
+
+  /* CGB models do not have soft reset buttons, so we resort to hard reset only.
+   * To support this, we have to pull the original image back down, recreate the
+   * emulator instance, and re-insert the cartridge. */
+  auto &instance = LibretroFrontend::get_instance();
+  initialize_gbc_instance(instance);
+  instance.load_game(c); // Cart will be valid
+
+  // Cartridge was re-allocated, so have to pull down it again
+  cartridge = get_cart();
+  if (cartridge == nullptr)
+    return;
+
+  /* Finally, restore sram content if it was saved */
+  if (!sram_backup.empty()) {
+    std::span<byte_t> dest_sram = cartridge->ram();
+    std::copy(sram_backup.begin(), sram_backup.end(), dest_sram.begin());
+  }
+}
 
 void retro_run(void) {
   constexpr std::size_t cycles_per_frame = 70224;
@@ -211,26 +266,12 @@ bool retro_load_game(const struct retro_game_info *info) {
   if (!data_ptr || size == 0)
     return false;
 
-  /* Our interface requires a `std::vector()`, construct accordingly. */
   std::vector<byte_t> raw(data_ptr, data_ptr + size);
   auto &instance = LibretroFrontend::get_instance();
 
   /* Attempt to load a BIOS file, we check two locations. If any of these fail,
    * for any reason, it is equivalent to starting without a BIOS file. */
-  auto mode = instance.get_bios_option();
-  if (mode == "dmg") {
-    auto bios = load_bios("dmg_boot.bin");
-    instance.make_gbc(bios);
-  } else if (mode == "cgb") {
-    auto bios = load_bios("cgb_boot.bin");
-    instance.make_gbc(bios);
-  } else if (mode == "auto") {
-    auto bios = load_bios("cgb_boot.bin");
-    if (!bios.has_value())
-      bios = load_bios("dmg_boot.bin");
-    instance.make_gbc(bios);
-  } else
-    instance.make_gbc(std::nullopt);
+  initialize_gbc_instance(instance);
 
   try {
     cart c = load_cart_raw(raw);

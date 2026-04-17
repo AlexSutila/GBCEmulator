@@ -72,7 +72,6 @@ public:
   void load_game(cart &c);
   void try_show_frame();
   void try_poll_input();
-  void reset();
 
 private:
   static constexpr auto fb_height = 144;

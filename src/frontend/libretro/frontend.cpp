@@ -179,9 +179,6 @@ void LibretroFrontend::try_poll_input() {
   }
 }
 
-/* Super simple workaround for a soft reset mechanism */
-void LibretroFrontend::reset() { gbc->savestate_deserialize(initial_state); }
-
 bool LibretroFrontend::test_input(unsigned id) const {
   return cb.input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, id);
 }
