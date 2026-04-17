@@ -62,6 +62,10 @@ To evaluate the accuracy of any emulator, the community has released a plethora 
 - Proves high level correctness of CPU instruction accuracy
 - Proves accuracy of sub-instruction memory access timings
 
+### Magen's Basic CGB Correctness Tests
+![CGB System Features Correctness](assets/magen_tests.png)
+- Proves basic correctness of hardware features introduced by CGB models
+
 ### Acid Visual Tests
 ![Visual Tests](assets/acid_tests.png)
 - Proves high level correctness of visual capabilities for both DMG and CGB
