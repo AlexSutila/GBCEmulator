@@ -3,6 +3,7 @@
 // Emulator core includes
 #include "cart/cart.hpp"
 #include "frontend/libretro/libretro.h"
+#include "frontend/logger.hpp"
 #include "gbc.hpp"
 #include "memory/mmio/dmg.hpp"
 #include "memory/mmio/mmio.hpp"
@@ -176,6 +177,36 @@ void LibretroFrontend::try_poll_input() {
           static_cast<std::uint8_t>(-static_cast<std::uint8_t>(test_input(btn.retro_id))) &
           btn.joypad_mask;
     joyp->set_state(input_state);
+  }
+}
+
+void LibretroFrontend::show_message(std::string msg, unsigned millis, retro_log_level level) {
+  retro_message_ext ext = {
+      .msg = msg.c_str(),
+      .duration = millis,
+      .priority = 0,
+      .level = level,
+      .target = RETRO_MESSAGE_TARGET_ALL,
+      .type = RETRO_MESSAGE_TYPE_NOTIFICATION,
+      .progress = 0,
+  };
+  get_callbacks().environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE_EXT, &ext);
+}
+
+void LibretroFrontend::clean_msg_queue() {
+  const auto message_queue = Logger::consume();
+  if (message_queue.empty()) [[likely]]
+    return;
+
+  for (const auto &msg : message_queue) {
+    retro_log_level level{};
+    if (msg.level == LogLevel::Warning)
+      level = RETRO_LOG_INFO;
+    else if (msg.level == LogLevel::Error)
+      level = RETRO_LOG_ERROR;
+    else
+      level = RETRO_LOG_INFO;
+    show_message(msg.message, msg_duration_sec(5), level);
   }
 }
 

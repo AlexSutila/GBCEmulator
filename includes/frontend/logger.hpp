@@ -29,7 +29,7 @@ public:
   // Returns all pending messages and clears the internal queue
   static std::vector<LogMessage> consume() {
     std::lock_guard lock(m_mutex);
-    if (m_queue.empty())
+    if (m_queue.empty()) [[likely]]
       return {};
     std::vector<LogMessage> result = std::move(m_queue);
     m_queue.clear();

@@ -18,7 +18,7 @@ full simple libretro: build
 build:
 	mkdir -p $(BUILD_DIR) $(BIN)
 	cmake -S . -B $(BUILD_DIR) \
-		-DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
 		-DBUILD_FULL=$(BUILD_FULL) \
 		-DBUILD_SIMPLE=$(BUILD_SIMPLE) \
 		-DBUILD_LIBRETRO=$(BUILD_LIBRETRO) \

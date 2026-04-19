@@ -9,6 +9,8 @@
 #include <array>
 #include <cstddef>
 
+constexpr unsigned msg_duration_sec(unsigned frames) { return 1000 * frames; }
+
 struct ButtonMap {
   unsigned retro_id;
   std::uint8_t joypad_mask;
@@ -44,6 +46,7 @@ public:
     retro_environment_t environ_cb;
     retro_input_poll_t input_poll_cb;
     retro_input_state_t input_state_cb;
+    retro_log_printf_t log_printf_cb;
   };
   LibretroCallbacks &get_callbacks() { return cb; }
 
@@ -72,6 +75,11 @@ public:
   void load_game(cart &c);
   void try_show_frame();
   void try_poll_input();
+
+  // Comes from our internal core logging utility, we clear the queue out and push
+  // all events which have popped up onto the screen as a libretro message.
+  void show_message(std::string msg, unsigned millis, retro_log_level level);
+  void clean_msg_queue();
 
 private:
   static constexpr auto fb_height = 144;
