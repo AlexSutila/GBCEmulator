@@ -225,10 +225,7 @@ public:
       break;
     case InstrStates::INSTR_STATE_READ2:
       hi = bus->read_byte(reg_file->reg_pc++);
-      if (cond)
-        state = InstrStates::INSTR_STATE_WRITE;
-      else // Call is ignored, goto dead state
-        state = InstrStates::INSTR_STATE_DEAD;
+      state = InstrStates::INSTR_STATE_WRITE;
       break;
 
     // Call is taken, write PC to stack and take jump
@@ -337,15 +334,12 @@ public:
     default:
       break;
     }
-    return state == InstrStates::INSTR_STATE_DEAD ? 8 : 20;
+    return cond ? 20 : 8;
   }
   std::string describe() override { return IroGB::format("RET {}", to_string<flag, expect>()); }
   void parse() override {
     cond = reg_file->reg_af.get_flag(flag) == expect;
-    if (!cond)
-      state = InstrStates::INSTR_STATE_DEAD;
-    else
-      state = InstrStates::INSTR_STATE_READ;
+    state = InstrStates::INSTR_STATE_READ;
     sp = reg_file->reg_sp.read();
   }
   std::size_t mem_access_t_cycle() override {

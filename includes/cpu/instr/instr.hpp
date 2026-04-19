@@ -27,11 +27,6 @@ enum class InstrStates {
    */
   INSTR_STATE_READ2,
   INSTR_STATE_WRITE2,
-
-  /**
-   * For conditional instructions when condition is not met
-   */
-  INSTR_STATE_DEAD,
 };
 
 class Instruction {
