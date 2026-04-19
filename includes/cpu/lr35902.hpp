@@ -77,15 +77,14 @@ private:
 
   enum CpuStates {
     STATE_FETCH,
-    STATE_DECODE,
     STATE_EXECUTE,
     STATE_HALTED,
   } state;
   void do_fetch();
-  void do_decode();
   void do_execute();
   void do_halt();
 
+  void prime_next_instr(Instruction *const next_ins);
   addr_t ins_base_addr{}; // For debugger reference
   Instruction *ins_{};    // Reference to current ins
 
