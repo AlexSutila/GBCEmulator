@@ -13,13 +13,22 @@
 template <Register8Bit dst, Register8Bit src> class LD_X_Y final : public Instruction {
 public:
   LD_X_Y(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+
   std::size_t exec() override {
     const byte_t val = read_reg<src>();
     write_reg<dst>(val);
     return 4;
   }
+
   std::string describe() override {
     return IroGB::format("LD {}, {}", to_string<dst>(), to_string<src>());
+  }
+
+  InstructionTiming get_timing_info() const override {
+    return {
+        .total_cycles = 4,
+        .sync_events = 1,
+    };
   }
 };
 
@@ -29,16 +38,26 @@ public:
 template <Register8Bit dst> class LD_X_imm8 final : public Instruction {
 public:
   LD_X_imm8(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+
   std::size_t exec() override {
     write_reg<dst>(imm);
     return 8;
   }
+
   std::string describe() override {
     return IroGB::format("LD {}, {}", to_string<dst>(), static_cast<int>(imm));
   }
+
   void parse() override {
     const addr_t addr = reg_file->reg_pc++;
     imm = bus->read_byte(addr);
+  }
+
+  InstructionTiming get_timing_info() const override {
+    return {
+        .total_cycles = 8,
+        .sync_events = 1,
+    };
   }
 
 private:
@@ -51,14 +70,23 @@ private:
 template <Register8Bit dst> class LD_X_HL final : public Instruction {
 public:
   LD_X_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+
   std::size_t exec() override {
     const addr_t addr = read_reg<Register16Bit::REG_HL>();
     const byte_t mem_byte = bus->read_byte(addr);
     write_reg<dst>(mem_byte);
     return 8;
   }
+
   std::string describe() override { return IroGB::format("LD {}, HL", to_string<dst>()); }
   std::size_t mem_access_t_cycle() override { return 4; }
+
+  InstructionTiming get_timing_info() const override {
+    return {
+        .total_cycles = 8,
+        .sync_events = 1,
+    };
+  }
 };
 
 /*
@@ -67,14 +95,23 @@ public:
 template <Register8Bit src> class LD_HL_X final : public Instruction {
 public:
   LD_HL_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+
   std::size_t exec() override {
     const addr_t addr = read_reg<Register16Bit::REG_HL>();
     const byte_t reg_byte = read_reg<src>();
     bus->write_byte(addr, reg_byte);
     return 8;
   }
+
   std::string describe() override { return IroGB::format("LD {}, HL", to_string<src>()); }
   std::size_t mem_access_t_cycle() override { return 4; }
+
+  InstructionTiming get_timing_info() const override {
+    return {
+        .total_cycles = 8,
+        .sync_events = 1,
+    };
+  }
 };
 
 /*
@@ -84,17 +121,27 @@ class LD_HL_imm8 final : public Instruction {
 public:
   LD_HL_imm8(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
+
   std::size_t exec() override {
     const addr_t addr = read_reg<Register16Bit::REG_HL>();
     bus->write_byte(addr, imm);
     return 12;
   }
+
   std::string describe() override { return IroGB::format("LD HL, {}", static_cast<int>(imm)); }
+  std::size_t mem_access_t_cycle() override { return 8; }
+
   void parse() override {
     const addr_t addr = reg_file->reg_pc++;
     imm = bus->read_byte(addr);
   }
-  std::size_t mem_access_t_cycle() override { return 8; }
+
+  InstructionTiming get_timing_info() const override {
+    return {
+        .total_cycles = 12,
+        .sync_events = 1,
+    };
+  }
 
 private:
   byte_t imm{};
@@ -106,14 +153,23 @@ private:
 template <Register16Bit src> class LD_A_XX final : public Instruction {
 public:
   LD_A_XX(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+
   std::size_t exec() override {
     const addr_t addr = read_reg<src>();
     const byte_t mem_byte = bus->read_byte(addr);
     reg_file->reg_af.write_hi(mem_byte);
     return 8;
   }
+
   std::string describe() override { return IroGB::format("LD A, {}", to_string<src>()); }
   std::size_t mem_access_t_cycle() override { return 4; }
+
+  InstructionTiming get_timing_info() const override {
+    return {
+        .total_cycles = 8,
+        .sync_events = 1,
+    };
+  }
 };
 
 /*
@@ -123,18 +179,28 @@ class LD_A_imm16 final : public Instruction {
 public:
   LD_A_imm16(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
+
   std::size_t exec() override {
     const byte_t mem_byte = bus->read_byte(addr);
     reg_file->reg_af.write_hi(mem_byte);
     return 16;
   }
-  std::string describe() override { return IroGB::format("LD A, {}", static_cast<int>(addr)); }
+
   void parse() override {
     const byte_t lsb = bus->read_byte(reg_file->reg_pc++);
     const byte_t msb = bus->read_byte(reg_file->reg_pc++);
     addr = (msb << 8) | lsb;
   }
+
+  std::string describe() override { return IroGB::format("LD A, {}", static_cast<int>(addr)); }
   std::size_t mem_access_t_cycle() override { return 12; }
+
+  InstructionTiming get_timing_info() const override {
+    return {
+        .total_cycles = 16,
+        .sync_events = 1,
+    };
+  }
 
 private:
   addr_t addr{};
@@ -146,14 +212,23 @@ private:
 template <Register16Bit dst> class LD_XX_A final : public Instruction {
 public:
   LD_XX_A(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+
   std::size_t exec() override {
     const byte_t reg_byte = read_reg<Register8Bit::REG_A>();
     const addr_t addr = read_reg<dst>();
     bus->write_byte(addr, reg_byte);
     return 8;
   }
+
   std::string describe() override { return IroGB::format("LD {}, A", to_string<dst>()); }
   std::size_t mem_access_t_cycle() override { return 4; }
+
+  InstructionTiming get_timing_info() const override {
+    return {
+        .total_cycles = 8,
+        .sync_events = 1,
+    };
+  }
 };
 
 /*
@@ -163,18 +238,28 @@ class LD_imm16_A final : public Instruction {
 public:
   LD_imm16_A(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
+
   std::size_t exec() override {
     const byte_t reg_byte = read_reg<Register8Bit::REG_A>();
     bus->write_byte(addr, reg_byte);
     return 16;
   }
-  std::string describe() override { return IroGB::format("LD {}, A", static_cast<int>(addr)); }
+
   void parse() override {
     const byte_t lsb = bus->read_byte(reg_file->reg_pc++);
     const byte_t msb = bus->read_byte(reg_file->reg_pc++);
     addr = (msb << 8) | lsb;
   }
+
+  std::string describe() override { return IroGB::format("LD {}, A", static_cast<int>(addr)); }
   std::size_t mem_access_t_cycle() override { return 12; }
+
+  InstructionTiming get_timing_info() const override {
+    return {
+        .total_cycles = 16,
+        .sync_events = 1,
+    };
+  }
 
 private:
   addr_t addr{};
@@ -187,14 +272,23 @@ class LDH_A_imm8 final : public Instruction {
 public:
   LDH_A_imm8(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
+
   std::size_t exec() override {
     const byte_t mem_byte = bus->read_byte(addr);
     reg_file->reg_af.write_hi(mem_byte);
     return 12;
   }
+
   std::string describe() override { return IroGB::format("LD A, {}", static_cast<int>(addr)); }
   void parse() override { addr = 0xFF00 | bus->read_byte(reg_file->reg_pc++); }
   std::size_t mem_access_t_cycle() override { return 8; }
+
+  InstructionTiming get_timing_info() const override {
+    return {
+        .total_cycles = 12,
+        .sync_events = 1,
+    };
+  }
 
 private:
   addr_t addr{};
@@ -207,14 +301,23 @@ class LDH_imm8_A final : public Instruction {
 public:
   LDH_imm8_A(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
+
   std::size_t exec() override {
     const byte_t reg_byte = read_reg<Register8Bit::REG_A>();
     bus->write_byte(addr, reg_byte);
     return 12;
   }
+
   std::string describe() override { return IroGB::format("LD {}, A", static_cast<int>(addr)); }
   void parse() override { addr = 0xFF00 | bus->read_byte(reg_file->reg_pc++); }
   std::size_t mem_access_t_cycle() override { return 8; }
+
+  InstructionTiming get_timing_info() const override {
+    return {
+        .total_cycles = 12,
+        .sync_events = 1,
+    };
+  }
 
 private:
   addr_t addr{};
@@ -226,13 +329,22 @@ private:
 class LDH_C_A final : public Instruction {
 public:
   LDH_C_A(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+
   std::size_t exec() override {
     const byte_t reg_byte = read_reg<Register8Bit::REG_A>();
     bus->write_byte(0xFF00 | read_reg<Register8Bit::REG_C>(), reg_byte);
     return 8;
   }
+
   std::string describe() override { return IroGB::format("LD C, A"); }
   std::size_t mem_access_t_cycle() override { return 4; }
+
+  InstructionTiming get_timing_info() const override {
+    return {
+        .total_cycles = 8,
+        .sync_events = 1,
+    };
+  }
 };
 
 /*
@@ -241,13 +353,23 @@ public:
 class LDH_A_C final : public Instruction {
 public:
   LDH_A_C(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+
   std::size_t exec() override {
     const byte_t mem_byte = bus->read_byte(0xFF00 | read_reg<Register8Bit::REG_C>());
     reg_file->reg_af.write_hi(mem_byte);
     return 8;
   }
+
   std::string describe() override { return IroGB::format("LDH A, C"); }
+
   std::size_t mem_access_t_cycle() override { return 4; }
+
+  InstructionTiming get_timing_info() const override {
+    return {
+        .total_cycles = 8,
+        .sync_events = 1,
+    };
+  }
 };
 
 /*
@@ -256,6 +378,7 @@ public:
 class LDI_HL_A final : public Instruction {
 public:
   LDI_HL_A(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+
   std::size_t exec() override {
     const byte_t reg_byte = read_reg<Register8Bit::REG_A>();
     const addr_t addr = read_reg<Register16Bit::REG_HL>();
@@ -265,8 +388,16 @@ public:
     write_reg<Register16Bit::REG_HL>(addr + 1);
     return 8;
   }
+
   std::string describe() override { return IroGB::format("LDI HL, A"); }
   std::size_t mem_access_t_cycle() override { return 4; }
+
+  InstructionTiming get_timing_info() const override {
+    return {
+        .total_cycles = 8,
+        .sync_events = 1,
+    };
+  }
 };
 
 /*
@@ -275,6 +406,7 @@ public:
 class LDI_A_HL final : public Instruction {
 public:
   LDI_A_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+
   std::size_t exec() override {
     const addr_t addr = read_reg<Register16Bit::REG_HL>();
     const byte_t mem_byte = bus->read_byte(addr);
@@ -284,8 +416,16 @@ public:
     write_reg<Register16Bit::REG_HL>(addr + 1);
     return 8;
   }
+
   std::string describe() override { return IroGB::format("LDI A, HL"); }
   std::size_t mem_access_t_cycle() override { return 4; }
+
+  InstructionTiming get_timing_info() const override {
+    return {
+        .total_cycles = 8,
+        .sync_events = 1,
+    };
+  }
 };
 
 /*
@@ -294,6 +434,7 @@ public:
 class LDD_HL_A final : public Instruction {
 public:
   LDD_HL_A(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+
   std::size_t exec() override {
     const byte_t reg_byte = read_reg<Register8Bit::REG_A>();
     const addr_t addr = read_reg<Register16Bit::REG_HL>();
@@ -303,8 +444,16 @@ public:
     write_reg<Register16Bit::REG_HL>(addr - 1);
     return 8;
   }
+
   std::string describe() override { return IroGB::format("LDD HL, A"); }
   std::size_t mem_access_t_cycle() override { return 4; }
+
+  InstructionTiming get_timing_info() const override {
+    return {
+        .total_cycles = 8,
+        .sync_events = 1,
+    };
+  }
 };
 
 /*
@@ -313,6 +462,7 @@ public:
 class LDD_A_HL final : public Instruction {
 public:
   LDD_A_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+
   std::size_t exec() override {
     const addr_t addr = read_reg<Register16Bit::REG_HL>();
     const byte_t mem_byte = bus->read_byte(addr);
@@ -322,8 +472,16 @@ public:
     write_reg<Register16Bit::REG_HL>(addr - 1);
     return 8;
   }
+
   std::string describe() override { return IroGB::format("LDD A, HL"); }
   std::size_t mem_access_t_cycle() override { return 4; }
+
+  InstructionTiming get_timing_info() const override {
+    return {
+        .total_cycles = 8,
+        .sync_events = 1,
+    };
+  }
 };
 
 /*
@@ -333,16 +491,26 @@ template <Register16Bit src> class LD_XX_imm16 final : public Instruction {
 public:
   LD_XX_imm16(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
+
   std::size_t exec() override {
     write_reg<src>(addr);
     return 12;
   }
+
   std::string describe() override {
     return IroGB::format("LD {}, {}", to_string<src>(), static_cast<int>(addr));
   }
+
   void parse() override {
     addr = bus->read_byte(reg_file->reg_pc++);
     addr |= static_cast<addr_t>(bus->read_byte(reg_file->reg_pc++)) << 8;
+  }
+
+  InstructionTiming get_timing_info() const override {
+    return {
+        .total_cycles = 12,
+        .sync_events = 1,
+    };
   }
 
 private:
@@ -356,15 +524,25 @@ class LD_imm16_SP final : public Instruction {
 public:
   LD_imm16_SP(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
+
   std::size_t exec() override {
     bus->write_byte(addr, reg_file->reg_sp.read_lo());
     bus->write_byte(addr + 1, reg_file->reg_sp.read_hi());
     return 20;
   }
-  std::string describe() override { return IroGB::format("LD {}, sp", static_cast<int>(addr)); }
+
   void parse() override {
     addr = bus->read_byte(reg_file->reg_pc++);
     addr |= static_cast<addr_t>(bus->read_byte(reg_file->reg_pc++)) << 8;
+  }
+
+  std::string describe() override { return IroGB::format("LD {}, sp", static_cast<int>(addr)); }
+
+  InstructionTiming get_timing_info() const override {
+    return {
+        .total_cycles = 20,
+        .sync_events = 1,
+    };
   }
 
 private:
@@ -377,12 +555,21 @@ private:
 class LD_SP_HL final : public Instruction {
 public:
   LD_SP_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+
   std::size_t exec() override {
     const addr_t addr = read_reg<Register16Bit::REG_HL>();
     reg_file->reg_sp.write(addr);
     return 8;
   }
+
   std::string describe() override { return IroGB::format("LD SP, HL"); }
+
+  InstructionTiming get_timing_info() const override {
+    return {
+        .total_cycles = 8,
+        .sync_events = 1,
+    };
+  }
 };
 
 /*
@@ -391,6 +578,7 @@ public:
 template <Register16Bit src> class PUSH_XX final : public Instruction {
 public:
   PUSH_XX(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+
   std::size_t exec() override {
     switch (state) {
     case InstrStates::INSTR_STATE_WRITE:
@@ -406,13 +594,22 @@ public:
     }
     return 16;
   }
-  std::string describe() override { return IroGB::format("PUSH {}", to_string<src>()); }
+
   void parse() override {
     state = InstrStates::INSTR_STATE_WRITE;
     sp = reg_file->reg_sp.read();
   }
+
   std::size_t mem_access_t_cycle() override {
     return state == InstrStates::INSTR_STATE_WRITE ? 8 : 12;
+  }
+  std::string describe() override { return IroGB::format("PUSH {}", to_string<src>()); }
+
+  InstructionTiming get_timing_info() const override {
+    return {
+        .total_cycles = 16,
+        .sync_events = 2,
+    };
   }
 
 private:
@@ -426,6 +623,7 @@ private:
 template <Register16Bit dst> class POP_XX final : public Instruction {
 public:
   POP_XX(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+
   std::size_t exec() override {
     switch (state) {
     case InstrStates::INSTR_STATE_READ:
@@ -441,13 +639,22 @@ public:
     }
     return 12;
   }
-  std::string describe() override { return IroGB::format("POP {}", to_string<dst>()); }
+
   void parse() override {
     state = InstrStates::INSTR_STATE_READ;
     sp = reg_file->reg_sp.read();
   }
+
   std::size_t mem_access_t_cycle() override {
     return state == InstrStates::INSTR_STATE_READ ? 4 : 8;
+  }
+  std::string describe() override { return IroGB::format("POP {}", to_string<dst>()); }
+
+  InstructionTiming get_timing_info() const override {
+    return {
+        .total_cycles = 12,
+        .sync_events = 2,
+    };
   }
 
 private:

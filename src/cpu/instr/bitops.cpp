@@ -36,6 +36,11 @@ std::size_t CB_PREFIX::exec() {
   return ins->exec();
 }
 
+InstructionTiming CB_PREFIX::get_timing_info() const {
+  const unique_ptr<Instruction> &ins = lookup.at(op);
+  return ins->get_timing_info();
+}
+
 std::size_t CB_PREFIX::mem_access_t_cycle() {
   const unique_ptr<Instruction> &ins = lookup.at(op);
   return ins->mem_access_t_cycle();

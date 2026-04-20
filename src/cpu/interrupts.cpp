@@ -117,6 +117,14 @@ std::size_t ISR::exec() {
   return was_halted ? 24 : 20;
 }
 
+InstructionTiming ISR::get_timing_info() const {
+  const unsigned total_cycles = halt_delay ? 24 : 20;
+  return {
+      .total_cycles = total_cycles,
+      .sync_events = 1, // TODO: Eventually we will need to change this (Pinball DX)
+  };
+}
+
 void ISR::handle_ei_push_bug() const {
   constexpr auto mask = 0x1F;
   constexpr addr_t pc_bugged = 0;

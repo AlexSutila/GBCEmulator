@@ -110,6 +110,7 @@ public:
       : Instruction(reg_file_ptr, bus_ptr), ime_(ime), // Needed to disable interrupt master enable
         if_(if_reg),                                   // Determines which vector to jump to
         ie_(ie_reg) {}
+  InstructionTiming get_timing_info() const override;
   std::string describe() override;
   std::size_t exec() override;
   void incur_halt_delay(); // Invoked by CPU to incur when halted

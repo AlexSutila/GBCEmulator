@@ -29,12 +29,22 @@ enum class InstrStates {
   INSTR_STATE_WRITE2,
 };
 
+struct InstructionTiming {
+  unsigned total_cycles;
+  unsigned sync_events;
+};
+
 class Instruction {
 public:
   virtual ~Instruction() = default;
 
   Instruction(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : reg_file(reg_file_ptr), bus(bus_ptr) {}
+
+  /**
+   * TODO: Document
+   */
+  virtual InstructionTiming get_timing_info() const = 0;
 
   /**
    * Executes the instruction in full, to be called on the memory access
@@ -191,6 +201,10 @@ protected:
     else
       static_assert("Invalid 8-bit register");
     return 0xFF;
+  }
+
+  static inline addr_t make_addr(byte_t lo, byte_t hi) {
+    return static_cast<addr_t>(lo) | (static_cast<addr_t>(hi) << 8);
   }
 
   RegisterFile *const reg_file;

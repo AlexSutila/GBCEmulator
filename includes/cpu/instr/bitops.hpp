@@ -17,6 +17,7 @@
 class RLCA final : public Instruction {
 public:
   RLCA(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+
   std::size_t exec() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
 
@@ -35,7 +36,15 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 4;
   }
+
   std::string describe() override { return IroGB::format("RLCA"); }
+
+  InstructionTiming get_timing_info() const override {
+    return {
+        .total_cycles = 4,
+        .sync_events = 1,
+    };
+  }
 };
 
 /*
@@ -44,6 +53,7 @@ public:
 class RRCA final : public Instruction {
 public:
   RRCA(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+
   std::size_t exec() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
 
@@ -62,7 +72,15 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 4;
   }
+
   std::string describe() override { return IroGB::format("RRCA"); }
+
+  InstructionTiming get_timing_info() const override {
+    return {
+        .total_cycles = 4,
+        .sync_events = 1,
+    };
+  }
 };
 
 /*
@@ -71,6 +89,7 @@ public:
 class RLA final : public Instruction {
 public:
   RLA(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+
   std::size_t exec() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
     const bool old_c = reg_file->reg_af.get_flag(StatusFlagMask::FLAG_C_MASK);
@@ -90,7 +109,15 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 4;
   }
+
   std::string describe() override { return IroGB::format("RLA"); }
+
+  InstructionTiming get_timing_info() const override {
+    return {
+        .total_cycles = 4,
+        .sync_events = 1,
+    };
+  }
 };
 
 /*
@@ -99,6 +126,7 @@ public:
 class RRA final : public Instruction {
 public:
   RRA(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+
   std::size_t exec() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
     const bool old_c = reg_file->reg_af.get_flag(StatusFlagMask::FLAG_C_MASK);
@@ -118,7 +146,15 @@ public:
     write_reg<Register8Bit::REG_A>(result);
     return 4;
   }
+
   std::string describe() override { return IroGB::format("RRA"); }
+
+  InstructionTiming get_timing_info() const override {
+    return {
+        .total_cycles = 4,
+        .sync_events = 1,
+    };
+  }
 };
 
 /*
@@ -128,6 +164,7 @@ public:
 class CB_PREFIX final : public Instruction {
 public:
   CB_PREFIX(RegisterFile *reg_file_ptr, AddressBus *bus_ptr);
+  InstructionTiming get_timing_info() const override;
   std::size_t exec() override;
   std::size_t mem_access_t_cycle() override;
   std::string describe() override;
@@ -145,6 +182,7 @@ private:
 template <Register8Bit dst> class RLC_X final : public Instruction {
 public:
   RLC_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+
   std::size_t exec() override {
     const byte_t x = read_reg<dst>();
 
@@ -161,12 +199,21 @@ public:
     write_reg<dst>(result);
     return 8;
   }
+
   std::string describe() override { return IroGB::format("RLC {}", to_string<dst>()); }
+
+  InstructionTiming get_timing_info() const override {
+    return {
+        .total_cycles = 8,
+        .sync_events = 1,
+    };
+  }
 };
 
 class RLC_HL final : public Instruction {
 public:
   RLC_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+
   std::size_t exec() override {
     const addr_t addr = read_reg<Register16Bit::REG_HL>();
     switch (state) {
@@ -190,11 +237,20 @@ public:
     }
     return 16;
   }
+
   std::size_t mem_access_t_cycle() override {
     return state == InstrStates::INSTR_STATE_READ ? 8 : 12;
   }
+
   std::string describe() override { return IroGB::format("RLC HL"); }
   void parse() override { state = InstrStates::INSTR_STATE_READ; }
+
+  InstructionTiming get_timing_info() const override {
+    return {
+        .total_cycles = 16,
+        .sync_events = 2,
+    };
+  }
 
 private:
   InstrStates state{};
@@ -206,6 +262,7 @@ private:
 template <Register8Bit dst> class RL_X final : public Instruction {
 public:
   RL_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+
   std::size_t exec() override {
     const byte_t x = read_reg<dst>();
     const bool old_c = reg_file->reg_af.get_flag(StatusFlagMask::FLAG_C_MASK);
@@ -222,12 +279,21 @@ public:
     write_reg<dst>(result);
     return 8;
   }
+
   std::string describe() override { return IroGB::format("RL {}", to_string<dst>()); }
+
+  InstructionTiming get_timing_info() const override {
+    return {
+        .total_cycles = 8,
+        .sync_events = 1,
+    };
+  }
 };
 
 class RL_HL final : public Instruction {
 public:
   RL_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+
   std::size_t exec() override {
     const addr_t hl = read_reg<Register16Bit::REG_HL>();
     switch (state) {
@@ -243,19 +309,30 @@ public:
       reg_file->reg_af.put_flag(StatusFlagMask::FLAG_C_MASK, (n & 0x80) != 0);
       state = InstrStates::INSTR_STATE_WRITE;
       break;
+
     case InstrStates::INSTR_STATE_WRITE:
       bus->write_byte(hl, result);
       break;
+
     default:
       break;
     }
     return 16;
   }
+
   std::size_t mem_access_t_cycle() override {
     return state == InstrStates::INSTR_STATE_READ ? 8 : 12;
   }
+
   std::string describe() override { return IroGB::format("RL HL"); }
   void parse() override { state = InstrStates::INSTR_STATE_READ; }
+
+  InstructionTiming get_timing_info() const override {
+    return {
+        .total_cycles = 16,
+        .sync_events = 2,
+    };
+  }
 
 private:
   InstrStates state{};
@@ -267,6 +344,7 @@ private:
 template <Register8Bit dst> class RRC_X final : public Instruction {
 public:
   RRC_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+
   std::size_t exec() override {
     const byte_t x = read_reg<dst>();
     const bool carry = (x & 0x01) != 0x00;
@@ -282,12 +360,21 @@ public:
     write_reg<dst>(result);
     return 8;
   }
+
   std::string describe() override { return IroGB::format("RRC {}", to_string<dst>()); }
+
+  InstructionTiming get_timing_info() const override {
+    return {
+        .total_cycles = 8,
+        .sync_events = 1,
+    };
+  }
 };
 
 class RRC_HL final : public Instruction {
 public:
   RRC_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+
   std::size_t exec() override {
     const addr_t addr = read_reg<Register16Bit::REG_HL>();
     switch (state) {
@@ -303,19 +390,30 @@ public:
       reg_file->reg_af.put_flag(StatusFlagMask::FLAG_C_MASK, c);
       state = InstrStates::INSTR_STATE_WRITE;
       break;
+
     case InstrStates::INSTR_STATE_WRITE:
       bus->write_byte(addr, result);
       break;
+
     default:
       break;
     }
     return 16;
   }
+
   std::size_t mem_access_t_cycle() override {
     return state == InstrStates::INSTR_STATE_READ ? 8 : 12;
   }
+
   std::string describe() override { return IroGB::format("RRC HL"); }
   void parse() override { state = InstrStates::INSTR_STATE_READ; }
+
+  InstructionTiming get_timing_info() const override {
+    return {
+        .total_cycles = 16,
+        .sync_events = 2,
+    };
+  }
 
 private:
   InstrStates state{};
@@ -327,6 +425,7 @@ private:
 template <Register8Bit dst> class RR_X final : public Instruction {
 public:
   RR_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+
   std::size_t exec() override {
     const byte_t x = read_reg<dst>();
     const bool old_c = reg_file->reg_af.get_flag(StatusFlagMask::FLAG_C_MASK);
@@ -343,12 +442,21 @@ public:
     write_reg<dst>(result);
     return 8;
   }
+
   std::string describe() override { return IroGB::format("RR {}", to_string<dst>()); }
+
+  InstructionTiming get_timing_info() const override {
+    return {
+        .total_cycles = 8,
+        .sync_events = 1,
+    };
+  }
 };
 
 class RR_HL final : public Instruction {
 public:
   RR_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+
   std::size_t exec() override {
     const addr_t addr = read_reg<Register16Bit::REG_HL>();
     switch (state) {
@@ -364,19 +472,30 @@ public:
       reg_file->reg_af.put_flag(StatusFlagMask::FLAG_C_MASK, (n & 1) != 0);
       state = InstrStates::INSTR_STATE_WRITE;
       break;
+
     case InstrStates::INSTR_STATE_WRITE:
       bus->write_byte(addr, result);
       break;
+
     default:
       break;
     }
     return 16;
   }
+
   std::size_t mem_access_t_cycle() override {
     return state == InstrStates::INSTR_STATE_READ ? 8 : 12;
   }
+
   std::string describe() override { return IroGB::format("RR HL"); }
   void parse() override { state = InstrStates::INSTR_STATE_READ; }
+
+  InstructionTiming get_timing_info() const override {
+    return {
+        .total_cycles = 16,
+        .sync_events = 2,
+    };
+  }
 
 private:
   InstrStates state{};
@@ -388,6 +507,7 @@ private:
 template <Register8Bit dst> class SLA_X final : public Instruction {
 public:
   SLA_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+
   std::size_t exec() override {
     const byte_t x = read_reg<dst>();
     const bool carry = (x & 0x80) != 0x00;
@@ -403,12 +523,21 @@ public:
     write_reg<dst>(result);
     return 8;
   }
+
   std::string describe() override { return IroGB::format("SLA {}", to_string<dst>()); }
+
+  InstructionTiming get_timing_info() const override {
+    return {
+        .total_cycles = 8,
+        .sync_events = 1,
+    };
+  }
 };
 
 class SLA_HL final : public Instruction {
 public:
   SLA_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+
   std::size_t exec() override {
     const addr_t addr = read_reg<Register16Bit::REG_HL>();
     switch (state) {
@@ -423,19 +552,30 @@ public:
       reg_file->reg_af.put_flag(StatusFlagMask::FLAG_C_MASK, (n & 0x80) != 0);
       state = InstrStates::INSTR_STATE_WRITE;
       break;
+
     case InstrStates::INSTR_STATE_WRITE:
       bus->write_byte(addr, result);
       break;
+
     default:
       break;
     }
     return 16;
   }
+
   std::size_t mem_access_t_cycle() override {
     return state == InstrStates::INSTR_STATE_READ ? 8 : 12;
   }
+
   std::string describe() override { return IroGB::format("SLA HL"); }
   void parse() override { state = InstrStates::INSTR_STATE_READ; }
+
+  InstructionTiming get_timing_info() const override {
+    return {
+        .total_cycles = 16,
+        .sync_events = 2,
+    };
+  }
 
 private:
   InstrStates state{};
@@ -446,6 +586,7 @@ private:
 template <Register8Bit dst> class SRA_X final : public Instruction {
 public:
   SRA_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+
   std::size_t exec() override {
     const byte_t x = read_reg<dst>();
     const bool carry = (x & 0x01) != 0x00;
@@ -461,12 +602,21 @@ public:
     write_reg<dst>(result);
     return 8;
   }
+
   std::string describe() override { return IroGB::format("SLA {}", to_string<dst>()); }
+
+  InstructionTiming get_timing_info() const override {
+    return {
+        .total_cycles = 8,
+        .sync_events = 1,
+    };
+  }
 };
 
 class SRA_HL final : public Instruction {
 public:
   SRA_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+
   std::size_t exec() override {
     const addr_t addr = read_reg<Register16Bit::REG_HL>();
     switch (state) {
@@ -481,19 +631,30 @@ public:
       reg_file->reg_af.put_flag(StatusFlagMask::FLAG_C_MASK, (n & 1) != 0);
       state = InstrStates::INSTR_STATE_WRITE;
       break;
+
     case InstrStates::INSTR_STATE_WRITE:
       bus->write_byte(addr, result);
       break;
+
     default:
       break;
     }
     return 16;
   }
+
   std::size_t mem_access_t_cycle() override {
     return state == InstrStates::INSTR_STATE_READ ? 8 : 12;
   }
+
   std::string describe() override { return IroGB::format("SLA HL"); }
   void parse() override { state = InstrStates::INSTR_STATE_READ; }
+
+  InstructionTiming get_timing_info() const override {
+    return {
+        .total_cycles = 16,
+        .sync_events = 2,
+    };
+  }
 
 private:
   InstrStates state{};
@@ -504,6 +665,7 @@ private:
 template <Register8Bit dst> class SWAP_X final : public Instruction {
 public:
   SWAP_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+
   std::size_t exec() override {
     const byte_t x = read_reg<dst>();
     const byte_t result = ((x & 0xF0) >> 4) | ((x & 0x0F) << 4);
@@ -518,12 +680,21 @@ public:
     write_reg<dst>(result);
     return 8;
   }
+
   std::string describe() override { return IroGB::format("SWAP {}", to_string<dst>()); }
+
+  InstructionTiming get_timing_info() const override {
+    return {
+        .total_cycles = 8,
+        .sync_events = 1,
+    };
+  }
 };
 
 class SWAP_HL final : public Instruction {
 public:
   SWAP_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+
   std::size_t exec() override {
     const addr_t addr = read_reg<Register16Bit::REG_HL>();
     switch (state) {
@@ -538,19 +709,30 @@ public:
       reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_C_MASK);
       state = InstrStates::INSTR_STATE_WRITE;
       break;
+
     case InstrStates::INSTR_STATE_WRITE:
       bus->write_byte(addr, result);
       break;
+
     default:
       break;
     }
     return 16;
   }
+
   std::size_t mem_access_t_cycle() override {
     return state == InstrStates::INSTR_STATE_READ ? 8 : 12;
   }
+
   std::string describe() override { return IroGB::format("SWAP HL"); }
   void parse() override { state = InstrStates::INSTR_STATE_READ; }
+
+  InstructionTiming get_timing_info() const override {
+    return {
+        .total_cycles = 16,
+        .sync_events = 2,
+    };
+  }
 
 private:
   InstrStates state{};
@@ -561,6 +743,7 @@ private:
 template <Register8Bit dst> class SRL_X final : public Instruction {
 public:
   SRL_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+
   std::size_t exec() override {
     const byte_t x = read_reg<dst>();
     const bool carry = (x & 0x01) != 0x00;
@@ -576,12 +759,21 @@ public:
     write_reg<dst>(result);
     return 8;
   }
+
   std::string describe() override { return IroGB::format("SRL {}", to_string<dst>()); }
+
+  InstructionTiming get_timing_info() const override {
+    return {
+        .total_cycles = 8,
+        .sync_events = 1,
+    };
+  }
 };
 
 class SRL_HL final : public Instruction {
 public:
   SRL_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+
   std::size_t exec() override {
     const addr_t addr = read_reg<Register16Bit::REG_HL>();
     switch (state) {
@@ -604,11 +796,20 @@ public:
     }
     return 16;
   }
+
   std::size_t mem_access_t_cycle() override {
     return state == InstrStates::INSTR_STATE_READ ? 8 : 12;
   }
+
   std::string describe() override { return IroGB::format("SRL HL"); }
   void parse() override { state = InstrStates::INSTR_STATE_READ; }
+
+  InstructionTiming get_timing_info() const override {
+    return {
+        .total_cycles = 16,
+        .sync_events = 2,
+    };
+  }
 
 private:
   InstrStates state{};
@@ -619,6 +820,7 @@ private:
 template <byte_t bit, Register8Bit dst> class BIT_N_X final : public Instruction {
 public:
   BIT_N_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+
   std::size_t exec() override {
     const byte_t x = read_reg<dst>();
     const bool bit_is_zero = ((x >> bit) & 0x01) == 0;
@@ -629,14 +831,23 @@ public:
     reg_file->reg_af.put_flag(StatusFlagMask::FLAG_H_MASK, true);
     return 8;
   }
+
   std::string describe() override {
     return IroGB::format("BIT {}, {}", static_cast<int>(bit), to_string<dst>());
+  }
+
+  InstructionTiming get_timing_info() const override {
+    return {
+        .total_cycles = 8,
+        .sync_events = 1,
+    };
   }
 };
 
 template <byte_t bit> class BIT_N_HL final : public Instruction {
 public:
   BIT_N_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+
   std::size_t exec() override {
     const addr_t addr = read_reg<Register16Bit::REG_HL>();
     const byte_t n = bus->read_byte(addr);
@@ -648,27 +859,45 @@ public:
     reg_file->reg_af.put_flag(StatusFlagMask::FLAG_H_MASK, true);
     return 12;
   }
+
   std::string describe() override { return IroGB::format("BIT {}, HL", static_cast<int>(bit)); }
   std::size_t mem_access_t_cycle() override { return 8; }
+
+  InstructionTiming get_timing_info() const override {
+    return {
+        .total_cycles = 12,
+        .sync_events = 1,
+    };
+  }
 };
 
 template <byte_t bit, Register8Bit dst> class RES_N_X final : public Instruction {
 public:
   RES_N_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+
   std::size_t exec() override {
     byte_t x = read_reg<dst>();
     x &= ~(1 << bit);
     write_reg<dst>(x);
     return 8;
   }
+
   std::string describe() override {
     return IroGB::format("RES {}, {}", static_cast<int>(bit), to_string<dst>());
+  }
+
+  InstructionTiming get_timing_info() const override {
+    return {
+        .total_cycles = 8,
+        .sync_events = 1,
+    };
   }
 };
 
 template <byte_t bit> class RES_N_HL final : public Instruction {
 public:
   RES_N_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+
   std::size_t exec() override {
     addr_t hl = read_reg<Register16Bit::REG_HL>();
     switch (state) {
@@ -676,19 +905,30 @@ public:
       n = bus->read_byte(hl) & ~(1 << bit);
       state = InstrStates::INSTR_STATE_WRITE;
       break;
+
     case InstrStates::INSTR_STATE_WRITE:
       bus->write_byte(hl, n);
       break;
+
     default:
       break;
     }
     return 16;
   }
+
   std::size_t mem_access_t_cycle() override {
     return state == InstrStates::INSTR_STATE_READ ? 8 : 12;
   }
+
   std::string describe() override { return IroGB::format("RST {}, HL", static_cast<int>(bit)); }
   void parse() override { state = InstrStates::INSTR_STATE_READ; }
+
+  InstructionTiming get_timing_info() const override {
+    return {
+        .total_cycles = 16,
+        .sync_events = 2,
+    };
+  }
 
 private:
   InstrStates state{};
@@ -698,14 +938,23 @@ private:
 template <byte_t bit, Register8Bit dst> class SET_N_X final : public Instruction {
 public:
   SET_N_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+
   std::size_t exec() override {
     byte_t x = read_reg<dst>();
     x |= (1 << bit);
     write_reg<dst>(x);
     return 8;
   }
+
   std::string describe() override {
     return IroGB::format("SET {}, {}", static_cast<int>(bit), to_string<dst>());
+  }
+
+  InstructionTiming get_timing_info() const override {
+    return {
+        .total_cycles = 8,
+        .sync_events = 1,
+    };
   }
 };
 
@@ -719,19 +968,30 @@ public:
       n = bus->read_byte(hl) | (1 << bit);
       state = InstrStates::INSTR_STATE_WRITE;
       break;
+
     case InstrStates::INSTR_STATE_WRITE:
       bus->write_byte(hl, n);
       break;
+
     default:
       break;
     }
     return 16;
   }
+
   std::size_t mem_access_t_cycle() override {
     return state == InstrStates::INSTR_STATE_READ ? 8 : 12;
   }
+
   std::string describe() override { return IroGB::format("SET {}, HL", static_cast<int>(bit)); }
   void parse() override { state = InstrStates::INSTR_STATE_READ; }
+
+  InstructionTiming get_timing_info() const override {
+    return {
+        .total_cycles = 16,
+        .sync_events = 2,
+    };
+  }
 
 private:
   InstrStates state{};
