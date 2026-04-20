@@ -37,7 +37,7 @@ public:
 
   std::string describe() override { return IroGB::format("ADD A, {}", to_string<src>()); }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
     return {
         .total_cycles = 4,
         .sync_events = 1,
@@ -71,9 +71,9 @@ public:
   }
 
   std::string describe() override { return IroGB::format("ADD A, {}", static_cast<int>(imm)); }
-  void parse() override { imm = bus->read_byte(reg_file->reg_pc++); }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
+    imm = bus->read_byte(reg_file->reg_pc++);
     return {
         .total_cycles = 8,
         .sync_events = 1,
@@ -112,7 +112,7 @@ public:
   std::string describe() override { return IroGB::format("ADD A, HL"); }
   std::size_t mem_access_t_cycle() override { return 4; }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
     return {
         .total_cycles = 8,
         .sync_events = 1,
@@ -150,7 +150,7 @@ public:
 
   std::string describe() override { return IroGB::format("ADC A, {}", to_string<src>()); }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
     return {
         .total_cycles = 4,
         .sync_events = 1,
@@ -188,9 +188,9 @@ public:
   }
 
   std::string describe() override { return IroGB::format("ADC A, {}", static_cast<int>(imm)); }
-  void parse() override { imm = bus->read_byte(reg_file->reg_pc++); }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
+    imm = bus->read_byte(reg_file->reg_pc++);
     return {
         .total_cycles = 8,
         .sync_events = 1,
@@ -232,7 +232,7 @@ public:
   std::string describe() override { return IroGB::format("ADC A, HL"); }
   std::size_t mem_access_t_cycle() override { return 4; }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
     return {
         .total_cycles = 8,
         .sync_events = 1,
@@ -266,7 +266,7 @@ public:
 
   std::string describe() override { return IroGB::format("SUB A, {}", to_string<src>()); }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
     return {
         .total_cycles = 4,
         .sync_events = 1,
@@ -299,9 +299,9 @@ public:
   }
 
   std::string describe() override { return IroGB::format("SUB A, {}", static_cast<int>(imm)); }
-  void parse() override { imm = bus->read_byte(reg_file->reg_pc++); }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
+    imm = bus->read_byte(reg_file->reg_pc++);
     return {
         .total_cycles = 8,
         .sync_events = 1,
@@ -339,7 +339,7 @@ public:
   std::string describe() override { return IroGB::format("SUB A, HL"); }
   std::size_t mem_access_t_cycle() override { return 4; }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
     return {
         .total_cycles = 8,
         .sync_events = 1,
@@ -379,7 +379,7 @@ public:
 
   std::string describe() override { return IroGB::format("SBC A, {}", to_string<src>()); }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
     return {
         .total_cycles = 4,
         .sync_events = 1,
@@ -418,9 +418,9 @@ public:
   }
 
   std::string describe() override { return IroGB::format("SBC A, {}", static_cast<int>(imm)); }
-  void parse() override { imm = bus->read_byte(reg_file->reg_pc++); }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
+    imm = bus->read_byte(reg_file->reg_pc++);
     return {
         .total_cycles = 8,
         .sync_events = 1,
@@ -464,7 +464,7 @@ public:
   std::string describe() override { return IroGB::format("SBC A, HL"); }
   std::size_t mem_access_t_cycle() override { return 4; }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
     return {
         .total_cycles = 8,
         .sync_events = 1,
@@ -497,7 +497,7 @@ public:
 
   std::string describe() override { return IroGB::format("AND A, {}", to_string<src>()); }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
     return {
         .total_cycles = 4,
         .sync_events = 1,
@@ -529,9 +529,9 @@ public:
   }
 
   std::string describe() override { return IroGB::format("AND A, {}", static_cast<int>(imm)); }
-  void parse() override { imm = bus->read_byte(reg_file->reg_pc++); }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
+    imm = bus->read_byte(reg_file->reg_pc++);
     return {
         .total_cycles = 8,
         .sync_events = 1,
@@ -568,7 +568,7 @@ public:
   std::string describe() override { return IroGB::format("AND A, HL"); }
   std::size_t mem_access_t_cycle() override { return 4; }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
     return {
         .total_cycles = 8,
         .sync_events = 1,
@@ -601,7 +601,7 @@ public:
 
   std::string describe() override { return IroGB::format("XOR A, {}", to_string<src>()); }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
     return {
         .total_cycles = 4,
         .sync_events = 1,
@@ -633,9 +633,9 @@ public:
   }
 
   std::string describe() override { return IroGB::format("XOR A, {}", static_cast<int>(imm)); }
-  void parse() override { imm = bus->read_byte(reg_file->reg_pc++); }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
+    imm = bus->read_byte(reg_file->reg_pc++);
     return {
         .total_cycles = 8,
         .sync_events = 1,
@@ -672,7 +672,7 @@ public:
   std::string describe() override { return IroGB::format("XOR A, HL"); }
   std::size_t mem_access_t_cycle() override { return 4; }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
     return {
         .total_cycles = 8,
         .sync_events = 1,
@@ -705,7 +705,7 @@ public:
 
   std::string describe() override { return IroGB::format("OR A, {}", to_string<src>()); }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
     return {
         .total_cycles = 4,
         .sync_events = 1,
@@ -736,9 +736,9 @@ public:
   }
 
   std::string describe() override { return IroGB::format("OR A, {}", static_cast<int>(imm)); }
-  void parse() override { imm = bus->read_byte(reg_file->reg_pc++); }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
+    imm = bus->read_byte(reg_file->reg_pc++);
     return {
         .total_cycles = 8,
         .sync_events = 1,
@@ -775,7 +775,7 @@ public:
   std::string describe() override { return IroGB::format("OR A, HL"); }
   std::size_t mem_access_t_cycle() override { return 4; }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
     return {
         .total_cycles = 8,
         .sync_events = 1,
@@ -806,7 +806,7 @@ public:
 
   std::string describe() override { return IroGB::format("CP A, {}", to_string<src>()); }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
     return {
         .total_cycles = 4,
         .sync_events = 1,
@@ -835,9 +835,9 @@ public:
   }
 
   std::string describe() override { return IroGB::format("CP A, {}", static_cast<int>(imm)); }
-  void parse() override { imm = bus->read_byte(reg_file->reg_pc++); }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
+    imm = bus->read_byte(reg_file->reg_pc++);
     return {
         .total_cycles = 8,
         .sync_events = 1,
@@ -872,7 +872,7 @@ public:
   std::string describe() override { return IroGB::format("CP A, HL"); }
   std::size_t mem_access_t_cycle() override { return 4; }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
     return {
         .total_cycles = 8,
         .sync_events = 1,
@@ -904,7 +904,7 @@ public:
 
   std::string describe() override { return IroGB::format("INC {}", to_string<src>()); }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
     return {
         .total_cycles = 4,
         .sync_events = 1,
@@ -947,9 +947,9 @@ public:
   }
 
   std::string describe() override { return IroGB::format("INC HL"); }
-  void parse() override { state = InstrStates::INSTR_STATE_READ; }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
+    state = InstrStates::INSTR_STATE_READ;
     return {
         .total_cycles = 12,
         .sync_events = 2,
@@ -986,7 +986,7 @@ public:
 
   std::string describe() override { return IroGB::format("DEC {}", to_string<src>()); }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
     return {
         .total_cycles = 4,
         .sync_events = 1,
@@ -1029,9 +1029,9 @@ public:
   }
 
   std::string describe() override { return IroGB::format("DEC HL"); }
-  void parse() override { state = InstrStates::INSTR_STATE_READ; }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
+    state = InstrStates::INSTR_STATE_READ;
     return {
         .total_cycles = 12,
         .sync_events = 2,
@@ -1088,7 +1088,7 @@ public:
 
   std::string describe() override { return IroGB::format("DAA"); }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
     return {
         .total_cycles = 4,
         .sync_events = 1,
@@ -1121,7 +1121,7 @@ public:
 
   std::string describe() override { return IroGB::format("ADD HL, {}", to_string<src>()); }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
     return {
         .total_cycles = 8,
         .sync_events = 1,
@@ -1144,7 +1144,7 @@ public:
 
   std::string describe() override { return IroGB::format("INC {}", to_string<dst>()); }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
     return {
         .total_cycles = 8,
         .sync_events = 1,
@@ -1167,7 +1167,7 @@ public:
 
   std::string describe() override { return IroGB::format("DEC {}", to_string<dst>()); }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
     return {
         .total_cycles = 8,
         .sync_events = 1,
@@ -1204,10 +1204,10 @@ public:
   }
 
   std::string describe() override { return IroGB::format("ADD SP, {}", static_cast<int>(imm)); }
-  void parse() override { imm = static_cast<std::int8_t>(bus->read_byte(reg_file->reg_pc, false)); }
   std::size_t mem_access_t_cycle() override { return 4; }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
+    imm = static_cast<std::int8_t>(bus->read_byte(reg_file->reg_pc, false));
     return {
         .total_cycles = 16,
         .sync_events = 1,
@@ -1246,10 +1246,10 @@ public:
   }
 
   std::string describe() override { return IroGB::format("LD HL, SP+{}", static_cast<int>(imm)); }
-  void parse() override { imm = static_cast<std::int8_t>(bus->read_byte(reg_file->reg_pc, false)); }
   std::size_t mem_access_t_cycle() override { return 4; }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
+    imm = static_cast<std::int8_t>(bus->read_byte(reg_file->reg_pc, false));
     return {
         .total_cycles = 12,
         .sync_events = 1,

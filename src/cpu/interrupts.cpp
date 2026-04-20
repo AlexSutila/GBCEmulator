@@ -117,7 +117,7 @@ std::size_t ISR::exec() {
   return was_halted ? 24 : 20;
 }
 
-InstructionTiming ISR::get_timing_info() const {
+InstructionTiming ISR::parse() {
   const unsigned total_cycles = halt_delay ? 24 : 20;
   return {
       .total_cycles = total_cycles,

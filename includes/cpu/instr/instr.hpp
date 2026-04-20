@@ -36,12 +36,6 @@ public:
 
   Instruction(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : reg_file(reg_file_ptr), bus(bus_ptr) {}
-
-  /**
-   * TODO: Document
-   */
-  virtual InstructionTiming get_timing_info() const = 0;
-
   /**
    * Executes the instruction in full, to be called on the memory access
    * clock cycle when appropriate.
@@ -61,7 +55,7 @@ public:
   /**
    * Parses the instruction in its entirety, reading intermediate fields
    */
-  virtual void parse() {}
+  virtual InstructionTiming parse() = 0;
 
   /**
    * @return A string describing the instruction

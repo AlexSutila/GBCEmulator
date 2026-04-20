@@ -36,11 +36,6 @@ std::size_t CB_PREFIX::exec() {
   return ins->exec();
 }
 
-InstructionTiming CB_PREFIX::get_timing_info() const {
-  const unique_ptr<Instruction> &ins = lookup.at(op);
-  return ins->get_timing_info();
-}
-
 std::size_t CB_PREFIX::mem_access_t_cycle() {
   const unique_ptr<Instruction> &ins = lookup.at(op);
   return ins->mem_access_t_cycle();
@@ -49,10 +44,10 @@ std::size_t CB_PREFIX::mem_access_t_cycle() {
 // TODO: This could fuck up royally but we ball lmao
 std::string CB_PREFIX::describe() { return IroGB::format("(CB) {}", lookup.at(op)->describe()); }
 
-void CB_PREFIX::parse() {
+InstructionTiming CB_PREFIX::parse() {
   op = bus->read_byte(reg_file->reg_pc++);
   const unique_ptr<Instruction> &ins = lookup.at(op);
-  ins->parse();
+  return ins->parse();
 }
 
 void LR35902::init_bitops(lookup_table_t &lookup_) {

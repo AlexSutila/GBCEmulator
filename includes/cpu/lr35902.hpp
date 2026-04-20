@@ -86,11 +86,10 @@ private:
 
   void prime_next_instr(Instruction *const next_ins);
   InstructionTiming timing_info{};
+  std::size_t cur_ins_clks{};
+
   addr_t ins_base_addr{}; // For debugger reference
   Instruction *ins_{};    // Reference to current ins
-
-  std::optional<std::size_t> total_ins_clks{};
-  std::size_t cur_ins_clks{};
 };
 
 #endif // GBC_LR35902_HPP

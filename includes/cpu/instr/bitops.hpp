@@ -39,7 +39,7 @@ public:
 
   std::string describe() override { return IroGB::format("RLCA"); }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
     return {
         .total_cycles = 4,
         .sync_events = 1,
@@ -75,7 +75,7 @@ public:
 
   std::string describe() override { return IroGB::format("RRCA"); }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
     return {
         .total_cycles = 4,
         .sync_events = 1,
@@ -112,7 +112,7 @@ public:
 
   std::string describe() override { return IroGB::format("RLA"); }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
     return {
         .total_cycles = 4,
         .sync_events = 1,
@@ -149,7 +149,7 @@ public:
 
   std::string describe() override { return IroGB::format("RRA"); }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
     return {
         .total_cycles = 4,
         .sync_events = 1,
@@ -164,11 +164,10 @@ public:
 class CB_PREFIX final : public Instruction {
 public:
   CB_PREFIX(RegisterFile *reg_file_ptr, AddressBus *bus_ptr);
-  InstructionTiming get_timing_info() const override;
+  InstructionTiming parse() override;
   std::size_t exec() override;
   std::size_t mem_access_t_cycle() override;
   std::string describe() override;
-  void parse() override;
 
 private:
   using lookup_table_t = std::array<std::unique_ptr<Instruction>, 256>;
@@ -202,7 +201,7 @@ public:
 
   std::string describe() override { return IroGB::format("RLC {}", to_string<dst>()); }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
     return {
         .total_cycles = 8,
         .sync_events = 1,
@@ -243,9 +242,9 @@ public:
   }
 
   std::string describe() override { return IroGB::format("RLC HL"); }
-  void parse() override { state = InstrStates::INSTR_STATE_READ; }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
+    state = InstrStates::INSTR_STATE_READ;
     return {
         .total_cycles = 16,
         .sync_events = 2,
@@ -282,7 +281,7 @@ public:
 
   std::string describe() override { return IroGB::format("RL {}", to_string<dst>()); }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
     return {
         .total_cycles = 8,
         .sync_events = 1,
@@ -325,9 +324,9 @@ public:
   }
 
   std::string describe() override { return IroGB::format("RL HL"); }
-  void parse() override { state = InstrStates::INSTR_STATE_READ; }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
+    state = InstrStates::INSTR_STATE_READ;
     return {
         .total_cycles = 16,
         .sync_events = 2,
@@ -363,7 +362,7 @@ public:
 
   std::string describe() override { return IroGB::format("RRC {}", to_string<dst>()); }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
     return {
         .total_cycles = 8,
         .sync_events = 1,
@@ -406,9 +405,9 @@ public:
   }
 
   std::string describe() override { return IroGB::format("RRC HL"); }
-  void parse() override { state = InstrStates::INSTR_STATE_READ; }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
+    state = InstrStates::INSTR_STATE_READ;
     return {
         .total_cycles = 16,
         .sync_events = 2,
@@ -445,7 +444,7 @@ public:
 
   std::string describe() override { return IroGB::format("RR {}", to_string<dst>()); }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
     return {
         .total_cycles = 8,
         .sync_events = 1,
@@ -488,9 +487,9 @@ public:
   }
 
   std::string describe() override { return IroGB::format("RR HL"); }
-  void parse() override { state = InstrStates::INSTR_STATE_READ; }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
+    state = InstrStates::INSTR_STATE_READ;
     return {
         .total_cycles = 16,
         .sync_events = 2,
@@ -526,7 +525,7 @@ public:
 
   std::string describe() override { return IroGB::format("SLA {}", to_string<dst>()); }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
     return {
         .total_cycles = 8,
         .sync_events = 1,
@@ -568,9 +567,9 @@ public:
   }
 
   std::string describe() override { return IroGB::format("SLA HL"); }
-  void parse() override { state = InstrStates::INSTR_STATE_READ; }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
+    state = InstrStates::INSTR_STATE_READ;
     return {
         .total_cycles = 16,
         .sync_events = 2,
@@ -605,7 +604,7 @@ public:
 
   std::string describe() override { return IroGB::format("SLA {}", to_string<dst>()); }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
     return {
         .total_cycles = 8,
         .sync_events = 1,
@@ -647,9 +646,9 @@ public:
   }
 
   std::string describe() override { return IroGB::format("SLA HL"); }
-  void parse() override { state = InstrStates::INSTR_STATE_READ; }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
+    state = InstrStates::INSTR_STATE_READ;
     return {
         .total_cycles = 16,
         .sync_events = 2,
@@ -683,7 +682,7 @@ public:
 
   std::string describe() override { return IroGB::format("SWAP {}", to_string<dst>()); }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
     return {
         .total_cycles = 8,
         .sync_events = 1,
@@ -725,9 +724,9 @@ public:
   }
 
   std::string describe() override { return IroGB::format("SWAP HL"); }
-  void parse() override { state = InstrStates::INSTR_STATE_READ; }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
+    state = InstrStates::INSTR_STATE_READ;
     return {
         .total_cycles = 16,
         .sync_events = 2,
@@ -762,7 +761,7 @@ public:
 
   std::string describe() override { return IroGB::format("SRL {}", to_string<dst>()); }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
     return {
         .total_cycles = 8,
         .sync_events = 1,
@@ -802,9 +801,9 @@ public:
   }
 
   std::string describe() override { return IroGB::format("SRL HL"); }
-  void parse() override { state = InstrStates::INSTR_STATE_READ; }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
+    state = InstrStates::INSTR_STATE_READ;
     return {
         .total_cycles = 16,
         .sync_events = 2,
@@ -836,7 +835,7 @@ public:
     return IroGB::format("BIT {}, {}", static_cast<int>(bit), to_string<dst>());
   }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
     return {
         .total_cycles = 8,
         .sync_events = 1,
@@ -863,7 +862,7 @@ public:
   std::string describe() override { return IroGB::format("BIT {}, HL", static_cast<int>(bit)); }
   std::size_t mem_access_t_cycle() override { return 8; }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
     return {
         .total_cycles = 12,
         .sync_events = 1,
@@ -886,7 +885,7 @@ public:
     return IroGB::format("RES {}, {}", static_cast<int>(bit), to_string<dst>());
   }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
     return {
         .total_cycles = 8,
         .sync_events = 1,
@@ -921,9 +920,9 @@ public:
   }
 
   std::string describe() override { return IroGB::format("RST {}, HL", static_cast<int>(bit)); }
-  void parse() override { state = InstrStates::INSTR_STATE_READ; }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
+    state = InstrStates::INSTR_STATE_READ;
     return {
         .total_cycles = 16,
         .sync_events = 2,
@@ -950,7 +949,7 @@ public:
     return IroGB::format("SET {}, {}", static_cast<int>(bit), to_string<dst>());
   }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
     return {
         .total_cycles = 8,
         .sync_events = 1,
@@ -984,9 +983,9 @@ public:
   }
 
   std::string describe() override { return IroGB::format("SET {}, HL", static_cast<int>(bit)); }
-  void parse() override { state = InstrStates::INSTR_STATE_READ; }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
+    state = InstrStates::INSTR_STATE_READ;
     return {
         .total_cycles = 16,
         .sync_events = 2,

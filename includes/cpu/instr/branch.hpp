@@ -40,17 +40,15 @@ public:
     return IroGB::format("JP {}", static_cast<int>(imm));
   }
 
-  void parse() override {
-    lo = bus->read_byte(reg_file->reg_pc, false);
-    hi = bus->read_byte(reg_file->reg_pc + 1, false);
-    state = InstrStates::INSTR_STATE_READ;
-  }
-
   std::size_t mem_access_t_cycle() override {
     return (state == InstrStates::INSTR_STATE_READ) ? 4 : 8;
   }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
+    lo = bus->read_byte(reg_file->reg_pc, false);
+    hi = bus->read_byte(reg_file->reg_pc + 1, false);
+    state = InstrStates::INSTR_STATE_READ;
+
     return {
         .total_cycles = 16,
         .sync_events = 2,
@@ -76,7 +74,7 @@ public:
 
   std::string describe() override { return IroGB::format("JP HL"); }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
     return {
         .total_cycles = 4,
         .sync_events = 1,
@@ -116,18 +114,16 @@ public:
                          static_cast<int>(make_addr(lo, hi)));
   }
 
-  void parse() override {
-    cond = reg_file->reg_af.get_flag(flag) == expect;
-    lo = bus->read_byte(reg_file->reg_pc, false);
-    hi = bus->read_byte(reg_file->reg_pc + 1, false);
-    state = InstrStates::INSTR_STATE_READ;
-  }
-
   std::size_t mem_access_t_cycle() override {
     return state == InstrStates::INSTR_STATE_READ ? 4 : 8;
   }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
+    cond = reg_file->reg_af.get_flag(flag) == expect;
+    lo = bus->read_byte(reg_file->reg_pc, false);
+    hi = bus->read_byte(reg_file->reg_pc + 1, false);
+    state = InstrStates::INSTR_STATE_READ;
+
     const unsigned total_cycles = cond ? 16 : 12;
     return {
         .total_cycles = total_cycles,
@@ -154,9 +150,9 @@ public:
   }
 
   std::string describe() override { return IroGB::format("JP {}", static_cast<int>(imm)); }
-  void parse() override { imm = static_cast<int8_t>(bus->read_byte(reg_file->reg_pc++)); }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
+    imm = static_cast<int8_t>(bus->read_byte(reg_file->reg_pc++));
     return {
         .total_cycles = 12,
         .sync_events = 1,
@@ -187,12 +183,10 @@ public:
     return IroGB::format("JP {}, {}", to_string<flag, expect>(), static_cast<int>(imm));
   }
 
-  void parse() override {
+  InstructionTiming parse() override {
     cond = reg_file->reg_af.get_flag(flag) == expect;
     imm = static_cast<int8_t>(bus->read_byte(reg_file->reg_pc++));
-  }
 
-  InstructionTiming get_timing_info() const override {
     const unsigned total_cycles = cond ? 12 : 8;
     return {
         .total_cycles = total_cycles,
@@ -248,13 +242,6 @@ public:
     return IroGB::format("CALL {}", static_cast<int>(imm));
   }
 
-  void parse() override {
-    state = InstrStates::INSTR_STATE_READ;
-    lo = bus->read_byte(reg_file->reg_pc, false);
-    hi = bus->read_byte(reg_file->reg_pc + 1, false);
-    sp = reg_file->reg_sp.read();
-  }
-
   std::size_t mem_access_t_cycle() override {
     switch (state) {
     case InstrStates::INSTR_STATE_READ:
@@ -270,7 +257,12 @@ public:
     }
   }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
+    state = InstrStates::INSTR_STATE_READ;
+    lo = bus->read_byte(reg_file->reg_pc, false);
+    hi = bus->read_byte(reg_file->reg_pc + 1, false);
+    sp = reg_file->reg_sp.read();
+
     return {
         .total_cycles = 24,
         .sync_events = 4,
@@ -326,14 +318,6 @@ public:
                          static_cast<int>(make_addr(lo, hi)));
   }
 
-  void parse() override {
-    cond = reg_file->reg_af.get_flag(flag) == expect;
-    lo = bus->read_byte(reg_file->reg_pc, false);
-    hi = bus->read_byte(reg_file->reg_pc + 1, false);
-    state = InstrStates::INSTR_STATE_READ;
-    sp = reg_file->reg_sp.read();
-  }
-
   std::size_t mem_access_t_cycle() override {
     switch (state) {
     case InstrStates::INSTR_STATE_READ:
@@ -349,7 +333,13 @@ public:
     }
   }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
+    cond = reg_file->reg_af.get_flag(flag) == expect;
+    lo = bus->read_byte(reg_file->reg_pc, false);
+    hi = bus->read_byte(reg_file->reg_pc + 1, false);
+    state = InstrStates::INSTR_STATE_READ;
+    sp = reg_file->reg_sp.read();
+
     const unsigned total_cycles = cond ? 24 : 12;
     return {
         .total_cycles = total_cycles,
@@ -394,14 +384,12 @@ public:
     return state == InstrStates::INSTR_STATE_READ ? 4 : 8;
   }
 
-  void parse() override {
-    state = InstrStates::INSTR_STATE_READ;
-    sp = reg_file->reg_sp.read();
-  }
-
   std::string describe() override { return IroGB::format("RET"); }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
+    state = InstrStates::INSTR_STATE_READ;
+    sp = reg_file->reg_sp.read();
+
     return {
         .total_cycles = 16,
         .sync_events = 2,
@@ -442,19 +430,17 @@ public:
 
   std::string describe() override { return IroGB::format("RET {}", to_string<flag, expect>()); }
 
-  void parse() override {
-    cond = reg_file->reg_af.get_flag(flag) == expect;
-    state = InstrStates::INSTR_STATE_READ;
-    sp = reg_file->reg_sp.read();
-  }
-
   std::size_t mem_access_t_cycle() override {
     if (!cond) // Return does not happen
       return 0;
     return state == InstrStates::INSTR_STATE_READ ? 8 : 12;
   }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
+    cond = reg_file->reg_af.get_flag(flag) == expect;
+    state = InstrStates::INSTR_STATE_READ;
+    sp = reg_file->reg_sp.read();
+
     const unsigned total_cycles = cond ? 20 : 8;
     return {
         .total_cycles = total_cycles,
@@ -501,14 +487,12 @@ public:
     return state == InstrStates::INSTR_STATE_READ ? 4 : 8;
   }
 
-  void parse() override {
-    state = InstrStates::INSTR_STATE_READ;
-    sp = reg_file->reg_sp.read();
-  }
-
   std::string describe() override { return IroGB::format("RETI"); }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
+    state = InstrStates::INSTR_STATE_READ;
+    sp = reg_file->reg_sp.read();
+
     return {
         .total_cycles = 16,
         .sync_events = 2,
@@ -552,12 +536,10 @@ public:
 
   std::string describe() override { return IroGB::format("RST {}", static_cast<int>(vec)); }
 
-  void parse() override {
+  InstructionTiming parse() override {
     state = InstrStates::INSTR_STATE_WRITE;
     sp = reg_file->reg_sp.read();
-  }
 
-  InstructionTiming get_timing_info() const override {
     return {
         .total_cycles = 16,
         .sync_events = 2,

@@ -26,7 +26,7 @@ public:
 
   std::string describe() override { return IroGB::format("CPL"); }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
     return {
         .total_cycles = 4,
         .sync_events = 1,
@@ -50,7 +50,7 @@ public:
 
   std::string describe() override { return IroGB::format("SCF"); }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
     return {
         .total_cycles = 4,
         .sync_events = 1,
@@ -75,7 +75,7 @@ public:
 
   std::string describe() override { return IroGB::format("CCF"); }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
     return {
         .total_cycles = 4,
         .sync_events = 1,
@@ -92,7 +92,7 @@ public:
   std::string describe() override { return IroGB::format("NOP"); }
   std::size_t exec() override { return 4; }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
     return {
         .total_cycles = 4,
         .sync_events = 1,
@@ -115,7 +115,7 @@ public:
 
   std::string describe() override { return IroGB::format("DI"); }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
     return {
         .total_cycles = 4,
         .sync_events = 1,
@@ -141,7 +141,7 @@ public:
 
   std::string describe() override { return IroGB::format("EI"); }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
     return {
         .total_cycles = 4,
         .sync_events = 1,
@@ -185,7 +185,7 @@ public:
    * HALT mode until the instruction has completed. */
   std::size_t mem_access_t_cycle() override { return 0; }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
     return {
         .total_cycles = 4,
         .sync_events = 1,
@@ -222,7 +222,7 @@ public:
   // Subject to change??? But same rationale as HALT timing for now.
   std::size_t mem_access_t_cycle() override { return 0; }
 
-  InstructionTiming get_timing_info() const override {
+  InstructionTiming parse() override {
     return {
         .total_cycles = 4,
         .sync_events = 1,

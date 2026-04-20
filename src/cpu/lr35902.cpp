@@ -92,7 +92,6 @@ LR35902::LR35902(AddressBus *bus_ptr, std::optional<Debug::Debugger> &debugger,
 
   /* Init fetch decode execute fsm */
   state = STATE_FETCH;
-  total_ins_clks = std::nullopt;
   cur_ins_clks = 0;
 
   /* Register initialization */
@@ -248,11 +247,8 @@ void LR35902::prime_next_instr(Instruction *const next_ins) {
   state = STATE_EXECUTE;
   ins_ = next_ins;
 
-  total_ins_clks.reset();
+  timing_info = ins_->parse();
   cur_ins_clks = 0;
-
-  ins_->parse();
-  timing_info = ins_->get_timing_info();
 
   // This must happen after `ins_->parse()` for correct operands
   try_brk(ins_base_addr, brk_reason_flags);
@@ -260,7 +256,7 @@ void LR35902::prime_next_instr(Instruction *const next_ins) {
 
 void LR35902::step() {
   switch (state) {
-  case STATE_FETCH: // Break omitted intentionally
+  case STATE_FETCH: // Break omitted intentionally to emulate fetch/exec overlap
     do_fetch();
 
   case STATE_EXECUTE:
