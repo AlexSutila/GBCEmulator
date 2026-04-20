@@ -176,9 +176,9 @@ public:
       : Instruction(reg_file_ptr, bus_ptr) {}
 
   std::size_t exec() override {
-    const bool cond = reg_file->reg_af.get_flag(flag);
-    if (cond != expect)
+    if (!cond)
       return 8;
+
     reg_file->reg_pc += static_cast<addr_t>(imm);
     return 12;
   }
@@ -187,10 +187,13 @@ public:
     return IroGB::format("JP {}, {}", to_string<flag, expect>(), static_cast<int>(imm));
   }
 
-  void parse() override { imm = static_cast<int8_t>(bus->read_byte(reg_file->reg_pc++)); }
+  void parse() override {
+    cond = reg_file->reg_af.get_flag(flag) == expect;
+    imm = static_cast<int8_t>(bus->read_byte(reg_file->reg_pc++));
+  }
 
   InstructionTiming get_timing_info() const override {
-    const unsigned total_cycles = reg_file->reg_af.get_flag(flag) == expect ? 12 : 8;
+    const unsigned total_cycles = cond ? 12 : 8;
     return {
         .total_cycles = total_cycles,
         .sync_events = 1,
@@ -199,6 +202,7 @@ public:
 
 private:
   std::int8_t imm{}; // Signed intentionally
+  bool cond{};
 };
 
 /*

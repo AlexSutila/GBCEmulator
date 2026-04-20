@@ -202,22 +202,21 @@ void LR35902::do_fetch() {
 /* Execute instruction on critical mem-access clock cycle */
 void LR35902::do_execute() {
   if (cur_ins_clks == ins_->mem_access_t_cycle())
-    total_ins_clks = ins_->exec();
+    ins_->exec();
   ++cur_ins_clks;
 
   /* Complete instruction based on execution time */
-  if (!total_ins_clks.has_value() || cur_ins_clks < total_ins_clks.value())
-    return;
+  if (cur_ins_clks >= timing_info.total_cycles) {
+    /* If the instruction executed was `HALT`, the processor suspends its
+     * execution until it is awakened by some interrupt source. The exact behavior
+     * is conditional depending on whether IME is enabled or not. */
+    if (sys_.halted) [[unlikely]]
+      state = STATE_HALTED;
 
-  /* If the instruction executed was `HALT`, the processor suspends its
-   * execution until it is awakened by some interrupt source. The exact behavior
-   * is conditional depending on whether IME is enabled or not. */
-  if (sys_.halted) [[unlikely]]
-    state = STATE_HALTED;
-
-  /* Otherwise, continue fetch/parse/execute pipeline as usual. */
-  else
-    state = STATE_FETCH;
+    /* Otherwise, continue fetch/parse/execute pipeline as usual. */
+    else
+      state = STATE_FETCH;
+  }
 }
 
 void LR35902::do_halt() {
@@ -251,7 +250,9 @@ void LR35902::prime_next_instr(Instruction *const next_ins) {
 
   total_ins_clks.reset();
   cur_ins_clks = 0;
+
   ins_->parse();
+  timing_info = ins_->get_timing_info();
 
   // This must happen after `ins_->parse()` for correct operands
   try_brk(ins_base_addr, brk_reason_flags);

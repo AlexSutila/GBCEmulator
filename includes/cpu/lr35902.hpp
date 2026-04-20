@@ -85,6 +85,7 @@ private:
   void do_halt();
 
   void prime_next_instr(Instruction *const next_ins);
+  InstructionTiming timing_info{};
   addr_t ins_base_addr{}; // For debugger reference
   Instruction *ins_{};    // Reference to current ins
 

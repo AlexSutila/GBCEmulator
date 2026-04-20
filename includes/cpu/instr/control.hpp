@@ -183,7 +183,7 @@ public:
   /* NOTE: This instruction does not access memory. However, we still do not
    * want this instruction to take effect and actually place the processor in
    * HALT mode until the instruction has completed. */
-  std::size_t mem_access_t_cycle() override { return 4; }
+  std::size_t mem_access_t_cycle() override { return 0; }
 
   InstructionTiming get_timing_info() const override {
     return {
@@ -220,7 +220,7 @@ public:
   std::string describe() override { return IroGB::format("STOP"); }
 
   // Subject to change??? But same rationale as HALT timing for now.
-  std::size_t mem_access_t_cycle() override { return 4; }
+  std::size_t mem_access_t_cycle() override { return 0; }
 
   InstructionTiming get_timing_info() const override {
     return {

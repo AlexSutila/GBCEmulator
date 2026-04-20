@@ -8,10 +8,6 @@
 #include <cstddef>
 #include <string>
 
-static inline addr_t make_addr(byte_t lo, byte_t hi) {
-  return static_cast<addr_t>(lo) | (static_cast<addr_t>(hi) << 8);
-}
-
 enum class InstrStates {
   INSTR_STATE_READ,
   INSTR_STATE_WRITE,
