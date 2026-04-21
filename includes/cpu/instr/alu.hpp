@@ -13,13 +13,14 @@
 /*
  * Add value in 8-bit register X to A
  */
-template <Register8Bit src> class ADD_A_X final : public Instruction {
+class ADD_A_X final : public Instruction {
 public:
-  ADD_A_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+  ADD_A_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr, Register8Bit src)
+      : Instruction(reg_file_ptr, bus_ptr), src(src) {}
 
   std::size_t exec() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
-    const byte_t x = read_reg<src>();
+    const byte_t x = read_reg(src);
     const byte_t result = a + x;
 
     // Update flags
@@ -35,7 +36,7 @@ public:
     return 4;
   }
 
-  std::string describe() override { return IroGB::format("ADD A, {}", to_string<src>()); }
+  std::string describe() override { return IroGB::format("ADD A, {}", to_string(src)); }
 
   InstructionTiming parse() override {
     return {
@@ -43,6 +44,9 @@ public:
         .sync_events = 1,
     };
   }
+
+private:
+  const Register8Bit src;
 };
 
 /*
@@ -123,13 +127,14 @@ public:
 /*
  * Add value in 8-bit register X to A with carry
  */
-template <Register8Bit src> class ADC_A_X final : public Instruction {
+class ADC_A_X final : public Instruction {
 public:
-  ADC_A_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+  ADC_A_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr, Register8Bit src)
+      : Instruction(reg_file_ptr, bus_ptr), src(src) {}
 
   std::size_t exec() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
-    const byte_t x = read_reg<src>();
+    const byte_t x = read_reg(src);
     const byte_t carry = reg_file->reg_af.get_flag(StatusFlagMask::FLAG_C_MASK) ? 1 : 0;
 
     // Compute sum including carry flag
@@ -148,7 +153,7 @@ public:
     return 4;
   }
 
-  std::string describe() override { return IroGB::format("ADC A, {}", to_string<src>()); }
+  std::string describe() override { return IroGB::format("ADC A, {}", to_string(src)); }
 
   InstructionTiming parse() override {
     return {
@@ -156,6 +161,9 @@ public:
         .sync_events = 1,
     };
   }
+
+private:
+  const Register8Bit src;
 };
 
 /*
@@ -243,13 +251,14 @@ public:
 /*
  * Subtract value in 8-bit register X from A
  */
-template <Register8Bit src> class SUB_A_X final : public Instruction {
+class SUB_A_X final : public Instruction {
 public:
-  SUB_A_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+  SUB_A_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr, Register8Bit src)
+      : Instruction(reg_file_ptr, bus_ptr), src(src) {}
 
   std::size_t exec() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
-    const byte_t x = read_reg<src>();
+    const byte_t x = read_reg(src);
     const byte_t result = a - x;
 
     // Update flags
@@ -264,7 +273,7 @@ public:
     return 4;
   }
 
-  std::string describe() override { return IroGB::format("SUB A, {}", to_string<src>()); }
+  std::string describe() override { return IroGB::format("SUB A, {}", to_string(src)); }
 
   InstructionTiming parse() override {
     return {
@@ -272,6 +281,9 @@ public:
         .sync_events = 1,
     };
   }
+
+private:
+  const Register8Bit src;
 };
 
 /*
@@ -350,13 +362,14 @@ public:
 /*
  * Subtract value in 8-bit register X from A with carry
  */
-template <Register8Bit src> class SBC_A_X final : public Instruction {
+class SBC_A_X final : public Instruction {
 public:
-  SBC_A_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+  SBC_A_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr, Register8Bit src)
+      : Instruction(reg_file_ptr, bus_ptr), src(src) {}
 
   std::size_t exec() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
-    const byte_t x = read_reg<src>();
+    const byte_t x = read_reg(src);
     const byte_t carry = reg_file->reg_af.get_flag(StatusFlagMask::FLAG_C_MASK) ? 1 : 0;
 
     // Compute difference including carry flag
@@ -377,7 +390,7 @@ public:
     return 4;
   }
 
-  std::string describe() override { return IroGB::format("SBC A, {}", to_string<src>()); }
+  std::string describe() override { return IroGB::format("SBC A, {}", to_string(src)); }
 
   InstructionTiming parse() override {
     return {
@@ -385,6 +398,9 @@ public:
         .sync_events = 1,
     };
   }
+
+private:
+  const Register8Bit src;
 };
 
 /*
@@ -475,13 +491,14 @@ public:
 /*
  * Bitwise AND value from 8-bit register X with A
  */
-template <Register8Bit src> class AND_A_X final : public Instruction {
+class AND_A_X final : public Instruction {
 public:
-  AND_A_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+  AND_A_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr, Register8Bit src)
+      : Instruction(reg_file_ptr, bus_ptr), src(src) {}
 
   std::size_t exec() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
-    const byte_t x = read_reg<src>();
+    const byte_t x = read_reg(src);
     const byte_t result = a & x;
 
     // Update flags
@@ -495,7 +512,7 @@ public:
     return 4;
   }
 
-  std::string describe() override { return IroGB::format("AND A, {}", to_string<src>()); }
+  std::string describe() override { return IroGB::format("AND A, {}", to_string(src)); }
 
   InstructionTiming parse() override {
     return {
@@ -503,6 +520,9 @@ public:
         .sync_events = 1,
     };
   }
+
+private:
+  const Register8Bit src;
 };
 
 /*
@@ -579,13 +599,14 @@ public:
 /*
  * Bitwise XOR value from 8-bit register X with A
  */
-template <Register8Bit src> class XOR_A_X final : public Instruction {
+class XOR_A_X final : public Instruction {
 public:
-  XOR_A_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+  XOR_A_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr, Register8Bit src)
+      : Instruction(reg_file_ptr, bus_ptr), src(src) {}
 
   std::size_t exec() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
-    const byte_t x = read_reg<src>();
+    const byte_t x = read_reg(src);
     const byte_t result = a ^ x;
 
     // Update flags
@@ -599,7 +620,7 @@ public:
     return 4;
   }
 
-  std::string describe() override { return IroGB::format("XOR A, {}", to_string<src>()); }
+  std::string describe() override { return IroGB::format("XOR A, {}", to_string(src)); }
 
   InstructionTiming parse() override {
     return {
@@ -607,6 +628,9 @@ public:
         .sync_events = 1,
     };
   }
+
+private:
+  const Register8Bit src;
 };
 
 /*
@@ -683,13 +707,14 @@ public:
 /*
  * Bitwise OR value from 8-bit register X with A
  */
-template <Register8Bit src> class OR_A_X final : public Instruction {
+class OR_A_X final : public Instruction {
 public:
-  OR_A_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+  OR_A_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr, Register8Bit src)
+      : Instruction(reg_file_ptr, bus_ptr), src(src) {}
 
   std::size_t exec() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
-    const byte_t x = read_reg<src>();
+    const byte_t x = read_reg(src);
     const byte_t result = a | x;
 
     // Update flags
@@ -703,7 +728,7 @@ public:
     return 4;
   }
 
-  std::string describe() override { return IroGB::format("OR A, {}", to_string<src>()); }
+  std::string describe() override { return IroGB::format("OR A, {}", to_string(src)); }
 
   InstructionTiming parse() override {
     return {
@@ -711,6 +736,9 @@ public:
         .sync_events = 1,
     };
   }
+
+private:
+  const Register8Bit src;
 };
 
 /*
@@ -787,13 +815,14 @@ public:
  * Compare 8-bit register X with A. This is basically a subtract operation,
  * but it throws away the result and only updates the flags.
  */
-template <Register8Bit src> class CP_A_X final : public Instruction {
+class CP_A_X final : public Instruction {
 public:
-  CP_A_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+  CP_A_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr, Register8Bit src)
+      : Instruction(reg_file_ptr, bus_ptr), src(src) {}
 
   std::size_t exec() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
-    const byte_t x = read_reg<src>();
+    const byte_t x = read_reg(src);
 
     // Update flags
     const bool half_carry = (a & 0x0F) < (x & 0x0F);
@@ -804,7 +833,7 @@ public:
     return 4;
   }
 
-  std::string describe() override { return IroGB::format("CP A, {}", to_string<src>()); }
+  std::string describe() override { return IroGB::format("CP A, {}", to_string(src)); }
 
   InstructionTiming parse() override {
     return {
@@ -812,6 +841,9 @@ public:
         .sync_events = 1,
     };
   }
+
+private:
+  const Register8Bit src;
 };
 
 /*
