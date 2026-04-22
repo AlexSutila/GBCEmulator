@@ -112,7 +112,7 @@ public:
         ie_(ie_reg) {}
   InstructionTiming parse() override;
   std::string describe() override;
-  std::size_t exec() override;
+  void exec() override;
   void incur_halt_delay(); // Invoked by CPU to incur when halted
 
   // Compute new PC location, considers stack overflow leading to EI overwrite

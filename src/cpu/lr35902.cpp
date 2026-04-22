@@ -200,7 +200,7 @@ void LR35902::do_fetch() {
 
 /* Execute instruction on critical mem-access clock cycle */
 void LR35902::do_execute() {
-  if (cur_ins_clks == ins_->mem_access_t_cycle())
+  if (cur_ins_clks == ins_->next_sync_cycle())
     ins_->exec();
   ++cur_ins_clks;
 

@@ -89,7 +89,7 @@ std::string ISR::describe() { return IroGB::format("ISR"); }
 void ISR::incur_halt_delay() { halt_delay = true; }
 
 /* See details about interrupt service routines in `interrupts.hpp` */
-std::size_t ISR::exec() {
+void ISR::exec() {
   const auto [flag, vec] = calc_effective_call_addr();
   const addr_t sp = read_reg<Register16Bit::REG_SP>();
 
@@ -114,7 +114,6 @@ std::size_t ISR::exec() {
     if_.put_flag(flag, false);
   }
   write_reg<Register16Bit::REG_SP>(sp - 2);
-  return was_halted ? 24 : 20;
 }
 
 InstructionTiming ISR::parse() {

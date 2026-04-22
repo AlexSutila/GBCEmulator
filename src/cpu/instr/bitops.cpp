@@ -20,7 +20,7 @@ CB_PREFIX::CB_PREFIX(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
   init_cb_prefix(lookup);
 }
 
-std::size_t CB_PREFIX::exec() {
+void CB_PREFIX::exec() {
   const unique_ptr<Instruction> &ins = lookup.at(op);
 
   // Handle un-implemented opcodes - unlikely because CB doesn't have illegal
@@ -33,12 +33,12 @@ std::size_t CB_PREFIX::exec() {
   }
 
   // Parse instruction operands and execute just like in CPU code
-  return ins->exec();
+  ins->exec();
 }
 
-std::size_t CB_PREFIX::mem_access_t_cycle() {
+std::size_t CB_PREFIX::next_sync_cycle() {
   const unique_ptr<Instruction> &ins = lookup.at(op);
-  return ins->mem_access_t_cycle();
+  return ins->next_sync_cycle();
 }
 
 // TODO: This could fuck up royally but we ball lmao

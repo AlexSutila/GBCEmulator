@@ -39,18 +39,20 @@ public:
   /**
    * Executes the instruction in full, to be called on the memory access
    * clock cycle when appropriate.
-   *
-   * @return A tuple containing:
-   *  - size_t: total number of clock cycles for this instruction
    */
-  virtual std::size_t exec() = 0;
+  virtual void exec() = 0;
 
   /**
+   * We use the clock cycles which align with the return value from this
+   * method as synchronization point candidates. The idea is optimize by
+   * doing less -> skip sync cycles -> improve performance without losing
+   * accuracy.
+   *
    * @return A tuple containing:
    *  - size_t: the memory access clock cycle of the instruction, when
    *    applicable. If memory access timing does not matter, use zero.
    */
-  virtual std::size_t mem_access_t_cycle() { return 0; };
+  virtual std::size_t next_sync_cycle() { return 0; };
 
   /**
    * Parses the instruction in its entirety, reading intermediate fields
