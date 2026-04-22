@@ -63,21 +63,6 @@ public:
   virtual std::string describe() { return "Un-implemented"; }
 
 protected:
-  template <Register16Bit reg> [[nodiscard]] static const char *to_string() {
-    if constexpr (reg == Register16Bit::REG_AF)
-      return "AF";
-    else if constexpr (reg == Register16Bit::REG_BC)
-      return "BC";
-    else if constexpr (reg == Register16Bit::REG_DE)
-      return "DE";
-    else if constexpr (reg == Register16Bit::REG_HL)
-      return "HL";
-    else if constexpr (reg == Register16Bit::REG_SP)
-      return "SP";
-    else
-      static_assert("Invalid 16-bit register");
-  }
-
   [[nodiscard]] static const char *to_string(Register16Bit reg) {
     switch (reg) {
     case Register16Bit::REG_AF:
@@ -91,28 +76,7 @@ protected:
     case Register16Bit::REG_SP:
       return "SP";
     }
-    return "??";
-  }
-
-  template <Register8Bit reg> [[nodiscard]] static const char *to_string() {
-    if constexpr (reg == Register8Bit::REG_A)
-      return "A";
-    else if constexpr (reg == Register8Bit::REG_F)
-      return "F";
-    else if constexpr (reg == Register8Bit::REG_B)
-      return "B";
-    else if constexpr (reg == Register8Bit::REG_C)
-      return "C";
-    else if constexpr (reg == Register8Bit::REG_D)
-      return "D";
-    else if constexpr (reg == Register8Bit::REG_E)
-      return "E";
-    else if constexpr (reg == Register8Bit::REG_H)
-      return "H";
-    else if constexpr (reg == Register8Bit::REG_L)
-      return "L";
-    else
-      static_assert("Invalid 8-bit register");
+    __builtin_unreachable();
   }
 
   [[nodiscard]] static const char *to_string(Register8Bit reg) {
@@ -134,7 +98,7 @@ protected:
     case Register8Bit::REG_L:
       return "L";
     }
-    return "?";
+    __builtin_unreachable();
   }
 
   [[nodiscard]] static const char *to_string(StatusFlagMask flag, bool expect) {
@@ -148,7 +112,7 @@ protected:
     case StatusFlagMask::FLAG_H_MASK:
       return expect ? "H" : "!H";
     }
-    return "?";
+    __builtin_unreachable();
   }
 
   template <Register16Bit reg> void write_reg(const addr_t addr) const {
@@ -214,7 +178,7 @@ protected:
     case Register16Bit::REG_SP:
       return reg_file->reg_sp.read();
     }
-    return 0xFF;
+    __builtin_unreachable();
   }
 
   template <Register8Bit reg> void write_reg(const byte_t byte) const {
@@ -308,7 +272,7 @@ protected:
     case Register8Bit::REG_L:
       return reg_file->reg_hl.read_lo();
     }
-    return 0xFF;
+    __builtin_unreachable();
   }
 
   static inline addr_t make_addr(byte_t lo, byte_t hi) {

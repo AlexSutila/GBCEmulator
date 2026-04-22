@@ -915,12 +915,13 @@ public:
 /*
  * Increment contents of 8-bit register X
  */
-template <Register8Bit src> class INC_X final : public Instruction {
+class INC_X final : public Instruction {
 public:
-  INC_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+  INC_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr, Register8Bit src)
+      : Instruction(reg_file_ptr, bus_ptr), src(src) {}
 
   std::size_t exec() override {
-    const byte_t x = read_reg<src>();
+    const byte_t x = read_reg(src);
     const byte_t result = x + 1;
 
     // Update flags - C is left alone for this instruction
@@ -930,11 +931,11 @@ public:
     reg_file->reg_af.put_flag(StatusFlagMask::FLAG_H_MASK, half_carry);
 
     // Write back
-    write_reg<src>(result);
+    write_reg(src, result);
     return 4;
   }
 
-  std::string describe() override { return IroGB::format("INC {}", to_string<src>()); }
+  std::string describe() override { return IroGB::format("INC {}", to_string(src)); }
 
   InstructionTiming parse() override {
     return {
@@ -942,6 +943,9 @@ public:
         .sync_events = 1,
     };
   }
+
+private:
+  const Register8Bit src;
 };
 
 /*
@@ -997,12 +1001,13 @@ private:
 /*
  * Decrement contents of 8-bit register X
  */
-template <Register8Bit src> class DEC_X final : public Instruction {
+class DEC_X final : public Instruction {
 public:
-  DEC_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+  DEC_X(RegisterFile *reg_file_ptr, AddressBus *bus_ptr, Register8Bit src)
+      : Instruction(reg_file_ptr, bus_ptr), src(src) {}
 
   std::size_t exec() override {
-    const byte_t x = read_reg<src>();
+    const byte_t x = read_reg(src);
     const byte_t result = x - 1;
 
     // Update flags
@@ -1012,11 +1017,11 @@ public:
     reg_file->reg_af.put_flag(StatusFlagMask::FLAG_H_MASK, half_carry);
 
     // Write back
-    write_reg<src>(result);
+    write_reg(src, result);
     return 4;
   }
 
-  std::string describe() override { return IroGB::format("DEC {}", to_string<src>()); }
+  std::string describe() override { return IroGB::format("DEC {}", to_string(src)); }
 
   InstructionTiming parse() override {
     return {
@@ -1024,6 +1029,9 @@ public:
         .sync_events = 1,
     };
   }
+
+private:
+  const Register8Bit src;
 };
 
 /*
@@ -1131,13 +1139,14 @@ public:
 /*
  * Increment HL register by contents of 16-bit XX register
  */
-template <Register16Bit src> class ADD_HL_XX final : public Instruction {
+class ADD_HL_XX final : public Instruction {
 public:
-  ADD_HL_XX(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+  ADD_HL_XX(RegisterFile *reg_file_ptr, AddressBus *bus_ptr, Register16Bit src)
+      : Instruction(reg_file_ptr, bus_ptr), src(src) {}
 
   std::size_t exec() override {
-    const addr_t hl = read_reg<Register16Bit::REG_HL>();
-    const addr_t xx = read_reg<src>();
+    const addr_t hl = read_reg(Register16Bit::REG_HL);
+    const addr_t xx = read_reg(src);
     const std::uint32_t sum = static_cast<std::uint32_t>(hl) + xx;
 
     // Update flags
@@ -1151,7 +1160,7 @@ public:
     return 8;
   }
 
-  std::string describe() override { return IroGB::format("ADD HL, {}", to_string<src>()); }
+  std::string describe() override { return IroGB::format("ADD HL, {}", to_string(src)); }
 
   InstructionTiming parse() override {
     return {
@@ -1159,22 +1168,26 @@ public:
         .sync_events = 1,
     };
   }
+
+private:
+  const Register16Bit src;
 };
 
 /*
  * Increment contents of 16-bit XX register
  */
-template <Register16Bit dst> class INC_XX final : public Instruction {
+class INC_XX final : public Instruction {
 public:
-  INC_XX(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+  INC_XX(RegisterFile *reg_file_ptr, AddressBus *bus_ptr, Register16Bit dst)
+      : Instruction(reg_file_ptr, bus_ptr), dst(dst) {}
 
   std::size_t exec() override {
-    const addr_t xx = read_reg<dst>();
-    write_reg<dst>(xx + 1);
+    const addr_t xx = read_reg(dst);
+    write_reg(dst, xx + 1);
     return 8;
   }
 
-  std::string describe() override { return IroGB::format("INC {}", to_string<dst>()); }
+  std::string describe() override { return IroGB::format("INC {}", to_string(dst)); }
 
   InstructionTiming parse() override {
     return {
@@ -1182,22 +1195,26 @@ public:
         .sync_events = 1,
     };
   }
+
+private:
+  const Register16Bit dst;
 };
 
 /*
  * Decrement contents of 16-bit XX register
  */
-template <Register16Bit dst> class DEC_XX final : public Instruction {
+class DEC_XX final : public Instruction {
 public:
-  DEC_XX(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+  DEC_XX(RegisterFile *reg_file_ptr, AddressBus *bus_ptr, Register16Bit dst)
+      : Instruction(reg_file_ptr, bus_ptr), dst(dst) {}
 
   std::size_t exec() override {
-    const addr_t xx = read_reg<dst>();
-    write_reg<dst>(xx - 1);
+    const addr_t xx = read_reg(dst);
+    write_reg(dst, xx - 1);
     return 8;
   }
 
-  std::string describe() override { return IroGB::format("DEC {}", to_string<dst>()); }
+  std::string describe() override { return IroGB::format("DEC {}", to_string(dst)); }
 
   InstructionTiming parse() override {
     return {
@@ -1205,6 +1222,9 @@ public:
         .sync_events = 1,
     };
   }
+
+private:
+  const Register16Bit dst;
 };
 
 /*
