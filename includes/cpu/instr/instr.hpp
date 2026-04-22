@@ -63,12 +63,6 @@ public:
   virtual std::string describe() { return "Un-implemented"; }
 
 protected:
-  /**
-   * All just compile time stuff to reduce having to go through unnecessary
-   * decode logic during runtime. A lot of it can be done during compile time
-   * unless an instruction deals with immediate values.
-   */
-
   template <Register16Bit reg> [[nodiscard]] static const char *to_string() {
     if constexpr (reg == Register16Bit::REG_AF)
       return "AF";
@@ -82,7 +76,6 @@ protected:
       return "SP";
     else
       static_assert("Invalid 16-bit register");
-    return "??";
   }
 
   [[nodiscard]] static const char *to_string(Register16Bit reg) {
@@ -120,7 +113,6 @@ protected:
       return "L";
     else
       static_assert("Invalid 8-bit register");
-    return "?";
   }
 
   [[nodiscard]] static const char *to_string(Register8Bit reg) {
@@ -145,15 +137,17 @@ protected:
     return "?";
   }
 
-  template <StatusFlagMask flag, bool expect> [[nodiscard]] static const char *to_string() {
-    if constexpr (flag == StatusFlagMask::FLAG_C_MASK)
+  [[nodiscard]] static const char *to_string(StatusFlagMask flag, bool expect) {
+    switch (flag) {
+    case StatusFlagMask::FLAG_C_MASK:
       return expect ? "C" : "!C";
-    if constexpr (flag == StatusFlagMask::FLAG_N_MASK)
+    case StatusFlagMask::FLAG_N_MASK:
       return expect ? "N" : "!N";
-    if constexpr (flag == StatusFlagMask::FLAG_Z_MASK)
+    case StatusFlagMask::FLAG_Z_MASK:
       return expect ? "Z" : "!Z";
-    if constexpr (flag == StatusFlagMask::FLAG_H_MASK)
+    case StatusFlagMask::FLAG_H_MASK:
       return expect ? "H" : "!H";
+    }
     return "?";
   }
 
@@ -205,7 +199,6 @@ protected:
       return reg_file->reg_sp.read();
     else
       static_assert("Invalid 16-bit register");
-    return 0xFF;
   }
 
   [[nodiscard]] addr_t read_reg(Register16Bit reg) const {

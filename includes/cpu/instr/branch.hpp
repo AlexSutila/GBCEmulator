@@ -3,6 +3,7 @@
 
 #include "cpu/instr/instr.hpp"
 #include "cpu/interrupts.hpp"
+#include "cpu/registers/flags.hpp"
 #include "cpu/registers/regfile.hpp"
 #include "emu_types.hpp"
 #include "format.hpp"
@@ -85,10 +86,10 @@ public:
 /*
  * Conditional absolute jump
  */
-template <StatusFlagMask flag, bool expect> class JP_cond_imm16 final : public Instruction {
+class JP_cond_imm16 final : public Instruction {
 public:
-  JP_cond_imm16(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  JP_cond_imm16(RegisterFile *reg_file_ptr, AddressBus *bus_ptr, StatusFlagMask flag, bool expect)
+      : Instruction(reg_file_ptr, bus_ptr), flag(flag), expect(expect) {}
 
   std::size_t exec() override {
     switch (state) {
@@ -110,8 +111,7 @@ public:
   }
 
   std::string describe() override {
-    return IroGB::format("JP {}, {}", to_string<flag, expect>(),
-                         static_cast<int>(make_addr(lo, hi)));
+    return IroGB::format("JP {}, {}", to_string(flag, expect), static_cast<int>(make_addr(lo, hi)));
   }
 
   std::size_t mem_access_t_cycle() override {
@@ -132,6 +132,9 @@ public:
   }
 
 private:
+  const StatusFlagMask flag;
+  const bool expect;
+
   InstrStates state{};
   byte_t lo{}, hi{};
   bool cond{};
@@ -166,10 +169,10 @@ private:
 /*
  * Conditional relative jump - NOTE: Offset is signed
  */
-template <StatusFlagMask flag, bool expect> class JR_cond_imm8 final : public Instruction {
+class JR_cond_imm8 final : public Instruction {
 public:
-  JR_cond_imm8(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  JR_cond_imm8(RegisterFile *reg_file_ptr, AddressBus *bus_ptr, StatusFlagMask flag, bool expect)
+      : Instruction(reg_file_ptr, bus_ptr), flag(flag), expect(expect) {}
 
   std::size_t exec() override {
     if (!cond)
@@ -180,7 +183,7 @@ public:
   }
 
   std::string describe() override {
-    return IroGB::format("JP {}, {}", to_string<flag, expect>(), static_cast<int>(imm));
+    return IroGB::format("JP {}, {}", to_string(flag, expect), static_cast<int>(imm));
   }
 
   InstructionTiming parse() override {
@@ -195,6 +198,9 @@ public:
   }
 
 private:
+  const StatusFlagMask flag;
+  const bool expect;
+
   std::int8_t imm{}; // Signed intentionally
   bool cond{};
 };
@@ -278,10 +284,10 @@ private:
 /*
  * Conditional absolute call
  */
-template <StatusFlagMask flag, bool expect> class CALL_cond_imm16 final : public Instruction {
+class CALL_cond_imm16 final : public Instruction {
 public:
-  CALL_cond_imm16(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
-      : Instruction(reg_file_ptr, bus_ptr) {}
+  CALL_cond_imm16(RegisterFile *reg_file_ptr, AddressBus *bus_ptr, StatusFlagMask flag, bool expect)
+      : Instruction(reg_file_ptr, bus_ptr), flag(flag), expect(expect) {}
   std::size_t exec() override {
     switch (state) {
 
@@ -314,7 +320,7 @@ public:
   }
 
   std::string describe() override {
-    return IroGB::format("CALL {}, {}", to_string<flag, expect>(),
+    return IroGB::format("CALL {}, {}", to_string(flag, expect),
                          static_cast<int>(make_addr(lo, hi)));
   }
 
@@ -348,6 +354,9 @@ public:
   }
 
 private:
+  const StatusFlagMask flag;
+  const bool expect;
+
   InstrStates state{};
   byte_t lo{}, hi{};
   addr_t sp{};
@@ -405,9 +414,10 @@ private:
 /*
  * Unconditional return
  */
-template <StatusFlagMask flag, bool expect> class RET_cond final : public Instruction {
+class RET_cond final : public Instruction {
 public:
-  RET_cond(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+  RET_cond(RegisterFile *reg_file_ptr, AddressBus *bus_ptr, StatusFlagMask flag, bool expect)
+      : Instruction(reg_file_ptr, bus_ptr), flag(flag), expect(expect) {}
 
   std::size_t exec() override {
     switch (state) {
@@ -428,7 +438,7 @@ public:
     return cond ? 20 : 8;
   }
 
-  std::string describe() override { return IroGB::format("RET {}", to_string<flag, expect>()); }
+  std::string describe() override { return IroGB::format("RET {}", to_string(flag, expect)); }
 
   std::size_t mem_access_t_cycle() override {
     if (!cond) // Return does not happen
@@ -449,6 +459,9 @@ public:
   }
 
 private:
+  const StatusFlagMask flag;
+  const bool expect;
+
   InstrStates state{};
   byte_t lo{}, hi{};
   addr_t sp{};
@@ -509,9 +522,10 @@ private:
 /*
  * Unconditional jump to reset vector
  */
-template <addr_t vec> class RST_vec final : public Instruction {
+class RST_vec final : public Instruction {
 public:
-  RST_vec(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+  RST_vec(RegisterFile *reg_file_ptr, AddressBus *bus_ptr, addr_t vec)
+      : Instruction(reg_file_ptr, bus_ptr), vec(vec) {}
 
   std::size_t exec() override {
     switch (state) {
@@ -547,6 +561,8 @@ public:
   }
 
 private:
+  const addr_t vec;
+
   InstrStates state{};
   addr_t sp{};
 };
