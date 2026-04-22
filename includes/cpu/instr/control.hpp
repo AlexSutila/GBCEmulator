@@ -15,6 +15,7 @@
 class CPL final : public Instruction {
 public:
   CPL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+
   std::size_t exec() override {
     const byte_t a = read_reg<Register8Bit::REG_A>();
     write_reg<Register8Bit::REG_A>(~a);
@@ -22,7 +23,15 @@ public:
     reg_file->reg_af.set_flag(StatusFlagMask::FLAG_H_MASK);
     return 4;
   }
+
   std::string describe() override { return IroGB::format("CPL"); }
+
+  InstructionTiming parse() override {
+    return {
+        .total_cycles = 4,
+        .sync_events = 1,
+    };
+  }
 };
 
 /*
@@ -31,13 +40,22 @@ public:
 class SCF final : public Instruction {
 public:
   SCF(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+
   std::size_t exec() override {
     reg_file->reg_af.set_flag(StatusFlagMask::FLAG_C_MASK);
     reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_N_MASK);
     reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_H_MASK);
     return 4;
   }
+
   std::string describe() override { return IroGB::format("SCF"); }
+
+  InstructionTiming parse() override {
+    return {
+        .total_cycles = 4,
+        .sync_events = 1,
+    };
+  }
 };
 
 /*
@@ -46,6 +64,7 @@ public:
 class CCF final : public Instruction {
 public:
   CCF(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
+
   std::size_t exec() override {
     const bool c = reg_file->reg_af.get_flag(StatusFlagMask::FLAG_C_MASK);
     reg_file->reg_af.put_flag(StatusFlagMask::FLAG_C_MASK, !c);
@@ -53,7 +72,15 @@ public:
     reg_file->reg_af.clr_flag(StatusFlagMask::FLAG_H_MASK);
     return 4;
   }
+
   std::string describe() override { return IroGB::format("CCF"); }
+
+  InstructionTiming parse() override {
+    return {
+        .total_cycles = 4,
+        .sync_events = 1,
+    };
+  }
 };
 
 /*
@@ -64,6 +91,13 @@ public:
   NOP(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
   std::string describe() override { return IroGB::format("NOP"); }
   std::size_t exec() override { return 4; }
+
+  InstructionTiming parse() override {
+    return {
+        .total_cycles = 4,
+        .sync_events = 1,
+    };
+  }
 };
 
 /*
@@ -73,11 +107,20 @@ class DI final : public Instruction {
 public:
   DI(RegisterFile *reg_file_ptr, AddressBus *bus_ptr, InterruptMasterEnable *ime_ptr)
       : Instruction(reg_file_ptr, bus_ptr), ime(ime_ptr) {}
+
   std::size_t exec() override {
     ime->disable();
     return 4;
   }
+
   std::string describe() override { return IroGB::format("DI"); }
+
+  InstructionTiming parse() override {
+    return {
+        .total_cycles = 4,
+        .sync_events = 1,
+    };
+  }
 
 private:
   InterruptMasterEnable *const ime;
@@ -90,11 +133,20 @@ class EI final : public Instruction {
 public:
   EI(RegisterFile *reg_file_ptr, AddressBus *bus_ptr, InterruptMasterEnable *ime_ptr)
       : Instruction(reg_file_ptr, bus_ptr), ime(ime_ptr) {}
+
   std::size_t exec() override {
     ime->enable(true);
     return 4;
   }
+
   std::string describe() override { return IroGB::format("EI"); }
+
+  InstructionTiming parse() override {
+    return {
+        .total_cycles = 4,
+        .sync_events = 1,
+    };
+  }
 
 private:
   InterruptMasterEnable *const ime;
@@ -113,6 +165,7 @@ public:
         if_(if_reg),                                   // ^^^
         ie_(ie_reg),                                   // ^^^
         sys_(sys) {}
+
   std::size_t exec() override {
     constexpr byte_t mask = 0x1F; // Mask out unused interrupt bits
     const bool isr_pending = (if_.peek() & ie_.peek() & mask) != 0;
@@ -124,12 +177,20 @@ public:
       reg_file->halt_bug_triggered = true;
     return 4;
   }
+
   std::string describe() override { return IroGB::format("HALT"); }
 
   /* NOTE: This instruction does not access memory. However, we still do not
    * want this instruction to take effect and actually place the processor in
    * HALT mode until the instruction has completed. */
-  std::size_t mem_access_t_cycle() override { return 4; }
+  std::size_t mem_access_t_cycle() override { return 0; }
+
+  InstructionTiming parse() override {
+    return {
+        .total_cycles = 4,
+        .sync_events = 1,
+    };
+  }
 
 private:
   InterruptMasterEnable &ime_;
@@ -147,6 +208,7 @@ class STOP final : public Instruction {
 public:
   STOP(RegisterFile *reg_file_ptr, AddressBus *bus_ptr, runtime_sys_info &sys)
       : Instruction(reg_file_ptr, bus_ptr), sys_(sys) {}
+
   std::size_t exec() override {
     if (sys_.speed_switch_armed) {
       sys_.double_speed = !sys_.double_speed;
@@ -154,10 +216,18 @@ public:
     }
     return 4;
   }
+
   std::string describe() override { return IroGB::format("STOP"); }
 
   // Subject to change??? But same rationale as HALT timing for now.
-  std::size_t mem_access_t_cycle() override { return 4; }
+  std::size_t mem_access_t_cycle() override { return 0; }
+
+  InstructionTiming parse() override {
+    return {
+        .total_cycles = 4,
+        .sync_events = 1,
+    };
+  }
 
 private:
   runtime_sys_info &sys_;
