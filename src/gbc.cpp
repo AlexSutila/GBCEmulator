@@ -494,6 +494,16 @@ void GameBoyColor::init_test_bed() const {
   bus->init_test_bed();
 }
 
+void GameBoyColor::step_peripherals(bool fast_cycle) const {
+  step_dma(fast_cycle);
+  timer->step();
+
+  if (!fast_cycle) {
+    ppu->step();
+    apu->step();
+  }
+}
+
 void GameBoyColor::step_dma(const bool fast_cycle) const {
   bus->get_oam_dma().step(); // Runs 2X in double speed
 
@@ -511,14 +521,17 @@ void GameBoyColor::step_processor() const {
     cpu->step();
 }
 
+std::size_t GameBoyColor::big_step() {
+  step(); // Temporary, just here while I'm getting test suite working for now
+  return 1;
+}
+
 void GameBoyColor::step() {
   try_brk(Debug::BreakReason::BRK_STEP_CLOCK_CYCLE);
 
+  // DMG cycle, or the first cycle of double speed in CGB mode (if double speed is enabled)
   step_processor();
-  step_dma(false);
-  ppu->step();
-  timer->step();
-  apu->step();
+  step_peripherals(false);
 
   // System clocks are maintained in unit `t-cycles`
   ++sys_.elapsed_clocks;
@@ -526,8 +539,7 @@ void GameBoyColor::step() {
   // If we are in double speed mode, step affected components again
   if (sys_.double_speed) {
     step_processor();
-    step_dma(true);
-    timer->step();
+    step_peripherals(true);
   }
 }
 

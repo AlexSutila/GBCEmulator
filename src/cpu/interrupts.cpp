@@ -94,7 +94,6 @@ void ISR::exec() {
   const addr_t sp = read_reg<Register16Bit::REG_SP>();
 
   // Consider additional four clock cycle delay when leaving halt mode
-  const bool was_halted = halt_delay;
   halt_delay = false;
   ime_.disable(); // Always disabled to avoid crazy recursion
 

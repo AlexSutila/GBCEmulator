@@ -35,7 +35,10 @@ public:
   /**
    * Emulation driver methods
    */
-  void step_cycles(int cycles);
+  std::size_t big_step_cycles(std::size_t cycles);
+  std::size_t big_step();
+
+  void step_cycles(std::size_t cycles);
   void step();
 
   /**

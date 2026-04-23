@@ -92,13 +92,25 @@ class GameBoyColor:
         addr_bus = self._gbc.get_bus()
         return addr_bus.write_byte(addr, value)
 
-    def step_frame(self):
+    def step_frame(self, big_step: bool = True):
         cycles = 70224  # One frame worth of t-cycles
-        self.step(cycles=cycles)
+        if big_step:
+            self.big_step(cycles=cycles)
+        else:
+            self.step(cycles=cycles)
 
-    def step_scanline(self):
+    def step_scanline(self, big_step: bool = True):
         cycles = 456  # One scanline worth of t-cycles
-        self.step(cycles=cycles)
+        if big_step:
+            self.big_step(cycles=cycles)
+        else:
+            self.step(cycles=cycles)
+
+    def big_step(self, cycles: int = None) -> int:
+        if cycles is not None:
+            return self._gbc.big_step_cycles(cycles)
+        else:
+            return self._gbc.big_step()
 
     def step(self, cycles: int = None):
         if cycles is not None:

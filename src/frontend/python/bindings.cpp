@@ -147,6 +147,8 @@ static void bind_gbc(const py::module_ &m) {
       .def(py::init<>())
       .def("insert_cartridge", &PyGameBoyColor::insert_cartridge)
       .def("init_test_bed", &PyGameBoyColor::init_test_bed)
+      .def("big_step_cycles", &PyGameBoyColor::big_step_cycles)
+      .def("big_step", &PyGameBoyColor::big_step)
       .def("step_cycles", &PyGameBoyColor::step_cycles)
       .def("step", &PyGameBoyColor::step)
       .def("get_frame", &PyGameBoyColor::get_frame)
