@@ -124,13 +124,13 @@ def load_cart_from_url(url: str) -> Cartridge:
     return make_cart_bytes(resp.content)
 
 
-def run_and_get_frame(url: str) -> List[int]:
+def run_and_get_frame(url: str, big_step: bool = False) -> List[int]:
     cart = load_cart_from_url(url)
     gbc = GameBoyColor(cart)
 
     # Runs for roughly one minute
     for _ in range(60 * 60):
-        gbc.step_frame()
+        gbc.step_frame(big_step=big_step)
     return gbc.frame.as_numpy()
 
 
@@ -140,6 +140,7 @@ def to_digest(img: np.ndarray) -> str:
 
 
 def run_test_set_rendered(
+    big_step: bool,
     urls: List[str],
     out_path: str,
     rows: int,
@@ -186,8 +187,9 @@ def run_test_set_rendered(
     plt.savefig(out_path, bbox_inches="tight", dpi=150)
 
 
-def run_acid_test_suite():
+def run_acid_test_suite(big_step: bool):
     run_test_set_rendered(
+        big_step=big_step,
         urls=[i[1] for i in ACID_CASES],
         titles=[i[0] for i in ACID_CASES],
         rows=1,
@@ -196,8 +198,9 @@ def run_acid_test_suite():
     )
 
 
-def run_blargg_tests():
+def run_blargg_tests(big_step: bool):
     run_test_set_rendered(
+        big_step=big_step,
         urls=[i[1] for i in BLARGG_CASES],
         titles=[i[0] for i in BLARGG_CASES],
         rows=2,
@@ -206,8 +209,9 @@ def run_blargg_tests():
     )
 
 
-def run_magen_tests():
+def run_magen_tests(big_step: bool):
     run_test_set_rendered(
+        big_step=big_step,
         urls=[i[1] for i in MAGEN_CASES],
         titles=[i[0] for i in MAGEN_CASES],
         rows=2,
@@ -220,38 +224,71 @@ def cases_with_ids(cases):
     return [pytest.param(title, url, md5, id=title) for title, url, md5 in cases]
 
 
-@pytest.mark.parametrize(
-    "title,url,expected_md5",
-    cases_with_ids(ACID_CASES),
-)
+def acid_params():
+    return pytest.mark.parametrize(
+        "title,url,expected_md5",
+        cases_with_ids(ACID_CASES),
+    )
+
+
+def blargg_params():
+    return pytest.mark.parametrize(
+        "title,url,expected_md5",
+        cases_with_ids(BLARGG_CASES),
+    )
+
+
+def magen_params():
+    return pytest.mark.parametrize(
+        "title,url,expected_md5",
+        cases_with_ids(MAGEN_CASES),
+        ids=lambda title, url, expected: title,
+    )
+
+
+@acid_params()
 def test_acid_suite(title: str, url: str, expected_md5: str):
-    img = run_and_get_frame(url)
+    img = run_and_get_frame(url, big_step=False)
     digest = to_digest(img)
     assert digest == expected_md5, f"{title} failed (got {digest})"
 
 
-@pytest.mark.parametrize(
-    "title,url,expected_md5",
-    cases_with_ids(BLARGG_CASES),
-)
+@acid_params()
+def test_acid_suite_opt(title: str, url: str, expected_md5: str):
+    img = run_and_get_frame(url, big_step=True)
+    digest = to_digest(img)
+    assert digest == expected_md5, f"{title} failed (got {digest})"
+
+
+@blargg_params()
 def test_blargg_suite(title: str, url: str, expected_md5: str):
-    img = run_and_get_frame(url)
+    img = run_and_get_frame(url, big_step=False)
     digest = to_digest(img)
     assert digest == expected_md5, f"{title} failed (got {digest})"
 
 
-@pytest.mark.parametrize(
-    "title,url,expected_md5",
-    cases_with_ids(MAGEN_CASES),
-    ids=lambda title, url, expected: title,
-)
+@blargg_params()
+def test_blargg_suite_opt(title: str, url: str, expected_md5: str):
+    img = run_and_get_frame(url, big_step=True)
+    digest = to_digest(img)
+    assert digest == expected_md5, f"{title} failed (got {digest})"
+
+
+@magen_params()
 def test_magen_suite(title: str, url: str, expected_md5: str):
-    img = run_and_get_frame(url)
+    img = run_and_get_frame(url, big_step=False)
+    digest = to_digest(img)
+    assert digest == expected_md5, f"{title} failed (got {digest})"
+
+
+@magen_params()
+def test_magen_suite_opt(title: str, url: str, expected_md5: str):
+    img = run_and_get_frame(url, big_step=True)
     digest = to_digest(img)
     assert digest == expected_md5, f"{title} failed (got {digest})"
 
 
 if __name__ == "__main__":
-    run_acid_test_suite()
-    run_blargg_tests()
-    run_magen_tests()
+    run_acid_test_suite(big_step=True)
+    run_blargg_tests(big_step=True)
+    run_magen_tests(big_step=True)

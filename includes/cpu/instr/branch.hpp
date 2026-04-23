@@ -18,7 +18,7 @@ class JP_imm16 final : public Instruction {
 public:
   JP_imm16(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
 
-  std::size_t exec() override {
+  void exec() override {
     switch (state) {
     case InstrStates::INSTR_STATE_READ:
       lo = bus->read_byte(reg_file->reg_pc++);
@@ -33,7 +33,6 @@ public:
     default:
       break;
     }
-    return 16;
   }
 
   std::string describe() override {
@@ -41,7 +40,7 @@ public:
     return IroGB::format("JP {}", static_cast<int>(imm));
   }
 
-  std::size_t mem_access_t_cycle() override {
+  std::size_t next_sync_cycle() override {
     return (state == InstrStates::INSTR_STATE_READ) ? 4 : 8;
   }
 
@@ -68,10 +67,7 @@ class JP_HL final : public Instruction {
 public:
   JP_HL(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
 
-  std::size_t exec() override {
-    reg_file->reg_pc = read_reg<Register16Bit::REG_HL>();
-    return 4;
-  }
+  void exec() override { reg_file->reg_pc = read_reg<Register16Bit::REG_HL>(); }
 
   std::string describe() override { return IroGB::format("JP HL"); }
 
@@ -91,7 +87,7 @@ public:
   JP_cond_imm16(RegisterFile *reg_file_ptr, AddressBus *bus_ptr, StatusFlagMask flag, bool expect)
       : Instruction(reg_file_ptr, bus_ptr), flag(flag), expect(expect) {}
 
-  std::size_t exec() override {
+  void exec() override {
     switch (state) {
     case InstrStates::INSTR_STATE_READ:
       lo = bus->read_byte(reg_file->reg_pc++);
@@ -107,16 +103,13 @@ public:
     default:
       break;
     }
-    return cond ? 16 : 12; // Four extra cycles when jump is taken
   }
 
   std::string describe() override {
     return IroGB::format("JP {}, {}", to_string(flag, expect), static_cast<int>(make_addr(lo, hi)));
   }
 
-  std::size_t mem_access_t_cycle() override {
-    return state == InstrStates::INSTR_STATE_READ ? 4 : 8;
-  }
+  std::size_t next_sync_cycle() override { return state == InstrStates::INSTR_STATE_READ ? 4 : 8; }
 
   InstructionTiming parse() override {
     cond = reg_file->reg_af.get_flag(flag) == expect;
@@ -147,10 +140,7 @@ class JR_imm8 final : public Instruction {
 public:
   JR_imm8(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
 
-  std::size_t exec() override {
-    reg_file->reg_pc += static_cast<addr_t>(imm);
-    return 12;
-  }
+  void exec() override { reg_file->reg_pc += static_cast<addr_t>(imm); }
 
   std::string describe() override { return IroGB::format("JP {}", static_cast<int>(imm)); }
 
@@ -174,12 +164,9 @@ public:
   JR_cond_imm8(RegisterFile *reg_file_ptr, AddressBus *bus_ptr, StatusFlagMask flag, bool expect)
       : Instruction(reg_file_ptr, bus_ptr), flag(flag), expect(expect) {}
 
-  std::size_t exec() override {
-    if (!cond)
-      return 8;
-
-    reg_file->reg_pc += static_cast<addr_t>(imm);
-    return 12;
+  void exec() override {
+    if (cond)
+      reg_file->reg_pc += static_cast<addr_t>(imm);
   }
 
   std::string describe() override {
@@ -213,7 +200,7 @@ public:
   CALL_imm16(RegisterFile *reg_file_ptr, AddressBus *bus_ptr)
       : Instruction(reg_file_ptr, bus_ptr) {}
 
-  std::size_t exec() override {
+  void exec() override {
     switch (state) {
     case InstrStates::INSTR_STATE_READ:
       lo = bus->read_byte(reg_file->reg_pc++);
@@ -240,7 +227,6 @@ public:
     default:
       break;
     }
-    return 24;
   }
 
   std::string describe() override {
@@ -248,7 +234,7 @@ public:
     return IroGB::format("CALL {}", static_cast<int>(imm));
   }
 
-  std::size_t mem_access_t_cycle() override {
+  std::size_t next_sync_cycle() override {
     switch (state) {
     case InstrStates::INSTR_STATE_READ:
       return 4;
@@ -288,7 +274,7 @@ class CALL_cond_imm16 final : public Instruction {
 public:
   CALL_cond_imm16(RegisterFile *reg_file_ptr, AddressBus *bus_ptr, StatusFlagMask flag, bool expect)
       : Instruction(reg_file_ptr, bus_ptr), flag(flag), expect(expect) {}
-  std::size_t exec() override {
+  void exec() override {
     switch (state) {
 
     case InstrStates::INSTR_STATE_READ:
@@ -316,7 +302,6 @@ public:
     default:
       break;
     }
-    return cond ? 24 : 12;
   }
 
   std::string describe() override {
@@ -324,7 +309,7 @@ public:
                          static_cast<int>(make_addr(lo, hi)));
   }
 
-  std::size_t mem_access_t_cycle() override {
+  std::size_t next_sync_cycle() override {
     switch (state) {
     case InstrStates::INSTR_STATE_READ:
       return 4;
@@ -347,9 +332,11 @@ public:
     sp = reg_file->reg_sp.read();
 
     const unsigned total_cycles = cond ? 24 : 12;
+    const unsigned sync_events = cond ? 4 : 2;
+
     return {
         .total_cycles = total_cycles,
-        .sync_events = 4,
+        .sync_events = sync_events,
     };
   }
 
@@ -370,7 +357,7 @@ class RET final : public Instruction {
 public:
   RET(RegisterFile *reg_file_ptr, AddressBus *bus_ptr) : Instruction(reg_file_ptr, bus_ptr) {}
 
-  std::size_t exec() override {
+  void exec() override {
     switch (state) {
     case InstrStates::INSTR_STATE_READ:
       lo = bus->read_byte(sp++);
@@ -386,12 +373,9 @@ public:
     default:
       break;
     }
-    return 16;
   }
 
-  std::size_t mem_access_t_cycle() override {
-    return state == InstrStates::INSTR_STATE_READ ? 4 : 8;
-  }
+  std::size_t next_sync_cycle() override { return state == InstrStates::INSTR_STATE_READ ? 4 : 8; }
 
   std::string describe() override { return IroGB::format("RET"); }
 
@@ -412,14 +396,14 @@ private:
 };
 
 /*
- * Unconditional return
+ * Conditional return
  */
 class RET_cond final : public Instruction {
 public:
   RET_cond(RegisterFile *reg_file_ptr, AddressBus *bus_ptr, StatusFlagMask flag, bool expect)
       : Instruction(reg_file_ptr, bus_ptr), flag(flag), expect(expect) {}
 
-  std::size_t exec() override {
+  void exec() override {
     switch (state) {
     case InstrStates::INSTR_STATE_READ:
       lo = bus->read_byte(sp++);
@@ -435,12 +419,11 @@ public:
     default:
       break;
     }
-    return cond ? 20 : 8;
   }
 
   std::string describe() override { return IroGB::format("RET {}", to_string(flag, expect)); }
 
-  std::size_t mem_access_t_cycle() override {
+  std::size_t next_sync_cycle() override {
     if (!cond) // Return does not happen
       return 0;
     return state == InstrStates::INSTR_STATE_READ ? 8 : 12;
@@ -452,9 +435,11 @@ public:
     sp = reg_file->reg_sp.read();
 
     const unsigned total_cycles = cond ? 20 : 8;
+    const unsigned sync_events = cond ? 2 : 0;
+
     return {
         .total_cycles = total_cycles,
-        .sync_events = 2,
+        .sync_events = sync_events,
     };
   }
 
@@ -476,7 +461,7 @@ public:
   RETI(RegisterFile *reg_file_ptr, AddressBus *bus_ptr, InterruptMasterEnable *ime_ptr)
       : Instruction(reg_file_ptr, bus_ptr), ime(ime_ptr) {}
 
-  std::size_t exec() override {
+  void exec() override {
     switch (state) {
     case InstrStates::INSTR_STATE_READ:
       lo = bus->read_byte(sp++);
@@ -493,12 +478,9 @@ public:
     default:
       break;
     }
-    return 16;
   }
 
-  std::size_t mem_access_t_cycle() override {
-    return state == InstrStates::INSTR_STATE_READ ? 4 : 8;
-  }
+  std::size_t next_sync_cycle() override { return state == InstrStates::INSTR_STATE_READ ? 4 : 8; }
 
   std::string describe() override { return IroGB::format("RETI"); }
 
@@ -527,7 +509,7 @@ public:
   RST_vec(RegisterFile *reg_file_ptr, AddressBus *bus_ptr, addr_t vec)
       : Instruction(reg_file_ptr, bus_ptr), vec(vec) {}
 
-  std::size_t exec() override {
+  void exec() override {
     switch (state) {
     case InstrStates::INSTR_STATE_WRITE:
       bus->write_byte(--sp, static_cast<uint8_t>(reg_file->reg_pc >> 8));
@@ -541,10 +523,9 @@ public:
     default:
       break;
     }
-    return 16;
   }
 
-  std::size_t mem_access_t_cycle() override {
+  std::size_t next_sync_cycle() override {
     return state == InstrStates::INSTR_STATE_WRITE ? 8 : 12;
   }
 

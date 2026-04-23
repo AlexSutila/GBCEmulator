@@ -147,6 +147,8 @@ static void bind_gbc(const py::module_ &m) {
       .def(py::init<>())
       .def("insert_cartridge", &PyGameBoyColor::insert_cartridge)
       .def("init_test_bed", &PyGameBoyColor::init_test_bed)
+      .def("big_step_cycles", &PyGameBoyColor::big_step_cycles)
+      .def("big_step", &PyGameBoyColor::big_step)
       .def("step_cycles", &PyGameBoyColor::step_cycles)
       .def("step", &PyGameBoyColor::step)
       .def("get_frame", &PyGameBoyColor::get_frame)
@@ -175,6 +177,6 @@ PYBIND11_MODULE(gbc_py, m) {
   bind_ppu(m);
 
   // Expose testing helpers, may add more in the future
-  m.def("poll_mooneye_test", &poll_mooneye_test, py::arg("gbc"),
+  m.def("poll_mooneye_test", &poll_mooneye_test, py::arg("gbc"), py::arg("big_step"),
         "Run the emulator until the Mooneye LD B,B end marker is reached");
 }

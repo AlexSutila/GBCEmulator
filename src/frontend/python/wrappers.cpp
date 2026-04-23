@@ -39,9 +39,28 @@ void PyGameBoyColor::breakpoint_del(const addr_t addr) {
   debugger->breakpoint_del(addr);
 }
 
-void PyGameBoyColor::step_cycles(int cycles) {
+std::size_t PyGameBoyColor::big_step_cycles(std::size_t cycles) {
   auto &gbc = fe_.get();
-  for (int i{0}; i < cycles; i++)
+  std::size_t elapsed_cycles{0};
+
+  do {
+    std::size_t sync_cycles = gbc->big_step();
+    elapsed_cycles = elapsed_cycles + sync_cycles;
+  } while (elapsed_cycles < cycles);
+
+  // We return the number of cycles elapsed here because it is not garunteed to
+  // always align perfectly with the number of cycles passed in.
+  return elapsed_cycles;
+}
+
+std::size_t PyGameBoyColor::big_step() {
+  auto &gbc = fe_.get();
+  return gbc->big_step();
+}
+
+void PyGameBoyColor::step_cycles(std::size_t cycles) {
+  auto &gbc = fe_.get();
+  for (std::size_t i{0}; i < cycles; i++)
     gbc->step();
 }
 

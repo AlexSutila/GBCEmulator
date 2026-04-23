@@ -61,6 +61,8 @@ public:
 
   void insert_cartridge(const cart &c);
   void init_test_bed() const;
+
+  std::size_t big_step();
   void step();
 
   CheatStats configure_cheats(const std::vector<CheatCode> &cheats);
@@ -100,6 +102,7 @@ private:
   void cram_init_mono() const;
 
   /* For moving emulation state along */
+  void step_peripherals(bool fast_cycle) const;
   void step_dma(bool fast_cycle) const;
   [[nodiscard]] bool vdma_enabled() const;
   void step_processor() const;

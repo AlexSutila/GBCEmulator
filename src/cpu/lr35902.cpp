@@ -162,6 +162,18 @@ bool LR35902::should_interrupt() const {
   return (ie_reg.peek() & if_reg.peek() & mask) != 0;
 }
 
+void LR35902::do_exec_state_transition() {
+  /* If the instruction executed was `HALT`, the processor suspends its
+   * execution until it is awakened by some interrupt source. The exact behavior
+   * is conditional depending on whether IME is enabled or not. */
+  if (sys_.halted) [[unlikely]]
+    state = STATE_HALTED;
+
+  /* Otherwise, continue fetch/parse/execute pipeline as usual. */
+  else
+    state = STATE_FETCH;
+}
+
 /* Read opcode from PC, populate `ins_` instruction reference */
 void LR35902::do_fetch() {
 
@@ -196,26 +208,6 @@ void LR35902::do_fetch() {
 
   // Prepare next instruction for execution stage
   prime_next_instr(next_ins.get());
-}
-
-/* Execute instruction on critical mem-access clock cycle */
-void LR35902::do_execute() {
-  if (cur_ins_clks == ins_->mem_access_t_cycle())
-    ins_->exec();
-  ++cur_ins_clks;
-
-  /* Complete instruction based on execution time */
-  if (cur_ins_clks >= timing_info.total_cycles) {
-    /* If the instruction executed was `HALT`, the processor suspends its
-     * execution until it is awakened by some interrupt source. The exact behavior
-     * is conditional depending on whether IME is enabled or not. */
-    if (sys_.halted) [[unlikely]]
-      state = STATE_HALTED;
-
-    /* Otherwise, continue fetch/parse/execute pipeline as usual. */
-    else
-      state = STATE_FETCH;
-  }
 }
 
 void LR35902::do_halt() {
@@ -259,9 +251,15 @@ void LR35902::step() {
   case STATE_FETCH: // Break omitted intentionally to emulate fetch/exec overlap
     do_fetch();
 
-  case STATE_EXECUTE:
-    do_execute();
-    break;
+  case STATE_EXECUTE: {
+    if (cur_ins_clks == ins_->next_sync_cycle())
+      ins_->exec();
+    ++cur_ins_clks;
+
+    /* Complete instruction based on execution time */
+    if (cur_ins_clks >= timing_info.total_cycles)
+      do_exec_state_transition();
+  } break;
 
   case STATE_HALTED:
     do_halt();
