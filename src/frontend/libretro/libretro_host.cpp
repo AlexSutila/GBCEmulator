@@ -13,6 +13,15 @@
 #include "gbc.hpp"
 #include "memory/boot.hpp"
 
+/**
+ * IroGB's GameBoyColor class exposes two emulation driver methods, one that steps cycle
+ * by cycle and provides better debugging capabilities, and one that is designed to skip
+ * idle CPU cycles and reduce the number of synchronization points while making the same
+ * accuracy guarantees. We will not expose the debugging capability through LibRetro, so
+ * this can be used to toggle between the 'fast' and 'slow' ways of driving the emulator
+ */
+#define USE_BIGSTEP 1
+
 // TODO: In case libretro logging breaks, we might want this to fall back to std::cerr?
 static void fallback_log(enum retro_log_level level, const char *fmt, ...) {}
 
@@ -265,8 +274,16 @@ void retro_reset(void) {
 void retro_run(void) {
   constexpr std::size_t cycles_per_frame = 70224;
   auto &instance = LibretroFrontend::get_instance();
+
+#if (USE_BIGSTEP)
+  std::size_t elapsed_cycles{0};
+  do {
+    elapsed_cycles += instance.get()->big_step();
+  } while (elapsed_cycles < cycles_per_frame);
+#else
   for (std::size_t i{0}; i < cycles_per_frame; i++)
-    instance.get()->step(); // Step one 'frame'
+    instance.get()->step();
+#endif // USE_BIGSTEP
 
   instance.try_show_frame();
   instance.try_poll_input();

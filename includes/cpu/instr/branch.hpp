@@ -332,9 +332,11 @@ public:
     sp = reg_file->reg_sp.read();
 
     const unsigned total_cycles = cond ? 24 : 12;
+    const unsigned sync_events = cond ? 4 : 2;
+
     return {
         .total_cycles = total_cycles,
-        .sync_events = 4,
+        .sync_events = sync_events,
     };
   }
 
@@ -394,7 +396,7 @@ private:
 };
 
 /*
- * Unconditional return
+ * Conditional return
  */
 class RET_cond final : public Instruction {
 public:
@@ -433,9 +435,11 @@ public:
     sp = reg_file->reg_sp.read();
 
     const unsigned total_cycles = cond ? 20 : 8;
+    const unsigned sync_events = cond ? 2 : 0;
+
     return {
         .total_cycles = total_cycles,
-        .sync_events = 2,
+        .sync_events = sync_events,
     };
   }
 

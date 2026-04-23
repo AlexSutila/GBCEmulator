@@ -170,11 +170,6 @@ public:
 
   std::string describe() override { return IroGB::format("HALT"); }
 
-  /* NOTE: This instruction does not access memory. However, we still do not
-   * want this instruction to take effect and actually place the processor in
-   * HALT mode until the instruction has completed. */
-  std::size_t next_sync_cycle() override { return 0; }
-
   InstructionTiming parse() override {
     return {
         .total_cycles = 4,
@@ -207,9 +202,6 @@ public:
   }
 
   std::string describe() override { return IroGB::format("STOP"); }
-
-  // Subject to change??? But same rationale as HALT timing for now.
-  std::size_t next_sync_cycle() override { return 0; }
 
   InstructionTiming parse() override {
     return {

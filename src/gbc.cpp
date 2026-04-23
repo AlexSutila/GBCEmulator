@@ -522,8 +522,12 @@ void GameBoyColor::step_processor() const {
 }
 
 std::size_t GameBoyColor::big_step() {
-  step(); // Temporary, just here while I'm getting test suite working for now
-  return 1;
+  const auto psync_cb = [this](std::size_t sync_cycles) {
+    for (std::size_t sync_cycle{0}; sync_cycle < sync_cycles; ++sync_cycle) {
+      step_peripherals(false);
+    }
+  };
+  return cpu->big_step(psync_cb);
 }
 
 void GameBoyColor::step() {
