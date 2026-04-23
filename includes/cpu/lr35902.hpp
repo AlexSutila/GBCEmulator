@@ -45,24 +45,25 @@ public:
     case STATE_EXECUTE: {
       const std::size_t total_cycles = timing_info.total_cycles;
       const std::size_t sync_events = timing_info.sync_events;
-      std::size_t elapsed_cycles{0};
 
       // Handle each sync event
       for (std::size_t sync_event{0}; sync_event < sync_events; ++sync_event) {
         const std::size_t sync_cycle = ins_->next_sync_cycle();
-        psync_cb(sync_cycle - elapsed_cycles);
+        psync_cb(sync_cycle - cur_ins_clks);
 
         ins_->exec(); // Handle event, prime next event
-        elapsed_cycles = sync_cycle;
+        cur_ins_clks = sync_cycle;
       }
 
       // Account for remaining cycles up until next opcode fetch
-      const std::size_t final_sync_cycles = total_cycles - elapsed_cycles;
+      const std::size_t final_sync_cycles = total_cycles - cur_ins_clks;
       psync_cb(final_sync_cycles);
 
-      // Finally, we still have to perform the state transition as per cycle-stepped impl
+      // Finally, we still have to perform the state transition as per cycle-stepped impl.
+      // We have to return the total dynamic number of cycles elapsed during this call so
+      // the frontend can synchronize accordingly.
       do_exec_state_transition();
-      return elapsed_cycles;
+      return total_cycles;
     };
 
     case STATE_HALTED:
