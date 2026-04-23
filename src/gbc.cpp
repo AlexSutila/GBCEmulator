@@ -524,10 +524,22 @@ void GameBoyColor::step_processor() const {
 std::size_t GameBoyColor::big_step() {
   const auto psync_cb = [this](std::size_t sync_cycles) {
     for (std::size_t sync_cycle{0}; sync_cycle < sync_cycles; ++sync_cycle) {
-      step_peripherals(false);
+      const bool fast_cycle = (sys_.double_speed) && (sync_cycle % 2 != 0);
+      step_peripherals(fast_cycle);
     }
   };
-  return cpu->big_step(psync_cb);
+
+  // CPU is only active if VDMA is not enabled
+  if (const auto &vdma = bus->get_vdma(); !vdma.enabled())
+    return cpu->big_step(psync_cb);
+
+  // If VDMA is active, we have to handle both speeds
+  step_peripherals(false);
+  if (sys_.double_speed) {
+    step_peripherals(true);
+    return 2;
+  }
+  return 1;
 }
 
 void GameBoyColor::step() {
