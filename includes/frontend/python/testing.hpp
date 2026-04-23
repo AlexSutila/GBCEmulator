@@ -2,7 +2,6 @@
 #define GBC_PY_FRONTEND_TESTING_HPP
 
 #include "frontend/python/wrappers.hpp"
-#include <cstdint>
 
 /**
  * For evaluating test roms from the mooneye test suite. The workflow here,
@@ -19,21 +18,6 @@
  *  ; assert state.h == 21
  *  ; assert state.l == 34
  */
-[[nodiscard]] inline bool poll_mooneye_test(PyGameBoyColor &gbc) {
-  constexpr std::uint32_t max_cycles = 10000000;
-  std::uint32_t cycles = 0;
-  byte_t op = 0;
-  while (op != 0x40 && cycles < max_cycles) {
-    const auto &cpu = gbc.get_cpu();
-    op = cpu->cur_opcode();
-
-    gbc.step(); // Run until 'LD B, B'
-    gbc.step();
-    gbc.step();
-    gbc.step();
-    ++cycles;
-  }
-  return op == 0x40;
-}
+[[nodiscard]] bool poll_mooneye_test(PyGameBoyColor &gbc, bool big_step);
 
 #endif // GBC_PY_FRONTEND_TESTING_HPP

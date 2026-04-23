@@ -14,9 +14,12 @@ fetchcontent_makeavailable(pybind11)
 # BUILD_TARGET: BUILD_PYTHON
 # ===========================================================================
 pybind11_add_module(
-  gbc_py ${CMAKE_SOURCE_DIR}/src/frontend/python/bindings.cpp
+  gbc_py
+  ${CMAKE_SOURCE_DIR}/src/frontend/python/bindings.cpp
   ${CMAKE_SOURCE_DIR}/src/frontend/python/frontend.cpp
-  ${CMAKE_SOURCE_DIR}/src/frontend/python/wrappers.cpp ${GBC_CORE_SOURCES}
+  ${CMAKE_SOURCE_DIR}/src/frontend/python/testing.cpp
+  ${CMAKE_SOURCE_DIR}/src/frontend/python/wrappers.cpp
+  ${GBC_CORE_SOURCES}
 )
 target_include_directories(gbc_py PRIVATE ${GBC_INCLUDE_DIR})
 target_compile_options(gbc_py PRIVATE ${GBC_COMPILE_OPTIONS})

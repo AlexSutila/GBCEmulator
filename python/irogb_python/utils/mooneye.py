@@ -7,11 +7,11 @@ from ..cart import Cartridge
 from .. import gbc_py as core
 
 
-def run_mooneye_test(cartridge: Cartridge):
+def run_mooneye_test(cartridge: Cartridge, big_step: bool = False):
     gbc = GameBoyColor(cartridge=cartridge)
 
     # Invoke the cpp backend to do this for speed sake
-    if not core.poll_mooneye_test(gbc._gbc):
+    if not core.poll_mooneye_test(gbc._gbc, big_step):
         return None  # Took too long
     return gbc.cpu_state
 

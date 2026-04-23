@@ -177,6 +177,6 @@ PYBIND11_MODULE(gbc_py, m) {
   bind_ppu(m);
 
   // Expose testing helpers, may add more in the future
-  m.def("poll_mooneye_test", &poll_mooneye_test, py::arg("gbc"),
+  m.def("poll_mooneye_test", &poll_mooneye_test, py::arg("gbc"), py::arg("big_step"),
         "Run the emulator until the Mooneye LD B,B end marker is reached");
 }
