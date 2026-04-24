@@ -179,14 +179,14 @@ bool validate(cart &c) {
   for (const auto offset : {mmm01_offset, static_cast<size_t>(0x00)}) {
     if (offset == mmm01_offset && c.rom_size() < 0x8000) {
       fail_count += 1;
-      continue;
+      continue; // Retry for non-mmm01 carts
     }
 
-    if (auto header = parse_header(c.rom, offset); header != std::nullopt) {
-      c.header = header.value();
-    } else
+    auto header = parse_header(c.rom, offset);
+    if (header == std::nullopt)
       return false;
 
+    c.header = header.value();
     c.declared_rom_bytes = rom_bytes_from_code(c.header.rom_size_code);
     c.declared_ram_bytes = ram_bytes_from_code(c.header.ram_size_code);
 
@@ -207,17 +207,22 @@ bool validate(cart &c) {
 
     if (!c.header_checksum_ok || !c.global_checksum_ok) {
       fail_count += 1;
-    } else {
+    }
+
+    else {
       if (offset != 0) // Offset is non-zero, so we found a valid header at the end
         c.special_mbc = MMM01_t;
       break;
     }
   }
+
+  // Give two tries to account for both MMM01 edge cases and normal carts
   if (fail_count == 2) {
     Logger::push(LogLevel::Warning, "ROM", "ROM validation failed",
                  "ROM checksum failed. Please make sure the ROM is not corrupted.");
     return false;
   }
+
   return true;
 }
 
