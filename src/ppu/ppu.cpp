@@ -370,7 +370,6 @@ std::optional<std::uint32_t> PixelProcessingUnit::try_fifo_pop() {
 
 void PixelProcessingUnit::do_disabled() {
   if (flush_on_disable) {
-    fe_.clear(); // This is slow
     reset();
 
     // Disabling the PPU impacts the other PPU related registers
@@ -379,6 +378,22 @@ void PixelProcessingUnit::do_disabled() {
 
     /* Reset PPU state only once when it is disabled. */
     flush_on_disable = false;
+    return;
+  }
+
+  // TODO: Our mechanism for pushing blank frames when the PPU is off is kinda
+  // hacky. Will likely go away, planning on doing a complete PPU re-write that
+  // will use a scheduler based architecture.
+  constexpr auto fb_height = 144, fb_width = 160;
+  constexpr std::uint32_t blank = 0x00FFFFFF;
+  ++cur_mode_clks;
+
+  if (cur_mode_clks >= fb_height * fb_width) {
+    fe_.clear(blank); // Clear the contents of the frame out
+    cur_mode_clks = 0;
+
+    // By writing the last pixel, we signal that the next frame is ready
+    fe_.put_pixel(fb_width - 1, fb_height - 1, blank);
   }
 }
 
@@ -640,7 +655,6 @@ void PixelProcessingUnit::reset() {
 }
 
 void PixelProcessingUnit::step() {
-
   /* When the PPU is disabled, the screen just shows plain white and the state
    * is set to it's initial state until it is re-enabled again. */
   if (!lcdc_.lcd_enabled()) {
