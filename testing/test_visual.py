@@ -124,13 +124,18 @@ def load_cart_from_url(url: str) -> Cartridge:
     return make_cart_bytes(resp.content)
 
 
-def run_and_get_frame(url: str, big_step: bool = False) -> List[int]:
+def run_and_get_frame(url: str, expected: str, big_step: bool = False) -> List[int]:
     cart = load_cart_from_url(url)
     gbc = GameBoyColor(cart)
 
     # Runs for roughly one minute
     for _ in range(60 * 60):
         gbc.step_frame(big_step=big_step)
+        test_img = gbc.frame.as_numpy()
+        if to_digest(test_img) == expected:
+            return test_img  # Match! We can return early
+
+    # Hasn't matched yet, return whats there and hope for the best
     return gbc.frame.as_numpy()
 
 
@@ -248,42 +253,42 @@ def magen_params():
 
 @acid_params()
 def test_acid_suite(title: str, url: str, expected_md5: str):
-    img = run_and_get_frame(url, big_step=False)
+    img = run_and_get_frame(url, expected_md5, big_step=False)
     digest = to_digest(img)
     assert digest == expected_md5, f"{title} failed (got {digest})"
 
 
 @acid_params()
 def test_acid_suite_opt(title: str, url: str, expected_md5: str):
-    img = run_and_get_frame(url, big_step=True)
+    img = run_and_get_frame(url, expected_md5, big_step=True)
     digest = to_digest(img)
     assert digest == expected_md5, f"{title} failed (got {digest})"
 
 
 @blargg_params()
 def test_blargg_suite(title: str, url: str, expected_md5: str):
-    img = run_and_get_frame(url, big_step=False)
+    img = run_and_get_frame(url, expected_md5, big_step=False)
     digest = to_digest(img)
     assert digest == expected_md5, f"{title} failed (got {digest})"
 
 
 @blargg_params()
 def test_blargg_suite_opt(title: str, url: str, expected_md5: str):
-    img = run_and_get_frame(url, big_step=True)
+    img = run_and_get_frame(url, expected_md5, big_step=True)
     digest = to_digest(img)
     assert digest == expected_md5, f"{title} failed (got {digest})"
 
 
 @magen_params()
 def test_magen_suite(title: str, url: str, expected_md5: str):
-    img = run_and_get_frame(url, big_step=False)
+    img = run_and_get_frame(url, expected_md5, big_step=False)
     digest = to_digest(img)
     assert digest == expected_md5, f"{title} failed (got {digest})"
 
 
 @magen_params()
 def test_magen_suite_opt(title: str, url: str, expected_md5: str):
-    img = run_and_get_frame(url, big_step=True)
+    img = run_and_get_frame(url, expected_md5, big_step=True)
     digest = to_digest(img)
     assert digest == expected_md5, f"{title} failed (got {digest})"
 
