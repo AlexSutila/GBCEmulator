@@ -208,7 +208,7 @@ bool validate(cart &c) {
     if (!c.header_checksum_ok || !c.global_checksum_ok) {
       fail_count += 1;
     } else {
-      if (offset != 0)
+      if (offset != 0) // Offset is non-zero, so we found a valid header at the end
         c.special_mbc = MMM01_t;
       break;
     }
@@ -318,6 +318,7 @@ SpecialMbc detect_special_mbc(const cart &c) {
       return M161_t;
     }
   }
+
   case 0x01:
   case 0x02:
   case 0x03: // MBC1M possibility
@@ -330,6 +331,7 @@ SpecialMbc detect_special_mbc(const cart &c) {
                                  c.header.title(), cart_type, c.rom_span().size()));
       return MBC1M_t;
     }
+
   case 0x0F:
   case 0x10:
   case 0x11:
@@ -337,28 +339,44 @@ SpecialMbc detect_special_mbc(const cart &c) {
   case 0x13: // Special MBC3 carts that have 64 KiB RAM or 128 KiB ROM
     if (c.declared_ram_bytes > 32 * 1024 || c.declared_rom_bytes > 128 * 16 * 1024)
       return MBC30_t;
+
   case 0x1B:
     if (c.header.destination_code == 0xE1 || c.header.title() == "EMSMENU" ||
         c.header.title() == "GB16M")
       return EMS_t;
+
   case 0xC0:
     if (c.header.destination_code == 0xD1)
       return WisdomTree_t;
+
   default:
     return NotSpecial_t;
   }
 }
 
+/**
+ * TODO: Is it safe to infer RAM+BATTERY if we pull from what ever the byte was which
+ * denotes the cartridge type if we found it with our MMM01 hueristic? I just now had
+ * to deal with a game claim it was MBC3 (0x11), when it was in fact MMM01.
+ */
+void validate_and_check_special(cart &c) {
+  validate(c); // We check for MMM01 at this step by trying to parse the header in
+               // the second to last 32KB bank. If it's valid (regardless of what
+               // ever the cart type reads), we give it MMM01.
+  if (c.special_mbc == NotSpecial_t) // Give another chance, if it wasn't MMM01
+    c.special_mbc = detect_special_mbc(c);
+}
+
 cart load_cart_raw(std::vector<byte_t> rom_bytes) {
-  cart c{};
+  cart c{.special_mbc = NotSpecial_t};
 
 #ifndef NO_CORE_FILESYSTEM
   c.file_path.clear();
 #endif // NO_CORE_FILESYSTEM
-
   c.rom = std::move(rom_bytes);
-  validate(c);
-  c.special_mbc = detect_special_mbc(c);
+
+  // We will load the cart even if it fails; the user should know what they are doing
+  validate_and_check_special(c);
   return c;
 }
 
@@ -410,18 +428,15 @@ static std::optional<std::vector<byte_t>> read_all_bytes(const std::filesystem::
 }
 
 cart load_cart_fs(const std::filesystem::path &rom_path) {
-  cart c{};
-  c.file_path = rom_path; // This is wrapped in NO_CORE_FILESYSTEM so we good
+  cart c{.file_path = rom_path, .special_mbc = NotSpecial_t};
   if (const auto rom = read_all_bytes(rom_path); rom != std::nullopt)
     c.rom = rom.value();
   else {
     throw std::runtime_error{"Cannot read cartridge content"};
   }
 
-  // We will load the cart even if it fails; the user should know what they are
-  // doing
-  validate(c);
-  c.special_mbc = detect_special_mbc(c);
+  // We will load the cart even if it fails; the user should know what they are doing
+  validate_and_check_special(c);
   return c;
 }
 

@@ -13,6 +13,8 @@ std::unique_ptr<Mbc> make_mbc(const cart &c) {
     return make_m161(c);
   case EMS_t:
     return make_ems(c);
+  case MMM01_t:
+    return make_mmm01(c);
   default:
     break;
   }

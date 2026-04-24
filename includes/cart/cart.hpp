@@ -22,7 +22,7 @@ constexpr std::size_t kHeaderEnd = 0x014F;
 constexpr std::size_t kMinRomSize = 0x0150;
 
 enum SpecialMbc {
-  NotSpecial_t,
+  NotSpecial_t = 0,
   MBC1M_t,
   MBC30_t,
   MMM01_t,
