@@ -181,12 +181,21 @@ bool validate(cart &c) {
       fail_count += 1;
       continue;
     }
+
     if (auto header = parse_header(c.rom, offset); header != std::nullopt) {
       c.header = header.value();
     } else
       return false;
+
     c.declared_rom_bytes = rom_bytes_from_code(c.header.rom_size_code);
     c.declared_ram_bytes = ram_bytes_from_code(c.header.ram_size_code);
+
+    // If declared size is known, ensure file is at least that big
+    if (c.declared_rom_bytes != 0 && c.rom.size() < c.declared_rom_bytes) {
+      Logger::push(LogLevel::Warning, "ROM", "ROM too small",
+                   "This ROM file is smaller than header-declared ROM size.");
+      c.rom.resize(c.declared_rom_bytes, 0);
+    }
 
     const byte_t computed_hchk = compute_header_checksum(c.rom, offset);
     c.computed_header_checksum = computed_hchk;
@@ -201,11 +210,6 @@ bool validate(cart &c) {
     } else {
       if (offset != 0)
         c.special_mbc = MMM01_t;
-      // If declared size is known, ensure file is at least that big
-      if (c.declared_rom_bytes != 0 && c.rom.size() < c.declared_rom_bytes) {
-        Logger::push(LogLevel::Warning, "ROM", "ROM too small",
-                     "This ROM file is smaller than header-declared ROM size.");
-      }
       break;
     }
   }
@@ -330,8 +334,8 @@ SpecialMbc detect_special_mbc(const cart &c) {
   case 0x10:
   case 0x11:
   case 0x12:
-  case 0x13: // Special MBC3 that has 64 KiB RAM
-    if (c.declared_ram_bytes > 32 * 1024)
+  case 0x13: // Special MBC3 carts that have 64 KiB RAM or 128 KiB ROM
+    if (c.declared_ram_bytes > 32 * 1024 || c.declared_rom_bytes > 128 * 16 * 1024)
       return MBC30_t;
   case 0x1B:
     if (c.header.destination_code == 0xE1 || c.header.title() == "EMSMENU" ||

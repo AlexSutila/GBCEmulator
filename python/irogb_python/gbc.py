@@ -81,12 +81,12 @@ class GameBoyColor:
     def insert_cartridge(self, cartridge: Cartridge):
         self._gbc.insert_cartridge(cartridge._raw)
 
-    def read_byte(self, addr: int):
+    def read_byte(self, addr: int, debug=False):
         self._check_bitwidth_addr(addr)
         addr_bus = self._gbc.get_bus()
-        return addr_bus.read_byte(addr)
+        return addr_bus.read_byte(addr, debug=debug)
 
-    def write_byte(self, addr: int, value: int):
+    def write_byte(self, addr: int, value: int, debug=False):
         self._check_bitwidth_addr(addr)
         self._check_bitwidth_byte(value)
         addr_bus = self._gbc.get_bus()
