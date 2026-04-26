@@ -106,7 +106,8 @@ private:
   void step_peripherals(bool fast_cycle);
   void step_dma(bool fast_cycle) const;
   [[nodiscard]] bool vdma_enabled() const;
-  void step_processor() const;
+  void sched_synchronize();
+  void step_processor();
   CheatStats cheat_stats_{};
 
   std::optional<Debug::Debugger> debugger_{};

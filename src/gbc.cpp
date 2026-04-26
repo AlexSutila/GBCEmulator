@@ -519,29 +519,42 @@ void GameBoyColor::step_dma(const bool fast_cycle) const {
 
 bool GameBoyColor::vdma_enabled() const { return bus->get_vdma().enabled(); }
 
-void GameBoyColor::step_processor() const {
+void GameBoyColor::sched_synchronize() {
+  auto cyc = sched_.peek_next_cycle();
+  if (cyc == std::nullopt)
+    return;
+
+  /* Here, the processor state is ahead of all events scheduled by the peripheral components,
+   * so we pop off the queue until we either one of the two scenarios holds true:
+   *  1. We are out of events to pop (this will likely end up being very rare)
+   *  2. We have popped all events before the current CPU cycle
+   * So if we see one that is still ahead of the CPU, we must wait. CPU must remain ahead. */
+  while (cyc != std::nullopt && cyc <= sys_.elapsed_clocks) {
+    auto [c_id, e_id] = sched_.pop_next_event();
+    bus->get_oam_dma().handle_event(cyc.value(), e_id);
+    cyc = sched_.peek_next_cycle();
+  }
+}
+
+void GameBoyColor::step_processor() {
   if (const auto &vdma = bus->get_vdma(); !vdma.enabled()) // CPU is halted until VDMA is complete
     cpu->step();
+  ++sys_.elapsed_clocks;
 }
 
 std::size_t GameBoyColor::big_step() {
   const auto psync_cb = [this](std::size_t sync_cycles) {
     sys_.elapsed_clocks += sync_cycles;
 
+    // TODO: Eventually, this needs to just straight up go
     for (std::size_t sync_cycle{0}; sync_cycle < sync_cycles; ++sync_cycle) {
       const bool fast_cycle = (sys_.double_speed) && (sync_cycle % 2 != 0);
       step_peripherals(fast_cycle);
     }
 
-    if (auto next_event_cycle = sched_.peek_next_cycle(); next_event_cycle != std::nullopt) {
-      while (next_event_cycle != std::nullopt && next_event_cycle <= sys_.elapsed_clocks) {
-        auto [component_id, event_id] = sched_.pop_next_event();
-        bus->get_oam_dma().handle_event(next_event_cycle.value(), event_id);
-        next_event_cycle = sched_.peek_next_cycle();
-      }
-    }
+    // TODO: This will be the new synchronization mechanism
+    sched_synchronize();
   };
-
   return cpu->big_step(psync_cb);
 }
 
@@ -551,11 +564,13 @@ void GameBoyColor::step() {
   // DMG cycle, or the first cycle of double speed in CGB mode (if double speed is enabled)
   step_processor();
   step_peripherals(false);
+  sched_synchronize();
 
   // If we are in double speed mode, step affected components again
   if (sys_.double_speed) {
     step_processor();
     step_peripherals(true);
+    sched_synchronize();
   }
 }
 
