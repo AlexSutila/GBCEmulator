@@ -4,6 +4,7 @@
 #include "memory/mmio/cgb.hpp"
 #include "memory/mmio/dmg.hpp"
 #include "savestate/codec.hpp"
+#include "schedule.hpp"
 #include <cassert>
 #include <optional>
 
@@ -37,8 +38,6 @@ template <typename T> void ObjAttrDMA::parse_savestate(T &t) {
 
   t.field_generic(F_OAM_DMA_SRC_BASE, src_base_addr);
   t.field_generic(F_OAM_DMA_DATA_OFFSET, data_offset);
-  t.field_enum(F_OAM_DMA_STATE, state);
-  t.field_optional(F_OAM_DMA_CLOCKS_REMAINING, clocks_remaining);
 
   // Memory mapped registers
   t.field_complex(F_OAM_DMA_DMA_REG, [&](T &t) { dma_.parse_savestate(t); });
@@ -50,22 +49,13 @@ template void ObjAttrDMA::parse_savestate<Savestate::Reader>(Savestate::Reader &
 template void ObjAttrDMA::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
 template void ObjAttrDMA::parse_savestate<Savestate::Checker>(Savestate::Checker &);
 
-ObjAttrDMA::ObjAttrDMA(AddressBus &bus) : dma_(*this), bus_(bus) {
+ObjAttrDMA::ObjAttrDMA(AddressBus &bus, SystemScheduler &g_sched)
+    : dma_(*this), sched(g_sched, SCHED_COMPONENT_OAM_DMA), bus_(bus) {
   src_base_addr = data_offset = 0;
-  clocks_remaining.reset();
-  state = STATE_DISABLED;
 }
 
 ObjAttrDMA::DMAState ObjAttrDMA::get_state() const {
   DMAState s{};
-  if (state == STATE_OAMDMA_TRAN) {
-    s.src_base_address = src_base_addr;
-    s.data_offset = data_offset;
-    s.active = true;
-  } else {
-    s.src_base_address = s.data_offset = 0;
-    s.active = false;
-  }
   return s;
 }
 
@@ -74,66 +64,45 @@ DMA::DMA *ObjAttrDMA::get_dma_reg() { return &dma_; }
 void ObjAttrDMA::start(const byte_t addr_high) {
   /* The value passed is what is received over the address bus, hence it is only
    * a single byte. This byte determines the upper byte of the source adders. */
-  src_base_addr = static_cast<addr_t>(addr_high) * 0x100;
-  state = STATE_OAMDMA_INIT;
-  clocks_remaining.reset();
+  src_base_addr = static_cast<addr_t>(addr_high) << 8;
   data_offset = 0;
+
+  /* Unschedule any on-going OAM-DMA transfers, in case we start it again while
+   * it is already running. */
+  for (auto e : {EVENT_COPY_DATA_BYTE, EVENT_ACQUIRE_BUS, EVENT_RELEASE_BUS})
+    sched.unschedule_event(e);
+  sched.schedule_event_in(6, EVENT_ACQUIRE_BUS);
 }
 
-void ObjAttrDMA::do_oam_dma_init() {
-  static constexpr auto total_clock_cycles = 4 * 2; // T-cycles
-  if (!clocks_remaining.has_value())
-    clocks_remaining = total_clock_cycles;
+void ObjAttrDMA::handle_event(time_type event_time, unsigned event) {
+  constexpr auto total_bytes_to_transfer = 0xA0;
 
-  if (clocks_remaining.value() == 4)
+  switch (static_cast<SchedulerEvents>(event)) {
+  case EVENT_ACQUIRE_BUS:
     bus_.acquire(BusConflictTypes::BUS_CONFLICT_OAM_DMA);
-  --clocks_remaining.value();
+    sched.schedule_event_on(event_time + 2, EVENT_COPY_DATA_BYTE);
+    break;
 
-  /* State transition logic */
-  if (clocks_remaining.value() == 0) {
-    state = STATE_OAMDMA_TRAN;
-    clocks_remaining.reset();
-  }
-}
-
-void ObjAttrDMA::do_oam_dma_tran() {
-  static constexpr auto total_clock_cycles = 160 * 4; // T-cycles
-
-  /* This is always fixed, although the time required for completion of the data
-   * transfer does seem to be impacted by double speed mode. */
-  if (!clocks_remaining.has_value())
-    // bus_.acquire(BusConflictTypes::BUS_CONFLICT_OAM_DMA);
-    clocks_remaining = total_clock_cycles;
-
-  /* Align data transfer perfectly with the M-cycle clock */
-  if (clocks_remaining.value() % 4 == 0) {
-    assert(data_offset >= 0 && data_offset <= 0x9F);
+  case EVENT_COPY_DATA_BYTE: {
     const addr_t src_addr = src_base_addr + data_offset;
     bus_.get_oam()[data_offset] = bus_.read_byte(src_addr);
-    ++data_offset;
-  }
-  --clocks_remaining.value();
 
-  /* Transfer completion logic */
-  if (clocks_remaining.value() == 0) {
+    if (++data_offset < total_bytes_to_transfer)
+      sched.schedule_event_on(event_time + 4, EVENT_COPY_DATA_BYTE);
+    else
+      sched.schedule_event_on(event_time + 4, EVENT_RELEASE_BUS);
+  } break;
+
+  case EVENT_RELEASE_BUS:
     bus_.release(BusConflictTypes::BUS_CONFLICT_OAM_DMA);
-    clocks_remaining.reset();
-    state = STATE_DISABLED;
-  }
-}
+    break;
 
-void ObjAttrDMA::step() {
-  switch (state) {
-  case STATE_OAMDMA_INIT:
-    do_oam_dma_init();
-    break;
-  case STATE_OAMDMA_TRAN:
-    do_oam_dma_tran();
-    break;
   default:
     break;
   }
 }
+
+void ObjAttrDMA::step() {}
 
 /* ======================================================================
  * VRAM DMA Transfer, applicable to only CGB

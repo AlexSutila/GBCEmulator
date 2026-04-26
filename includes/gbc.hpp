@@ -9,6 +9,7 @@
 #include "memory/bus.hpp"
 #include "memory/mmio/mmio.hpp"
 #include "ppu/ppu.hpp"
+#include "schedule.hpp"
 #include "serial.hpp"
 #include "timer.hpp"
 
@@ -102,7 +103,7 @@ private:
   void cram_init_mono() const;
 
   /* For moving emulation state along */
-  void step_peripherals(bool fast_cycle) const;
+  void step_peripherals(bool fast_cycle);
   void step_dma(bool fast_cycle) const;
   [[nodiscard]] bool vdma_enabled() const;
   void step_processor() const;
@@ -111,6 +112,8 @@ private:
   std::optional<Debug::Debugger> debugger_{};
   std::optional<BootROM> bios_{};
   runtime_sys_info sys_{};
+
+  SystemScheduler sched_;
   Frontend &fe_;
 };
 

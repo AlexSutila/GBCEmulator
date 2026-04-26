@@ -5,6 +5,7 @@
 #include "memory/mmio/mmio.hpp"
 #include "mmio/cgb.hpp"
 #include "mmio/dmg.hpp"
+#include "schedule.hpp"
 #include <cstddef>
 #include <optional>
 
@@ -20,7 +21,7 @@ class AddressBus;
 class ObjAttrDMA {
 public:
   DMA::DMA *get_dma_reg();
-  explicit ObjAttrDMA(AddressBus &bus);
+  explicit ObjAttrDMA(AddressBus &bus, SystemScheduler &g_sched);
   template <typename T> void parse_savestate(T &t);
 
   struct DMAState {
@@ -30,25 +31,21 @@ public:
   };
   [[nodiscard]] DMAState get_state() const;
 
+  void handle_event(time_type event_time, unsigned event);
   void start(byte_t addr_high); // Begins the actual data transfer
   void step();
 
 private:
   addr_t src_base_addr{}, data_offset{};
-
-  enum State {
-    STATE_DISABLED,    // DMA is not active
-    STATE_OAMDMA_INIT, // Initialization
-    STATE_OAMDMA_TRAN, // Data Transfer
-  } state;
   DMA::DMA dma_;
 
-  /* Core OAM DMA logic implementation */
-  void do_oam_dma_init();
-  void do_oam_dma_tran();
+  enum SchedulerEvents : unsigned {
+    EVENT_ACQUIRE_BUS,
+    EVENT_COPY_DATA_BYTE,
+    EVENT_RELEASE_BUS,
+  };
 
-  /* Timing metadata */
-  std::optional<std::size_t> clocks_remaining;
+  ChildScheduler sched;
   AddressBus &bus_;
 };
 

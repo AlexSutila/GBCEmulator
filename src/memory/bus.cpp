@@ -110,15 +110,15 @@ template void AddressBus::parse_savestate<Savestate::Reader>(Savestate::Reader &
 template void AddressBus::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
 template void AddressBus::parse_savestate<Savestate::Checker>(Savestate::Checker &);
 
-AddressBus::AddressBus(runtime_sys_info &sys, std::optional<Debug::Debugger> &debugger,
-                       std::optional<BootROM> &bios)
-    : Debuggable(debugger), // Bus read/write breakpoints
-      key0(sys),            // Controls backwards compatability
-      key1(sys),            // Controls clock speed mode
-      oam_dma(*this),       // Performs object attribute DMA (DMG/CGB)
-      vdma(*this, sys),     // Performs GDMA and HDMA (CGB only)
-      bios_(bios),          // Optionally configured by frontend
-      sys_(sys)             // Generic system information
+AddressBus::AddressBus(runtime_sys_info &sys, SystemScheduler &g_sched,
+                       std::optional<Debug::Debugger> &debugger, std::optional<BootROM> &bios)
+    : Debuggable(debugger),    // Bus read/write breakpoints
+      key0(sys),               // Controls backwards compatability
+      key1(sys),               // Controls clock speed mode
+      oam_dma(*this, g_sched), // Performs object attribute DMA (DMG/CGB)
+      vdma(*this, sys),        // Performs GDMA and HDMA (CGB only)
+      bios_(bios),             // Optionally configured by frontend
+      sys_(sys)                // Generic system information
 {
   using mmio = IORegisterMapping;
   using namespace std::ranges;

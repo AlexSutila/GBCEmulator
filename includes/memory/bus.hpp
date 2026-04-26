@@ -8,6 +8,7 @@
 #include "memory/mmio/cgb.hpp"
 #include "memory/mmio/dmg.hpp"
 #include "memory/mmio/mmio.hpp"
+#include "schedule.hpp"
 
 #include <array>
 #include <cstdint>
@@ -68,8 +69,8 @@ public:
 
   /* Second constructor is called when skipping BIOS, first constructor may also
    * ignore the BIOS if the initialization fails for some reason. */
-  AddressBus(runtime_sys_info &sys, std::optional<Debug::Debugger> &debugger,
-             std::optional<BootROM> &bios);
+  AddressBus(runtime_sys_info &sys, SystemScheduler &g_sched,
+             std::optional<Debug::Debugger> &debugger, std::optional<BootROM> &bios);
   template <typename T> void parse_savestate(T &t);
 
   void write_byte(addr_t addr, byte_t value) const;

@@ -9,6 +9,7 @@
 #include "ppu/palette.hpp"
 #include "ppu/ppu.hpp"
 #include "savestate/codec.hpp"
+#include "schedule.hpp"
 #include "timer.hpp"
 
 #include <cstdint>
@@ -305,7 +306,7 @@ std::optional<AddressBus::CheatOverride> compile_cheat(const std::string_view co
 } // namespace
 
 GameBoyColor::GameBoyColor(Frontend &frontend, const std::string &bios_path)
-    : Debuggable(debugger_), debugger_(std::nullopt), fe_(frontend) {
+    : Debuggable(debugger_), debugger_(std::nullopt), sched_(sys_), fe_(frontend) {
   system_init(); // Connects all system components to each other
 
   /* We set CGB mode based on the size of the boot ROM. This is the best way
@@ -327,7 +328,7 @@ GameBoyColor::GameBoyColor(Frontend &frontend, const std::string &bios_path)
 }
 
 GameBoyColor::GameBoyColor(Frontend &frontend, const BootROM &rom)
-    : Debuggable(debugger_), debugger_(std::nullopt), fe_(frontend) {
+    : Debuggable(debugger_), debugger_(std::nullopt), sched_(sys_), fe_(frontend) {
   system_init();
   bios_ = rom; // We assume rom is already valid
 
@@ -339,7 +340,8 @@ GameBoyColor::GameBoyColor(Frontend &frontend, const BootROM &rom)
 }
 
 GameBoyColor::GameBoyColor(Frontend &frontend)
-    : Debuggable(debugger_), debugger_(std::nullopt), bios_(std::nullopt), fe_(frontend) {
+    : Debuggable(debugger_), debugger_(std::nullopt), bios_(std::nullopt), sched_(sys_),
+      fe_(frontend) {
   system_init(); // Connects all system components
   skip_bios();   // BIOS is left unconfigured
   /* We still kind of have to do this here in case we run DMG games. Will likely
@@ -359,7 +361,7 @@ void GameBoyColor::system_init() {
   };
 
   /* Component initialization */
-  bus = std::make_unique<AddressBus>(sys_, debugger_, bios_);
+  bus = std::make_unique<AddressBus>(sys_, sched_, debugger_, bios_);
   cpu = std::make_unique<LR35902>(bus.get(), debugger_, sys_);
   apu = std::make_unique<APU>(*bus, fe_);
   ppu = std::make_unique<PixelProcessingUnit>(bus.get(), fe_, debugger_, sys_);
@@ -494,7 +496,7 @@ void GameBoyColor::init_test_bed() const {
   bus->init_test_bed();
 }
 
-void GameBoyColor::step_peripherals(bool fast_cycle) const {
+void GameBoyColor::step_peripherals(bool fast_cycle) {
   step_dma(fast_cycle);
   timer->step();
 
@@ -514,6 +516,7 @@ void GameBoyColor::step_dma(const bool fast_cycle) const {
   else
     bus->get_vdma().step();
 }
+
 bool GameBoyColor::vdma_enabled() const { return bus->get_vdma().enabled(); }
 
 void GameBoyColor::step_processor() const {
@@ -523,23 +526,23 @@ void GameBoyColor::step_processor() const {
 
 std::size_t GameBoyColor::big_step() {
   const auto psync_cb = [this](std::size_t sync_cycles) {
+    sys_.elapsed_clocks += sync_cycles;
+
     for (std::size_t sync_cycle{0}; sync_cycle < sync_cycles; ++sync_cycle) {
       const bool fast_cycle = (sys_.double_speed) && (sync_cycle % 2 != 0);
       step_peripherals(fast_cycle);
     }
+
+    if (auto next_event_cycle = sched_.peek_next_cycle(); next_event_cycle != std::nullopt) {
+      while (next_event_cycle != std::nullopt && next_event_cycle <= sys_.elapsed_clocks) {
+        auto [component_id, event_id] = sched_.pop_next_event();
+        bus->get_oam_dma().handle_event(next_event_cycle.value(), event_id);
+        next_event_cycle = sched_.peek_next_cycle();
+      }
+    }
   };
 
-  // CPU is only active if VDMA is not enabled
-  if (const auto &vdma = bus->get_vdma(); !vdma.enabled())
-    return cpu->big_step(psync_cb);
-
-  // If VDMA is active, we have to handle both speeds
-  step_peripherals(false);
-  if (sys_.double_speed) {
-    step_peripherals(true);
-    return 2;
-  }
-  return 1;
+  return cpu->big_step(psync_cb);
 }
 
 void GameBoyColor::step() {
@@ -548,9 +551,6 @@ void GameBoyColor::step() {
   // DMG cycle, or the first cycle of double speed in CGB mode (if double speed is enabled)
   step_processor();
   step_peripherals(false);
-
-  // System clocks are maintained in unit `t-cycles`
-  ++sys_.elapsed_clocks;
 
   // If we are in double speed mode, step affected components again
   if (sys_.double_speed) {
