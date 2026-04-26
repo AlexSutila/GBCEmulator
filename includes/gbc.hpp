@@ -26,13 +26,18 @@ class Frontend;
  * compatability and current operating mode. */
 struct runtime_sys_info {
   std::uint64_t elapsed_clocks{};
-  bool cgb_mode{};
-  bool halted{};
 
-  // For double speed mode, see KEY1 register in `cgb.hpp` for details
-  bool speed_switch_armed{};
-  bool double_speed{};
-  bool unmap_key0{};
+  union {
+    struct {
+      bool cgb_mode : 1;
+      bool halted : 1;
+      // For double speed mode, see KEY1 register in `cgb.hpp` for details
+      bool speed_switch_armed : 1;
+      bool double_speed : 1;
+      bool unmap_key0 : 1;
+    };
+    std::uint8_t flags{};
+  };
 };
 
 class GameBoyColor final : Debug::Debuggable {

@@ -507,7 +507,7 @@ void GameBoyColor::step_peripherals(bool fast_cycle) {
 }
 
 void GameBoyColor::step_dma(const bool fast_cycle) const {
-  bus->get_oam_dma().step(); // Runs 2X in double speed
+  // bus->get_oam_dma().step(); // Runs 2X in double speed
 
   /* As described elsewhere, HDMA and GDMA have an initialization phase that
    * does run fast in double speed mode, but the transfers themselves don't */
@@ -612,23 +612,15 @@ bool GameBoyColor::savestate_ready() const {
 
 enum : std::uint16_t {
   F_ELAPSED_CLOCKS = 1,
-  F_CGB_MODE,
-  F_HALTED,
-  F_SPEED_SWITCH_ARMED,
-  F_DOUBLE_SPEED,
-  F_UNMAP_KEY0,
+  F_FLAGS,
 };
 
 template <typename T> void GameBoyColor::parse_savestate(T &t) {
-  constexpr auto version = 3; // Schema revision
+  constexpr auto version = 4; // Schema revision
   t.chunk_header(version, Savestate::C_GBC);
 
   t.field_generic(F_ELAPSED_CLOCKS, sys_.elapsed_clocks);
-  t.field_generic(F_CGB_MODE, sys_.cgb_mode);
-  t.field_generic(F_HALTED, sys_.halted);
-  t.field_generic(F_SPEED_SWITCH_ARMED, sys_.speed_switch_armed);
-  t.field_generic(F_DOUBLE_SPEED, sys_.double_speed);
-  t.field_generic(F_UNMAP_KEY0, sys_.unmap_key0);
+  t.field_generic(F_FLAGS, sys_.flags);
 
   // Begin recursive descent into each component
   cpu->parse_savestate(t);

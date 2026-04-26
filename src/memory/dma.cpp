@@ -55,7 +55,11 @@ ObjAttrDMA::ObjAttrDMA(AddressBus &bus, SystemScheduler &g_sched)
 }
 
 ObjAttrDMA::DMAState ObjAttrDMA::get_state() const {
-  DMAState s{};
+  DMAState s{
+      .src_base_address = src_base_addr,
+      .data_offset = data_offset,
+      .active = active,
+  };
   return s;
 }
 
@@ -81,13 +85,14 @@ void ObjAttrDMA::handle_event(time_type event_time, unsigned event) {
   case EVENT_ACQUIRE_BUS:
     bus_.acquire(BusConflictTypes::BUS_CONFLICT_OAM_DMA);
     sched.schedule_event_on(event_time + 2, EVENT_COPY_DATA_BYTE);
+    active = true;
     break;
 
   case EVENT_COPY_DATA_BYTE: {
     const addr_t src_addr = src_base_addr + data_offset;
     bus_.get_oam()[data_offset] = bus_.read_byte(src_addr);
 
-    if (++data_offset < total_bytes_to_transfer)
+    if (++data_offset < total_bytes_to_transfer) [[likely]]
       sched.schedule_event_on(event_time + 4, EVENT_COPY_DATA_BYTE);
     else
       sched.schedule_event_on(event_time + 4, EVENT_RELEASE_BUS);
@@ -95,14 +100,13 @@ void ObjAttrDMA::handle_event(time_type event_time, unsigned event) {
 
   case EVENT_RELEASE_BUS:
     bus_.release(BusConflictTypes::BUS_CONFLICT_OAM_DMA);
+    active = false;
     break;
 
   default:
     break;
   }
 }
-
-void ObjAttrDMA::step() {}
 
 /* ======================================================================
  * VRAM DMA Transfer, applicable to only CGB

@@ -33,7 +33,6 @@ public:
 
   void handle_event(time_type event_time, unsigned event);
   void start(byte_t addr_high); // Begins the actual data transfer
-  void step();
 
 private:
   addr_t src_base_addr{}, data_offset{};
@@ -44,6 +43,7 @@ private:
     EVENT_COPY_DATA_BYTE,
     EVENT_RELEASE_BUS,
   };
+  bool active{false};
 
   ChildScheduler sched;
   AddressBus &bus_;
