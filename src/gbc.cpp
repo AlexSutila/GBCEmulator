@@ -629,6 +629,8 @@ template <typename T> void GameBoyColor::parse_savestate(T &t) {
   serial->parse_savestate(t);
   ppu->parse_savestate(t);
   apu->parse_savestate(t);
+
+  sched_.parse_savestate(t);
   t.eof();
 }
 

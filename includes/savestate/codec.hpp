@@ -47,6 +47,11 @@ enum ChunkTags : std::uint16_t {
   C_VDMA,
   C_CRAM,
 
+  /* The child schedulers do not hold any stateful information that is not already
+   * initialized deterministicall by their constructor, so we don't need to worry
+   * about them from a save-state perspective. */
+  C_SCHEDULER,
+
   /* Denotes end of chunk */
   C_EOF = 0xFFFF
 };

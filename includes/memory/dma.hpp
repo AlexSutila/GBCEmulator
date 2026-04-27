@@ -24,6 +24,15 @@ public:
   explicit ObjAttrDMA(AddressBus &bus, SystemScheduler &g_sched);
   template <typename T> void parse_savestate(T &t);
 
+  enum SchedulerEvents : unsigned {
+    EVENT_ACQUIRE_BUS = 0,
+    EVENT_COPY_DATA_BYTE,
+    EVENT_RELEASE_BUS,
+
+    /* For scheduler serialization */
+    EVENT_COUNT,
+  };
+
   struct DMAState {
     addr_t src_base_address;
     addr_t data_offset;
@@ -36,17 +45,12 @@ public:
 
 private:
   addr_t src_base_addr{}, data_offset{};
-  DMA::DMA dma_;
-
-  enum SchedulerEvents : unsigned {
-    EVENT_ACQUIRE_BUS,
-    EVENT_COPY_DATA_BYTE,
-    EVENT_RELEASE_BUS,
-  };
-  bool active{false};
+  DMA::DMA dma_; // MMIO Register
 
   ChildScheduler sched;
   AddressBus &bus_;
+
+  bool active{false};
 };
 
 /*

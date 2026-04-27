@@ -1,5 +1,6 @@
 #ifndef SCHEDULE_HPP
 #define SCHEDULE_HPP
+
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -10,18 +11,23 @@ struct runtime_sys_info;
 using time_type = std::uint64_t;
 using ord_type = std::uint64_t;
 
-using event_time = std::tuple<time_type, ord_type>;
-using event = std::tuple<unsigned, unsigned>; // (component_id, event_id)
-
 enum SchedulerComponents : unsigned {
-  SCHED_COMPONENT_OAM_DMA,
+  SCHED_COMPONENT_OAM_DMA = 0,
+
+  /* For serialization purposes - don't touch */
+  SCHED_COMPONENT_COUNT,
 };
+
+using event = std::tuple<SchedulerComponents, unsigned>; // (component_id, event_id)
+using event_time = std::tuple<time_type, ord_type>;
 
 class SystemScheduler {
 public:
   SystemScheduler(runtime_sys_info &sys);
   ~SystemScheduler();
 
+  // Serialization gets hairy, see implementation file for details
+  template <typename T> void parse_savestate(T &t);
   std::optional<time_type> peek_next_cycle() const;
   event pop_next_event();
 
@@ -57,14 +63,11 @@ public:
   }
 
 private:
-  struct Implementation;
-  std::unique_ptr<Implementation> impl;
-
   void schedule_event_in_impl(time_type in_cycles, unsigned event_id) const;
   void schedule_event_on_impl(time_type cycle, unsigned event_id) const;
   void unschedule_event_impl(unsigned event_id) const;
 
-  const unsigned component_id;
+  const SchedulerComponents component_id;
   SystemScheduler &g_sched;
 };
 
