@@ -21,7 +21,7 @@ class AddressBus;
 class ObjAttrDMA {
 public:
   DMA::DMA *get_dma_reg();
-  explicit ObjAttrDMA(AddressBus &bus, SystemScheduler &g_sched);
+  explicit ObjAttrDMA(AddressBus &bus, runtime_sys_info &sys, SystemScheduler &g_sched);
   template <typename T> void parse_savestate(T &t);
 
   enum SchedulerEvents : unsigned {
@@ -50,6 +50,7 @@ private:
   ChildScheduler sched;
   AddressBus &bus_;
 
+  runtime_sys_info &sys_;
   bool active{false};
 };
 

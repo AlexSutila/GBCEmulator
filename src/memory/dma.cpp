@@ -49,8 +49,8 @@ template void ObjAttrDMA::parse_savestate<Savestate::Reader>(Savestate::Reader &
 template void ObjAttrDMA::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
 template void ObjAttrDMA::parse_savestate<Savestate::Checker>(Savestate::Checker &);
 
-ObjAttrDMA::ObjAttrDMA(AddressBus &bus, SystemScheduler &g_sched)
-    : dma_(*this), sched(g_sched, SCHED_COMPONENT_OAM_DMA), bus_(bus) {
+ObjAttrDMA::ObjAttrDMA(AddressBus &bus, runtime_sys_info &sys, SystemScheduler &g_sched)
+    : dma_(*this), sched(g_sched, SCHED_COMPONENT_OAM_DMA), bus_(bus), sys_(sys) {
   src_base_addr = data_offset = 0;
 }
 
@@ -75,7 +75,7 @@ void ObjAttrDMA::start(const byte_t addr_high) {
    * it is already running. */
   for (auto e : {EVENT_COPY_DATA_BYTE, EVENT_ACQUIRE_BUS, EVENT_RELEASE_BUS})
     sched.unschedule_event(e);
-  sched.schedule_event_in(6, EVENT_ACQUIRE_BUS);
+  sched.schedule_event_in(clks_key1_controlled(sys_.double_speed, 6), EVENT_ACQUIRE_BUS);
 }
 
 void ObjAttrDMA::handle_event(time_type event_time, unsigned event) {
@@ -84,7 +84,8 @@ void ObjAttrDMA::handle_event(time_type event_time, unsigned event) {
   switch (static_cast<SchedulerEvents>(event)) {
   case EVENT_ACQUIRE_BUS:
     bus_.acquire(BusConflictTypes::BUS_CONFLICT_OAM_DMA);
-    sched.schedule_event_on(event_time + 2, EVENT_COPY_DATA_BYTE);
+    sched.schedule_event_on(event_time + clks_key1_controlled(sys_.double_speed, 2),
+                            EVENT_COPY_DATA_BYTE);
     active = true;
     break;
 
@@ -92,10 +93,13 @@ void ObjAttrDMA::handle_event(time_type event_time, unsigned event) {
     const addr_t src_addr = src_base_addr + data_offset;
     bus_.get_oam()[data_offset] = bus_.read_byte(src_addr);
 
-    if (++data_offset < total_bytes_to_transfer) [[likely]]
-      sched.schedule_event_on(event_time + 4, EVENT_COPY_DATA_BYTE);
-    else
-      sched.schedule_event_on(event_time + 4, EVENT_RELEASE_BUS);
+    if (++data_offset < total_bytes_to_transfer) [[likely]] {
+      sched.schedule_event_on(event_time + clks_key1_controlled(sys_.double_speed, 4),
+                              EVENT_COPY_DATA_BYTE);
+    } else {
+      sched.schedule_event_on(event_time + clks_key1_controlled(sys_.double_speed, 4),
+                              EVENT_RELEASE_BUS);
+    }
   } break;
 
   case EVENT_RELEASE_BUS:

@@ -21,6 +21,22 @@ enum SchedulerComponents : unsigned {
 using event = std::tuple<SchedulerComponents, unsigned>; // (component_id, event_id)
 using event_time = std::tuple<time_type, ord_type>;
 
+inline constexpr time_type clks_static_timing(time_type cycles) {
+  /**
+   * We increment our elapsed clocks counter, technically, at a speed of 8MHz, so that
+   * we can align events that run in double speed mode on the odd-cycles.
+   */
+  return cycles * 2;
+}
+
+inline time_type clks_key1_controlled(bool double_speed, time_type cycles) {
+  /**
+   * Use only if the timing of an event is controlled by KEY1, which is the hardware
+   * register used to control the speed switch build into CGB models.
+   */
+  return cycles * (double_speed ? 1 : 2);
+}
+
 class SystemScheduler {
 public:
   SystemScheduler(runtime_sys_info &sys);

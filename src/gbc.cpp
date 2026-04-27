@@ -539,12 +539,12 @@ void GameBoyColor::sched_synchronize() {
 void GameBoyColor::step_processor() {
   if (const auto &vdma = bus->get_vdma(); !vdma.enabled()) // CPU is halted until VDMA is complete
     cpu->step();
-  ++sys_.elapsed_clocks;
 }
 
+// TODO: This entire goofy ass function makes me want to jump off a building in its current state ngl
 std::size_t GameBoyColor::big_step() {
   const auto psync_cb = [this](std::size_t sync_cycles) {
-    sys_.elapsed_clocks += sync_cycles;
+    sys_.elapsed_clocks += clks_key1_controlled(sys_.double_speed, sync_cycles);
 
     // TODO: Eventually, this needs to just straight up go
     for (std::size_t sync_cycle{0}; sync_cycle < sync_cycles; ++sync_cycle) {
@@ -555,6 +555,21 @@ std::size_t GameBoyColor::big_step() {
     // TODO: This will be the new synchronization mechanism
     sched_synchronize();
   };
+
+  // TODO: This will go away when we move VDMA to a scheduler as well
+  if (const auto &vdma = bus->get_vdma(); vdma.enabled()) {
+    sys_.elapsed_clocks++;
+    step_peripherals(false);
+    sched_synchronize();
+
+    if (sys_.double_speed) {
+      step_peripherals(true);
+      sched_synchronize();
+      return 2;
+    }
+    return 1;
+  }
+
   return cpu->big_step(psync_cb);
 }
 
@@ -564,14 +579,16 @@ void GameBoyColor::step() {
   // DMG cycle, or the first cycle of double speed in CGB mode (if double speed is enabled)
   step_processor();
   step_peripherals(false);
-  sched_synchronize();
 
   // If we are in double speed mode, step affected components again
   if (sys_.double_speed) {
     step_processor();
     step_peripherals(true);
-    sched_synchronize();
   }
+
+  // TODO: This will go away once we've fully transitioned to a scheduler
+  sys_.elapsed_clocks += clks_key1_controlled(sys_.double_speed, 1);
+  sched_synchronize();
 }
 
 GameBoyColor::CheatStats GameBoyColor::configure_cheats(const std::vector<CheatCode> &cheats) {
