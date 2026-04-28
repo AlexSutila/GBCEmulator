@@ -11,8 +11,9 @@ struct runtime_sys_info;
 using time_type = std::uint64_t;
 using ord_type = std::uint64_t;
 
-enum SchedulerComponents : unsigned {
+enum class SchedulerComponents : unsigned {
   SCHED_COMPONENT_OAM_DMA = 0,
+  SCHED_COMPONENT_VRAM_DMA,
 
   /* For serialization purposes - don't touch */
   SCHED_COMPONENT_COUNT,

@@ -369,7 +369,7 @@ void GameBoyColor::system_init() {
   serial = std::make_unique<SerialUnit>(bus.get());
 
   oam_dma = std::make_unique<ObjAttrDMA>(*bus, sys_, sched_);
-  vram_dma = std::make_unique<VDMA>(*bus, *ppu, sys_);
+  vram_dma = std::make_unique<VDMA>(*bus, *ppu, sys_, sched_);
 
   /* Joypad initialization */
   auto *const joypad_reg =
@@ -520,7 +520,16 @@ void GameBoyColor::sched_synchronize() {
    * So if we see one that is still ahead of the CPU, we must wait. CPU must remain ahead. */
   while (cyc != std::nullopt && cyc <= sys_.elapsed_clocks) {
     auto [c_id, e_id] = sched_.pop_next_event();
-    oam_dma->handle_event(cyc.value(), e_id);
+    switch (c_id) {
+    case SchedulerComponents::SCHED_COMPONENT_OAM_DMA:
+      oam_dma->handle_event(cyc.value(), e_id);
+      break;
+    case SchedulerComponents::SCHED_COMPONENT_VRAM_DMA:
+      vram_dma->handle_event(cyc.value(), e_id);
+      break;
+    default:
+      break;
+    }
     cyc = sched_.peek_next_cycle();
   }
 }

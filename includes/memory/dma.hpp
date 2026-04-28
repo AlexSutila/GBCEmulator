@@ -2,7 +2,6 @@
 #define GBC_DMA_HPP
 
 #include "emu_types.hpp"
-#include "memory/mmio/mmio.hpp"
 #include "mmio/cgb.hpp"
 #include "mmio/dmg.hpp"
 #include "schedule.hpp"
@@ -20,11 +19,10 @@ class AddressBus;
  */
 class ObjAttrDMA {
 public:
-  DMA::DMA *get_dma_reg();
   explicit ObjAttrDMA(AddressBus &bus, runtime_sys_info &sys, SystemScheduler &g_sched);
   template <typename T> void parse_savestate(T &t);
 
-  enum SchedulerEvents : unsigned {
+  enum class SchedulerEvents : unsigned {
     EVENT_ACQUIRE_BUS = 0,
     EVENT_COPY_DATA_BYTE,
     EVENT_RELEASE_BUS,
@@ -59,14 +57,17 @@ private:
  */
 class VDMA {
 public:
-  explicit VDMA(AddressBus &bus, PixelProcessingUnit &ppu, runtime_sys_info &sys);
+  explicit VDMA(AddressBus &bus, PixelProcessingUnit &ppu, runtime_sys_info &sys,
+                SystemScheduler &g_sched);
   template <typename T> void parse_savestate(T &t);
 
-  MMIORegister *get_vdma1() { return &vdma1_; }
-  MMIORegister *get_vdma2() { return &vdma2_; }
-  MMIORegister *get_vdma3() { return &vdma3_; }
-  MMIORegister *get_vdma4() { return &vdma4_; }
-  MMIORegister *get_vdma5() { return &vdma5_; }
+  enum class SchedulerEvents : unsigned {
+    EVENT_GDMA_COPY = 0,
+    EVENT_HDMA_COPY,
+
+    /* For scheduler serialization */
+    EVENT_COUNT,
+  };
 
   struct DMAState {
     addr_t dest_base_address;
@@ -78,6 +79,7 @@ public:
   };
   [[nodiscard]] DMAState get_state() const;
 
+  void handle_event(time_type event_time, unsigned event);
   void try_start(DMA::VDMATransferMode mode, byte_t blks);
 
   /* Getters and setters for both source and destination addresses involve
@@ -99,10 +101,15 @@ private:
   static void set_addr(DMA::VDMA_ADDR &lo, DMA::VDMA_ADDR &hi, addr_t addr);
   static addr_t get_addr(const DMA::VDMA_ADDR &lo, const DMA::VDMA_ADDR &hi);
 
-  /* Timing metadata */
-  runtime_sys_info &sys_;
-  PixelProcessingUnit &ppu_;
+  void transfer_byte(const addr_t offset) const;
+  void signal_complete();
+
+  ChildScheduler sched;
   AddressBus &bus_;
+
+  /* Timing metadata */
+  PixelProcessingUnit &ppu_;
+  runtime_sys_info &sys_;
 };
 
 #endif // GBC_DMA_HPP

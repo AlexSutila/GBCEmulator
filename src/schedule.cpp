@@ -128,16 +128,18 @@ SystemScheduler::~SystemScheduler() = default;
  * The overall size of the savestate does not increase unless such events are actually
  * scheduled, only the size of the allocation (libretro constraint).
  */
-constexpr std::size_t queue_size_upper_bound() { return ObjAttrDMA::EVENT_COUNT; }
-
-enum : std::uint16_t {
-  F_EVENT_QUEUE = 1,
-  F_ORD,
-};
+constexpr std::size_t queue_size_upper_bound() {
+  return static_cast<std::size_t>(ObjAttrDMA::SchedulerEvents::EVENT_COUNT) +
+         static_cast<std::size_t>(VDMA::SchedulerEvents::EVENT_COUNT);
+}
 
 template <typename T> void SystemScheduler::parse_savestate(T &t) {
   using queue_entry = Implementation::SavedScheduledEvent;
   constexpr auto version = 1; // Schema revision
+  enum : std::uint16_t {
+    F_EVENT_QUEUE = 1,
+    F_ORD,
+  };
   t.chunk_header(version, Savestate::C_SCHEDULER);
 
   constexpr auto max_bytes = sizeof(queue_entry) * queue_size_upper_bound();
