@@ -4,7 +4,6 @@
 #include "cpu/interrupts.hpp"
 #include "debugger/debugger.hpp"
 #include "memory/bus.hpp"
-#include "memory/dma.hpp"
 #include "memory/mmio/cgb.hpp"
 #include "memory/mmio/dmg.hpp"
 #include "memory/mmio/mmio.hpp"
@@ -99,9 +98,6 @@ private:
 
   /* CGB mode object priority resolution */
   PPU::OPRI opri_{};
-
-  /* CGB mode only, VRAM direct memory access */
-  VDMA &vdma_;
 
   /* Pixel Processor operation modes */
   void do_disabled();

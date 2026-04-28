@@ -29,6 +29,7 @@ struct runtime_sys_info {
 
   union {
     struct {
+      bool vdma_active : 1;
       bool cgb_mode : 1;
       bool halted : 1;
       // For double speed mode, see KEY1 register in `cgb.hpp` for details
@@ -99,6 +100,9 @@ private:
   std::unique_ptr<TimerUnit> timer{};
   std::unique_ptr<SerialUnit> serial{};
 
+  std::unique_ptr<ObjAttrDMA> oam_dma{};
+  std::unique_ptr<VDMA> vram_dma{};
+
   /* Top-level system initialization helpers */
   void system_init(); // Connects all components in the system
   void skip_bios();   // Skips bios when unconfigured
@@ -109,10 +113,8 @@ private:
 
   /* For moving emulation state along */
   void step_peripherals(bool fast_cycle);
-  void step_dma(bool fast_cycle) const;
   [[nodiscard]] bool vdma_enabled() const;
   void sched_synchronize();
-  void step_processor();
   CheatStats cheat_stats_{};
 
   std::optional<Debug::Debugger> debugger_{};

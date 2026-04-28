@@ -136,19 +136,11 @@ void VDMA_MODE_LEN::write(const byte_t value) {
 
   // All logic revolving around HDMA cancel and bizarre behavior is implemented
   // within the VDMA unit itself, so calling this is completely intentional.
-  dma_.enable(mode, blks);
+  dma_.try_start(mode, blks);
 }
 
-byte_t VDMA_MODE_LEN::peek() const {
-  constexpr byte_t complete_mask = 0x80;
-  constexpr byte_t size_mask = 0x7F;
-  if (dma_.complete())
-    return complete_mask | dma_.get_blks_remaining();
+byte_t VDMA_MODE_LEN::peek() const { return 0xFF; }
 
-  // If the DMA is still in progress, it just shows the size. The seventh
-  // bit indicates that the full data transfer is complete.
-  return dma_.get_blks_remaining() & size_mask;
-}
 byte_t VDMA_MODE_LEN::read() { return peek(); }
 
 } // namespace DMA

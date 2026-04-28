@@ -140,7 +140,6 @@ PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus, Frontend &fe,
       fe_(fe),                                // To access frame buffer(s)
       vram(bus->get_vram()),                  // Tile data/map/attribute content
       oam(bus->get_oam()),                    // Object (sprite) attribute memory
-      vdma_(bus->get_vdma()),                 // Performs GDMA and HDMA in CGB mode
       obj_cram(std::make_unique<ColorRam>()), // CGB sprite color RAM
       bg_cram(std::make_unique<ColorRam>())   // CGB background color RAM
 {
@@ -540,10 +539,6 @@ void PixelProcessingUnit::do_draw() {
   else if (fetcher->was_window_visible())
     fetcher->inc_win_ly();
 
-  /* Signal that HDMA can start running if it has been requested or started
-   * previously. If HBLANK is partially complete, it can also be triggered. */
-  vdma_.set_ppu_hblank_signal(true);
-
   // State transition logic
   state = modes::MODE_HBLANK;
   total_mode_clks.reset();
@@ -556,8 +551,7 @@ void PixelProcessingUnit::do_hblank() {
 
   /* Signal that HDMA is no longer allowed to kick in. Note, that it can still
    * start running last minute and bleed into OAM scan. This is intentional. */
-  if (blank())
-    vdma_.set_ppu_hblank_signal(false);
+  blank();
 }
 
 void PixelProcessingUnit::do_vblank() {

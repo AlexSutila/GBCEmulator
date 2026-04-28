@@ -75,8 +75,6 @@ public:
 
   void write_byte(addr_t addr, byte_t value) const;
   [[nodiscard]] byte_t read_byte(addr_t addr, bool debug = true) const;
-  ObjAttrDMA &get_oam_dma() { return oam_dma; };
-  VDMA &get_vdma() { return vdma; }
 
   /* To be used by debuggers, more or less reads memory exactly the same as the
    * regular `read_byte()`, but calls `peak()` for memory mapped registers. */
@@ -131,10 +129,6 @@ private:
   /* System control registers: (speed mode, backwards compatability, etc.) */
   SYS::KEY0 key0; // Controls DMG backwards compatability
   SYS::KEY1 key1; // Controls clock speed mode
-
-  /* Direct memory access routine modules */
-  ObjAttrDMA oam_dma;
-  VDMA vdma;
 
   /* MMIO refs maintained for convenience */
   PPU::VramBank vram_bank_ctrl{};

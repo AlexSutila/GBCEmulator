@@ -96,10 +96,6 @@ template <typename T> void AddressBus::parse_savestate(T &t) {
   t.field_complex(F_KEY0, [&](T &t) { key0.parse_savestate(t); });
   t.field_complex(F_KEY1, [&](T &t) { key1.parse_savestate(t); });
 
-  // Direct memory access sub-structures
-  t.field_complex(F_OAM_DMA, [&](T &t) { oam_dma.parse_savestate(t); });
-  t.field_complex(F_VDMA, [&](T &t) { vdma.parse_savestate(t); });
-
   // Cartridge sub-structure (mapper handled internally)
   t.field_complex(F_CART, [&](T &t) { cart_->parse_savestate(t); });
   t.eof();
@@ -112,13 +108,11 @@ template void AddressBus::parse_savestate<Savestate::Checker>(Savestate::Checker
 
 AddressBus::AddressBus(runtime_sys_info &sys, SystemScheduler &g_sched,
                        std::optional<Debug::Debugger> &debugger, std::optional<BootROM> &bios)
-    : Debuggable(debugger),         // Bus read/write breakpoints
-      key0(sys),                    // Controls backwards compatability
-      key1(sys),                    // Controls clock speed mode
-      oam_dma(*this, sys, g_sched), // Performs object attribute DMA (DMG/CGB)
-      vdma(*this, sys),             // Performs GDMA and HDMA (CGB only)
-      bios_(bios),                  // Optionally configured by frontend
-      sys_(sys)                     // Generic system information
+    : Debuggable(debugger), // Bus read/write breakpoints
+      key0(sys),            // Controls backwards compatability
+      key1(sys),            // Controls clock speed mode
+      bios_(bios),          // Optionally configured by frontend
+      sys_(sys)             // Generic system information
 {
   using mmio = IORegisterMapping;
   using namespace std::ranges;
@@ -137,14 +131,6 @@ AddressBus::AddressBus(runtime_sys_info &sys, SystemScheduler &g_sched,
   connect_mmio(static_cast<addr_t>(mmio::MMIO_VRAM_BANK), &vram_bank_ctrl);
   connect_mmio(static_cast<addr_t>(mmio::MMIO_SPD_KEY0), &key0);
   connect_mmio(static_cast<addr_t>(mmio::MMIO_SPD_KEY1), &key1);
-
-  /* Connect memory mapped IO owned by DMA modules */
-  connect_mmio(static_cast<addr_t>(mmio::MMIO_OAM_DMA), oam_dma.get_dma_reg());
-  connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA1), vdma.get_vdma1());
-  connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA2), vdma.get_vdma2());
-  connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA3), vdma.get_vdma3());
-  connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA4), vdma.get_vdma4());
-  connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA5), vdma.get_vdma5());
 }
 
 void AddressBus::connect_mmio(const addr_t addr, MMIORegister *const reg) {

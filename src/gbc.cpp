@@ -368,6 +368,9 @@ void GameBoyColor::system_init() {
   timer = std::make_unique<TimerUnit>(bus.get());
   serial = std::make_unique<SerialUnit>(bus.get());
 
+  oam_dma = std::make_unique<ObjAttrDMA>(*bus, sys_, sched_);
+  vram_dma = std::make_unique<VDMA>(*bus, *ppu, sys_);
+
   /* Joypad initialization */
   auto *const joypad_reg =
       dynamic_cast<Joypad::JOYP *>(bus->get_mmio(IORegisterMapping::MMIO_JOYPAD));
@@ -497,7 +500,6 @@ void GameBoyColor::init_test_bed() const {
 }
 
 void GameBoyColor::step_peripherals(bool fast_cycle) {
-  step_dma(fast_cycle);
   timer->step();
 
   if (!fast_cycle) {
@@ -505,19 +507,6 @@ void GameBoyColor::step_peripherals(bool fast_cycle) {
     apu->step();
   }
 }
-
-void GameBoyColor::step_dma(const bool fast_cycle) const {
-  // bus->get_oam_dma().step(); // Runs 2X in double speed
-
-  /* As described elsewhere, HDMA and GDMA have an initialization phase that
-   * does run fast in double speed mode, but the transfers themselves don't */
-  if (fast_cycle)
-    bus->get_vdma().step_fast_cycle();
-  else
-    bus->get_vdma().step();
-}
-
-bool GameBoyColor::vdma_enabled() const { return bus->get_vdma().enabled(); }
 
 void GameBoyColor::sched_synchronize() {
   auto cyc = sched_.peek_next_cycle();
@@ -531,17 +520,11 @@ void GameBoyColor::sched_synchronize() {
    * So if we see one that is still ahead of the CPU, we must wait. CPU must remain ahead. */
   while (cyc != std::nullopt && cyc <= sys_.elapsed_clocks) {
     auto [c_id, e_id] = sched_.pop_next_event();
-    bus->get_oam_dma().handle_event(cyc.value(), e_id);
+    oam_dma->handle_event(cyc.value(), e_id);
     cyc = sched_.peek_next_cycle();
   }
 }
 
-void GameBoyColor::step_processor() {
-  if (const auto &vdma = bus->get_vdma(); !vdma.enabled()) // CPU is halted until VDMA is complete
-    cpu->step();
-}
-
-// TODO: This entire goofy ass function makes me want to jump off a building in its current state ngl
 std::size_t GameBoyColor::big_step() {
   const auto psync_cb = [this](std::size_t sync_cycles) {
     sys_.elapsed_clocks += clks_key1_controlled(sys_.double_speed, sync_cycles);
@@ -556,20 +539,6 @@ std::size_t GameBoyColor::big_step() {
     sched_synchronize();
   };
 
-  // TODO: This will go away when we move VDMA to a scheduler as well
-  if (const auto &vdma = bus->get_vdma(); vdma.enabled()) {
-    sys_.elapsed_clocks++;
-    step_peripherals(false);
-    sched_synchronize();
-
-    if (sys_.double_speed) {
-      step_peripherals(true);
-      sched_synchronize();
-      return 2;
-    }
-    return 1;
-  }
-
   return cpu->big_step(psync_cb);
 }
 
@@ -577,12 +546,12 @@ void GameBoyColor::step() {
   try_brk(Debug::BreakReason::BRK_STEP_CLOCK_CYCLE);
 
   // DMG cycle, or the first cycle of double speed in CGB mode (if double speed is enabled)
-  step_processor();
+  cpu->step();
   step_peripherals(false);
 
   // If we are in double speed mode, step affected components again
   if (sys_.double_speed) {
-    step_processor();
+    cpu->step();
     step_peripherals(true);
   }
 
