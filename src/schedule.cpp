@@ -79,7 +79,7 @@ public:
    * save and restore the state of the scheduler.
    * ====================================================================== */
   struct SavedScheduledEvent {
-    SchedulerComponents comp_id;
+    SchedulerComponent comp_id;
     unsigned event_id;
     time_type event_time;
     ord_type event_ord;
@@ -129,8 +129,8 @@ SystemScheduler::~SystemScheduler() = default;
  * scheduled, only the size of the allocation (libretro constraint).
  */
 constexpr std::size_t queue_size_upper_bound() {
-  return static_cast<std::size_t>(ObjAttrDMA::SchedulerEvents::EVENT_COUNT) +
-         static_cast<std::size_t>(VDMA::SchedulerEvents::EVENT_COUNT);
+  return static_cast<std::size_t>(ObjAttrDMA::SchedulerEvent::EVENT_COUNT) +
+         static_cast<std::size_t>(VDMA::SchedulerEvent::EVENT_COUNT);
 }
 
 template <typename T> void SystemScheduler::parse_savestate(T &t) {
@@ -196,7 +196,7 @@ void SystemScheduler::unschedule_event(event e) const { impl->try_unqueue(e); }
  * Child (per-component) scheduler implementation
  * ====================================================================== */
 
-ChildScheduler::ChildScheduler(SystemScheduler &global_sched, SchedulerComponents component_id)
+ChildScheduler::ChildScheduler(SystemScheduler &global_sched, SchedulerComponent component_id)
     : component_id(component_id), g_sched(global_sched) {}
 ChildScheduler::~ChildScheduler() = default;
 

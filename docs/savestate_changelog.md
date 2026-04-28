@@ -1,3 +1,6 @@
+## Mon Apr 27 09:05:04 PM MST 2026 (~1 fields)
+- F_FLAGS reordered bits in `runtime_sys_info`
+
 ## Sun Apr 26 04:10:41 PM MST 2026 (+1 new fields, -5 fields)
 - F_CGB_MODE removed from `runtime_sys_info`
 - F_HALTED removed from `runtime_sys_info`

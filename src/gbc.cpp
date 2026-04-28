@@ -353,10 +353,11 @@ void GameBoyColor::system_init() {
   /* General system operation info */
   sys_ = {
       .elapsed_clocks = 0,
-      .cgb_mode = true,
+      .vdma_active = false,
       .halted = false,
-      .speed_switch_armed = false,
       .double_speed = false,
+      .speed_switch_armed = false,
+      .cgb_mode = true,
       .unmap_key0 = false,
   };
 
@@ -377,7 +378,7 @@ void GameBoyColor::system_init() {
   auto *const if_reg =
       dynamic_cast<InterruptBits *>(bus->get_mmio(IORegisterMapping::MMIO_INT_FLAGS));
   if (!joypad_reg || !if_reg)
-    throw std::logic_error("Failed to configure joypad MMIO");
+    throw std::runtime_error("Failed to configure joypad MMIO");
 
   /* To avoid running into problems with other registers it depends on in time,
    * we have to invoke this method to configure the dependencies it needs after
@@ -477,7 +478,7 @@ void GameBoyColor::cram_init_mono(IORegisterMapping index, IORegisterMapping dat
 void GameBoyColor::insert_cartridge(const cart &c) {
   const byte_t &cgb_flag = c.header.cgb_flag();
   if (!bus)
-    throw std::logic_error("Bus not initialized");
+    throw std::runtime_error("Bus not initialized");
   bus->insert_cartridge(c);
 
   /* IMPORTANT: on the real hardware, this flag is set via KEY0 during the BIOS
@@ -493,12 +494,13 @@ void GameBoyColor::insert_cartridge(const cart &c) {
 
 void GameBoyColor::init_test_bed() const {
   if (!bus)
-    throw std::logic_error("Bus not initialized");
+    throw std::runtime_error("Bus not initialized");
 
   /* Init convenience RAM-only cartridge for testing */
   bus->init_test_bed();
 }
 
+// TODO: This needs to go once these components use the scheduler
 void GameBoyColor::step_peripherals(bool fast_cycle) {
   timer->step();
 
@@ -508,7 +510,42 @@ void GameBoyColor::step_peripherals(bool fast_cycle) {
   }
 }
 
-void GameBoyColor::sched_synchronize() {
+ScheduledEventOutcome GameBoyColor::handle_event(SchedulerComponent c_id, unsigned e_id,
+                                                 time_type t) {
+  switch (c_id) {
+  case SchedulerComponent::SCHED_COMPONENT_OAM_DMA:
+    return oam_dma->handle_event(t, e_id);
+  case SchedulerComponent::SCHED_COMPONENT_VRAM_DMA:
+    return vram_dma->handle_event(t, e_id);
+
+  default:
+    throw std::runtime_error("Event with undefined component ID");
+  }
+}
+
+time_type GameBoyColor::sched_pop_until(ScheduledEventOutcome outcome) {
+  ScheduledEventOutcome next_outcome{};
+  time_type cycle{};
+
+  do {
+    auto c = sched_.peek_next_cycle();
+    /* We call this method with the assumption that an outcome will come along eventually.
+     * That being said, if it is not immediately in the queue as this is called, that is ok.
+     * An event which is scheduled might schedule another event that generates the desired
+     * outcome. If, the queue is empty, this is simply not possible. */
+    if (!c) [[unlikely]]
+      throw std::runtime_error("Waiting on event outcome with empty queue");
+    cycle = *c;
+
+    auto [c_id, e_id] = sched_.pop_next_event();
+    next_outcome = handle_event(c_id, e_id, cycle);
+  } while (next_outcome != outcome);
+
+  // Return the target cycle which the hardware ended up producing the outcome on
+  return cycle;
+}
+
+void GameBoyColor::sched_pop_until(time_type target_cycle) {
   auto cyc = sched_.peek_next_cycle();
   if (cyc == std::nullopt)
     return;
@@ -518,25 +555,16 @@ void GameBoyColor::sched_synchronize() {
    *  1. We are out of events to pop (this will likely end up being very rare)
    *  2. We have popped all events before the current CPU cycle
    * So if we see one that is still ahead of the CPU, we must wait. CPU must remain ahead. */
-  while (cyc != std::nullopt && cyc <= sys_.elapsed_clocks) {
+  while (cyc != std::nullopt && cyc <= target_cycle) {
     auto [c_id, e_id] = sched_.pop_next_event();
-    switch (c_id) {
-    case SchedulerComponents::SCHED_COMPONENT_OAM_DMA:
-      oam_dma->handle_event(cyc.value(), e_id);
-      break;
-    case SchedulerComponents::SCHED_COMPONENT_VRAM_DMA:
-      vram_dma->handle_event(cyc.value(), e_id);
-      break;
-    default:
-      break;
-    }
+    handle_event(c_id, e_id, cyc.value());
     cyc = sched_.peek_next_cycle();
   }
 }
 
 std::size_t GameBoyColor::big_step() {
   const auto psync_cb = [this](std::size_t sync_cycles) {
-    sys_.elapsed_clocks += clks_key1_controlled(sys_.double_speed, sync_cycles);
+    const auto elapsed_clocks = clks_key1_controlled(sys_.double_speed, sync_cycles);
 
     // TODO: Eventually, this needs to just straight up go
     for (std::size_t sync_cycle{0}; sync_cycle < sync_cycles; ++sync_cycle) {
@@ -545,9 +573,12 @@ std::size_t GameBoyColor::big_step() {
     }
 
     // TODO: This will be the new synchronization mechanism
-    sched_synchronize();
+    sys_.elapsed_clocks += elapsed_clocks;
+    sched_pop_until(sys_.elapsed_clocks);
   };
 
+  if (sys_.vdma_active) [[unlikely]]
+    return sched_pop_until(ScheduledEventOutcome::EVENT_OUTCOME_VDMA_COMPLETE);
   return cpu->big_step(psync_cb);
 }
 
@@ -555,18 +586,20 @@ void GameBoyColor::step() {
   try_brk(Debug::BreakReason::BRK_STEP_CLOCK_CYCLE);
 
   // DMG cycle, or the first cycle of double speed in CGB mode (if double speed is enabled)
-  cpu->step();
+  if (!sys_.vdma_active)
+    cpu->step();
   step_peripherals(false);
 
   // If we are in double speed mode, step affected components again
   if (sys_.double_speed) {
-    cpu->step();
+    if (!sys_.vdma_active)
+      cpu->step();
     step_peripherals(true);
   }
 
   // TODO: This will go away once we've fully transitioned to a scheduler
   sys_.elapsed_clocks += clks_key1_controlled(sys_.double_speed, 1);
-  sched_synchronize();
+  sched_pop_until(sys_.elapsed_clocks);
 }
 
 GameBoyColor::CheatStats GameBoyColor::configure_cheats(const std::vector<CheatCode> &cheats) {
@@ -611,7 +644,7 @@ enum : std::uint16_t {
 };
 
 template <typename T> void GameBoyColor::parse_savestate(T &t) {
-  constexpr auto version = 4; // Schema revision
+  constexpr auto version = 5; // Schema revision
   t.chunk_header(version, Savestate::C_GBC);
 
   t.field_generic(F_ELAPSED_CLOCKS, sys_.elapsed_clocks);

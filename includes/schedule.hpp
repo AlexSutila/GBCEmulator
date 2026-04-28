@@ -11,7 +11,24 @@ struct runtime_sys_info;
 using time_type = std::uint64_t;
 using ord_type = std::uint64_t;
 
-enum class SchedulerComponents : unsigned {
+/**
+ * The outcomes of the handling of a particular event, best explained via an example.
+ * Consider the CPU is halted. We can continuously pop events off the queue without
+ * worrying about the CPU, and know we need to stop when the components event handler
+ * denotes that it fired an interrupt.
+ */
+enum class ScheduledEventOutcome {
+  EVENT_OUTCOME_NONE = 0,      // Default, no synchronization conflict
+  EVENT_OUTCOME_INTERRUPT,     // Unpauses CPU after HALT instruction
+  EVENT_OUTCOME_VDMA_COMPLETE, // Unpauses CPU after VRAM DMA transfers
+};
+
+/**
+ * A list of all components that the scheduler uses to determine component IDs. This
+ * is necessary so components can easily locate and unmap already scheduled events if
+ * they are canceled under certain conditions.
+ */
+enum class SchedulerComponent : unsigned {
   SCHED_COMPONENT_OAM_DMA = 0,
   SCHED_COMPONENT_VRAM_DMA,
 
@@ -19,7 +36,7 @@ enum class SchedulerComponents : unsigned {
   SCHED_COMPONENT_COUNT,
 };
 
-using event = std::tuple<SchedulerComponents, unsigned>; // (component_id, event_id)
+using event = std::tuple<SchedulerComponent, unsigned>; // (component_id, event_id)
 using event_time = std::tuple<time_type, ord_type>;
 
 inline constexpr time_type clks_static_timing(time_type cycles) {
@@ -62,7 +79,7 @@ private:
 
 class ChildScheduler {
 public:
-  ChildScheduler(SystemScheduler &global_sched, SchedulerComponents component_id);
+  ChildScheduler(SystemScheduler &global_sched, SchedulerComponent component_id);
   ~ChildScheduler();
 
   template <typename EventIdType>
@@ -84,7 +101,7 @@ private:
   void schedule_event_on_impl(time_type cycle, unsigned event_id) const;
   void unschedule_event_impl(unsigned event_id) const;
 
-  const SchedulerComponents component_id;
+  const SchedulerComponent component_id;
   SystemScheduler &g_sched;
 };
 

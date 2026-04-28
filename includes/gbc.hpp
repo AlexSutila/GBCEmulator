@@ -29,12 +29,14 @@ struct runtime_sys_info {
 
   union {
     struct {
+      // System synchronization flags
       bool vdma_active : 1;
-      bool cgb_mode : 1;
       bool halted : 1;
-      // For double speed mode, see KEY1 register in `cgb.hpp` for details
-      bool speed_switch_armed : 1;
       bool double_speed : 1;
+
+      // System control flags
+      bool speed_switch_armed : 1;
+      bool cgb_mode : 1;
       bool unmap_key0 : 1;
     };
     std::uint8_t flags{};
@@ -111,10 +113,12 @@ private:
   void cram_init_mono(IORegisterMapping index, IORegisterMapping data) const;
   void cram_init_mono() const;
 
+  ScheduledEventOutcome handle_event(SchedulerComponent c_id, unsigned e_id, time_type t);
+  time_type sched_pop_until(ScheduledEventOutcome outcome); // Be careful with this!!!!!
+  void sched_pop_until(time_type target_cycles);
+
   /* For moving emulation state along */
   void step_peripherals(bool fast_cycle);
-  [[nodiscard]] bool vdma_enabled() const;
-  void sched_synchronize();
   CheatStats cheat_stats_{};
 
   std::optional<Debug::Debugger> debugger_{};

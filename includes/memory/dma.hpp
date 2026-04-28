@@ -22,7 +22,7 @@ public:
   explicit ObjAttrDMA(AddressBus &bus, runtime_sys_info &sys, SystemScheduler &g_sched);
   template <typename T> void parse_savestate(T &t);
 
-  enum class SchedulerEvents : unsigned {
+  enum class SchedulerEvent : unsigned {
     EVENT_ACQUIRE_BUS = 0,
     EVENT_COPY_DATA_BYTE,
     EVENT_RELEASE_BUS,
@@ -38,7 +38,7 @@ public:
   };
   [[nodiscard]] DMAState get_state() const;
 
-  void handle_event(time_type event_time, unsigned event);
+  ScheduledEventOutcome handle_event(time_type event_time, unsigned event);
   void start(byte_t addr_high); // Begins the actual data transfer
 
 private:
@@ -61,7 +61,7 @@ public:
                 SystemScheduler &g_sched);
   template <typename T> void parse_savestate(T &t);
 
-  enum class SchedulerEvents : unsigned {
+  enum class SchedulerEvent : unsigned {
     EVENT_GDMA_COPY = 0,
     EVENT_HDMA_COPY,
 
@@ -79,7 +79,7 @@ public:
   };
   [[nodiscard]] DMAState get_state() const;
 
-  void handle_event(time_type event_time, unsigned event);
+  ScheduledEventOutcome handle_event(time_type event_time, unsigned event);
   void try_start(DMA::VDMATransferMode mode, byte_t blks);
 
   /* Getters and setters for both source and destination addresses involve

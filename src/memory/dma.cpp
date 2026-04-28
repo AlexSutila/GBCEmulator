@@ -49,7 +49,7 @@ template void ObjAttrDMA::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
 template void ObjAttrDMA::parse_savestate<Savestate::Checker>(Savestate::Checker &);
 
 ObjAttrDMA::ObjAttrDMA(AddressBus &bus, runtime_sys_info &sys, SystemScheduler &g_sched)
-    : dma_(*this), sched(g_sched, SchedulerComponents::SCHED_COMPONENT_OAM_DMA), bus_(bus),
+    : dma_(*this), sched(g_sched, SchedulerComponent::SCHED_COMPONENT_OAM_DMA), bus_(bus),
       sys_(sys) {
   bus.connect_mmio(static_cast<addr_t>(IORegisterMapping::MMIO_OAM_DMA), &dma_);
   src_base_addr = data_offset = 0;
@@ -72,41 +72,41 @@ void ObjAttrDMA::start(const byte_t addr_high) {
 
   /* Unschedule any on-going OAM-DMA transfers, in case we start it again while
    * it is already running. */
-  for (auto e : {SchedulerEvents::EVENT_COPY_DATA_BYTE, SchedulerEvents::EVENT_ACQUIRE_BUS,
-                 SchedulerEvents::EVENT_RELEASE_BUS}) {
+  for (auto e : {SchedulerEvent::EVENT_COPY_DATA_BYTE, SchedulerEvent::EVENT_ACQUIRE_BUS,
+                 SchedulerEvent::EVENT_RELEASE_BUS}) {
     sched.unschedule_event(e);
   }
 
   // Object attribute DMA runs fast in double speed mode so it must be key1 controlled
   sched.schedule_event_in(clks_key1_controlled(sys_.double_speed, 6),
-                          SchedulerEvents::EVENT_ACQUIRE_BUS);
+                          SchedulerEvent::EVENT_ACQUIRE_BUS);
 }
 
-void ObjAttrDMA::handle_event(time_type event_time, unsigned event) {
+ScheduledEventOutcome ObjAttrDMA::handle_event(time_type event_time, unsigned event) {
   constexpr auto total_bytes_to_transfer = 0xA0;
 
-  switch (static_cast<SchedulerEvents>(event)) {
-  case SchedulerEvents::EVENT_ACQUIRE_BUS:
+  switch (static_cast<SchedulerEvent>(event)) {
+  case SchedulerEvent::EVENT_ACQUIRE_BUS:
     bus_.acquire(BusConflictTypes::BUS_CONFLICT_OAM_DMA);
     sched.schedule_event_on(event_time + clks_key1_controlled(sys_.double_speed, 2),
-                            SchedulerEvents::EVENT_COPY_DATA_BYTE);
+                            SchedulerEvent::EVENT_COPY_DATA_BYTE);
     active = true;
     break;
 
-  case SchedulerEvents::EVENT_COPY_DATA_BYTE: {
+  case SchedulerEvent::EVENT_COPY_DATA_BYTE: {
     const addr_t src_addr = src_base_addr + data_offset;
     bus_.get_oam()[data_offset] = bus_.read_byte(src_addr);
 
     if (++data_offset < total_bytes_to_transfer) [[likely]] {
       sched.schedule_event_on(event_time + clks_key1_controlled(sys_.double_speed, 4),
-                              SchedulerEvents::EVENT_COPY_DATA_BYTE);
+                              SchedulerEvent::EVENT_COPY_DATA_BYTE);
     } else {
       sched.schedule_event_on(event_time + clks_key1_controlled(sys_.double_speed, 4),
-                              SchedulerEvents::EVENT_RELEASE_BUS);
+                              SchedulerEvent::EVENT_RELEASE_BUS);
     }
   } break;
 
-  case SchedulerEvents::EVENT_RELEASE_BUS:
+  case SchedulerEvent::EVENT_RELEASE_BUS:
     bus_.release(BusConflictTypes::BUS_CONFLICT_OAM_DMA);
     active = false;
     break;
@@ -114,6 +114,8 @@ void ObjAttrDMA::handle_event(time_type event_time, unsigned event) {
   default:
     break;
   }
+
+  return ScheduledEventOutcome::EVENT_OUTCOME_NONE;
 }
 
 /* ======================================================================
@@ -160,7 +162,7 @@ template void VDMA::parse_savestate<Savestate::Checker>(Savestate::Checker &);
 VDMA::VDMA(AddressBus &bus, PixelProcessingUnit &ppu, runtime_sys_info &sys,
            SystemScheduler &g_sched)
     : vdma1_(), vdma2_(), vdma3_(), vdma4_(), vdma5_(*this),
-      sched(g_sched, SchedulerComponents::SCHED_COMPONENT_VRAM_DMA), bus_(bus), ppu_(ppu),
+      sched(g_sched, SchedulerComponent::SCHED_COMPONENT_VRAM_DMA), bus_(bus), ppu_(ppu),
       sys_(sys) {
   using mmio = IORegisterMapping;
   bus.connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA1), &vdma1_);
@@ -233,7 +235,7 @@ void VDMA::try_start(DMA::VDMATransferMode mode, const byte_t blks) {
   switch (mode) {
   case DMA::VDMATransferMode::GENERAL_PURPOSE_DMA:
     sched.schedule_event_in(clks_key1_controlled(sys_.double_speed, 4),
-                            VDMA::SchedulerEvents::EVENT_GDMA_COPY);
+                            VDMA::SchedulerEvent::EVENT_GDMA_COPY);
     transfer_size = vdma_blks_to_bytes(blks);
     break;
 
@@ -243,26 +245,29 @@ void VDMA::try_start(DMA::VDMATransferMode mode, const byte_t blks) {
   }
 }
 
-void VDMA::handle_event(time_type event_time, unsigned event) {
-  switch (static_cast<SchedulerEvents>(event)) {
-  case SchedulerEvents::EVENT_GDMA_COPY: {
+ScheduledEventOutcome VDMA::handle_event(time_type event_time, unsigned event) {
+  switch (static_cast<SchedulerEvent>(event)) {
+  case SchedulerEvent::EVENT_GDMA_COPY: {
     if (!sys_.vdma_active) [[unlikely]]
       sys_.vdma_active = true;
     transfer_byte(data_offset++);
 
     if (data_offset < transfer_size) {
       sched.schedule_event_on(event_time + clks_static_timing(2),
-                              VDMA::SchedulerEvents::EVENT_GDMA_COPY);
+                              VDMA::SchedulerEvent::EVENT_GDMA_COPY);
+      return ScheduledEventOutcome::EVENT_OUTCOME_NONE;
     } else {
       sys_.vdma_active = false;
       signal_complete();
+      return ScheduledEventOutcome::EVENT_OUTCOME_VDMA_COMPLETE;
     }
-  } break;
+  }
 
-  case SchedulerEvents::EVENT_HDMA_COPY:
-    break;
+  case SchedulerEvent::EVENT_HDMA_COPY:
+    return ScheduledEventOutcome::EVENT_OUTCOME_NONE;
 
   default:
-    break;
+    return ScheduledEventOutcome::EVENT_OUTCOME_NONE;
   }
+  __builtin_unreachable();
 }
