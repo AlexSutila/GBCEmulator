@@ -32,13 +32,13 @@ public:
   std::map<event_time, event, event_sequencer> e_queue;
   std::map<event, event_time> e_index; // Ordering does not matter
 
-  void try_unqueue(event e) {
+  bool try_unqueue(event e) {
     if (e_index.empty())
-      return;
+      return false;
 
     auto it = e_index.find(e); // Locate event time
     const event_time &t = it->second;
-    e_queue.erase(t);
+    return e_queue.erase(t) > 0;
   }
 
   void queue(event_time t, event e) {
@@ -190,7 +190,7 @@ void SystemScheduler::schedule_event_on(time_type cycle, event e) {
   impl->queue(t, e);
 }
 
-void SystemScheduler::unschedule_event(event e) const { impl->try_unqueue(e); }
+bool SystemScheduler::unschedule_event(event e) const { return impl->try_unqueue(e); }
 
 /* ======================================================================
  * Child (per-component) scheduler implementation
@@ -210,7 +210,7 @@ void ChildScheduler::schedule_event_on_impl(time_type cycle, unsigned event_id) 
   g_sched.schedule_event_on(cycle, e);
 }
 
-void ChildScheduler::unschedule_event_impl(unsigned event_id) const {
+bool ChildScheduler::unschedule_event_impl(unsigned event_id) const {
   const event e = std::make_tuple(component_id, event_id);
-  g_sched.unschedule_event(e);
+  return g_sched.unschedule_event(e);
 }

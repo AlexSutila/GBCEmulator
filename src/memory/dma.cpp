@@ -112,7 +112,7 @@ ScheduledEventOutcome ObjAttrDMA::handle_event(time_type event_time, unsigned ev
     break;
 
   default:
-    break;
+    __builtin_unreachable();
   }
 
   return ScheduledEventOutcome::EVENT_OUTCOME_NONE;
@@ -140,10 +140,8 @@ template <typename T> void VDMA::parse_savestate(T &t) {
   constexpr auto version = 1; // Schema revision
   t.chunk_header(version, Savestate::C_VDMA);
 
-  t.field_generic(F_VDMA_SRC_BASE, src_base_addr);
-  t.field_generic(F_VDMA_DEST_BASE, dest_base_addr);
   t.field_generic(F_VDMA_DATA_OFFSET, data_offset);
-  t.field_generic(F_VDMA_TRANSFER_SIZE, transfer_size);
+  t.field_generic(F_VDMA_TRANSFER_SIZE, transfer_size_bytes);
 
   // duplicate tags here are fine, they are all the same thing, just mind order
   t.field_complex(F_VDMA_ADDR_REG, [&](T &t) { vdma1_.parse_savestate(t); });
@@ -164,13 +162,18 @@ VDMA::VDMA(AddressBus &bus, PixelProcessingUnit &ppu, runtime_sys_info &sys,
     : vdma1_(), vdma2_(), vdma3_(), vdma4_(), vdma5_(*this),
       sched(g_sched, SchedulerComponent::SCHED_COMPONENT_VRAM_DMA), bus_(bus), ppu_(ppu),
       sys_(sys) {
+  transfer_size_bytes = total_transfer_size_bytes = data_offset = 0;
+  waiting = false;
+
   using mmio = IORegisterMapping;
   bus.connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA1), &vdma1_);
   bus.connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA2), &vdma2_);
   bus.connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA3), &vdma3_);
   bus.connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA4), &vdma4_);
   bus.connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA5), &vdma5_);
-  src_base_addr = dest_base_addr = data_offset = transfer_size = 0;
+
+  /* PPU sends start signal to begin HDMA transfer */
+  ppu.connect_vdma(this);
 }
 
 VDMA::DMAState VDMA::get_state() const {
@@ -202,6 +205,8 @@ addr_t VDMA::get_src_addr() const {
 void VDMA::set_src_addr(const addr_t addr) { set_addr(vdma2_, vdma1_, addr); }
 
 void VDMA::transfer_byte(const addr_t offset) const {
+  const addr_t dest_base_addr = get_dest_addr();
+  const addr_t src_base_addr = get_src_addr();
   byte_t data{0xFF}; // Assume open bus unless address range is sane
 
   // This is the ideal source address range, read byte as you would expect
@@ -219,55 +224,78 @@ void VDMA::transfer_byte(const addr_t offset) const {
     bus_.write_byte(dest_base_addr + offset, data);
 }
 
-/* When VDMA has completed, VDMA5 will return 0xFF when read, so we have to update the
- * size to reflect this value since this is what the register pulls. */
-void VDMA::signal_complete() {
-  constexpr auto max_blks = 0x7F;
-  transfer_size = vdma_blks_to_bytes(max_blks);
-  data_offset = 0;
-}
-
 void VDMA::try_start(DMA::VDMATransferMode mode, const byte_t blks) {
-  dest_base_addr = get_dest_addr();
-  src_base_addr = get_src_addr();
   data_offset = 0;
+  waiting = false;
 
   switch (mode) {
   case DMA::VDMATransferMode::GENERAL_PURPOSE_DMA:
     sched.schedule_event_in(clks_key1_controlled(sys_.double_speed, 4),
-                            VDMA::SchedulerEvent::EVENT_GDMA_COPY);
-    transfer_size = vdma_blks_to_bytes(blks);
+                            SchedulerEvent::EVENT_COPY_BYTE);
+    total_transfer_size_bytes = vdma_blks_to_bytes(blks);
+    transfer_size_bytes = vdma_blks_to_bytes(blks);
     break;
 
   case DMA::VDMATransferMode::HBLANK_DMA:
-    // TODO: Implement this later
+    if (sched.unschedule_event(SchedulerEvent::EVENT_COPY_BYTE)) {
+      total_transfer_size_bytes = transfer_size_bytes = 0;
+      break;
+    }
+
+    total_transfer_size_bytes = vdma_blks_to_bytes(blks);
+    transfer_size_bytes = 0x10;
+    waiting = true; // We don't schedule the next event here, the PPU does this in HBLANK
+
+    if (ppu_.get_mode() == PPU::StatModes::MODE_HBLANK)
+      try_hdma();
     break;
   }
 }
 
+void VDMA::try_hdma() {
+  if (!sys_.halted && waiting) {
+    sched.schedule_event_in(clks_key1_controlled(sys_.double_speed, 4),
+                            SchedulerEvent::EVENT_COPY_BYTE);
+  }
+}
+
+byte_t VDMA::blks_remaining() const {
+  const auto bytes_remaining = total_transfer_size_bytes - data_offset;
+  return vdma_bytes_to_blks(bytes_remaining) & 0x7F;
+}
+
+bool VDMA::hdma_waiting() const { return waiting; }
+
 ScheduledEventOutcome VDMA::handle_event(time_type event_time, unsigned event) {
   switch (static_cast<SchedulerEvent>(event)) {
-  case SchedulerEvent::EVENT_GDMA_COPY: {
+  case SchedulerEvent::EVENT_COPY_BYTE: {
     if (!sys_.vdma_active) [[unlikely]]
       sys_.vdma_active = true;
     transfer_byte(data_offset++);
 
-    if (data_offset < transfer_size) {
+    const bool full_transfer_complete = data_offset >= total_transfer_size_bytes;
+    const bool blk_transfer_complete = data_offset >= transfer_size_bytes;
+
+    if (!blk_transfer_complete && !full_transfer_complete) {
       sched.schedule_event_on(event_time + clks_static_timing(2),
-                              VDMA::SchedulerEvent::EVENT_GDMA_COPY);
+                              VDMA::SchedulerEvent::EVENT_COPY_BYTE);
       return ScheduledEventOutcome::EVENT_OUTCOME_NONE;
-    } else {
+    }
+
+    else if (blk_transfer_complete && !full_transfer_complete) {
       sys_.vdma_active = false;
-      signal_complete();
       return ScheduledEventOutcome::EVENT_OUTCOME_VDMA_COMPLETE;
     }
-  }
 
-  case SchedulerEvent::EVENT_HDMA_COPY:
+    else if (blk_transfer_complete && full_transfer_complete) {
+      sys_.vdma_active = waiting = false;
+      return ScheduledEventOutcome::EVENT_OUTCOME_VDMA_COMPLETE;
+    }
+
     return ScheduledEventOutcome::EVENT_OUTCOME_NONE;
+  }
 
   default:
-    return ScheduledEventOutcome::EVENT_OUTCOME_NONE;
+    __builtin_unreachable();
   }
-  __builtin_unreachable();
 }

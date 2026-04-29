@@ -139,7 +139,12 @@ void VDMA_MODE_LEN::write(const byte_t value) {
   dma_.try_start(mode, blks);
 }
 
-byte_t VDMA_MODE_LEN::peek() const { return 0xFF; }
+byte_t VDMA_MODE_LEN::peek() const {
+  byte_t ret = dma_.blks_remaining();
+  if (!dma_.hdma_waiting())
+    ret |= 0x80;
+  return ret;
+}
 
 byte_t VDMA_MODE_LEN::read() { return peek(); }
 

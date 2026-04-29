@@ -62,8 +62,7 @@ public:
   template <typename T> void parse_savestate(T &t);
 
   enum class SchedulerEvent : unsigned {
-    EVENT_GDMA_COPY = 0,
-    EVENT_HDMA_COPY,
+    EVENT_COPY_BYTE = 0,
 
     /* For scheduler serialization */
     EVENT_COUNT,
@@ -81,6 +80,11 @@ public:
 
   ScheduledEventOutcome handle_event(time_type event_time, unsigned event);
   void try_start(DMA::VDMATransferMode mode, byte_t blks);
+  void try_hdma();
+
+  // TODO: Document
+  byte_t blks_remaining() const;
+  bool hdma_waiting() const;
 
   /* Getters and setters for both source and destination addresses involve
    * consulting a pair of two 8-bit MMIORegisters to form a 16-bit address. */
@@ -90,7 +94,8 @@ public:
   [[nodiscard]] addr_t get_src_addr() const;
 
 private:
-  addr_t src_base_addr{}, dest_base_addr{}, data_offset{}, transfer_size{};
+  addr_t transfer_size_bytes{}, total_transfer_size_bytes{}, data_offset{};
+  bool waiting{};
 
   /* See details about these registers under their definitions in `cgb.hpp` */
   DMA::VDMA_ADDR vdma1_, vdma2_; // Source low and high registers
@@ -100,9 +105,7 @@ private:
   /* Helpers for working with source and destination address registers. */
   static void set_addr(DMA::VDMA_ADDR &lo, DMA::VDMA_ADDR &hi, addr_t addr);
   static addr_t get_addr(const DMA::VDMA_ADDR &lo, const DMA::VDMA_ADDR &hi);
-
   void transfer_byte(const addr_t offset) const;
-  void signal_complete();
 
   ChildScheduler sched;
   AddressBus &bus_;

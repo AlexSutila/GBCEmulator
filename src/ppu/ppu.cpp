@@ -4,6 +4,7 @@
 #include "frontend/frontend.hpp"
 #include "gbc.hpp"
 #include "memory/bus.hpp"
+#include "memory/dma.hpp"
 #include "memory/mmio/dmg.hpp"
 #include "memory/mmio/mmio.hpp"
 #include "ppu/fetcher.hpp"
@@ -211,6 +212,12 @@ PixelProcessingUnit::PPUState PixelProcessingUnit::get_state() const {
   state_.ly = ly_.peek();
   state_.dots = cur_scanline_clks;
   return state_;
+}
+
+void PixelProcessingUnit::connect_vdma(VDMA *vdma) {
+  if (vdma == nullptr) [[unlikely]]
+    throw std::runtime_error("Read nullptr for VDMA connection");
+  vdma_module = vdma;
 }
 
 bool PixelProcessingUnit::should_advance_ly() {
@@ -538,6 +545,9 @@ void PixelProcessingUnit::do_draw() {
     fetcher->reset_win_ly();
   else if (fetcher->was_window_visible())
     fetcher->inc_win_ly();
+
+  // Attempt to start HDMA, if it isn't waiting on a block transfer nothing happens
+  vdma_module->try_hdma();
 
   // State transition logic
   state = modes::MODE_HBLANK;
