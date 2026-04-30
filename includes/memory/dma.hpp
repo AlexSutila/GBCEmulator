@@ -89,10 +89,10 @@ public:
 
   /* Getters and setters for both source and destination addresses involve
    * consulting a pair of two 8-bit MMIORegisters to form a 16-bit address. */
-  void set_dest_addr(addr_t addr);
-  void set_src_addr(addr_t addr);
   [[nodiscard]] addr_t get_dest_addr() const;
   [[nodiscard]] addr_t get_src_addr() const;
+  void inc_dest_addr();
+  void inc_src_addr();
 
 private:
   addr_t bytes_to_transfer{}; // How many bytes will be transfered during this VDMA
@@ -104,9 +104,9 @@ private:
   DMA::VDMA_MODE_LEN vdma5_;
 
   /* Helpers for working with source and destination address registers. */
-  static void set_addr(DMA::VDMA_ADDR &lo, DMA::VDMA_ADDR &hi, addr_t addr);
   static addr_t get_addr(const DMA::VDMA_ADDR &lo, const DMA::VDMA_ADDR &hi);
-  void transfer_byte(const addr_t offset) const;
+  static void inc_addr(DMA::VDMA_ADDR &lo, DMA::VDMA_ADDR &hi);
+  void transfer_byte();
 
   ChildScheduler sched;
   AddressBus &bus_;

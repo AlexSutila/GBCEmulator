@@ -181,7 +181,11 @@ addr_t VDMA::get_addr(const DMA::VDMA_ADDR &lo, const DMA::VDMA_ADDR &hi) {
   return (static_cast<addr_t>(hi_byte) << 8) | static_cast<addr_t>(lo_byte);
 }
 
-void VDMA::set_addr(DMA::VDMA_ADDR &lo, DMA::VDMA_ADDR &hi, const addr_t addr) {
+void VDMA::inc_addr(DMA::VDMA_ADDR &lo, DMA::VDMA_ADDR &hi) {
+  const byte_t hi_byte = hi.get_addr_bits(), lo_byte = lo.get_addr_bits();
+  auto addr = (static_cast<addr_t>(hi_byte) << 8) | static_cast<addr_t>(lo_byte);
+  ++addr;
+
   hi.write(static_cast<byte_t>((addr >> 8) & 0xFF));
   lo.write(static_cast<byte_t>(addr & 0xFF));
 }
@@ -189,17 +193,17 @@ void VDMA::set_addr(DMA::VDMA_ADDR &lo, DMA::VDMA_ADDR &hi, const addr_t addr) {
 addr_t VDMA::get_dest_addr() const {
   constexpr addr_t vram_base = 0x8000;
   const addr_t addr_true = get_addr(vdma4_, vdma3_);
-  return vram_base | (addr_true & 0x1FF0);
+  return vram_base | (addr_true & 0x1FFF);
 }
-void VDMA::set_dest_addr(const addr_t addr) { set_addr(vdma4_, vdma3_, addr); }
+void VDMA::inc_dest_addr() { inc_addr(vdma4_, vdma3_); }
 
 addr_t VDMA::get_src_addr() const {
   const addr_t addr_true = get_addr(vdma2_, vdma1_);
-  return addr_true & 0xFFF0;
+  return addr_true;
 }
-void VDMA::set_src_addr(const addr_t addr) { set_addr(vdma2_, vdma1_, addr); }
+void VDMA::inc_src_addr() { inc_addr(vdma2_, vdma1_); }
 
-void VDMA::transfer_byte(const addr_t offset) const {
+void VDMA::transfer_byte() {
   const addr_t dest_base_addr = get_dest_addr();
   const addr_t src_base_addr = get_src_addr();
   byte_t data{0xFF}; // Assume open bus unless address range is sane
@@ -207,16 +211,23 @@ void VDMA::transfer_byte(const addr_t offset) const {
   // This is the ideal source address range, read byte as you would expect
   if ((src_base_addr >= 0x0000 && src_base_addr <= 0x7FF0) ||
       (src_base_addr >= 0xA000 && src_base_addr <= 0xDFF0)) [[likely]]
-    data = bus_.read_byte(src_base_addr + offset);
+    data = bus_.read_byte(src_base_addr);
 
   // If the source address lies within this address range, it actually ends up
   // reading from 0xA000-0xBFF0, which is located somewhere in SRAM
   else if (src_base_addr >= 0xE000 && src_base_addr <= 0xFFF0)
-    data = bus_.read_byte((src_base_addr - 0x4000) + offset);
+    data = bus_.read_byte(src_base_addr - 0x4000);
 
   // Only write data byte if the dest address is sane
   if (dest_base_addr >= 0x8000 && dest_base_addr <= 0x9FF0) [[likely]]
-    bus_.write_byte(dest_base_addr + offset, data);
+    bus_.write_byte(dest_base_addr, data);
+
+  /* Hardware quirk, docs say the bottom four bits aren't used, but they still exist
+   * and increase during VDMA. If you write to FF55, and write to FF55 again after a
+   * round of VDMA has completed without updating the source and dest registers, you
+   * might not read from the same address both times. */
+  inc_dest_addr();
+  inc_src_addr();
 }
 
 void VDMA::try_start(DMA::VDMATransferMode mode, const byte_t blks) {
@@ -257,7 +268,9 @@ ScheduledEventOutcome VDMA::handle_event(time_type event_time, unsigned event) {
   case SchedulerEvent::EVENT_GDMA_COPY_BYTE: {
     if (!sys_.vdma_active) [[unlikely]]
       sys_.vdma_active = true;
-    transfer_byte(bytes_transferred++);
+
+    bytes_transferred++;
+    transfer_byte();
 
     if (bytes_transferred < bytes_to_transfer) {
       sched.schedule_event_on(event_time + clks_static_timing(2),
@@ -272,7 +285,9 @@ ScheduledEventOutcome VDMA::handle_event(time_type event_time, unsigned event) {
   case SchedulerEvent::EVENT_HDMA_COPY_BYTE: {
     if (!sys_.vdma_active) [[unlikely]]
       sys_.vdma_active = true;
-    transfer_byte(bytes_transferred++);
+
+    bytes_transferred++;
+    transfer_byte();
 
     if (bytes_transferred < bytes_to_transfer && bytes_transferred % 0x10 != 0) {
       sched.schedule_event_on(event_time + clks_static_timing(2),
