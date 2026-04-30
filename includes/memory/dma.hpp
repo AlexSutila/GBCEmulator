@@ -62,7 +62,8 @@ public:
   template <typename T> void parse_savestate(T &t);
 
   enum class SchedulerEvent : unsigned {
-    EVENT_COPY_BYTE = 0,
+    EVENT_GDMA_COPY_BYTE = 0,
+    EVENT_HDMA_COPY_BYTE,
 
     /* For scheduler serialization */
     EVENT_COUNT,
@@ -94,8 +95,8 @@ public:
   [[nodiscard]] addr_t get_src_addr() const;
 
 private:
-  addr_t transfer_size_bytes{}, total_transfer_size_bytes{}, data_offset{};
-  bool waiting{};
+  addr_t bytes_to_transfer{}; // How many bytes will be transfered during this VDMA
+  addr_t bytes_transferred{}; // How many bytes have been transfered so far
 
   /* See details about these registers under their definitions in `cgb.hpp` */
   DMA::VDMA_ADDR vdma1_, vdma2_; // Source low and high registers

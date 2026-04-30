@@ -140,9 +140,6 @@ template <typename T> void VDMA::parse_savestate(T &t) {
   constexpr auto version = 1; // Schema revision
   t.chunk_header(version, Savestate::C_VDMA);
 
-  t.field_generic(F_VDMA_DATA_OFFSET, data_offset);
-  t.field_generic(F_VDMA_TRANSFER_SIZE, transfer_size_bytes);
-
   // duplicate tags here are fine, they are all the same thing, just mind order
   t.field_complex(F_VDMA_ADDR_REG, [&](T &t) { vdma1_.parse_savestate(t); });
   t.field_complex(F_VDMA_ADDR_REG, [&](T &t) { vdma2_.parse_savestate(t); });
@@ -162,8 +159,6 @@ VDMA::VDMA(AddressBus &bus, PixelProcessingUnit &ppu, runtime_sys_info &sys,
     : vdma1_(), vdma2_(), vdma3_(), vdma4_(), vdma5_(*this),
       sched(g_sched, SchedulerComponent::SCHED_COMPONENT_VRAM_DMA), bus_(bus), ppu_(ppu),
       sys_(sys) {
-  transfer_size_bytes = total_transfer_size_bytes = data_offset = 0;
-  waiting = false;
 
   using mmio = IORegisterMapping;
   bus.connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA1), &vdma1_);
@@ -225,74 +220,68 @@ void VDMA::transfer_byte(const addr_t offset) const {
 }
 
 void VDMA::try_start(DMA::VDMATransferMode mode, const byte_t blks) {
-  data_offset = 0;
-  waiting = false;
+  bytes_to_transfer = vdma_blks_to_bytes(blks);
+  bytes_transferred = 0;
 
   switch (mode) {
   case DMA::VDMATransferMode::GENERAL_PURPOSE_DMA:
     sched.schedule_event_in(clks_key1_controlled(sys_.double_speed, 4),
-                            SchedulerEvent::EVENT_COPY_BYTE);
-    total_transfer_size_bytes = vdma_blks_to_bytes(blks);
-    transfer_size_bytes = vdma_blks_to_bytes(blks);
+                            SchedulerEvent::EVENT_GDMA_COPY_BYTE);
     break;
 
   case DMA::VDMATransferMode::HBLANK_DMA:
-    if (sched.unschedule_event(SchedulerEvent::EVENT_COPY_BYTE)) {
-      total_transfer_size_bytes = transfer_size_bytes = 0;
-      break;
-    }
-
-    total_transfer_size_bytes = vdma_blks_to_bytes(blks);
-    transfer_size_bytes = 0x10;
-    waiting = true; // We don't schedule the next event here, the PPU does this in HBLANK
-
+    // If we start in HBLANK, then HDMA starts instantly
     if (ppu_.get_mode() == PPU::StatModes::MODE_HBLANK)
       try_hdma();
     break;
   }
 }
 
+// Called by the PPU when entering HBLANK mode (or formally mode 0)
 void VDMA::try_hdma() {
-  if (!sys_.halted && waiting) {
+  if (!sys_.halted && hdma_waiting()) {
     sched.schedule_event_in(clks_key1_controlled(sys_.double_speed, 4),
-                            SchedulerEvent::EVENT_COPY_BYTE);
+                            SchedulerEvent::EVENT_HDMA_COPY_BYTE);
   }
 }
 
 byte_t VDMA::blks_remaining() const {
-  const auto bytes_remaining = total_transfer_size_bytes - data_offset;
+  const auto bytes_remaining = bytes_to_transfer - bytes_transferred;
   return vdma_bytes_to_blks(bytes_remaining) & 0x7F;
 }
 
-bool VDMA::hdma_waiting() const { return waiting; }
+bool VDMA::hdma_waiting() const { return bytes_transferred < bytes_to_transfer; }
 
 ScheduledEventOutcome VDMA::handle_event(time_type event_time, unsigned event) {
   switch (static_cast<SchedulerEvent>(event)) {
-  case SchedulerEvent::EVENT_COPY_BYTE: {
+  case SchedulerEvent::EVENT_GDMA_COPY_BYTE: {
     if (!sys_.vdma_active) [[unlikely]]
       sys_.vdma_active = true;
-    transfer_byte(data_offset++);
+    transfer_byte(bytes_transferred++);
 
-    const bool full_transfer_complete = data_offset >= total_transfer_size_bytes;
-    const bool blk_transfer_complete = data_offset >= transfer_size_bytes;
-
-    if (!blk_transfer_complete && !full_transfer_complete) {
+    if (bytes_transferred < bytes_to_transfer) {
       sched.schedule_event_on(event_time + clks_static_timing(2),
-                              VDMA::SchedulerEvent::EVENT_COPY_BYTE);
+                              SchedulerEvent::EVENT_GDMA_COPY_BYTE);
       return ScheduledEventOutcome::EVENT_OUTCOME_NONE;
     }
 
-    else if (blk_transfer_complete && !full_transfer_complete) {
-      sys_.vdma_active = false;
-      return ScheduledEventOutcome::EVENT_OUTCOME_VDMA_COMPLETE;
+    sys_.vdma_active = false;
+    return ScheduledEventOutcome::EVENT_OUTCOME_VDMA_COMPLETE;
+  }
+
+  case SchedulerEvent::EVENT_HDMA_COPY_BYTE: {
+    if (!sys_.vdma_active) [[unlikely]]
+      sys_.vdma_active = true;
+    transfer_byte(bytes_transferred++);
+
+    if (bytes_transferred < bytes_to_transfer && bytes_transferred % 0x10 != 0) {
+      sched.schedule_event_on(event_time + clks_static_timing(2),
+                              SchedulerEvent::EVENT_HDMA_COPY_BYTE);
+      return ScheduledEventOutcome::EVENT_OUTCOME_NONE;
     }
 
-    else if (blk_transfer_complete && full_transfer_complete) {
-      sys_.vdma_active = waiting = false;
-      return ScheduledEventOutcome::EVENT_OUTCOME_VDMA_COMPLETE;
-    }
-
-    return ScheduledEventOutcome::EVENT_OUTCOME_NONE;
+    sys_.vdma_active = false;
+    return ScheduledEventOutcome::EVENT_OUTCOME_VDMA_COMPLETE;
   }
 
   default:
