@@ -9,6 +9,7 @@
 #include "ppu/palette.hpp"
 #include "ppu/ppu.hpp"
 #include "savestate/codec.hpp"
+#include "schedule.hpp"
 #include "timer.hpp"
 
 #include <cstdint>
@@ -305,7 +306,7 @@ std::optional<AddressBus::CheatOverride> compile_cheat(const std::string_view co
 } // namespace
 
 GameBoyColor::GameBoyColor(Frontend &frontend, const std::string &bios_path)
-    : Debuggable(debugger_), debugger_(std::nullopt), fe_(frontend) {
+    : Debuggable(debugger_), debugger_(std::nullopt), sched_(sys_), fe_(frontend) {
   system_init(); // Connects all system components to each other
 
   /* We set CGB mode based on the size of the boot ROM. This is the best way
@@ -327,7 +328,7 @@ GameBoyColor::GameBoyColor(Frontend &frontend, const std::string &bios_path)
 }
 
 GameBoyColor::GameBoyColor(Frontend &frontend, const BootROM &rom)
-    : Debuggable(debugger_), debugger_(std::nullopt), fe_(frontend) {
+    : Debuggable(debugger_), debugger_(std::nullopt), sched_(sys_), fe_(frontend) {
   system_init();
   bios_ = rom; // We assume rom is already valid
 
@@ -339,7 +340,8 @@ GameBoyColor::GameBoyColor(Frontend &frontend, const BootROM &rom)
 }
 
 GameBoyColor::GameBoyColor(Frontend &frontend)
-    : Debuggable(debugger_), debugger_(std::nullopt), bios_(std::nullopt), fe_(frontend) {
+    : Debuggable(debugger_), debugger_(std::nullopt), bios_(std::nullopt), sched_(sys_),
+      fe_(frontend) {
   system_init(); // Connects all system components
   skip_bios();   // BIOS is left unconfigured
   /* We still kind of have to do this here in case we run DMG games. Will likely
@@ -351,20 +353,24 @@ void GameBoyColor::system_init() {
   /* General system operation info */
   sys_ = {
       .elapsed_clocks = 0,
-      .cgb_mode = true,
+      .vdma_active = false,
       .halted = false,
-      .speed_switch_armed = false,
       .double_speed = false,
+      .speed_switch_armed = false,
+      .cgb_mode = true,
       .unmap_key0 = false,
   };
 
   /* Component initialization */
-  bus = std::make_unique<AddressBus>(sys_, debugger_, bios_);
+  bus = std::make_unique<AddressBus>(sys_, sched_, debugger_, bios_);
   cpu = std::make_unique<LR35902>(bus.get(), debugger_, sys_);
   apu = std::make_unique<APU>(*bus, fe_);
   ppu = std::make_unique<PixelProcessingUnit>(bus.get(), fe_, debugger_, sys_);
   timer = std::make_unique<TimerUnit>(bus.get());
   serial = std::make_unique<SerialUnit>(bus.get());
+
+  oam_dma = std::make_unique<ObjAttrDMA>(*bus, sys_, sched_);
+  vram_dma = std::make_unique<VDMA>(*bus, *ppu, sys_, sched_);
 
   /* Joypad initialization */
   auto *const joypad_reg =
@@ -372,7 +378,7 @@ void GameBoyColor::system_init() {
   auto *const if_reg =
       dynamic_cast<InterruptBits *>(bus->get_mmio(IORegisterMapping::MMIO_INT_FLAGS));
   if (!joypad_reg || !if_reg)
-    throw std::logic_error("Failed to configure joypad MMIO");
+    throw std::runtime_error("Failed to configure joypad MMIO");
 
   /* To avoid running into problems with other registers it depends on in time,
    * we have to invoke this method to configure the dependencies it needs after
@@ -472,7 +478,7 @@ void GameBoyColor::cram_init_mono(IORegisterMapping index, IORegisterMapping dat
 void GameBoyColor::insert_cartridge(const cart &c) {
   const byte_t &cgb_flag = c.header.cgb_flag();
   if (!bus)
-    throw std::logic_error("Bus not initialized");
+    throw std::runtime_error("Bus not initialized");
   bus->insert_cartridge(c);
 
   /* IMPORTANT: on the real hardware, this flag is set via KEY0 during the BIOS
@@ -488,14 +494,14 @@ void GameBoyColor::insert_cartridge(const cart &c) {
 
 void GameBoyColor::init_test_bed() const {
   if (!bus)
-    throw std::logic_error("Bus not initialized");
+    throw std::runtime_error("Bus not initialized");
 
   /* Init convenience RAM-only cartridge for testing */
   bus->init_test_bed();
 }
 
-void GameBoyColor::step_peripherals(bool fast_cycle) const {
-  step_dma(fast_cycle);
+// TODO: This needs to go once these components use the scheduler
+void GameBoyColor::step_peripherals(bool fast_cycle) {
   timer->step();
 
   if (!fast_cycle) {
@@ -504,59 +510,96 @@ void GameBoyColor::step_peripherals(bool fast_cycle) const {
   }
 }
 
-void GameBoyColor::step_dma(const bool fast_cycle) const {
-  bus->get_oam_dma().step(); // Runs 2X in double speed
+ScheduledEventOutcome GameBoyColor::handle_event(SchedulerComponent c_id, unsigned e_id,
+                                                 time_type t) {
+  switch (c_id) {
+  case SchedulerComponent::SCHED_COMPONENT_OAM_DMA:
+    return oam_dma->handle_event(t, e_id);
+  case SchedulerComponent::SCHED_COMPONENT_VRAM_DMA:
+    return vram_dma->handle_event(t, e_id);
 
-  /* As described elsewhere, HDMA and GDMA have an initialization phase that
-   * does run fast in double speed mode, but the transfers themselves don't */
-  if (fast_cycle)
-    bus->get_vdma().step_fast_cycle();
-  else
-    bus->get_vdma().step();
+  default:
+    throw std::runtime_error("Event with undefined component ID");
+  }
 }
-bool GameBoyColor::vdma_enabled() const { return bus->get_vdma().enabled(); }
 
-void GameBoyColor::step_processor() const {
-  if (const auto &vdma = bus->get_vdma(); !vdma.enabled()) // CPU is halted until VDMA is complete
-    cpu->step();
+time_type GameBoyColor::sched_pop_until(ScheduledEventOutcome outcome) {
+  ScheduledEventOutcome next_outcome{};
+  time_type cycle{};
+
+  do {
+    auto c = sched_.peek_next_cycle();
+    /* We call this method with the assumption that an outcome will come along eventually.
+     * That being said, if it is not immediately in the queue as this is called, that is ok.
+     * An event which is scheduled might schedule another event that generates the desired
+     * outcome. If, the queue is empty, this is simply not possible. */
+    if (!c) [[unlikely]]
+      throw std::runtime_error("Waiting on event outcome with empty queue");
+    cycle = *c;
+
+    auto [c_id, e_id] = sched_.pop_next_event();
+    next_outcome = handle_event(c_id, e_id, cycle);
+  } while (next_outcome != outcome);
+
+  // Return the target cycle which the hardware ended up producing the outcome on
+  return cycle;
+}
+
+void GameBoyColor::sched_pop_until(time_type target_cycle) {
+  auto cyc = sched_.peek_next_cycle();
+  if (cyc == std::nullopt)
+    return;
+
+  /* Here, the processor state is ahead of all events scheduled by the peripheral components,
+   * so we pop off the queue until we either one of the two scenarios holds true:
+   *  1. We are out of events to pop (this will likely end up being very rare)
+   *  2. We have popped all events before the current CPU cycle
+   * So if we see one that is still ahead of the CPU, we must wait. CPU must remain ahead. */
+  while (cyc != std::nullopt && cyc <= target_cycle) {
+    auto [c_id, e_id] = sched_.pop_next_event();
+    handle_event(c_id, e_id, cyc.value());
+    cyc = sched_.peek_next_cycle();
+  }
 }
 
 std::size_t GameBoyColor::big_step() {
   const auto psync_cb = [this](std::size_t sync_cycles) {
+    const auto elapsed_clocks = clks_key1_controlled(sys_.double_speed, sync_cycles);
+
+    // TODO: Eventually, this needs to just straight up go
     for (std::size_t sync_cycle{0}; sync_cycle < sync_cycles; ++sync_cycle) {
       const bool fast_cycle = (sys_.double_speed) && (sync_cycle % 2 != 0);
       step_peripherals(fast_cycle);
     }
+
+    // TODO: This will be the new synchronization mechanism
+    sys_.elapsed_clocks += elapsed_clocks;
+    sched_pop_until(sys_.elapsed_clocks);
   };
 
-  // CPU is only active if VDMA is not enabled
-  if (const auto &vdma = bus->get_vdma(); !vdma.enabled())
-    return cpu->big_step(psync_cb);
-
-  // If VDMA is active, we have to handle both speeds
-  step_peripherals(false);
-  if (sys_.double_speed) {
-    step_peripherals(true);
-    return 2;
-  }
-  return 1;
+  if (sys_.vdma_active) [[unlikely]]
+    return sched_pop_until(ScheduledEventOutcome::EVENT_OUTCOME_VDMA_COMPLETE);
+  return cpu->big_step(psync_cb);
 }
 
 void GameBoyColor::step() {
   try_brk(Debug::BreakReason::BRK_STEP_CLOCK_CYCLE);
 
   // DMG cycle, or the first cycle of double speed in CGB mode (if double speed is enabled)
-  step_processor();
+  if (!sys_.vdma_active)
+    cpu->step();
   step_peripherals(false);
-
-  // System clocks are maintained in unit `t-cycles`
-  ++sys_.elapsed_clocks;
 
   // If we are in double speed mode, step affected components again
   if (sys_.double_speed) {
-    step_processor();
+    if (!sys_.vdma_active)
+      cpu->step();
     step_peripherals(true);
   }
+
+  // TODO: This will go away once we've fully transitioned to a scheduler
+  sys_.elapsed_clocks += clks_key1_controlled(sys_.double_speed, 1);
+  sched_pop_until(sys_.elapsed_clocks);
 }
 
 GameBoyColor::CheatStats GameBoyColor::configure_cheats(const std::vector<CheatCode> &cheats) {
@@ -597,23 +640,15 @@ bool GameBoyColor::savestate_ready() const {
 
 enum : std::uint16_t {
   F_ELAPSED_CLOCKS = 1,
-  F_CGB_MODE,
-  F_HALTED,
-  F_SPEED_SWITCH_ARMED,
-  F_DOUBLE_SPEED,
-  F_UNMAP_KEY0,
+  F_FLAGS,
 };
 
 template <typename T> void GameBoyColor::parse_savestate(T &t) {
-  constexpr auto version = 3; // Schema revision
+  constexpr auto version = 5; // Schema revision
   t.chunk_header(version, Savestate::C_GBC);
 
   t.field_generic(F_ELAPSED_CLOCKS, sys_.elapsed_clocks);
-  t.field_generic(F_CGB_MODE, sys_.cgb_mode);
-  t.field_generic(F_HALTED, sys_.halted);
-  t.field_generic(F_SPEED_SWITCH_ARMED, sys_.speed_switch_armed);
-  t.field_generic(F_DOUBLE_SPEED, sys_.double_speed);
-  t.field_generic(F_UNMAP_KEY0, sys_.unmap_key0);
+  t.field_generic(F_FLAGS, sys_.flags);
 
   // Begin recursive descent into each component
   cpu->parse_savestate(t);
@@ -622,6 +657,8 @@ template <typename T> void GameBoyColor::parse_savestate(T &t) {
   serial->parse_savestate(t);
   ppu->parse_savestate(t);
   apu->parse_savestate(t);
+
+  sched_.parse_savestate(t);
   t.eof();
 }
 

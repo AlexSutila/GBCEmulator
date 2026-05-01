@@ -7,7 +7,7 @@
 constexpr std::uint32_t max_cycles = 40000000;
 constexpr byte_t breakpoint_opcode = 0x40; // LD B, B
 
-bool poll_mooneye_big_step(PyGameBoyColor &gbc) {
+bool poll_mooneye_regular(PyGameBoyColor &gbc) {
   std::uint32_t cycles{0};
   byte_t op = 0;
   while (op != breakpoint_opcode && cycles < max_cycles) {
@@ -20,7 +20,7 @@ bool poll_mooneye_big_step(PyGameBoyColor &gbc) {
   return op == breakpoint_opcode;
 }
 
-bool poll_mooneye_regular(PyGameBoyColor &gbc) {
+bool poll_mooneye_big_step(PyGameBoyColor &gbc) {
   std::uint32_t cycles{0};
   byte_t op = 0;
 

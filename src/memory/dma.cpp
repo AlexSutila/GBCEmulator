@@ -4,8 +4,8 @@
 #include "memory/mmio/cgb.hpp"
 #include "memory/mmio/dmg.hpp"
 #include "savestate/codec.hpp"
+#include "schedule.hpp"
 #include <cassert>
-#include <optional>
 
 inline byte_t vdma_bytes_to_blks(const std::size_t bytes) {
   constexpr auto blk_size_bytes = 0x10;
@@ -24,21 +24,17 @@ inline std::size_t vdma_blks_to_bytes(const byte_t blks) {
 enum : std::uint16_t {
   F_OAM_DMA_SRC_BASE = 1,
   F_OAM_DMA_DATA_OFFSET,
-  F_OAM_DMA_STATE,
-  F_OAM_DMA_CLOCKS_REMAINING,
-
-  // Memory mapped registers
+  F_OAM_DMA_ACTIVE,
   F_OAM_DMA_DMA_REG,
 };
 
 template <typename T> void ObjAttrDMA::parse_savestate(T &t) {
-  constexpr auto version = 1; // Schema revision
+  constexpr auto version = 2; // Schema revision
   t.chunk_header(version, Savestate::C_OAM_DMA);
 
   t.field_generic(F_OAM_DMA_SRC_BASE, src_base_addr);
   t.field_generic(F_OAM_DMA_DATA_OFFSET, data_offset);
-  t.field_enum(F_OAM_DMA_STATE, state);
-  t.field_optional(F_OAM_DMA_CLOCKS_REMAINING, clocks_remaining);
+  t.field_generic(F_OAM_DMA_ACTIVE, active);
 
   // Memory mapped registers
   t.field_complex(F_OAM_DMA_DMA_REG, [&](T &t) { dma_.parse_savestate(t); });
@@ -50,89 +46,74 @@ template void ObjAttrDMA::parse_savestate<Savestate::Reader>(Savestate::Reader &
 template void ObjAttrDMA::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
 template void ObjAttrDMA::parse_savestate<Savestate::Checker>(Savestate::Checker &);
 
-ObjAttrDMA::ObjAttrDMA(AddressBus &bus) : dma_(*this), bus_(bus) {
+ObjAttrDMA::ObjAttrDMA(AddressBus &bus, runtime_sys_info &sys, SystemScheduler &g_sched)
+    : dma_(*this), sched(g_sched, SchedulerComponent::SCHED_COMPONENT_OAM_DMA), bus_(bus),
+      sys_(sys) {
+  bus.connect_mmio(static_cast<addr_t>(IORegisterMapping::MMIO_OAM_DMA), &dma_);
   src_base_addr = data_offset = 0;
-  clocks_remaining.reset();
-  state = STATE_DISABLED;
 }
 
 ObjAttrDMA::DMAState ObjAttrDMA::get_state() const {
-  DMAState s{};
-  if (state == STATE_OAMDMA_TRAN) {
-    s.src_base_address = src_base_addr;
-    s.data_offset = data_offset;
-    s.active = true;
-  } else {
-    s.src_base_address = s.data_offset = 0;
-    s.active = false;
-  }
+  DMAState s{
+      .src_base_address = src_base_addr,
+      .data_offset = data_offset,
+      .active = active,
+  };
   return s;
 }
-
-DMA::DMA *ObjAttrDMA::get_dma_reg() { return &dma_; }
 
 void ObjAttrDMA::start(const byte_t addr_high) {
   /* The value passed is what is received over the address bus, hence it is only
    * a single byte. This byte determines the upper byte of the source adders. */
-  src_base_addr = static_cast<addr_t>(addr_high) * 0x100;
-  state = STATE_OAMDMA_INIT;
-  clocks_remaining.reset();
+  src_base_addr = static_cast<addr_t>(addr_high) << 8;
   data_offset = 0;
-}
 
-void ObjAttrDMA::do_oam_dma_init() {
-  static constexpr auto total_clock_cycles = 4 * 2; // T-cycles
-  if (!clocks_remaining.has_value())
-    clocks_remaining = total_clock_cycles;
-
-  if (clocks_remaining.value() == 4)
-    bus_.acquire(BusConflictTypes::BUS_CONFLICT_OAM_DMA);
-  --clocks_remaining.value();
-
-  /* State transition logic */
-  if (clocks_remaining.value() == 0) {
-    state = STATE_OAMDMA_TRAN;
-    clocks_remaining.reset();
+  /* Unschedule any on-going OAM-DMA transfers, in case we start it again while
+   * it is already running. */
+  for (auto e : {SchedulerEvent::EVENT_COPY_DATA_BYTE, SchedulerEvent::EVENT_ACQUIRE_BUS,
+                 SchedulerEvent::EVENT_RELEASE_BUS}) {
+    sched.unschedule_event(e);
   }
+
+  // Object attribute DMA runs fast in double speed mode so it must be key1 controlled
+  sched.schedule_event_in(clks_key1_controlled(sys_.double_speed, 6),
+                          SchedulerEvent::EVENT_ACQUIRE_BUS);
 }
 
-void ObjAttrDMA::do_oam_dma_tran() {
-  static constexpr auto total_clock_cycles = 160 * 4; // T-cycles
+ScheduledEventOutcome ObjAttrDMA::handle_event(time_type event_time, unsigned event) {
+  constexpr auto total_bytes_to_transfer = 0xA0;
 
-  /* This is always fixed, although the time required for completion of the data
-   * transfer does seem to be impacted by double speed mode. */
-  if (!clocks_remaining.has_value())
-    // bus_.acquire(BusConflictTypes::BUS_CONFLICT_OAM_DMA);
-    clocks_remaining = total_clock_cycles;
+  switch (static_cast<SchedulerEvent>(event)) {
+  case SchedulerEvent::EVENT_ACQUIRE_BUS:
+    bus_.acquire(BusConflictTypes::BUS_CONFLICT_OAM_DMA);
+    sched.schedule_event_on(event_time + clks_key1_controlled(sys_.double_speed, 2),
+                            SchedulerEvent::EVENT_COPY_DATA_BYTE);
+    active = true;
+    break;
 
-  /* Align data transfer perfectly with the M-cycle clock */
-  if (clocks_remaining.value() % 4 == 0) {
-    assert(data_offset >= 0 && data_offset <= 0x9F);
+  case SchedulerEvent::EVENT_COPY_DATA_BYTE: {
     const addr_t src_addr = src_base_addr + data_offset;
     bus_.get_oam()[data_offset] = bus_.read_byte(src_addr);
-    ++data_offset;
-  }
-  --clocks_remaining.value();
 
-  /* Transfer completion logic */
-  if (clocks_remaining.value() == 0) {
+    if (++data_offset < total_bytes_to_transfer) [[likely]] {
+      sched.schedule_event_on(event_time + clks_key1_controlled(sys_.double_speed, 4),
+                              SchedulerEvent::EVENT_COPY_DATA_BYTE);
+    } else {
+      sched.schedule_event_on(event_time + clks_key1_controlled(sys_.double_speed, 4),
+                              SchedulerEvent::EVENT_RELEASE_BUS);
+    }
+  } break;
+
+  case SchedulerEvent::EVENT_RELEASE_BUS:
     bus_.release(BusConflictTypes::BUS_CONFLICT_OAM_DMA);
-    clocks_remaining.reset();
-    state = STATE_DISABLED;
-  }
-}
+    active = false;
+    break;
 
-void ObjAttrDMA::step() {
-  switch (state) {
-  case STATE_OAMDMA_INIT:
-    do_oam_dma_init();
-    break;
-  case STATE_OAMDMA_TRAN:
-    do_oam_dma_tran();
-    break;
   default:
-    break;
+    __builtin_unreachable();
   }
+
+  return ScheduledEventOutcome::EVENT_OUTCOME_NONE;
 }
 
 /* ======================================================================
@@ -140,37 +121,29 @@ void ObjAttrDMA::step() {
  * ====================================================================== */
 
 enum : std::uint16_t {
-  F_VDMA_SRC_BASE = 1,
-  F_VDMA_DEST_BASE,
-  F_VDMA_DATA_OFFSET,
-  F_VDMA_TRANSFER_SIZE,
-  F_VDMA_CAN_START_HDMA,
-  F_VDMA_STATE,
-  F_VDMA_CLOCKS_REMAINING,
+  F_VDMA_BYTES_TO_TRANSFER = 1,
+  F_VDMA_BYTES_TRANSFERRED,
+  F_VDMA_HDMA_PENDING,
 
   // Memory mapped registers
-  F_VDMA_ADDR_REG,
-  F_VDMA_MODE_REG,
+  F_VDMA_ADDR_REGISTER,
+  F_VDMA_MODE_REGISTER,
 };
 
 template <typename T> void VDMA::parse_savestate(T &t) {
-  constexpr auto version = 1; // Schema revision
+  constexpr auto version = 2; // Schema revision
   t.chunk_header(version, Savestate::C_VDMA);
 
-  t.field_generic(F_VDMA_SRC_BASE, src_base_addr);
-  t.field_generic(F_VDMA_DEST_BASE, dest_base_addr);
-  t.field_generic(F_VDMA_DATA_OFFSET, data_offset);
-  t.field_generic(F_VDMA_TRANSFER_SIZE, transfer_size);
-  t.field_generic(F_VDMA_CAN_START_HDMA, can_start_hdma);
-  t.field_enum(F_VDMA_STATE, state);
-  t.field_optional(F_VDMA_CLOCKS_REMAINING, clocks_remaining);
+  t.field_generic(F_VDMA_BYTES_TO_TRANSFER, bytes_to_transfer);
+  t.field_generic(F_VDMA_BYTES_TRANSFERRED, bytes_transferred);
+  t.field_generic(F_VDMA_HDMA_PENDING, hdma_pending);
 
-  // duplicate tags here are fine, they are all the same thing, just mind order
-  t.field_complex(F_VDMA_ADDR_REG, [&](T &t) { vdma1_.parse_savestate(t); });
-  t.field_complex(F_VDMA_ADDR_REG, [&](T &t) { vdma2_.parse_savestate(t); });
-  t.field_complex(F_VDMA_ADDR_REG, [&](T &t) { vdma3_.parse_savestate(t); });
-  t.field_complex(F_VDMA_ADDR_REG, [&](T &t) { vdma4_.parse_savestate(t); });
-  t.field_complex(F_VDMA_MODE_REG, [&](T &t) { vdma5_.parse_savestate(t); });
+  // duplicate tags here are file, they are all the same thing, just mind ordering
+  t.field_complex(F_VDMA_ADDR_REGISTER, [&](T &t) { vdma1_.parse_savestate(t); });
+  t.field_complex(F_VDMA_ADDR_REGISTER, [&](T &t) { vdma2_.parse_savestate(t); });
+  t.field_complex(F_VDMA_ADDR_REGISTER, [&](T &t) { vdma3_.parse_savestate(t); });
+  t.field_complex(F_VDMA_ADDR_REGISTER, [&](T &t) { vdma4_.parse_savestate(t); });
+  t.field_complex(F_VDMA_MODE_REGISTER, [&](T &t) { vdma5_.parse_savestate(t); });
   t.eof();
 }
 
@@ -179,29 +152,27 @@ template void VDMA::parse_savestate<Savestate::Reader>(Savestate::Reader &);
 template void VDMA::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
 template void VDMA::parse_savestate<Savestate::Checker>(Savestate::Checker &);
 
-VDMA::VDMA(AddressBus &bus, runtime_sys_info &sys)
-    : vdma1_(), vdma2_(), // Source low and high registers
-      vdma3_(), vdma4_(), // Destination low and high registers
-      vdma5_(*this),      // The Vram DMA length/mode/start register
-      sys_(sys),          // HDMA is paused in halt mode
-      bus_(bus) {
-  src_base_addr = dest_base_addr = data_offset = transfer_size = 0;
-  state = STATE_DISABLED;
+VDMA::VDMA(AddressBus &bus, PixelProcessingUnit &ppu, runtime_sys_info &sys,
+           SystemScheduler &g_sched)
+    : vdma1_(0xFF), vdma2_(0xF0), vdma3_(0xFF), vdma4_(0xF0), vdma5_(*this),
+      sched(g_sched, SchedulerComponent::SCHED_COMPONENT_VRAM_DMA), bus_(bus), ppu_(ppu),
+      sys_(sys) {
+  bytes_to_transfer = bytes_transferred = 0;
+  hdma_pending = false;
+
+  using mmio = IORegisterMapping;
+  bus.connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA1), &vdma1_);
+  bus.connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA2), &vdma2_);
+  bus.connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA3), &vdma3_);
+  bus.connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA4), &vdma4_);
+  bus.connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA5), &vdma5_);
+
+  /* PPU sends start signal to begin HDMA transfer */
+  ppu.connect_vdma(this);
 }
 
 VDMA::DMAState VDMA::get_state() const {
   VDMA::DMAState s{};
-  if (state == STATE_GDMA_TRAN || state == STATE_HDMA_TRAN) {
-    s.gdma_active = (state == STATE_GDMA_TRAN);
-    s.hdma_active = (state == STATE_HDMA_TRAN);
-    s.dest_base_address = dest_base_addr;
-    s.src_base_address = src_base_addr;
-    s.data_offset = data_offset;
-  } else {
-    s.data_offset = s.src_base_address = s.dest_base_address = 0;
-    if (state == STATE_HDMA_WAIT)
-      s.hdma_waiting = true;
-  }
   return s;
 }
 
@@ -210,188 +181,140 @@ addr_t VDMA::get_addr(const DMA::VDMA_ADDR &lo, const DMA::VDMA_ADDR &hi) {
   return (static_cast<addr_t>(hi_byte) << 8) | static_cast<addr_t>(lo_byte);
 }
 
-void VDMA::set_addr(DMA::VDMA_ADDR &lo, DMA::VDMA_ADDR &hi, const addr_t addr) {
-  hi.write(static_cast<byte_t>((addr >> 8) & 0xFF));
-  lo.write(static_cast<byte_t>(addr & 0xFF));
+void VDMA::inc_addr(DMA::VDMA_ADDR &lo, DMA::VDMA_ADDR &hi) {
+  const byte_t hi_byte = hi.get_addr_bits(), lo_byte = lo.get_addr_bits();
+  auto addr = (static_cast<addr_t>(hi_byte) << 8) | static_cast<addr_t>(lo_byte);
+  ++addr;
+
+  hi.put_addr_bits(static_cast<byte_t>((addr >> 8) & 0xFF));
+  lo.put_addr_bits(static_cast<byte_t>(addr & 0xFF));
 }
 
 addr_t VDMA::get_dest_addr() const {
   constexpr addr_t vram_base = 0x8000;
   const addr_t addr_true = get_addr(vdma4_, vdma3_);
-  return vram_base | (addr_true & 0x1FF0);
+  return vram_base | (addr_true & 0x1FFF);
 }
-void VDMA::set_dest_addr(const addr_t addr) { set_addr(vdma4_, vdma3_, addr); }
+void VDMA::inc_dest_addr() { inc_addr(vdma4_, vdma3_); }
 
 addr_t VDMA::get_src_addr() const {
   const addr_t addr_true = get_addr(vdma2_, vdma1_);
-  return addr_true & 0xFFF0;
+  return addr_true;
 }
-void VDMA::set_src_addr(const addr_t addr) { set_addr(vdma2_, vdma1_, addr); }
+void VDMA::inc_src_addr() { inc_addr(vdma2_, vdma1_); }
 
-void VDMA::set_ppu_hblank_signal(bool hblank_enabled) { can_start_hdma = hblank_enabled; }
-
-void VDMA::enable(DMA::VDMATransferMode mode, const byte_t blks) {
-  using modes = DMA::VDMATransferMode;
-  transfer_size = vdma_blks_to_bytes(blks);
-  data_offset = 0;
-
-  /* If the mode bit was written zero, it should start GDMA. However, if we are
-   * already performing an ongoing HDMA transfer, then it will be canceled and
-   * no DMA happens. */
-  if (mode == modes::GENERAL_PURPOSE_DMA)
-    state = (state == STATE_HDMA_WAIT) ? STATE_DISABLED : STATE_GDMA_INIT;
-
-  /* Otherwise, we start an HDMA data transfer. This can only happen if we are
-   * not already performing or waiting on HDMA. If the pixel processor already
-   * is in HBLANK, then it can begin the transfer right away. Otherwise, must
-   * wait until the pixel processor is performing HBLANK. */
-  else if (mode == modes::HBLANK_DMA && state == STATE_DISABLED)
-    state = (can_start_hdma) ? STATE_HDMA_INIT : STATE_HDMA_WAIT;
-}
-
-byte_t VDMA::get_blks_remaining() const {
-  const std::size_t bytes_remaining = transfer_size - data_offset;
-  return vdma_bytes_to_blks(bytes_remaining);
-}
-
-void VDMA::transfer_byte(const addr_t offset) const {
+void VDMA::transfer_byte() {
+  const addr_t dest_base_addr = get_dest_addr();
+  const addr_t src_base_addr = get_src_addr();
   byte_t data{0xFF}; // Assume open bus unless address range is sane
 
   // This is the ideal source address range, read byte as you would expect
-  if ((src_base_addr >= 0x0000 && src_base_addr <= 0x7FF0) ||
-      (src_base_addr >= 0xA000 && src_base_addr <= 0xDFF0)) [[likely]]
-    data = bus_.read_byte(src_base_addr + offset);
+  if ((src_base_addr >= 0x0000 && src_base_addr <= 0x7FFF) ||
+      (src_base_addr >= 0xA000 && src_base_addr <= 0xDFFF)) [[likely]]
+    data = bus_.read_byte(src_base_addr);
 
   // If the source address lies within this address range, it actually ends up
   // reading from 0xA000-0xBFF0, which is located somewhere in SRAM
-  else if (src_base_addr >= 0xE000 && src_base_addr <= 0xFFF0)
-    data = bus_.read_byte((src_base_addr - 0x4000) + offset);
+  else if (src_base_addr >= 0xE000 && src_base_addr <= 0xFFFF)
+    data = bus_.read_byte(src_base_addr - 0x4000);
 
   // Only write data byte if the dest address is sane
-  if (dest_base_addr >= 0x8000 && dest_base_addr <= 0x9FF0) [[likely]]
-    bus_.write_byte(dest_base_addr + offset, data);
+  if (dest_base_addr >= 0x8000 && dest_base_addr <= 0x9FFF) [[likely]]
+    bus_.write_byte(dest_base_addr, data);
+
+  /* Hardware quirk, docs say the bottom four bits aren't used, but they still exist
+   * and increase during VDMA. If you write to FF55, and write to FF55 again after a
+   * round of VDMA has completed without updating the source and dest registers, you
+   * might not read from the same address both times. */
+  bytes_transferred++;
+  inc_dest_addr();
+  inc_src_addr();
 }
 
-void VDMA::do_init(const State next_state) {
-  // State entry logic
-  if (!clocks_remaining.has_value()) {
-    constexpr auto total_init_clks = 4;
-    clocks_remaining = total_init_clks;
+void VDMA::try_start(DMA::VDMATransferMode mode, const byte_t blks) {
+  bytes_to_transfer = vdma_blks_to_bytes(blks);
+  bytes_transferred = 0;
 
-    // Sample address values and size
-    dest_base_addr = get_dest_addr();
-    src_base_addr = get_src_addr();
-  }
-  --clocks_remaining.value();
+  switch (mode) {
+  case DMA::VDMATransferMode::GENERAL_PURPOSE_DMA: {
+    const bool hdma_was_active = hdma_pending;
+    hdma_pending = false;
 
-  // State transition logic
-  if (clocks_remaining.value() == 0) {
-    clocks_remaining.reset();
-    state = next_state;
-  }
-}
+    // GDMA is always started when FF55 is written, however should only actually be
+    // used when in VBLANK (or I guess HBLANK if you're doing a small transfer).
+    if (!hdma_was_active) {
+      sched.schedule_event_in(clks_key1_controlled(sys_.double_speed, 4),
+                              SchedulerEvent::EVENT_GDMA_COPY_BYTE);
+    }
+  } break;
 
-/* In some circumstances, when DMA has completed VDMA5 will return 0xFF when
- * read, meaning we have to update the size to reflect this value. That is all
- * this method is intended to do. */
-void VDMA::signal_complete() {
-  constexpr auto max_blks = 0x7F;
-  transfer_size = vdma_blks_to_bytes(max_blks);
-  data_offset = 0;
-}
+  case DMA::VDMATransferMode::HBLANK_DMA: {
+    hdma_pending = true;
 
-void VDMA::do_gdma_init() {
-  constexpr auto next_state = STATE_GDMA_TRAN;
-  do_init(next_state);
-}
+    // If we start in HBLANK, then HDMA starts instantly
+    if (ppu_.get_mode() == PPU::StatModes::MODE_HBLANK)
+      try_hdma();
+  } break;
 
-void VDMA::do_hdma_init() {
-  constexpr auto next_state = STATE_HDMA_TRAN;
-  if (!sys_.halted) // HDMA is paused when halted
-    do_init(next_state);
-}
-
-void VDMA::do_gdma_tran() {
-  constexpr auto byte_transfer_clks = 2; // 2 T-cycles
-
-  // State entry logic
-  if (!clocks_remaining.has_value())
-    clocks_remaining = byte_transfer_clks * transfer_size;
-
-  // Data transfer
-  if (clocks_remaining.value() % byte_transfer_clks == 0)
-    transfer_byte(data_offset++);
-  --clocks_remaining.value();
-
-  // State transition logic
-  if (clocks_remaining.value() == 0) {
-    clocks_remaining.reset();
-    state = STATE_DISABLED;
-    signal_complete(); // VDMA5 reads 0xFF
-  }
-}
-
-void VDMA::do_hdma_tran() {
-  constexpr auto byte_transfer_clks = 2; // 2 T-cycles
-  constexpr auto blk_size_bytes = 0x10;  // Fixed transfer size
-  if (sys_.halted)                       // HDMA is paused when halted
-    return;
-
-  // State entry logic, always transfers exactly one block
-  if (!clocks_remaining.has_value())
-    clocks_remaining = byte_transfer_clks * blk_size_bytes;
-
-  // Data transfer
-  if (clocks_remaining.value() % byte_transfer_clks == 0)
-    transfer_byte(data_offset++);
-  --clocks_remaining.value();
-
-  // State transition logic is trickier here since HDMA does multiple transfers
-  if (clocks_remaining.value() != 0)
-    return;
-  clocks_remaining.reset();
-
-  // If the full transfer is complete, we are done. Otherwise, we have to wait
-  // for the PPU to signal that we can begin the transfer of the next data block
-  can_start_hdma = false; // Do not rapid fire HDMA transfers
-  if (transfer_size != data_offset)
-    state = STATE_HDMA_WAIT;
-  else {
-    state = STATE_DISABLED;
-    signal_complete();
-  }
-}
-
-void VDMA::do_hdma_wait() {
-  if (!sys_.halted && can_start_hdma)
-    state = STATE_HDMA_INIT;
-}
-
-void VDMA::step_fast_cycle() {
-  if (state == STATE_GDMA_INIT)
-    do_gdma_init();
-  else if (state == STATE_HDMA_INIT)
-    do_hdma_init();
-}
-
-void VDMA::step() {
-  switch (state) {
-  case STATE_GDMA_INIT:
-    do_gdma_init();
-    break;
-  case STATE_GDMA_TRAN:
-    do_gdma_tran();
-    break;
-  case STATE_HDMA_WAIT:
-    do_hdma_wait();
-    break;
-  case STATE_HDMA_INIT:
-    do_hdma_init();
-    break;
-  case STATE_HDMA_TRAN:
-    do_hdma_tran();
-    break;
   default:
-    break;
+    __builtin_unreachable();
+  }
+}
+
+// Called by the PPU when entering HBLANK mode (or formally mode 0)
+void VDMA::try_hdma() {
+  if (!sys_.halted && hdma_active()) {
+    sched.schedule_event_in(clks_key1_controlled(sys_.double_speed, 4),
+                            SchedulerEvent::EVENT_HDMA_COPY_BYTE);
+  }
+}
+
+byte_t VDMA::blks_remaining() const {
+  const auto bytes_remaining = bytes_to_transfer - bytes_transferred;
+  return vdma_bytes_to_blks(bytes_remaining) & 0x7F;
+}
+
+bool VDMA::hdma_active() const { return hdma_pending; }
+
+ScheduledEventOutcome VDMA::handle_event(time_type event_time, unsigned event) {
+  switch (static_cast<SchedulerEvent>(event)) {
+  case SchedulerEvent::EVENT_GDMA_COPY_BYTE: {
+    if (!sys_.vdma_active) [[unlikely]]
+      sys_.vdma_active = true;
+    transfer_byte();
+
+    /* Transfer all blocks of VRAM memory in one swoop */
+    if (bytes_transferred < bytes_to_transfer) {
+      sched.schedule_event_on(event_time + clks_static_timing(2),
+                              SchedulerEvent::EVENT_GDMA_COPY_BYTE);
+      return ScheduledEventOutcome::EVENT_OUTCOME_NONE;
+    }
+
+    sys_.vdma_active = false;
+    return ScheduledEventOutcome::EVENT_OUTCOME_VDMA_COMPLETE;
+  }
+
+  case SchedulerEvent::EVENT_HDMA_COPY_BYTE: {
+    if (!sys_.vdma_active) [[unlikely]]
+      sys_.vdma_active = true;
+    transfer_byte();
+
+    /* Transfer one block (16 bytes) of VRAM memory */
+    if (bytes_transferred < bytes_to_transfer && bytes_transferred % 0x10 != 0) {
+      sched.schedule_event_on(event_time + clks_static_timing(2),
+                              SchedulerEvent::EVENT_HDMA_COPY_BYTE);
+      return ScheduledEventOutcome::EVENT_OUTCOME_NONE;
+    }
+
+    /* Denotes the end of all HDMA transfers, we should not wait for another */
+    else if (bytes_transferred == bytes_to_transfer)
+      hdma_pending = false;
+
+    sys_.vdma_active = false;
+    return ScheduledEventOutcome::EVENT_OUTCOME_VDMA_COMPLETE;
+  }
+
+  default:
+    __builtin_unreachable();
   }
 }

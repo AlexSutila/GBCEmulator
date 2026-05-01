@@ -89,8 +89,8 @@ void DebuggerImGui::update_state_from_core(const std::unique_ptr<GameBoyColor> &
   const auto address_bus = core->get_bus();
 
   // Address bus relevant information
-  ctx.oam_dma_state = Debug::to_string(address_bus->get_oam_dma().get_state());
-  ctx.vdma_state = Debug::to_string(address_bus->get_vdma().get_state());
+  ctx.oam_dma_state = Debug::to_string(core->get_oam_dma()->get_state());
+  ctx.vdma_state = Debug::to_string(core->get_vdma()->get_state());
   read_bus_data(core, ctx.bus_content_base_addr & 0xFF00);
 
   // Interrupt enable bits and flags

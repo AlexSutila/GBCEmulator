@@ -4,6 +4,7 @@
 #include "frontend/frontend.hpp"
 #include "gbc.hpp"
 #include "memory/bus.hpp"
+#include "memory/dma.hpp"
 #include "memory/mmio/dmg.hpp"
 #include "memory/mmio/mmio.hpp"
 #include "ppu/fetcher.hpp"
@@ -140,7 +141,6 @@ PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus, Frontend &fe,
       fe_(fe),                                // To access frame buffer(s)
       vram(bus->get_vram()),                  // Tile data/map/attribute content
       oam(bus->get_oam()),                    // Object (sprite) attribute memory
-      vdma_(bus->get_vdma()),                 // Performs GDMA and HDMA in CGB mode
       obj_cram(std::make_unique<ColorRam>()), // CGB sprite color RAM
       bg_cram(std::make_unique<ColorRam>())   // CGB background color RAM
 {
@@ -212,6 +212,12 @@ PixelProcessingUnit::PPUState PixelProcessingUnit::get_state() const {
   state_.ly = ly_.peek();
   state_.dots = cur_scanline_clks;
   return state_;
+}
+
+void PixelProcessingUnit::connect_vdma(VDMA *vdma) {
+  if (vdma == nullptr) [[unlikely]]
+    throw std::runtime_error("Read nullptr for VDMA connection");
+  vdma_module = vdma;
 }
 
 bool PixelProcessingUnit::should_advance_ly() {
@@ -540,9 +546,8 @@ void PixelProcessingUnit::do_draw() {
   else if (fetcher->was_window_visible())
     fetcher->inc_win_ly();
 
-  /* Signal that HDMA can start running if it has been requested or started
-   * previously. If HBLANK is partially complete, it can also be triggered. */
-  vdma_.set_ppu_hblank_signal(true);
+  // Attempt to start HDMA, if it isn't waiting on a block transfer nothing happens
+  vdma_module->try_hdma();
 
   // State transition logic
   state = modes::MODE_HBLANK;
@@ -556,8 +561,7 @@ void PixelProcessingUnit::do_hblank() {
 
   /* Signal that HDMA is no longer allowed to kick in. Note, that it can still
    * start running last minute and bleed into OAM scan. This is intentional. */
-  if (blank())
-    vdma_.set_ppu_hblank_signal(false);
+  blank();
 }
 
 void PixelProcessingUnit::do_vblank() {

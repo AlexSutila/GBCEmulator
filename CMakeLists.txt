@@ -66,6 +66,7 @@ set(GBC_CORE_SOURCES
     ${CMAKE_SOURCE_DIR}/src/debugger/breakpoint.cpp
     ${CMAKE_SOURCE_DIR}/src/debugger/debugger.cpp
     ${CMAKE_SOURCE_DIR}/src/debugger/print.cpp
+    ${CMAKE_SOURCE_DIR}/src/schedule.cpp
 )
 
 set(GBC_RELEASE_OPTIONS -O3 -fvisibility=hidden)
