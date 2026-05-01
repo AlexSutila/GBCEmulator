@@ -142,7 +142,7 @@ void VDMA_MODE_LEN::write(const byte_t value) {
 
 byte_t VDMA_MODE_LEN::peek() const {
   byte_t ret = dma_.blks_remaining();
-  if (!dma_.hdma_waiting())
+  if (!dma_.hdma_active())
     ret |= 0x80;
   return ret;
 }

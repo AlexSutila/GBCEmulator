@@ -83,9 +83,12 @@ public:
   void try_start(DMA::VDMATransferMode mode, byte_t blks);
   void try_hdma();
 
-  // TODO: Document
+  /* Used by register $FF55 (mode/length), to determine the value read. The
+   * most significant bit determines if VDMA is active, which will always be
+   * a check for HDMA since the CPU cannot ever run during GDMA. Then whats
+   * left is just seven bits to denote the blocks which have been copied. */
   byte_t blks_remaining() const;
-  bool hdma_waiting() const;
+  bool hdma_active() const;
 
   /* Getters and setters for both source and destination addresses involve
    * consulting a pair of two 8-bit MMIORegisters to form a 16-bit address. */
@@ -97,6 +100,7 @@ public:
 private:
   addr_t bytes_to_transfer{}; // How many bytes will be transfered during this VDMA
   addr_t bytes_transferred{}; // How many bytes have been transfered so far
+  bool hdma_pending{};        // Are we waiting on an HBLANK VDMA transfer?
 
   /* See details about these registers under their definitions in `cgb.hpp` */
   DMA::VDMA_ADDR vdma1_, vdma2_; // Source low and high registers

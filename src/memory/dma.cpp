@@ -159,6 +159,8 @@ VDMA::VDMA(AddressBus &bus, PixelProcessingUnit &ppu, runtime_sys_info &sys,
     : vdma1_(0xFF), vdma2_(0xF0), vdma3_(0xFF), vdma4_(0xF0), vdma5_(*this),
       sched(g_sched, SchedulerComponent::SCHED_COMPONENT_VRAM_DMA), bus_(bus), ppu_(ppu),
       sys_(sys) {
+  bytes_to_transfer = bytes_transferred = 0;
+  hdma_pending = false;
 
   using mmio = IORegisterMapping;
   bus.connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA1), &vdma1_);
@@ -226,6 +228,7 @@ void VDMA::transfer_byte() {
    * and increase during VDMA. If you write to FF55, and write to FF55 again after a
    * round of VDMA has completed without updating the source and dest registers, you
    * might not read from the same address both times. */
+  bytes_transferred++;
   inc_dest_addr();
   inc_src_addr();
 }
@@ -235,22 +238,34 @@ void VDMA::try_start(DMA::VDMATransferMode mode, const byte_t blks) {
   bytes_transferred = 0;
 
   switch (mode) {
-  case DMA::VDMATransferMode::GENERAL_PURPOSE_DMA:
-    sched.schedule_event_in(clks_key1_controlled(sys_.double_speed, 4),
-                            SchedulerEvent::EVENT_GDMA_COPY_BYTE);
-    break;
+  case DMA::VDMATransferMode::GENERAL_PURPOSE_DMA: {
+    const bool hdma_was_active = hdma_pending;
+    hdma_pending = false;
 
-  case DMA::VDMATransferMode::HBLANK_DMA:
+    // GDMA is always started when FF55 is written, however should only actually be
+    // used when in VBLANK (or I guess HBLANK if you're doing a small transfer).
+    if (!hdma_was_active) {
+      sched.schedule_event_in(clks_key1_controlled(sys_.double_speed, 4),
+                              SchedulerEvent::EVENT_GDMA_COPY_BYTE);
+    }
+  } break;
+
+  case DMA::VDMATransferMode::HBLANK_DMA: {
+    hdma_pending = true;
+
     // If we start in HBLANK, then HDMA starts instantly
     if (ppu_.get_mode() == PPU::StatModes::MODE_HBLANK)
       try_hdma();
-    break;
+  } break;
+
+  default:
+    __builtin_unreachable();
   }
 }
 
 // Called by the PPU when entering HBLANK mode (or formally mode 0)
 void VDMA::try_hdma() {
-  if (!sys_.halted && hdma_waiting()) {
+  if (!sys_.halted && hdma_active()) {
     sched.schedule_event_in(clks_key1_controlled(sys_.double_speed, 4),
                             SchedulerEvent::EVENT_HDMA_COPY_BYTE);
   }
@@ -261,17 +276,16 @@ byte_t VDMA::blks_remaining() const {
   return vdma_bytes_to_blks(bytes_remaining) & 0x7F;
 }
 
-bool VDMA::hdma_waiting() const { return bytes_transferred < bytes_to_transfer; }
+bool VDMA::hdma_active() const { return hdma_pending; }
 
 ScheduledEventOutcome VDMA::handle_event(time_type event_time, unsigned event) {
   switch (static_cast<SchedulerEvent>(event)) {
   case SchedulerEvent::EVENT_GDMA_COPY_BYTE: {
     if (!sys_.vdma_active) [[unlikely]]
       sys_.vdma_active = true;
-
-    bytes_transferred++;
     transfer_byte();
 
+    /* Transfer all blocks of VRAM memory in one swoop */
     if (bytes_transferred < bytes_to_transfer) {
       sched.schedule_event_on(event_time + clks_static_timing(2),
                               SchedulerEvent::EVENT_GDMA_COPY_BYTE);
@@ -285,15 +299,18 @@ ScheduledEventOutcome VDMA::handle_event(time_type event_time, unsigned event) {
   case SchedulerEvent::EVENT_HDMA_COPY_BYTE: {
     if (!sys_.vdma_active) [[unlikely]]
       sys_.vdma_active = true;
-
-    bytes_transferred++;
     transfer_byte();
 
+    /* Transfer one block (16 bytes) of VRAM memory */
     if (bytes_transferred < bytes_to_transfer && bytes_transferred % 0x10 != 0) {
       sched.schedule_event_on(event_time + clks_static_timing(2),
                               SchedulerEvent::EVENT_HDMA_COPY_BYTE);
       return ScheduledEventOutcome::EVENT_OUTCOME_NONE;
     }
+
+    /* Denotes the end of all HDMA transfers, we should not wait for another */
+    else if (bytes_transferred == bytes_to_transfer)
+      hdma_pending = false;
 
     sys_.vdma_active = false;
     return ScheduledEventOutcome::EVENT_OUTCOME_VDMA_COMPLETE;

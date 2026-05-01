@@ -166,12 +166,15 @@ public:
   [[nodiscard]] byte_t peek() const override;
   byte_t read() override;
 
-  // For internal DMA usage only, since registers themselves are W/O off the address bus
-  // and the lower 4 address bits are unmapped but are technically still used.
+  /* For internal DMA usage only, since registers themselves are W/O off the address bus
+   * and the lower 4 address bits are unmapped but are technically still used. */
   [[nodiscard]] byte_t get_addr_bits() const;
   void put_addr_bits(byte_t value); // Ignores mask
 
 private:
+  /* This is necessary, because writes to the low bytes of the source and destination regs
+   * always have the lowest nibble masked, such that all transfers are 16-byte aligned, but
+   * the bits still exist and are used to increment these registers over time. */
   const byte_t bitmask;
 };
 
