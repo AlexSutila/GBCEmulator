@@ -1,3 +1,7 @@
+## Fri May  1 02:28:09 PM MST 2026 (~2 components)
+- C_OAM_DMA refactored completely for scheduler, fields changed accordingly
+- C_VDMA refactored completely for scheduler, fields changed accordingly
+
 ## Mon Apr 27 09:05:04 PM MST 2026 (~1 fields)
 - F_FLAGS reordered bits in `runtime_sys_info`
 

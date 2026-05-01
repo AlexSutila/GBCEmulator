@@ -24,19 +24,17 @@ inline std::size_t vdma_blks_to_bytes(const byte_t blks) {
 enum : std::uint16_t {
   F_OAM_DMA_SRC_BASE = 1,
   F_OAM_DMA_DATA_OFFSET,
-  F_OAM_DMA_STATE,
-  F_OAM_DMA_CLOCKS_REMAINING,
-
-  // Memory mapped registers
+  F_OAM_DMA_ACTIVE,
   F_OAM_DMA_DMA_REG,
 };
 
 template <typename T> void ObjAttrDMA::parse_savestate(T &t) {
-  constexpr auto version = 1; // Schema revision
+  constexpr auto version = 2; // Schema revision
   t.chunk_header(version, Savestate::C_OAM_DMA);
 
   t.field_generic(F_OAM_DMA_SRC_BASE, src_base_addr);
   t.field_generic(F_OAM_DMA_DATA_OFFSET, data_offset);
+  t.field_generic(F_OAM_DMA_ACTIVE, active);
 
   // Memory mapped registers
   t.field_complex(F_OAM_DMA_DMA_REG, [&](T &t) { dma_.parse_savestate(t); });
@@ -123,29 +121,29 @@ ScheduledEventOutcome ObjAttrDMA::handle_event(time_type event_time, unsigned ev
  * ====================================================================== */
 
 enum : std::uint16_t {
-  F_VDMA_SRC_BASE = 1,
-  F_VDMA_DEST_BASE,
-  F_VDMA_DATA_OFFSET,
-  F_VDMA_TRANSFER_SIZE,
-  F_VDMA_CAN_START_HDMA,
-  F_VDMA_STATE,
-  F_VDMA_CLOCKS_REMAINING,
+  F_VDMA_BYTES_TO_TRANSFER = 1,
+  F_VDMA_BYTES_TRANSFERRED,
+  F_VDMA_HDMA_PENDING,
 
   // Memory mapped registers
-  F_VDMA_ADDR_REG,
-  F_VDMA_MODE_REG,
+  F_VDMA_ADDR_REGISTER,
+  F_VDMA_MODE_REGISTER,
 };
 
 template <typename T> void VDMA::parse_savestate(T &t) {
-  constexpr auto version = 1; // Schema revision
+  constexpr auto version = 2; // Schema revision
   t.chunk_header(version, Savestate::C_VDMA);
 
-  // duplicate tags here are fine, they are all the same thing, just mind order
-  t.field_complex(F_VDMA_ADDR_REG, [&](T &t) { vdma1_.parse_savestate(t); });
-  t.field_complex(F_VDMA_ADDR_REG, [&](T &t) { vdma2_.parse_savestate(t); });
-  t.field_complex(F_VDMA_ADDR_REG, [&](T &t) { vdma3_.parse_savestate(t); });
-  t.field_complex(F_VDMA_ADDR_REG, [&](T &t) { vdma4_.parse_savestate(t); });
-  t.field_complex(F_VDMA_MODE_REG, [&](T &t) { vdma5_.parse_savestate(t); });
+  t.field_generic(F_VDMA_BYTES_TO_TRANSFER, bytes_to_transfer);
+  t.field_generic(F_VDMA_BYTES_TRANSFERRED, bytes_transferred);
+  t.field_generic(F_VDMA_HDMA_PENDING, hdma_pending);
+
+  // duplicate tags here are file, they are all the same thing, just mind ordering
+  t.field_complex(F_VDMA_ADDR_REGISTER, [&](T &t) { vdma1_.parse_savestate(t); });
+  t.field_complex(F_VDMA_ADDR_REGISTER, [&](T &t) { vdma2_.parse_savestate(t); });
+  t.field_complex(F_VDMA_ADDR_REGISTER, [&](T &t) { vdma3_.parse_savestate(t); });
+  t.field_complex(F_VDMA_ADDR_REGISTER, [&](T &t) { vdma4_.parse_savestate(t); });
+  t.field_complex(F_VDMA_MODE_REGISTER, [&](T &t) { vdma5_.parse_savestate(t); });
   t.eof();
 }
 
