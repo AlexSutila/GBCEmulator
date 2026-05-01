@@ -351,15 +351,13 @@ GameBoyColor::GameBoyColor(Frontend &frontend)
 
 void GameBoyColor::system_init() {
   /* General system operation info */
-  sys_ = {
-      .elapsed_clocks = 0,
-      .vdma_active = false,
-      .halted = false,
-      .double_speed = false,
-      .speed_switch_armed = false,
-      .cgb_mode = true,
-      .unmap_key0 = false,
-  };
+  sys_.elapsed_clocks = 0;
+  sys_.vdma_active = false;
+  sys_.halted = false;
+  sys_.double_speed = false;
+  sys_.speed_switch_armed = false;
+  sys_.cgb_mode = true;
+  sys_.unmap_key0 = false;
 
   /* Component initialization */
   bus = std::make_unique<AddressBus>(sys_, sched_, debugger_, bios_);
