@@ -118,7 +118,7 @@ ObjectPriorityMode OPRI::get_prio_mode() const {
 
 namespace DMA {
 
-void VDMA_ADDR::write(const byte_t value) { state_ = value; }
+void VDMA_ADDR::write(const byte_t value) { state_ = value & bitmask; }
 [[nodiscard]] byte_t VDMA_ADDR::peek() const { return 0xFF; }
 byte_t VDMA_ADDR::read() { return peek(); }
 
@@ -126,6 +126,7 @@ byte_t VDMA_ADDR::read() { return peek(); }
 // we need to be able to see what was written to calculate source/dest addresses
 // for dma transfers.
 [[nodiscard]] byte_t VDMA_ADDR::get_addr_bits() const { return state_; }
+void VDMA_ADDR::put_addr_bits(byte_t value) { state_ = value; }
 
 void VDMA_MODE_LEN::write(const byte_t value) {
   const byte_t mode_bit = (value & 0x80) >> 7;

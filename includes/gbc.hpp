@@ -7,6 +7,7 @@
 #include "debugger/debugger.hpp"
 #include "memory/boot.hpp"
 #include "memory/bus.hpp"
+#include "memory/dma.hpp"
 #include "memory/mmio/mmio.hpp"
 #include "ppu/ppu.hpp"
 #include "schedule.hpp"
@@ -92,6 +93,8 @@ public:
   [[nodiscard]] LR35902 *get_cpu() const { return cpu.get(); };
   [[nodiscard]] PixelProcessingUnit *get_ppu() const { return ppu.get(); }
   [[nodiscard]] TimerUnit *get_timer() const { return timer.get(); }
+  [[nodiscard]] ObjAttrDMA *get_oam_dma() const { return oam_dma.get(); }
+  [[nodiscard]] VDMA *get_vdma() const { return vram_dma.get(); }
   [[nodiscard]] const runtime_sys_info &get_sys() const { return sys_; }
 
 private:

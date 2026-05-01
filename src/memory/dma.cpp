@@ -156,7 +156,7 @@ template void VDMA::parse_savestate<Savestate::Checker>(Savestate::Checker &);
 
 VDMA::VDMA(AddressBus &bus, PixelProcessingUnit &ppu, runtime_sys_info &sys,
            SystemScheduler &g_sched)
-    : vdma1_(), vdma2_(), vdma3_(), vdma4_(), vdma5_(*this),
+    : vdma1_(0xFF), vdma2_(0xF0), vdma3_(0xFF), vdma4_(0xF0), vdma5_(*this),
       sched(g_sched, SchedulerComponent::SCHED_COMPONENT_VRAM_DMA), bus_(bus), ppu_(ppu),
       sys_(sys) {
 
@@ -186,8 +186,8 @@ void VDMA::inc_addr(DMA::VDMA_ADDR &lo, DMA::VDMA_ADDR &hi) {
   auto addr = (static_cast<addr_t>(hi_byte) << 8) | static_cast<addr_t>(lo_byte);
   ++addr;
 
-  hi.write(static_cast<byte_t>((addr >> 8) & 0xFF));
-  lo.write(static_cast<byte_t>(addr & 0xFF));
+  hi.put_addr_bits(static_cast<byte_t>((addr >> 8) & 0xFF));
+  lo.put_addr_bits(static_cast<byte_t>(addr & 0xFF));
 }
 
 addr_t VDMA::get_dest_addr() const {
@@ -209,17 +209,17 @@ void VDMA::transfer_byte() {
   byte_t data{0xFF}; // Assume open bus unless address range is sane
 
   // This is the ideal source address range, read byte as you would expect
-  if ((src_base_addr >= 0x0000 && src_base_addr <= 0x7FF0) ||
-      (src_base_addr >= 0xA000 && src_base_addr <= 0xDFF0)) [[likely]]
+  if ((src_base_addr >= 0x0000 && src_base_addr <= 0x7FFF) ||
+      (src_base_addr >= 0xA000 && src_base_addr <= 0xDFFF)) [[likely]]
     data = bus_.read_byte(src_base_addr);
 
   // If the source address lies within this address range, it actually ends up
   // reading from 0xA000-0xBFF0, which is located somewhere in SRAM
-  else if (src_base_addr >= 0xE000 && src_base_addr <= 0xFFF0)
+  else if (src_base_addr >= 0xE000 && src_base_addr <= 0xFFFF)
     data = bus_.read_byte(src_base_addr - 0x4000);
 
   // Only write data byte if the dest address is sane
-  if (dest_base_addr >= 0x8000 && dest_base_addr <= 0x9FF0) [[likely]]
+  if (dest_base_addr >= 0x8000 && dest_base_addr <= 0x9FFF) [[likely]]
     bus_.write_byte(dest_base_addr, data);
 
   /* Hardware quirk, docs say the bottom four bits aren't used, but they still exist
