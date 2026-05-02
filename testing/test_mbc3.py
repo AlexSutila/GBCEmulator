@@ -21,7 +21,8 @@ def test_mbc3():
     cart, expects = make_cart_bytes(resp.content), resp.content[0x4000::0x4000]
     gbc, reads = None, []
 
-    def breakpoint_cb():
+    def breakpoint_cb(gbc):
+        print(gbc)
         byte_read = gbc.read_byte(0x4000)
         reads.append(byte_read)
         return BreakReason.BRK_CONTINUE
@@ -33,3 +34,7 @@ def test_mbc3():
 
     for read, expect in zip(reads, expects):
         assert read == expect
+
+
+if __name__ == "__main__":
+    test_mbc3()

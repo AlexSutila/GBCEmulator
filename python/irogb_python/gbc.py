@@ -13,7 +13,7 @@ class GameBoyColor:
     def __init__(self, cartridge: Cartridge = None, dbg_callback: Callable = None):
         try:
             self._gbc = (
-                core.GameBoyColor(dbg_callback)
+                core.GameBoyColor(lambda: dbg_callback(self))
                 if dbg_callback is not None
                 else core.GameBoyColor()
             )
