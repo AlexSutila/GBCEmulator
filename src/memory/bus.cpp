@@ -231,7 +231,7 @@ byte_t AddressBus::read_byte_safe(const addr_t addr) const {
 
 byte_t AddressBus::read_byte(const addr_t addr, const bool debug) const {
   if (debug)
-    try_brk(addr, Debug::BRK_ADDRESS_READ);
+    try_brk(sys_.elapsed_clocks, addr, Debug::BRK_ADDRESS_READ);
   if (is_conflicting(addr)) [[unlikely]]
     return open_bus();
 
@@ -284,7 +284,7 @@ void AddressBus::write_byte(const addr_t addr, const byte_t value) const {
 
   /* We intentionally evaluate the breakpoint after the value has been written,
    * as it is less confusing from a UI perspective, seeing the updated value. */
-  try_brk(addr, Debug::BRK_ADDRESS_WRITTEN);
+  try_brk(sys_.elapsed_clocks, addr, Debug::BRK_ADDRESS_WRITTEN);
 }
 
 MMIORegister *AddressBus::get_mmio(IORegisterMapping mapping) const {

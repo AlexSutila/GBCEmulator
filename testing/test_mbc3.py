@@ -2,6 +2,7 @@
 from irogb_python import (
     make_cart_bytes,
     GameBoyColor,
+    BreakContext,
     BreakReason,
 )
 import requests
@@ -19,11 +20,13 @@ def test_mbc3():
     resp.raise_for_status()
 
     cart, expects = make_cart_bytes(resp.content), resp.content[0x4000::0x4000]
-    gbc, reads = None, []
+    reads = []
 
-    def breakpoint_cb(gbc):
-        print(gbc)
-        byte_read = gbc.read_byte(0x4000)
+    def breakpoint_cb(gbc: GameBoyColor, ctx: BreakContext):
+        assert ctx.reason & BreakReason.BRK_ADDRESS_READ != 0
+        assert ctx.data == 0x4000
+
+        byte_read = gbc.read_byte(0x4000)  # Peek at memory value
         reads.append(byte_read)
         return BreakReason.BRK_CONTINUE
 

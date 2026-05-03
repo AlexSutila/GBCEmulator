@@ -2,6 +2,26 @@ from __future__ import annotations
 
 from .gbc_py import BreakReason
 from . import gbc_py as core
+from typing import Union
+
+
+class BreakContext:
+    def __init__(self, ctx_core: core.BreakContext):
+        if not isinstance(ctx_core, core.BreakContext):
+            raise ValueError("Expected core.BreakContext")
+        self._ctx = ctx_core
+
+    @property
+    def reason(self) -> BreakReason:
+        return self._ctx.reason
+
+    @property
+    def time(self) -> int:
+        return self._ctx.time
+
+    @property
+    def data(self) -> Union[None, int]:
+        return self._ctx.data
 
 
 class Debugger:

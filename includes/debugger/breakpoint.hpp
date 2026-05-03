@@ -2,8 +2,10 @@
 #define GBC_BREAKPOINT_HPP
 
 #include "emu_types.hpp"
+#include "schedule.hpp"
 #include <cstdint>
 #include <string>
+#include <variant>
 
 namespace Debug {
 
@@ -42,6 +44,14 @@ constexpr bool operator&(const BreakReason a, const BreakReason b) {
  * Pausing on other events might be confusing, and this event happens frequently
  * enough to still come across as seamless to the naked eye. */
 constexpr auto BRK_STOPPED_BY_UI = BRK_STEP_INSTRUCTION;
+
+struct Context {
+  BreakReason reason;
+  time_type time;
+
+  // Additional context depends on breakpoint type
+  std::variant<std::monostate, addr_t> data;
+};
 
 class Breakpoint {
 public:

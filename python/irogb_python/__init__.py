@@ -8,6 +8,10 @@ from .ppu import (
     RenderedFrame,
     PPUState,
 )
+from .debugger import (
+    Debugger,
+    BreakContext,
+)
 from .utils.mooneye import (
     run_mooneye_test,
     eval_mooneye_cpu_state,
@@ -23,6 +27,8 @@ from .gbc_py import (
 __all__ = [
     # Core emulator sources
     "GameBoyColor",
+    "Debugger",
+    "BreakContext",
     "BreakReason",
     "StatModes",
     # Cartridge sources

@@ -5,6 +5,7 @@
 #include "debugger/debugger.hpp"
 #include "emu_types.hpp"
 #include "frontend/python/frontend.hpp"
+#include "schedule.hpp"
 #include <array>
 #include <functional>
 #include <optional>
@@ -64,7 +65,7 @@ public:
   void put_joyp_state(std::uint8_t state);
 
 private:
-  std::function<Debug::BreakReason()> cb_;
+  std::function<Debug::BreakReason(Debug::Context)> cb_;
   PyFrontend fe_;
 };
 

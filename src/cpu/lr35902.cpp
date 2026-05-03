@@ -243,7 +243,7 @@ void LR35902::prime_next_instr(Instruction *const next_ins) {
   cur_ins_clks = 0;
 
   // This must happen after `ins_->parse()` for correct operands
-  try_brk(ins_base_addr, brk_reason_flags);
+  try_brk(sys_.elapsed_clocks, ins_base_addr, brk_reason_flags);
 }
 
 void LR35902::step() {

@@ -432,7 +432,7 @@ void PixelProcessingUnit::do_oam_scan() {
     const Debug::BreakReason reason = (ly_.peek() == 0)
                                           ? Debug::BRK_STEP_SCANLINE | Debug::BRK_STEP_FRAME
                                           : Debug::BRK_STEP_SCANLINE;
-    try_brk(reason);
+    try_brk(sys_.elapsed_clocks, reason);
 
     /* Keeps track of which sprite we are on being on. If the sprite is visible
      * on the current scanline, we push it into the vector to so all the sprites

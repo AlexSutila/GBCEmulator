@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import Callable
 
+from .debugger import Debugger, BreakContext
 from .ppu import PPUState, RenderedFrame
 from .cpu import ProcessorState
-from .debugger import Debugger
 from .cart import Cartridge
 from . import gbc_py as core
 
@@ -13,7 +13,7 @@ class GameBoyColor:
     def __init__(self, cartridge: Cartridge = None, dbg_callback: Callable = None):
         try:
             self._gbc = (
-                core.GameBoyColor(lambda: dbg_callback(self))
+                core.GameBoyColor(lambda ctx: dbg_callback(self, BreakContext(ctx)))
                 if dbg_callback is not None
                 else core.GameBoyColor()
             )

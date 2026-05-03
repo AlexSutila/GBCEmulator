@@ -129,13 +129,17 @@ static void bind_debugger(const py::module_ &m) {
       .value("BRK_STEP_INSTRUCTION", Debug::BreakReason::BRK_STEP_INSTRUCTION)
       .value("BRK_STEP_SCANLINE", Debug::BreakReason::BRK_STEP_SCANLINE)
       .value("BRK_STEP_FRAME", Debug::BreakReason::BRK_STEP_FRAME);
+  py::class_<Debug::Context>(m, "BreakContext")
+      .def_readonly("reason", &Debug::Context::reason)
+      .def_readonly("time", &Debug::Context::time)
+      .def_readonly("data", &Debug::Context::data);
   py::class_<Debug::Breakpoint>(m, "Breakpoint")
       .def(py::init<Debug::BreakReason, addr_t>(), py::arg("reason_flags"), py::arg("watch_addr"))
       .def("eval", &Debug::Breakpoint::eval, py::arg("reason_flags"))
       .def("has_flag", &Debug::Breakpoint::has_flag, py::arg("flag"))
       .def("to_string", &Debug::Breakpoint::to_string);
   py::class_<Debug::Debugger>(m, "Debugger")
-      .def(py::init<std::function<Debug::BreakReason()>>(), py::arg("callback"))
+      .def(py::init<std::function<Debug::BreakReason(Debug::Context)>>(), py::arg("callback"))
       .def("breakpoint_add", &Debug::Debugger::breakpoint_add, py::arg("addr"), py::arg("reason"))
       .def("breakpoint_del", &Debug::Debugger::breakpoint_del, py::arg("addr"))
       .def("get_breakpoints", &Debug::Debugger::get_breakpoints);

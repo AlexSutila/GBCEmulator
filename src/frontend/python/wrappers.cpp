@@ -12,9 +12,9 @@ PyGameBoyColor::PyGameBoyColor(const pybind11::function &callback) {
   const auto &gbc = fe_.get();
 
   // Need to wrap callback and make it Python-call safe
-  cb_ = [callback]() -> Debug::BreakReason {
+  cb_ = [callback](Debug::Context ctx) -> Debug::BreakReason {
     pybind11::gil_scoped_acquire acquire;
-    return callback().cast<Debug::BreakReason>();
+    return callback(ctx).cast<Debug::BreakReason>();
   };
   gbc->configure_debugger(Debug::Debugger(cb_));
 }

@@ -581,7 +581,7 @@ std::size_t GameBoyColor::big_step() {
 }
 
 void GameBoyColor::step() {
-  try_brk(Debug::BreakReason::BRK_STEP_CLOCK_CYCLE);
+  try_brk(sys_.elapsed_clocks, Debug::BreakReason::BRK_STEP_CLOCK_CYCLE);
 
   // DMG cycle, or the first cycle of double speed in CGB mode (if double speed is enabled)
   if (!sys_.vdma_active)
