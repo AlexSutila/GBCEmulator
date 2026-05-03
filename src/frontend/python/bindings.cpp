@@ -135,6 +135,7 @@ static void bind_debugger(const py::module_ &m) {
       .value("BRK_ADDRESS_READ", Debug::BreakReason::BRK_ADDRESS_READ)
       .value("BRK_ADDRESS_WRITTEN", Debug::BreakReason::BRK_ADDRESS_WRITTEN)
       .value("BRK_EVENT_QUEUED", Debug::BreakReason::BRK_EVENT_QUEUED)
+      .value("BRK_EVENT_POPPED", Debug::BreakReason::BRK_EVENT_POPPED)
       .value("BRK_STEP_CLOCK_CYCLE", Debug::BreakReason::BRK_STEP_CLOCK_CYCLE)
       .value("BRK_STEP_INSTRUCTION", Debug::BreakReason::BRK_STEP_INSTRUCTION)
       .value("BRK_STEP_SCANLINE", Debug::BreakReason::BRK_STEP_SCANLINE)

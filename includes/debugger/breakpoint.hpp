@@ -20,17 +20,21 @@ namespace Debug {
  */
 enum BreakReason : std::uint32_t {
   BRK_CONTINUE = 0,
+
   // User configured or hardware specified reasons
   BRK_ADDRESS_EXECUTED = 1 << 1,
   BRK_ADDRESS_READ = 1 << 2,
   BRK_ADDRESS_WRITTEN = 1 << 3,
+
   // User configured scheduler event reasons
   BRK_EVENT_QUEUED = 1 << 4,
+  BRK_EVENT_POPPED = 1 << 5, // Analogous to event handling
+
   // Hardware specified reasons only
-  BRK_STEP_CLOCK_CYCLE = 1 << 5,
-  BRK_STEP_INSTRUCTION = 1 << 6,
-  BRK_STEP_SCANLINE = 1 << 7,
-  BRK_STEP_FRAME = 1 << 8,
+  BRK_STEP_CLOCK_CYCLE = 1 << 6,
+  BRK_STEP_INSTRUCTION = 1 << 7,
+  BRK_STEP_SCANLINE = 1 << 8,
+  BRK_STEP_FRAME = 1 << 9,
 };
 
 constexpr BreakReason operator|(const BreakReason a, const BreakReason b) {

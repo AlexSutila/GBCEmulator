@@ -101,7 +101,7 @@ def run(cart_path: str, steps: int = 120):
     for component in components:
         for i in range(256):  # Brute force guess how many events there are lol
             gbc.debugger.breakpoint_add_event(
-                (component, i), BreakReason.BRK_EVENT_QUEUED
+                (component, i), BreakReason.BRK_EVENT_POPPED
             )
 
     print("[*] Running emulator...")

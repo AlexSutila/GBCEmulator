@@ -44,15 +44,24 @@ public:
     return e_queue.erase(t) > 0;
   }
 
-  void queue(event_time t, event e) {
-    try_brk(std::get<0>(t), e, Debug::BreakReason::BRK_EVENT_QUEUED);
-    e_queue.insert({t, e});
-    e_index.insert({e, t});
+  // We want to note the time at which the event was queued, the handling of
+  // the event can be observed through `Debug::BreakReason::BRK_EVENT_POPPED`
+  void queue(time_type queued_at, event_time t, event e) {
+    try_brk(queued_at, e, Debug::BreakReason::BRK_EVENT_QUEUED);
+    queue(t, e);
   }
 
+  // Pop for event handling
   event pop() {
     auto it = e_queue.begin();
-    event e = it->second;
+    const auto &[t, e] = *it;
+
+    /* Important note, multiple events which were queued up over a wide range
+     * of cycle may all be handled on the same cycle, hence we show the time
+     * which the event should have been handled. */
+    const time_type popped_at = std::get<0>(t);
+    try_brk(popped_at, e, Debug::BreakReason::BRK_EVENT_POPPED);
+
     e_queue.erase(it);
     e_index.erase(e);
     return e;
@@ -114,8 +123,15 @@ public:
 
       // Restoring is more compex because we have to restore the mapping
       // and the reverse mapping for seamless scheduling and unscheduling.
-      queue(t, e);
+      queue(t, e); // This does not need to trigger a breakpoint
     }
+  }
+
+private:
+  void queue(event_time t, event e) {
+    try_brk(std::get<0>(t), e, Debug::BreakReason::BRK_EVENT_QUEUED);
+    e_queue.insert({t, e});
+    e_index.insert({e, t});
   }
 };
 
@@ -186,12 +202,12 @@ event SystemScheduler::pop_next_event() {
 
 void SystemScheduler::schedule_event_in(time_type in_cycles, event e) {
   const event_time t = std::make_tuple(sys.elapsed_clocks + in_cycles, ord++);
-  impl->queue(t, e);
+  impl->queue(sys.elapsed_clocks, t, e);
 }
 
 void SystemScheduler::schedule_event_on(time_type cycle, event e) {
   const event_time t = std::make_tuple(cycle, ord++);
-  impl->queue(t, e);
+  impl->queue(sys.elapsed_clocks, t, e);
 }
 
 bool SystemScheduler::unschedule_event(event e) const { return impl->try_unqueue(e); }

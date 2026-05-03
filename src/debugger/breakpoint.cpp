@@ -18,7 +18,7 @@ Breakpoint::Breakpoint(const BreakReason reason_flags, const addr_t watch_addr)
 Breakpoint::Breakpoint(const BreakReason reason_flags, const event e)
     : context(e), reasons(reason_flags) // Should be read/write/execute only
 {
-  constexpr auto BRK_ALLOWED_FLAGS = BRK_EVENT_QUEUED; // TODO: May include some for handling?
+  constexpr auto BRK_ALLOWED_FLAGS = BRK_EVENT_QUEUED | BRK_EVENT_POPPED;
   if ((reason_flags & ~BRK_ALLOWED_FLAGS) != 0)
     throw std::runtime_error("Breakpoint::Breakpoint() bad flags");
 }
