@@ -31,7 +31,7 @@ def test_mbc3():
         return BreakReason.BRK_CONTINUE
 
     gbc = GameBoyColor(cartridge=cart, dbg_callback=breakpoint_cb)
-    gbc.debugger.breakpoint_add(0x4000, BreakReason.BRK_ADDRESS_READ)
+    gbc.debugger.breakpoint_add_address(0x4000, BreakReason.BRK_ADDRESS_READ)
     for _ in range(60):
         gbc.step_frame(big_step=True)
 
