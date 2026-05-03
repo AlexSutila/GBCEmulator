@@ -29,7 +29,7 @@ void Debugger::eval(time_type time, event e, BreakReason reason) {
     const Context ctx = {
         .reason = reason,
         .time = time,
-        .data = std::monostate(),
+        .data = e,
     };
     reason_ = on_brk_callback(ctx);
   }

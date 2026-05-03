@@ -52,7 +52,7 @@ struct Context {
   time_type time;
 
   // Additional context depends on breakpoint type
-  std::variant<std::monostate, addr_t> data;
+  std::variant<std::monostate, event, addr_t> data;
 };
 
 class Breakpoint {
