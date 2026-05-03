@@ -261,7 +261,7 @@ void DebuggerImGui::build_breakpoints_window(UiState &state,
     return;
   }
 
-  for (const auto bps = debugger->get_breakpoints(); const auto &[addr, bp] : bps) {
+  for (const auto bps = debugger->get_rwe_breakpoints(); const auto &[addr, bp] : bps) {
     ImGui::PushID(addr);
 
     ImGui::Text("%s", bp.to_string().c_str());

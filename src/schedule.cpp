@@ -1,4 +1,6 @@
 #include "schedule.hpp"
+#include "debugger/breakpoint.hpp"
+#include "debugger/debugger.hpp"
 #include "gbc.hpp"
 #include "memory/dma.hpp"
 #include "savestate/codec.hpp"
@@ -25,8 +27,9 @@ struct event_sequencer {
 
 // TODO: We can probably use a more efficient data structure for `e_index` since
 // we really do not care much about ordering, not as much as mapping at least.
-struct SystemScheduler::Implementation {
+struct SystemScheduler::Implementation : public Debug::Debuggable {
 public:
+  Implementation(std::optional<Debug::Debugger> &debugger_) : Debug::Debuggable(debugger_) {}
   ~Implementation() = default;
 
   std::map<event_time, event, event_sequencer> e_queue;
@@ -42,6 +45,7 @@ public:
   }
 
   void queue(event_time t, event e) {
+    try_brk(std::get<0>(t), e, Debug::BreakReason::BRK_EVENT_QUEUED);
     e_queue.insert({t, e});
     e_index.insert({e, t});
   }
@@ -115,8 +119,8 @@ public:
   }
 };
 
-SystemScheduler::SystemScheduler(runtime_sys_info &sys_)
-    : impl(std::make_unique<SystemScheduler::Implementation>()), // PIMPL
+SystemScheduler::SystemScheduler(std::optional<Debug::Debugger> &debugger_, runtime_sys_info &sys_)
+    : impl(std::make_unique<SystemScheduler::Implementation>(debugger_)), // PIMPL
       sys(sys_), ord(0) {}
 SystemScheduler::~SystemScheduler() = default;
 

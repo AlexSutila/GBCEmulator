@@ -306,7 +306,7 @@ std::optional<AddressBus::CheatOverride> compile_cheat(const std::string_view co
 } // namespace
 
 GameBoyColor::GameBoyColor(Frontend &frontend, const std::string &bios_path)
-    : Debuggable(debugger_), debugger_(std::nullopt), sched_(sys_), fe_(frontend) {
+    : Debuggable(debugger_), debugger_(std::nullopt), sched_(debugger_, sys_), fe_(frontend) {
   system_init(); // Connects all system components to each other
 
   /* We set CGB mode based on the size of the boot ROM. This is the best way
@@ -328,7 +328,7 @@ GameBoyColor::GameBoyColor(Frontend &frontend, const std::string &bios_path)
 }
 
 GameBoyColor::GameBoyColor(Frontend &frontend, const BootROM &rom)
-    : Debuggable(debugger_), debugger_(std::nullopt), sched_(sys_), fe_(frontend) {
+    : Debuggable(debugger_), debugger_(std::nullopt), sched_(debugger_, sys_), fe_(frontend) {
   system_init();
   bios_ = rom; // We assume rom is already valid
 
@@ -340,7 +340,7 @@ GameBoyColor::GameBoyColor(Frontend &frontend, const BootROM &rom)
 }
 
 GameBoyColor::GameBoyColor(Frontend &frontend)
-    : Debuggable(debugger_), debugger_(std::nullopt), bios_(std::nullopt), sched_(sys_),
+    : Debuggable(debugger_), debugger_(std::nullopt), bios_(std::nullopt), sched_(debugger_, sys_),
       fe_(frontend) {
   system_init(); // Connects all system components
   skip_bios();   // BIOS is left unconfigured

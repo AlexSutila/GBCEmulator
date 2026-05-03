@@ -6,6 +6,10 @@
 #include <optional>
 #include <tuple>
 
+namespace Debug {
+class Debuggable;
+class Debugger;
+} // namespace Debug
 struct runtime_sys_info;
 
 using time_type = std::uint64_t;
@@ -57,7 +61,7 @@ inline time_type clks_key1_controlled(bool double_speed, time_type cycles) {
 
 class SystemScheduler {
 public:
-  SystemScheduler(runtime_sys_info &sys);
+  SystemScheduler(std::optional<Debug::Debugger> &debugger_, runtime_sys_info &sys_);
   ~SystemScheduler();
 
   // Serialization gets hairy, see implementation file for details

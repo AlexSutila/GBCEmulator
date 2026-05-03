@@ -20,6 +20,7 @@ from .utils.mooneye import (
 # We export some enumerations directly from the core
 from .gbc_py import (
     # Enumerations
+    SchedulerComponent,
     BreakReason,
     StatModes,
 )
@@ -29,6 +30,8 @@ __all__ = [
     "GameBoyColor",
     "Debugger",
     "BreakContext",
+    # Enumerations
+    "SchedulerComponent",
     "BreakReason",
     "StatModes",
     # Cartridge sources

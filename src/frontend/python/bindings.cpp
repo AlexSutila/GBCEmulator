@@ -3,6 +3,7 @@
 #include "frontend/python/testing.hpp"
 #include "frontend/python/wrappers.hpp"
 #include "ppu/ppu.hpp"
+#include "schedule.hpp"
 #include <filesystem>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -120,11 +121,20 @@ static void bind_ppu(const py::module_ &m) {
 }
 
 static void bind_debugger(const py::module_ &m) {
+  // We have to expose this too since the debugger can wire breakpoints up to events being
+  // queued and handled and what not. It needs to have visibility into the components.
+  py::enum_<SchedulerComponent>(m, "SchedulerComponent")
+      .value("OAM_DMA", SchedulerComponent::SCHED_COMPONENT_OAM_DMA)
+      .value("VRAM_DMA", SchedulerComponent::SCHED_COMPONENT_VRAM_DMA)
+      .export_values();
+
+  // What remains is the actual debugger guts
   py::enum_<Debug::BreakReason>(m, "BreakReason", py::arithmetic())
       .value("BRK_CONTINUE", Debug::BreakReason::BRK_CONTINUE)
       .value("BRK_ADDRESS_EXECUTED", Debug::BreakReason::BRK_ADDRESS_EXECUTED)
       .value("BRK_ADDRESS_READ", Debug::BreakReason::BRK_ADDRESS_READ)
       .value("BRK_ADDRESS_WRITTEN", Debug::BreakReason::BRK_ADDRESS_WRITTEN)
+      .value("BRK_EVENT_QUEUED", Debug::BreakReason::BRK_EVENT_QUEUED)
       .value("BRK_STEP_CLOCK_CYCLE", Debug::BreakReason::BRK_STEP_CLOCK_CYCLE)
       .value("BRK_STEP_INSTRUCTION", Debug::BreakReason::BRK_STEP_INSTRUCTION)
       .value("BRK_STEP_SCANLINE", Debug::BreakReason::BRK_STEP_SCANLINE)
@@ -140,9 +150,21 @@ static void bind_debugger(const py::module_ &m) {
       .def("to_string", &Debug::Breakpoint::to_string);
   py::class_<Debug::Debugger>(m, "Debugger")
       .def(py::init<std::function<Debug::BreakReason(Debug::Context)>>(), py::arg("callback"))
-      .def("breakpoint_add", &Debug::Debugger::breakpoint_add, py::arg("addr"), py::arg("reason"))
-      .def("breakpoint_del", &Debug::Debugger::breakpoint_del, py::arg("addr"))
-      .def("get_breakpoints", &Debug::Debugger::get_breakpoints);
+      .def("breakpoint_add_event",
+           static_cast<void (Debug::Debugger::*)(event, Debug::BreakReason)>(
+               &Debug::Debugger::breakpoint_add),
+           py::arg("event"), py::arg("reason"))
+      .def("breakpoint_add_addr",
+           static_cast<void (Debug::Debugger::*)(addr_t, Debug::BreakReason)>(
+               &Debug::Debugger::breakpoint_add),
+           py::arg("addr"), py::arg("reason"))
+      .def("breakpoint_del_event",
+           static_cast<void (Debug::Debugger::*)(event)>(&Debug::Debugger::breakpoint_del),
+           py::arg("event"))
+      .def("breakpoint_del_addr",
+           static_cast<void (Debug::Debugger::*)(addr_t)>(&Debug::Debugger::breakpoint_del),
+           py::arg("addr"))
+      .def("get_rwe_breakpoints", &Debug::Debugger::get_rwe_breakpoints);
 }
 
 static void bind_gbc(const py::module_ &m) {
