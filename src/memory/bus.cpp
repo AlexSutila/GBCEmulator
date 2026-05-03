@@ -11,8 +11,10 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <optional>
+#include <random>
 #include <stdexcept>
 
 constexpr std::size_t vram_bank_size = 0x2000;
@@ -25,6 +27,14 @@ constexpr std::size_t oam_size = 0xA0;
 constexpr addr_t VRAM_MASK = 0x1FFF;
 constexpr addr_t WRAM_MASK = 0x0FFF;
 constexpr addr_t HRAM_MASK = 0x007F;
+
+template <typename T>
+std::unique_ptr<T[]> make_random(std::uniform_int_distribution<T> &dist, std::mt19937 &rng,
+                                 std::size_t size) {
+  auto p = std::make_unique<T[]>(size);
+  std::generate_n(p.get(), size, [&]() { return dist(rng); });
+  return p;
+}
 
 template <typename T> std::unique_ptr<T[]> make_zeroed(std::size_t size) {
   auto p = std::make_unique<T[]>(size);
@@ -114,13 +124,16 @@ AddressBus::AddressBus(runtime_sys_info &sys, SystemScheduler &g_sched,
       bios_(bios),          // Optionally configured by frontend
       sys_(sys)             // Generic system information
 {
+  static thread_local std::mt19937 rng(std::random_device{}());
+  std::uniform_int_distribution<byte_t> dist(std::numeric_limits<byte_t>::min(),
+                                             std::numeric_limits<byte_t>::max());
   using mmio = IORegisterMapping;
   using namespace std::ranges;
 
   /* Initialize banked and non-banked memory */
+  generate(wram, [&] { return make_random<byte_t>(dist, rng, wram_bank_size); });
   generate(vram, [&] { return make_zeroed<byte_t>(vram_bank_size); });
-  generate(wram, [&] { return make_zeroed<byte_t>(wram_bank_size); });
-  hram = make_zeroed<byte_t>(hram_size);
+  hram = make_random<byte_t>(dist, rng, hram_size);
   oam = make_zeroed<byte_t>(oam_size);
   bus_conflicts = BUS_CONFLICT_NONE;
 
