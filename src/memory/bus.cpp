@@ -121,6 +121,7 @@ AddressBus::AddressBus(runtime_sys_info &sys, SystemScheduler &g_sched,
     : Debuggable(debugger), // Bus read/write breakpoints
       key0(sys),            // Controls backwards compatability
       key1(sys),            // Controls clock speed mode
+      undocFF74(sys),       // Undocumented, behaves differently in CGB mode
       bios_(bios),          // Optionally configured by frontend
       sys_(sys)             // Generic system information
 {
@@ -144,6 +145,12 @@ AddressBus::AddressBus(runtime_sys_info &sys, SystemScheduler &g_sched,
   connect_mmio(static_cast<addr_t>(mmio::MMIO_VRAM_BANK), &vram_bank_ctrl);
   connect_mmio(static_cast<addr_t>(mmio::MMIO_SPD_KEY0), &key0);
   connect_mmio(static_cast<addr_t>(mmio::MMIO_SPD_KEY1), &key1);
+
+  /* Connect undocumented memory mapped IO owned by ??? */
+  connect_mmio(static_cast<addr_t>(mmio::MMIO_UNDOC_FF72), &undocFF72);
+  connect_mmio(static_cast<addr_t>(mmio::MMIO_UNDOC_FF73), &undocFF73);
+  connect_mmio(static_cast<addr_t>(mmio::MMIO_UNDOC_FF74), &undocFF74);
+  connect_mmio(static_cast<addr_t>(mmio::MMIO_UNDOC_FF75), &undocFF75);
 }
 
 void AddressBus::connect_mmio(const addr_t addr, MMIORegister *const reg) {

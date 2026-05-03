@@ -135,6 +135,12 @@ private:
   WramBank wram_bank_ctrl{};
   BootROMCtrl boot_rom_ctrl{};
 
+  /* Undocumented MMIO registers we emulate for the sake of completionism */
+  MMIORegister undocFF72{};
+  MMIORegister undocFF73{};
+  Undocumented::UndocFF74 undocFF74;
+  Undocumented::UndocFF75 undocFF75{};
+
   /* Denotes who is currently holding onto what address ranges. In the case
    * of bus conflicts, one component will end up reading what we are basically
    * going to be treating as `open bus`. */

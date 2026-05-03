@@ -231,6 +231,7 @@ private:
 };
 
 } // namespace DMA
+
 /*
  * FF70 - SVBK/WBK: WRAM Bank
  *
@@ -247,5 +248,39 @@ public:
   WramBank() : MMIORegister(1) {}
   [[nodiscard]] byte_t get_bank() const;
 };
+
+namespace Undocumented {
+
+/*
+ * FF74 — Bits 0–7 (CGB Mode only)
+ *
+ * In CGB mode, this register is fully readable and writable. Its initial value
+ * is $00. Otherwise, this register is read-only, and locked at value $FF.
+ */
+class UndocFF74 final : public MMIORegister {
+public:
+  UndocFF74(runtime_sys_info &sys) : MMIORegister(0), sys_(sys) {}
+  void write(byte_t value) override;
+  [[nodiscard]] byte_t peek() const override;
+  byte_t read() override;
+
+private:
+  runtime_sys_info &sys_;
+};
+
+/*
+ * FF75 — Bits 4–6 (CGB Mode only)
+ *
+ * Only bits 4, 5 and 6 of this register are read/write enabled. Their initial
+ * value is 0.
+ */
+class UndocFF75 final : public MMIORegister {
+public:
+  UndocFF75() : MMIORegister(0) {}
+  [[nodiscard]] byte_t peek() const override;
+  byte_t read() override;
+};
+
+} // namespace Undocumented
 
 #endif // GBC_MMIO_CGB_HPP

@@ -2,6 +2,7 @@
 #include "emu_types.hpp"
 #include "gbc.hpp"
 #include "memory/dma.hpp"
+#include "memory/mmio/mmio.hpp"
 #include "savestate/codec.hpp"
 
 namespace SYS {
@@ -164,3 +165,21 @@ byte_t WramBank::get_bank() const {
     ++ret;
   return ret;
 }
+
+namespace Undocumented {
+
+void UndocFF74::write(byte_t value) {
+  if (sys_.cgb_mode)
+    MMIORegister::write(value);
+}
+
+byte_t UndocFF74::peek() const {
+  // Usable only in CGB mode, for some reason idk lol
+  return sys_.cgb_mode ? MMIORegister::peek() : 0xFF;
+}
+byte_t UndocFF74::read() { return peek(); }
+
+byte_t UndocFF75::peek() const { return MMIORegister::peek() | 0x8F; }
+byte_t UndocFF75::read() { return MMIORegister::read() | 0x8F; }
+
+} // namespace Undocumented
