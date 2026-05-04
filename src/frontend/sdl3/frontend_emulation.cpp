@@ -50,7 +50,8 @@ SDL3Frontend::build_emulator_instance(
       gui.clear_bios_path();
       gbc = std::make_unique<GameBoyColor>(*this);
     }
-  }
+  } else
+    gbc = std::make_unique<GameBoyColor>(*this);
   gbc->insert_cartridge(cart);
 
   auto *const bus_ptr = gbc->get_bus();
