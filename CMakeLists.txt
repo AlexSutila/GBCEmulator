@@ -61,6 +61,7 @@ set(GBC_CORE_SOURCES
     ${CMAKE_SOURCE_DIR}/src/cart/mbc/tama5.cpp
     ${CMAKE_SOURCE_DIR}/src/cart/mbc/wisdom_tree.cpp
     ${CMAKE_SOURCE_DIR}/src/cart/mbc/ems.cpp
+    ${CMAKE_SOURCE_DIR}/src/cart/mbc/sachen.cpp
     ${CMAKE_SOURCE_DIR}/src/cart/mbc/test_mbc.cpp
     ${CMAKE_SOURCE_DIR}/src/cart/mbc/mbc_factory.cpp
     ${CMAKE_SOURCE_DIR}/src/debugger/breakpoint.cpp

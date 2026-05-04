@@ -22,6 +22,7 @@ std::unique_ptr<Mbc> make_huc3(const cart &c);
 std::unique_ptr<Mbc> make_tama5(const cart &c);
 std::unique_ptr<Mbc> make_wisdom_tree(const cart &c);
 std::unique_ptr<Mbc> make_ems(const cart &c);
+std::unique_ptr<Mbc> make_sachen(const cart &c);
 std::unique_ptr<Mbc> make_test_mbc();
 
 #endif // GBC_MBC_CREATOR_HPP

@@ -1,3 +1,6 @@
+## Sun May  3 08:50:06 PM MST 2026 (+1 component)
+- C_MBC_SACHEN added, other enumeration values will have shifted
+
 ## Fri May  1 02:28:09 PM MST 2026 (~2 components)
 - C_OAM_DMA refactored completely for scheduler, fields changed accordingly
 - C_VDMA refactored completely for scheduler, fields changed accordingly

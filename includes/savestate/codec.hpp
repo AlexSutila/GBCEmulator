@@ -27,6 +27,7 @@ enum ChunkTags : std::uint16_t {
 
   C_CART,
   C_MBC_EMS,
+  C_MBC_SACHEN,
   C_MBC_HUC1,
   C_MBC_HUC3,
   C_MBC_M161,

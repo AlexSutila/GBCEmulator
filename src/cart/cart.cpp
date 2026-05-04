@@ -5,6 +5,7 @@
 #include "savestate/codec.hpp"
 
 #include <algorithm>
+#include <array>
 #include <bitset>
 #include <cstring>
 #include <fstream>
@@ -298,14 +299,53 @@ static bool maybe_mbc1m(const std::span<const byte_t> rom) {
   return false;
 }
 
+// They jumble the header on these cartridges, so we have to undo it. If we
+// read off a valid checksum for the nintento logo, we ball c:
+static bool maybe_sachen(const cart &c, const std::span<const byte_t> rom) {
+  std::array<byte_t, 0x14F> unborked_header{};
+  if (c.header_checksum_ok)
+    return false; // Lmao
+
+  // We attempt to first unscramble the header found on the cartridge itself
+  for (std::size_t addr{0}; addr < unborked_header.size(); ++addr) {
+    addr_t unjumbled_addr = sachen_jumble(addr);
+    unborked_header.at(addr) = rom[unjumbled_addr];
+  }
+
+  // Checks if the unjumbled bytes are a valid nintendo logo (this feels wrong)
+  return compute_header_checksum(unborked_header, 0) == unborked_header[0x014D];
+}
+
 SpecialMbc detect_special_mbc(const cart &c) {
+  const auto cart_type = Debug::hex8(c.header.cartridge_type, true);
+
+  // Sachen MMC2 jumbles the cartridge header to avoid getting sued so it is
+  // guaranteed to fail the header checksum basically every single time
+  if (!c.header_checksum_ok) {
+    switch (c.header.cartridge_type) {
+    case 0x00:
+    case 0x01:
+    case 0x31:
+    case 0x40:
+    case 0xC2:
+    case 0xFA:
+    case 0xFF:
+      if (maybe_sachen(c, c.rom_span())) {
+        Logger::push(LogLevel::Info, "ROM", "Mapper override",
+                     IroGB::format("{} fails header checksum but meets criteria"
+                                   "with Sachen MMC2 unscramble; forcing Sachen.",
+                                   cart_type));
+        return Sachen_t;
+      }
+    }
+  }
+
   switch (c.header.cartridge_type) {
   case 0x00: { // ROM ONLY, but some WT/M161 carts lie about this, we
                // investigate further
     if (c.rom_size() <= 0x8000)
       return NotSpecial_t; // If strictly <= 32KiB, it's probably safe
     if (c.header.title() == "WISDOM TREE" || maybe_wisdom_tree(c.rom_span())) {
-      const auto cart_type = Debug::hex8(c.header.cartridge_type, true);
       Logger::push(LogLevel::Info, "ROM", "Mapper override",
                    IroGB::format("{} header type {} looks inconsistent with "
                                  "ROM size {} and appears to be WT; "
@@ -314,7 +354,6 @@ SpecialMbc detect_special_mbc(const cart &c) {
       return WisdomTree_t;
     }
     if (maybe_m161(c.rom_span())) {
-      const auto cart_type = Debug::hex8(c.header.cartridge_type, true);
       Logger::push(LogLevel::Info, "ROM", "Mapper override",
                    IroGB::format("{} header type {} looks inconsistent with "
                                  "ROM size {} and appears to be M161; "
@@ -328,7 +367,6 @@ SpecialMbc detect_special_mbc(const cart &c) {
   case 0x02:
   case 0x03: // MBC1M possibility
     if (maybe_mbc1m(c.rom_span())) {
-      const auto cart_type = Debug::hex8(c.header.cartridge_type, true);
       Logger::push(LogLevel::Info, "ROM", "Mapper override",
                    IroGB::format("{} header type {} looks inconsistent with "
                                  "ROM size {} and appears to be MBC1M; "
