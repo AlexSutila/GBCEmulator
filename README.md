@@ -48,6 +48,7 @@ IroGB supports most official and unofficial memory bank controllers (MBCs) that 
 - HuC3
 - TAMA5
 - EMS
+- Sachen/MMC2
 - Wisdom Tree
 
 ## Accuracy
