@@ -22,6 +22,7 @@ from .gbc_py import (
     # Enumerations
     SchedulerComponent,
     BreakReason,
+    SpecialMbc,
     StatModes,
 )
 
@@ -33,6 +34,7 @@ __all__ = [
     # Enumerations
     "SchedulerComponent",
     "BreakReason",
+    "SpecialMbc",
     "StatModes",
     # Cartridge sources
     "Cartridge",

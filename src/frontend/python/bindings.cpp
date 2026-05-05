@@ -1,3 +1,4 @@
+#include "cart/cart.hpp"
 #include "debugger/breakpoint.hpp"
 #include "emu_types.hpp"
 #include "frontend/python/testing.hpp"
@@ -21,6 +22,7 @@ static void bind_cart(py::module_ &m) {
       .def_readonly("declared_ram_bytes", &cart::declared_ram_bytes)
       .def_readonly("header_checksum_ok", &cart::header_checksum_ok)
       .def_readonly("global_checksum_ok", &cart::global_checksum_ok)
+      .def_readonly("special_mbc", &cart::special_mbc)
       .def_property_readonly(
           "rom",
           [](const cart &c) {
@@ -47,6 +49,19 @@ static void bind_cart(py::module_ &m) {
       .def("cgb_flag", &rom_header::cgb_flag)
       .def("title", &rom_header::title)
       .def("manufacturer_code", &rom_header::manufacturer_code);
+
+  // For evaluating additional mapper detection heuristic
+  py::enum_<SpecialMbc>(m, "SpecialMbc")
+      .value("NotSpecial", SpecialMbc::NotSpecial_t)
+      .value("MBC1M", SpecialMbc::MBC1M_t)
+      .value("MBC30", SpecialMbc::MBC30_t)
+      .value("MMM01", SpecialMbc::MMM01_t)
+      .value("M161", SpecialMbc::M161_t)
+      .value("WisdomTree", SpecialMbc::WisdomTree_t)
+      .value("Bung", SpecialMbc::Bung_t)
+      .value("EMS", SpecialMbc::EMS_t)
+      .value("Sachen", SpecialMbc::Sachen_t)
+      .export_values();
 
   // For content loading
   m.def(
