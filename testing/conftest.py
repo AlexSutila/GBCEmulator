@@ -21,6 +21,15 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "heuristic: requires --db and --roms")
 
 
+@pytest.fixture(scope="session")
+def rom_paths(request):
+    roms_path = request.config.getoption("roms")
+    if not roms_path:
+        pytest.exit("--roms is required", returncode=1)
+    roms_path = Path(roms_path)
+    return list(roms_path.glob("gb*/*.gb*"))
+
+
 def pytest_generate_tests(metafunc):
     if "case" not in metafunc.fixturenames:
         return
