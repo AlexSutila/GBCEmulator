@@ -71,7 +71,7 @@ public:
 
   void schedule_event_in(time_type in_cycles, event e);
   void schedule_event_on(time_type cycle, event e);
-  bool unschedule_event(event e) const;
+  bool unschedule_event(event e);
 
 private:
   struct Implementation;
@@ -87,23 +87,23 @@ public:
   ~ChildScheduler();
 
   template <typename EventIdType>
-  void schedule_event_in(time_type in_cycles, EventIdType event_id) const {
+  void schedule_event_in(time_type in_cycles, EventIdType event_id) {
     schedule_event_in_impl(in_cycles, static_cast<unsigned>(event_id));
   }
 
   template <typename EventIdType>
-  void schedule_event_on(time_type cycle, EventIdType event_id) const {
+  void schedule_event_on(time_type cycle, EventIdType event_id) {
     schedule_event_on_impl(cycle, static_cast<unsigned>(event_id));
   }
 
-  template <typename EventIdType> bool unschedule_event(EventIdType event_id) const {
+  template <typename EventIdType> bool unschedule_event(EventIdType event_id) {
     return unschedule_event_impl(static_cast<unsigned>(event_id));
   }
 
 private:
-  void schedule_event_in_impl(time_type in_cycles, unsigned event_id) const;
-  void schedule_event_on_impl(time_type cycle, unsigned event_id) const;
-  bool unschedule_event_impl(unsigned event_id) const;
+  void schedule_event_in_impl(time_type in_cycles, unsigned event_id);
+  void schedule_event_on_impl(time_type cycle, unsigned event_id);
+  bool unschedule_event_impl(unsigned event_id);
 
   const SchedulerComponent component_id;
   SystemScheduler &g_sched;

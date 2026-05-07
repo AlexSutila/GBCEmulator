@@ -16,8 +16,8 @@ struct event_sequencer {
     const auto time_a = std::get<0>(a), time_b = std::get<0>(b);
     const auto ord_a = std::get<1>(a), ord_b = std::get<1>(b);
     if (time_a != time_b) [[likely]]
-      return time_a > time_b;
-    return ord_a > ord_b;
+      return time_a < time_b;
+    return ord_a < ord_b;
   }
 };
 
@@ -36,12 +36,22 @@ public:
   std::map<event, event_time> e_index; // Ordering does not matter
 
   bool try_unqueue(event e) {
-    if (e_index.empty())
+    auto it = e_index.find(e);
+    if (it == e_index.end())
       return false;
 
-    auto it = e_index.find(e); // Locate event time
-    const event_time &t = it->second;
-    return e_queue.erase(t) > 0;
+    const event_time t = it->second;
+    auto itq = e_queue.find(t);
+
+    // This should not happen, but clean up just in case
+    if (itq == e_queue.end()) [[unlikely]] {
+      e_index.erase(it);
+      return false;
+    }
+
+    e_queue.erase(itq);
+    e_index.erase(it);
+    return true;
   }
 
   // We want to note the time at which the event was queued, the handling of
@@ -54,7 +64,7 @@ public:
   // Pop for event handling
   event pop() {
     auto it = e_queue.begin();
-    const auto &[t, e] = *it;
+    const auto [t, e] = *it;
 
     /* Important note, multiple events which were queued up over a wide range
      * of cycle may all be handled on the same cycle, hence we show the time
@@ -115,11 +125,12 @@ public:
   }
 
   void from_vec(std::vector<SavedScheduledEvent> &vec) {
+    e_queue.clear();
+    e_index.clear();
+
     for (auto s : vec) {
       const event_time t = {s.event_time, s.event_ord};
       const event e = {s.comp_id, s.event_id};
-      e_queue.clear();
-      e_index.clear();
 
       // Restoring is more compex because we have to restore the mapping
       // and the reverse mapping for seamless scheduling and unscheduling.
@@ -129,7 +140,6 @@ public:
 
 private:
   void queue(event_time t, event e) {
-    try_brk(std::get<0>(t), e, Debug::BreakReason::BRK_EVENT_QUEUED);
     e_queue.insert({t, e});
     e_index.insert({e, t});
   }
@@ -210,7 +220,7 @@ void SystemScheduler::schedule_event_on(time_type cycle, event e) {
   impl->queue(sys.elapsed_clocks, t, e);
 }
 
-bool SystemScheduler::unschedule_event(event e) const { return impl->try_unqueue(e); }
+bool SystemScheduler::unschedule_event(event e) { return impl->try_unqueue(e); }
 
 /* ======================================================================
  * Child (per-component) scheduler implementation
@@ -220,17 +230,17 @@ ChildScheduler::ChildScheduler(SystemScheduler &global_sched, SchedulerComponent
     : component_id(component_id), g_sched(global_sched) {}
 ChildScheduler::~ChildScheduler() = default;
 
-void ChildScheduler::schedule_event_in_impl(time_type in_cycles, unsigned event_id) const {
+void ChildScheduler::schedule_event_in_impl(time_type in_cycles, unsigned event_id) {
   const event e = std::make_tuple(component_id, event_id);
   g_sched.schedule_event_in(in_cycles, e);
 }
 
-void ChildScheduler::schedule_event_on_impl(time_type cycle, unsigned event_id) const {
+void ChildScheduler::schedule_event_on_impl(time_type cycle, unsigned event_id) {
   const event e = std::make_tuple(component_id, event_id);
   g_sched.schedule_event_on(cycle, e);
 }
 
-bool ChildScheduler::unschedule_event_impl(unsigned event_id) const {
+bool ChildScheduler::unschedule_event_impl(unsigned event_id) {
   const event e = std::make_tuple(component_id, event_id);
   return g_sched.unschedule_event(e);
 }
