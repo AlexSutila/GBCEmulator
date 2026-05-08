@@ -79,6 +79,7 @@ public:
   // Comes from our internal core logging utility, we clear the queue out and push
   // all events which have popped up onto the screen as a libretro message.
   void show_message(std::string msg, unsigned millis, retro_log_level level);
+  void log(std::string msg, unsigned millis, retro_log_level level);
   void clean_msg_queue();
 
 private:

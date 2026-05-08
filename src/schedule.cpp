@@ -1,6 +1,7 @@
 #include "schedule.hpp"
 #include "debugger/breakpoint.hpp"
 #include "debugger/debugger.hpp"
+#include "frontend/logger.hpp"
 #include "gbc.hpp"
 #include "memory/dma.hpp"
 #include "savestate/codec.hpp"
@@ -8,6 +9,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <sstream>
 #include <stdexcept>
 #include <tuple>
 
@@ -20,6 +22,32 @@ struct event_sequencer {
     return ord_a < ord_b;
   }
 };
+
+/* ======================================================================
+ * Convenience configurable debug logging
+ * ====================================================================== */
+#define SCHED_LOG_ENABLED // WARNING: May clutter logs, leave undefined unless debugging
+
+#ifdef SCHED_LOG_ENABLED
+static void sched_log(const char *message, const char *summary, event e, event_time t) {
+  const auto [comp_id, event_id] = e;
+  const auto [time, ord] = t;
+  std::ostringstream oss{};
+
+  oss << message << ": (" << static_cast<unsigned>(comp_id) << "," << event_id << ") @ (" << time
+      << "," << ord << ")";
+  Logger::push(LogLevel::Debug, "sched", std::string(summary), oss.str());
+}
+
+#define LOG_UNQUEUE(message, e, t) sched_log(message, "unqueue", e, t)
+#define LOG_QUEUE(message, e, t) sched_log(message, "queue", e, t)
+#define LOG_HANDLE(message, e, t) sched_log(message, "handle", e, t)
+
+#else
+#define LOG_UNQUEUE(message, e, t)
+#define LOG_QUEUE(message, e, t)
+#define LOG_HANDLE(message, e, t)
+#endif // SCHED_LOG_ENABLED
 
 /* ======================================================================
  * Global system scheduler implementation
@@ -41,6 +69,7 @@ public:
       return false;
 
     const event_time t = it->second;
+    LOG_UNQUEUE("event_unqueued", e, t);
     auto itq = e_queue.find(t);
 
     // This should not happen, but clean up just in case
@@ -58,6 +87,7 @@ public:
   // the event can be observed through `Debug::BreakReason::BRK_EVENT_POPPED`
   void queue(time_type queued_at, event_time t, event e) {
     try_brk(queued_at, e, Debug::BreakReason::BRK_EVENT_QUEUED);
+    LOG_QUEUE("event_queued", e, t);
     queue(t, e);
   }
 
@@ -71,6 +101,7 @@ public:
      * which the event should have been handled. */
     const time_type popped_at = std::get<0>(t);
     try_brk(popped_at, e, Debug::BreakReason::BRK_EVENT_POPPED);
+    LOG_HANDLE("event_handled", e, t);
 
     e_queue.erase(it);
     e_index.erase(e);

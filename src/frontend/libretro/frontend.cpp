@@ -181,17 +181,22 @@ void LibretroFrontend::try_poll_input() {
 }
 
 void LibretroFrontend::show_message(std::string msg, unsigned millis, retro_log_level level) {
+  const retro_message_target target =
+      level == RETRO_LOG_DEBUG ? RETRO_MESSAGE_TARGET_LOG : RETRO_MESSAGE_TARGET_ALL;
+
   retro_message_ext ext = {
       .msg = msg.c_str(),
       .duration = millis,
       .priority = 0,
       .level = level,
-      .target = RETRO_MESSAGE_TARGET_ALL,
+      .target = target,
       .type = RETRO_MESSAGE_TYPE_NOTIFICATION,
       .progress = 0,
   };
   get_callbacks().environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE_EXT, &ext);
 }
+
+void LibretroFrontend::log(std::string msg, unsigned millis, retro_log_level level) {}
 
 void LibretroFrontend::clean_msg_queue() {
   const auto message_queue = Logger::consume();
@@ -200,12 +205,24 @@ void LibretroFrontend::clean_msg_queue() {
 
   for (const auto &msg : message_queue) {
     retro_log_level level{};
-    if (msg.level == LogLevel::Warning)
+
+    switch (msg.level) {
+    case LogLevel::Debug:
+      level = RETRO_LOG_DEBUG;
+      break;
+    case LogLevel::Info:
       level = RETRO_LOG_INFO;
-    else if (msg.level == LogLevel::Error)
+      break;
+    case LogLevel::Status:
+      level = RETRO_LOG_INFO;
+      break;
+    case LogLevel::Warning:
+      level = RETRO_LOG_WARN;
+      break;
+    case LogLevel::Error:
       level = RETRO_LOG_ERROR;
-    else
-      level = RETRO_LOG_INFO;
+      break;
+    }
     show_message(msg.message, msg_duration_sec(5), level);
   }
 }
