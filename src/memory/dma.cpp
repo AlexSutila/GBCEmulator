@@ -47,8 +47,9 @@ template void ObjAttrDMA::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
 template void ObjAttrDMA::parse_savestate<Savestate::Checker>(Savestate::Checker &);
 
 ObjAttrDMA::ObjAttrDMA(AddressBus &bus, runtime_sys_info &sys, SystemScheduler &g_sched)
-    : dma_(*this), sched(g_sched, SchedulerComponent::SCHED_COMPONENT_OAM_DMA), bus_(bus),
-      sys_(sys) {
+    : dma_(*this), sched(g_sched, SchedulerComponent::SCHED_COMPONENT_OAM_DMA,
+                         static_cast<std::size_t>(ObjAttrDMA::SchedulerEvent::EVENT_COUNT)),
+      bus_(bus), sys_(sys) {
   bus.connect_mmio(static_cast<addr_t>(IORegisterMapping::MMIO_OAM_DMA), &dma_);
   src_base_addr = data_offset = 0;
 }
@@ -155,8 +156,9 @@ template void VDMA::parse_savestate<Savestate::Checker>(Savestate::Checker &);
 VDMA::VDMA(AddressBus &bus, PixelProcessingUnit &ppu, runtime_sys_info &sys,
            SystemScheduler &g_sched)
     : vdma1_(0xFF), vdma2_(0xF0), vdma3_(0xFF), vdma4_(0xF0), vdma5_(*this),
-      sched(g_sched, SchedulerComponent::SCHED_COMPONENT_VRAM_DMA), bus_(bus), ppu_(ppu),
-      sys_(sys) {
+      sched(g_sched, SchedulerComponent::SCHED_COMPONENT_VRAM_DMA,
+            static_cast<std::size_t>(VDMA::SchedulerEvent::EVENT_COUNT)),
+      bus_(bus), ppu_(ppu), sys_(sys) {
   bytes_to_transfer = bytes_transferred = 0;
   hdma_pending = false;
 
