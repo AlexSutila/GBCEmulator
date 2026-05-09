@@ -20,7 +20,7 @@
  * accuracy guarantees. We will not expose the debugging capability through LibRetro, so
  * this can be used to toggle between the 'fast' and 'slow' ways of driving the emulator
  */
-#define USE_BIGSTEP 1
+#define USE_BIGSTEP 0
 
 // TODO: In case libretro logging breaks, we might want this to fall back to std::cerr?
 static void fallback_log(enum retro_log_level level, const char *fmt, ...) {}
