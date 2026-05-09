@@ -5,6 +5,8 @@
 #include "memory/dma.hpp"
 #include "savestate/codec.hpp"
 #include <algorithm>
+#include <cassert>
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <queue>
@@ -23,18 +25,6 @@ constexpr std::size_t queue_size_upper_bound() {
   return static_cast<std::size_t>(ObjAttrDMA::SchedulerEvent::EVENT_COUNT) +
          static_cast<std::size_t>(VDMA::SchedulerEvent::EVENT_COUNT);
 }
-
-template <typename T> void SystemScheduler::parse_savestate(T &t) {
-  constexpr auto version = 1; // Schema revision
-  t.chunk_header(version, Savestate::C_SCHEDULER);
-  // TODO: Need to rework this again lol
-  t.eof();
-}
-
-template void SystemScheduler::parse_savestate<Savestate::Writer>(Savestate::Writer &);
-template void SystemScheduler::parse_savestate<Savestate::Reader>(Savestate::Reader &);
-template void SystemScheduler::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
-template void SystemScheduler::parse_savestate<Savestate::Checker>(Savestate::Checker &);
 
 struct SchedNode {
   event_time t;
@@ -64,6 +54,13 @@ public:
     // Need to restructure the heap after removal
     std::make_heap(vec.begin(), vec.end(), this->comp);
   }
+
+  void load_vec(std::vector<SchedNode> vec) {
+    this->c = std::move(vec);
+    std::make_heap(this->c.begin(), this->c.end(), this->comp);
+  }
+
+  std::vector<SchedNode> as_vec() const { return this->c; }
 };
 
 /* ======================================================================
@@ -106,9 +103,54 @@ public:
     return std::get<0>(t);
   }
 
+  // For serialization / deserialization
+  void load_vec(std::vector<SchedNode> &vec) { e_queue.load_vec(vec); }
+  std::vector<SchedNode> as_vec() const { return e_queue.as_vec(); }
+
 private:
   SchedQueue e_queue;
 };
+
+template <typename T> void SystemScheduler::parse_savestate(T &t) {
+  constexpr auto version = 2; // Schema revision
+  enum : std::uint16_t {
+    F_EVENT_QUEUE,
+    F_ORD,
+  };
+  t.chunk_header(version, Savestate::C_SCHEDULER);
+
+  constexpr auto max_size = queue_size_upper_bound();
+  std::vector<SchedNode> event_vec{}; // Temporary queue state representation
+
+  // If we are writing, use existing state
+  if (t.op() == Savestate::OP_WRITE)
+    event_vec = impl->as_vec();
+
+  // Serialize event queue under upper bound queue length assumption
+  t.field_vector(F_EVENT_QUEUE, event_vec, max_size, [&](T &t, auto &s) {
+    auto [comp_id, event_id] = s.e;
+    auto [time, ord] = s.t;
+
+    // Write fields directly rather than serializing a struct so we dont deal with wasted
+    // bytes caused by padding. Be careful, this must lie with `max_bytes`.
+    t.field_generic(0, comp_id);
+    t.field_generic(1, event_id);
+    t.field_generic(2, time);
+    t.field_generic(3, ord);
+  });
+
+  // If we are reading, use new state. Make sure stale metadata is cleared.
+  if (t.op() == Savestate::OP_READ)
+    impl->load_vec(event_vec);
+
+  t.field_generic(F_ORD, ord);
+  t.eof();
+}
+
+template void SystemScheduler::parse_savestate<Savestate::Writer>(Savestate::Writer &);
+template void SystemScheduler::parse_savestate<Savestate::Reader>(Savestate::Reader &);
+template void SystemScheduler::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
+template void SystemScheduler::parse_savestate<Savestate::Checker>(Savestate::Checker &);
 
 SystemScheduler::SystemScheduler(std::optional<Debug::Debugger> &debugger_, runtime_sys_info &sys_)
     : impl(std::make_unique<SystemScheduler::Implementation>(debugger_)), // PIMPL
@@ -139,8 +181,12 @@ event_time SystemScheduler::schedule_event_on(time_type cycle, event e) {
 
 bool SystemScheduler::unschedule_event(event_time t) {
   auto [time, ord] = t;
-  if (time < sys.elapsed_clocks)
+  if (time < sys.elapsed_clocks) {
+    // It is too late to unschedule this event. We leave the stale entry because its
+    // more efficient to do so, rather than needing a reverse mapping in the system
+    // scheduler to remove it.
     return false;
+  }
 
   impl->unqueue(t);
   return true;
@@ -167,9 +213,48 @@ public:
     return ret;
   }
 
+  // For serialization / deserialization
+  void load_vec(std::vector<LookupVal> &vec) { e_index = std::move(vec); }
+  std::vector<LookupVal> as_vec() const { return e_index; }
+
 private:
   std::vector<LookupVal> e_index;
 };
+
+// We pass in the size so we can garuntee the sizes of the vectors match
+template <typename T> void ChildScheduler::parse_savestate(T &t, std::size_t num_events) {
+  std::vector<Implementation::LookupVal> vec(num_events, std::nullopt);
+  enum : std::uint16_t { F_TIME, F_ORD };
+
+  // If we are writing, use existing state
+  if (t.op() == Savestate::OP_WRITE) {
+    vec = impl->as_vec(); // Should always match num_events
+    assert(vec.size() == num_events);
+  }
+
+  // The indices should align with the components event ID enum values
+  for (std::size_t event_id{0}; event_id < num_events; ++event_id) {
+    t.field_optional(event_id, vec.at(event_id), [&](T &t, auto &s) {
+      auto &[time, ord] = s;
+      t.field_generic(F_TIME, time);
+      t.field_generic(F_ORD, ord);
+    });
+  }
+
+  // If we are reading, use new state. Make sure stale metadata is cleared.
+  if (t.op() == Savestate::OP_READ) {
+    assert(vec.size() == num_events);
+    impl->load_vec(vec);
+  }
+
+  t.eof();
+}
+
+template void ChildScheduler::parse_savestate<Savestate::Writer>(Savestate::Writer &, std::size_t);
+template void ChildScheduler::parse_savestate<Savestate::Reader>(Savestate::Reader &, std::size_t);
+template void ChildScheduler::parse_savestate<Savestate::Sizer>(Savestate::Sizer &, std::size_t);
+template void ChildScheduler::parse_savestate<Savestate::Checker>(Savestate::Checker &,
+                                                                  std::size_t);
 
 ChildScheduler::ChildScheduler(SystemScheduler &global_sched, SchedulerComponent component_id,
                                const std::size_t num_events)

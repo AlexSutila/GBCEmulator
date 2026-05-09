@@ -64,7 +64,7 @@ public:
   SystemScheduler(std::optional<Debug::Debugger> &debugger_, runtime_sys_info &sys_);
   ~SystemScheduler();
 
-  // Serialization gets hairy, see implementation file for details
+  // Main system scheduler needs to recover the global event queue
   template <typename T> void parse_savestate(T &t);
   std::optional<time_type> peek_next_cycle() const;
   event pop_next_event();
@@ -86,6 +86,11 @@ public:
   ChildScheduler(SystemScheduler &global_sched, SchedulerComponent component_id,
                  const std::size_t num_events);
   ~ChildScheduler();
+
+  // Child scheduler needs to recover its event lookup vector used for unscheduling. We
+  // do not assign these chunk headers, as the structure is rather simple, and should be
+  // called by the owning component and serialized as a complex field.
+  template <typename T> void parse_savestate(T &t, std::size_t num_events);
 
   template <typename EventIdType>
   void schedule_event_in(time_type in_cycles, EventIdType event_id) {

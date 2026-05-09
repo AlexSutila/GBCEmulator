@@ -107,6 +107,17 @@ public:
       write<bool>(false);
   }
 
+  template <typename T, typename Fn>
+  void field_optional(const std::uint16_t tag, std::optional<T> &val, Fn &&fn) {
+    write<std::uint16_t>(tag);
+
+    const bool present = val.has_value();
+    if (present) {
+      fn(*this, *val);
+      eof();
+    }
+  }
+
   void eof() { write<std::uint16_t>(C_EOF); }
 
   void chunk_header(const std::uint16_t version, const std::uint16_t tag) {
@@ -182,6 +193,18 @@ public:
     if (read<bool>())
       val = read<T>();
     else
+      val.reset();
+  }
+
+  template <typename T, typename Fn>
+  void field_optional(const std::uint16_t tag, std::optional<T> &val, Fn &&fn) {
+    check_tag(tag);
+
+    if (read<bool>()) {
+      val.emplace();
+      fn(*this, *val);
+      eof();
+    } else
       val.reset();
   }
 
@@ -277,6 +300,17 @@ public:
       skip<T>();
   }
 
+  template <typename T, typename Fn>
+  void field_optional(const std::uint16_t tag, std::optional<T> &val, Fn &&fn) {
+    check_tag(tag);
+
+    if (read<bool>()) {
+      T dummy{};
+      fn(*this, dummy);
+      eof();
+    }
+  }
+
   void eof() { check_tag(C_EOF); }
 
   void chunk_header(const std::uint16_t version, const std::uint16_t tag) {
@@ -363,6 +397,15 @@ public:
     parse<T>();
   }
 
+  template <typename T, typename Fn>
+  void field_optional(const std::uint16_t tag, std::optional<T> &val, Fn &&fn) {
+    parse<std::uint16_t>();
+    parse<bool>();
+
+    T dummy{};
+    fn(*this, dummy);
+    eof();
+  }
   void eof() { parse<std::uint16_t>(); }
 
   void chunk_header(const std::uint16_t version, const std::uint16_t tag) {
