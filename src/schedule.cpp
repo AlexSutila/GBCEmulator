@@ -9,6 +9,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <ostream>
 #include <sstream>
 #include <stdexcept>
 #include <tuple>
@@ -29,24 +30,31 @@ struct event_sequencer {
 #define SCHED_LOG_ENABLED // WARNING: May clutter logs, leave undefined unless debugging
 
 #ifdef SCHED_LOG_ENABLED
-static void sched_log(const char *message, const char *summary, event e, event_time t) {
+#define LOG_UNQUEUE(message, e, t, sys) sched_log(message, "unqueue", e, t, sys)
+#define LOG_QUEUE(message, e, t, sys) sched_log(message, "queue", e, t, sys)
+#define LOG_HANDLE(message, e, t, sys) sched_log(message, "handle", e, t, sys)
+
+static inline std::ostream &operator<<(std::ostream &os, const runtime_sys_info &sys) {
+  return os << "{ clocks=" << sys.elapsed_clocks << ", vdma=" << sys.vdma_active
+            << ", halt=" << sys.halted << ", ds=" << sys.double_speed
+            << ", arm=" << sys.speed_switch_armed << ", cgb=" << sys.cgb_mode << " }";
+}
+
+static inline void sched_log(const char *message, const char *summary, event e, event_time t,
+                             const runtime_sys_info &sys) {
   const auto [comp_id, event_id] = e;
   const auto [time, ord] = t;
   std::ostringstream oss{};
 
   oss << message << ": (" << static_cast<unsigned>(comp_id) << "," << event_id << ") @ (" << time
-      << "," << ord << ")";
+      << "," << ord << ") - " << sys;
   Logger::push(LogLevel::Debug, "sched", std::string(summary), oss.str());
 }
 
-#define LOG_UNQUEUE(message, e, t) sched_log(message, "unqueue", e, t)
-#define LOG_QUEUE(message, e, t) sched_log(message, "queue", e, t)
-#define LOG_HANDLE(message, e, t) sched_log(message, "handle", e, t)
-
 #else
-#define LOG_UNQUEUE(message, e, t)
-#define LOG_QUEUE(message, e, t)
-#define LOG_HANDLE(message, e, t)
+#define LOG_UNQUEUE(message, e, t, sys)
+#define LOG_QUEUE(message, e, t, sys)
+#define LOG_HANDLE(message, e, t, sys)
 #endif // SCHED_LOG_ENABLED
 
 /* ======================================================================
@@ -57,7 +65,8 @@ static void sched_log(const char *message, const char *summary, event e, event_t
 // we really do not care much about ordering, not as much as mapping at least.
 struct SystemScheduler::Implementation : public Debug::Debuggable {
 public:
-  Implementation(std::optional<Debug::Debugger> &debugger_) : Debug::Debuggable(debugger_) {}
+  Implementation(std::optional<Debug::Debugger> &debugger_, runtime_sys_info &sys)
+      : Debug::Debuggable(debugger_), sys_(sys) {}
   ~Implementation() = default;
 
   std::map<event_time, event, event_sequencer> e_queue;
@@ -69,7 +78,7 @@ public:
       return false;
 
     const event_time t = it->second;
-    LOG_UNQUEUE("event_unqueued", e, t);
+    LOG_UNQUEUE("event_unqueued", e, t, sys_);
     auto itq = e_queue.find(t);
 
     // This should not happen, but clean up just in case
@@ -87,7 +96,7 @@ public:
   // the event can be observed through `Debug::BreakReason::BRK_EVENT_POPPED`
   void queue(time_type queued_at, event_time t, event e) {
     try_brk(queued_at, e, Debug::BreakReason::BRK_EVENT_QUEUED);
-    LOG_QUEUE("event_queued", e, t);
+    LOG_QUEUE("event_queued", e, t, sys_);
     queue(t, e);
   }
 
@@ -101,7 +110,7 @@ public:
      * which the event should have been handled. */
     const time_type popped_at = std::get<0>(t);
     try_brk(popped_at, e, Debug::BreakReason::BRK_EVENT_POPPED);
-    LOG_HANDLE("event_handled", e, t);
+    LOG_HANDLE("event_handled", e, t, sys_);
 
     e_queue.erase(it);
     e_index.erase(e);
@@ -174,10 +183,13 @@ private:
     e_queue.insert({t, e});
     e_index.insert({e, t});
   }
+
+  // Mainly just used for logging purposes
+  const runtime_sys_info &sys_;
 };
 
 SystemScheduler::SystemScheduler(std::optional<Debug::Debugger> &debugger_, runtime_sys_info &sys_)
-    : impl(std::make_unique<SystemScheduler::Implementation>(debugger_)), // PIMPL
+    : impl(std::make_unique<SystemScheduler::Implementation>(debugger_, sys_)), // PIMPL
       sys(sys_), ord(0) {}
 SystemScheduler::~SystemScheduler() = default;
 
