@@ -69,9 +69,9 @@ public:
   std::optional<time_type> peek_next_cycle() const;
   event pop_next_event();
 
-  void schedule_event_in(time_type in_cycles, event e);
-  void schedule_event_on(time_type cycle, event e);
-  bool unschedule_event(event e);
+  event_time schedule_event_in(time_type in_cycles, event e);
+  event_time schedule_event_on(time_type cycle, event e);
+  bool unschedule_event(event_time t);
 
 private:
   struct Implementation;
@@ -83,7 +83,8 @@ private:
 
 class ChildScheduler {
 public:
-  ChildScheduler(SystemScheduler &global_sched, SchedulerComponent component_id);
+  ChildScheduler(SystemScheduler &global_sched, SchedulerComponent component_id,
+                 const std::size_t num_events);
   ~ChildScheduler();
 
   template <typename EventIdType>
@@ -91,8 +92,7 @@ public:
     schedule_event_in_impl(in_cycles, static_cast<unsigned>(event_id));
   }
 
-  template <typename EventIdType>
-  void schedule_event_on(time_type cycle, EventIdType event_id) {
+  template <typename EventIdType> void schedule_event_on(time_type cycle, EventIdType event_id) {
     schedule_event_on_impl(cycle, static_cast<unsigned>(event_id));
   }
 
@@ -101,6 +101,9 @@ public:
   }
 
 private:
+  struct Implementation;
+  std::unique_ptr<Implementation> impl;
+
   void schedule_event_in_impl(time_type in_cycles, unsigned event_id);
   void schedule_event_on_impl(time_type cycle, unsigned event_id);
   bool unschedule_event_impl(unsigned event_id);
