@@ -1,8 +1,10 @@
+#include "cart/cart.hpp"
 #include "debugger/breakpoint.hpp"
 #include "emu_types.hpp"
 #include "frontend/python/testing.hpp"
 #include "frontend/python/wrappers.hpp"
 #include "ppu/ppu.hpp"
+#include "schedule.hpp"
 #include <filesystem>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -20,6 +22,7 @@ static void bind_cart(py::module_ &m) {
       .def_readonly("declared_ram_bytes", &cart::declared_ram_bytes)
       .def_readonly("header_checksum_ok", &cart::header_checksum_ok)
       .def_readonly("global_checksum_ok", &cart::global_checksum_ok)
+      .def_readonly("special_mbc", &cart::special_mbc)
       .def_property_readonly(
           "rom",
           [](const cart &c) {
@@ -46,6 +49,19 @@ static void bind_cart(py::module_ &m) {
       .def("cgb_flag", &rom_header::cgb_flag)
       .def("title", &rom_header::title)
       .def("manufacturer_code", &rom_header::manufacturer_code);
+
+  // For evaluating additional mapper detection heuristic
+  py::enum_<SpecialMbc>(m, "SpecialMbc")
+      .value("NotSpecial", SpecialMbc::NotSpecial_t)
+      .value("MBC1M", SpecialMbc::MBC1M_t)
+      .value("MBC30", SpecialMbc::MBC30_t)
+      .value("MMM01", SpecialMbc::MMM01_t)
+      .value("M161", SpecialMbc::M161_t)
+      .value("WisdomTree", SpecialMbc::WisdomTree_t)
+      .value("Bung", SpecialMbc::Bung_t)
+      .value("EMS", SpecialMbc::EMS_t)
+      .value("Sachen", SpecialMbc::Sachen_t)
+      .export_values();
 
   // For content loading
   m.def(
@@ -120,25 +136,51 @@ static void bind_ppu(const py::module_ &m) {
 }
 
 static void bind_debugger(const py::module_ &m) {
+  // We have to expose this too since the debugger can wire breakpoints up to events being
+  // queued and handled and what not. It needs to have visibility into the components.
+  py::enum_<SchedulerComponent>(m, "SchedulerComponent")
+      .value("OAM_DMA", SchedulerComponent::SCHED_COMPONENT_OAM_DMA)
+      .value("VRAM_DMA", SchedulerComponent::SCHED_COMPONENT_VRAM_DMA)
+      .export_values();
+
+  // What remains is the actual debugger guts
   py::enum_<Debug::BreakReason>(m, "BreakReason", py::arithmetic())
       .value("BRK_CONTINUE", Debug::BreakReason::BRK_CONTINUE)
       .value("BRK_ADDRESS_EXECUTED", Debug::BreakReason::BRK_ADDRESS_EXECUTED)
       .value("BRK_ADDRESS_READ", Debug::BreakReason::BRK_ADDRESS_READ)
       .value("BRK_ADDRESS_WRITTEN", Debug::BreakReason::BRK_ADDRESS_WRITTEN)
+      .value("BRK_EVENT_QUEUED", Debug::BreakReason::BRK_EVENT_QUEUED)
+      .value("BRK_EVENT_POPPED", Debug::BreakReason::BRK_EVENT_POPPED)
       .value("BRK_STEP_CLOCK_CYCLE", Debug::BreakReason::BRK_STEP_CLOCK_CYCLE)
       .value("BRK_STEP_INSTRUCTION", Debug::BreakReason::BRK_STEP_INSTRUCTION)
       .value("BRK_STEP_SCANLINE", Debug::BreakReason::BRK_STEP_SCANLINE)
       .value("BRK_STEP_FRAME", Debug::BreakReason::BRK_STEP_FRAME);
+  py::class_<Debug::Context>(m, "BreakContext")
+      .def_readonly("reason", &Debug::Context::reason)
+      .def_readonly("time", &Debug::Context::time)
+      .def_readonly("data", &Debug::Context::data);
   py::class_<Debug::Breakpoint>(m, "Breakpoint")
       .def(py::init<Debug::BreakReason, addr_t>(), py::arg("reason_flags"), py::arg("watch_addr"))
       .def("eval", &Debug::Breakpoint::eval, py::arg("reason_flags"))
       .def("has_flag", &Debug::Breakpoint::has_flag, py::arg("flag"))
       .def("to_string", &Debug::Breakpoint::to_string);
   py::class_<Debug::Debugger>(m, "Debugger")
-      .def(py::init<std::function<Debug::BreakReason()>>(), py::arg("callback"))
-      .def("breakpoint_add", &Debug::Debugger::breakpoint_add, py::arg("addr"), py::arg("reason"))
-      .def("breakpoint_del", &Debug::Debugger::breakpoint_del, py::arg("addr"))
-      .def("get_breakpoints", &Debug::Debugger::get_breakpoints);
+      .def(py::init<std::function<Debug::BreakReason(Debug::Context)>>(), py::arg("callback"))
+      .def("breakpoint_add_event",
+           static_cast<void (Debug::Debugger::*)(event, Debug::BreakReason)>(
+               &Debug::Debugger::breakpoint_add),
+           py::arg("event"), py::arg("reason"))
+      .def("breakpoint_add_addr",
+           static_cast<void (Debug::Debugger::*)(addr_t, Debug::BreakReason)>(
+               &Debug::Debugger::breakpoint_add),
+           py::arg("addr"), py::arg("reason"))
+      .def("breakpoint_del_event",
+           static_cast<void (Debug::Debugger::*)(event)>(&Debug::Debugger::breakpoint_del),
+           py::arg("event"))
+      .def("breakpoint_del_addr",
+           static_cast<void (Debug::Debugger::*)(addr_t)>(&Debug::Debugger::breakpoint_del),
+           py::arg("addr"))
+      .def("get_rwe_breakpoints", &Debug::Debugger::get_rwe_breakpoints);
 }
 
 static void bind_gbc(const py::module_ &m) {
@@ -147,6 +189,8 @@ static void bind_gbc(const py::module_ &m) {
       .def(py::init<>())
       .def("insert_cartridge", &PyGameBoyColor::insert_cartridge)
       .def("init_test_bed", &PyGameBoyColor::init_test_bed)
+      .def("big_step_cycles", &PyGameBoyColor::big_step_cycles)
+      .def("big_step", &PyGameBoyColor::big_step)
       .def("step_cycles", &PyGameBoyColor::step_cycles)
       .def("step", &PyGameBoyColor::step)
       .def("get_frame", &PyGameBoyColor::get_frame)
@@ -175,6 +219,6 @@ PYBIND11_MODULE(gbc_py, m) {
   bind_ppu(m);
 
   // Expose testing helpers, may add more in the future
-  m.def("poll_mooneye_test", &poll_mooneye_test, py::arg("gbc"),
+  m.def("poll_mooneye_test", &poll_mooneye_test, py::arg("gbc"), py::arg("big_step"),
         "Run the emulator until the Mooneye LD B,B end marker is reached");
 }

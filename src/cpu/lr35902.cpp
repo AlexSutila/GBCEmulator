@@ -92,7 +92,6 @@ LR35902::LR35902(AddressBus *bus_ptr, std::optional<Debug::Debugger> &debugger,
 
   /* Init fetch decode execute fsm */
   state = STATE_FETCH;
-  total_ins_clks = std::nullopt;
   cur_ins_clks = 0;
 
   /* Register initialization */
@@ -163,62 +162,7 @@ bool LR35902::should_interrupt() const {
   return (ie_reg.peek() & if_reg.peek() & mask) != 0;
 }
 
-/* Read opcode from PC, populate `ins_` instruction reference */
-void LR35902::do_fetch() {
-
-  // Check for interrupts, delay fetch until after ISR
-  const bool interrupted = should_interrupt();
-  if (ime.is_enabled() && interrupted) {
-    ins_ = &isr;
-    return;
-  }
-  ime.step();
-
-  // Else continue with fetch/decode/exec as usual
-  const byte_t op = bus->read_byte(reg_file.reg_pc);
-  const std::unique_ptr<Instruction> &ins = lookup.at(op);
-
-  // Handle un-implemented opcodes
-  if (!ins) [[unlikely]] {
-    std::ostringstream oss;
-    oss << "Unimplemented opcode: 0x" << std::uppercase << std::hex << std::setw(2)
-        << std::setfill('0') << static_cast<int>(op);
-    throw std::logic_error(oss.str());
-  }
-  ins_ = ins.get();
-
-  // Save this to handle execution breakpoints
-  ins_base_addr = reg_file.reg_pc;
-  state = STATE_DECODE;
-
-  // If the halt bug was triggered, PC freaks out and doesn't increment
-  if (reg_file.halt_bug_triggered)
-    reg_file.halt_bug_triggered = false;
-  else
-    reg_file.reg_pc++;
-}
-
-/* Parse operands, prepare for execution */
-void LR35902::do_decode() {
-  state = STATE_EXECUTE;
-  total_ins_clks.reset();
-  cur_ins_clks = 0;
-  ins_->parse();
-
-  // This must happen after `ins_->parse()` for correct operands
-  try_brk(ins_base_addr, brk_reason_flags);
-}
-
-/* Execute instruction on critical mem-access clock cycle */
-void LR35902::do_execute() {
-  if (cur_ins_clks == ins_->mem_access_t_cycle())
-    total_ins_clks = ins_->exec();
-  ++cur_ins_clks;
-
-  /* Complete instruction based on execution time */
-  if (!total_ins_clks.has_value() || cur_ins_clks < total_ins_clks.value())
-    return;
-
+void LR35902::do_exec_state_transition() {
   /* If the instruction executed was `HALT`, the processor suspends its
    * execution until it is awakened by some interrupt source. The exact behavior
    * is conditional depending on whether IME is enabled or not. */
@@ -228,6 +172,42 @@ void LR35902::do_execute() {
   /* Otherwise, continue fetch/parse/execute pipeline as usual. */
   else
     state = STATE_FETCH;
+}
+
+/* Read opcode from PC, populate `ins_` instruction reference */
+void LR35902::do_fetch() {
+
+  // Check for interrupts, delay fetch until after ISR
+  const bool interrupted = should_interrupt();
+  if (ime.is_enabled() && interrupted) {
+    prime_next_instr(&isr);
+    return;
+  }
+  ime.step();
+
+  // Else continue with fetch/decode/exec as usual
+  const byte_t op = bus->read_byte(reg_file.reg_pc);
+  const std::unique_ptr<Instruction> &next_ins = lookup.at(op);
+
+  // Handle un-implemented opcodes
+  if (!next_ins) [[unlikely]] {
+    std::ostringstream oss;
+    oss << "Unimplemented opcode: 0x" << std::uppercase << std::hex << std::setw(2)
+        << std::setfill('0') << static_cast<int>(op);
+    throw std::logic_error(oss.str());
+  }
+
+  // Save this to handle execution breakpoints
+  ins_base_addr = reg_file.reg_pc;
+
+  // If the halt bug was triggered, PC freaks out and doesn't increment
+  if (reg_file.halt_bug_triggered)
+    reg_file.halt_bug_triggered = false;
+  else
+    reg_file.reg_pc++;
+
+  // Prepare next instruction for execution stage
+  prime_next_instr(next_ins.get());
 }
 
 void LR35902::do_halt() {
@@ -244,8 +224,7 @@ void LR35902::do_halt() {
    * interrupt is serviced and execution resumes as normal. */
   if (ime.is_enabled()) {
     isr.incur_halt_delay();
-    ins_ = &isr;
-    state = STATE_DECODE;
+    prime_next_instr(&isr);
   }
 
   /* If IME is disabled, the execution still stops. The only difference is the
@@ -256,15 +235,32 @@ void LR35902::do_halt() {
   }
 }
 
+void LR35902::prime_next_instr(Instruction *const next_ins) {
+  state = STATE_EXECUTE;
+  ins_ = next_ins;
+
+  timing_info = ins_->parse();
+  cur_ins_clks = 0;
+
+  // This must happen after `ins_->parse()` for correct operands
+  try_brk(sys_.elapsed_clocks, ins_base_addr, brk_reason_flags);
+}
+
 void LR35902::step() {
   switch (state) {
-  case STATE_FETCH: // Break omitted intentionally
+  case STATE_FETCH: // Break omitted intentionally to emulate fetch/exec overlap
     do_fetch();
-  case STATE_DECODE: // Break omitted intentionally
-    do_decode();
-  case STATE_EXECUTE:
-    do_execute();
-    break;
+
+  case STATE_EXECUTE: {
+    if (cur_ins_clks == ins_->next_sync_cycle())
+      ins_->exec();
+    ++cur_ins_clks;
+
+    /* Complete instruction based on execution time */
+    if (cur_ins_clks >= timing_info.total_cycles)
+      do_exec_state_transition();
+  } break;
+
   case STATE_HALTED:
     do_halt();
     break;

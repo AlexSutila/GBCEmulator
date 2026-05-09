@@ -64,6 +64,14 @@ enum class IORegisterMapping : addr_t {
   MMIO_LCD_OBPD = 0xFF6B,
   MMIO_LCD_OPRI = 0xFF6C,
   MMIO_WRAM_BANK = 0xFF70,
+
+  // Undocumented registers we emulate for the sake of completionism
+  MMIO_UNDOC_FF72 = 0xFF72,
+  MMIO_UNDOC_FF73 = 0xFF73,
+  MMIO_UNDOC_FF74 = 0xFF74,
+  MMIO_UNDOC_FF75 = 0xFF75,
+
+  // Interrupt enable flags
   MMIO_INT_ENABLE = 0xFFFF,
 };
 

@@ -2,8 +2,10 @@
 #define GBC_BREAKPOINT_HPP
 
 #include "emu_types.hpp"
+#include "schedule.hpp"
 #include <cstdint>
 #include <string>
+#include <variant>
 
 namespace Debug {
 
@@ -18,15 +20,21 @@ namespace Debug {
  */
 enum BreakReason : std::uint32_t {
   BRK_CONTINUE = 0,
+
   // User configured or hardware specified reasons
   BRK_ADDRESS_EXECUTED = 1 << 1,
   BRK_ADDRESS_READ = 1 << 2,
   BRK_ADDRESS_WRITTEN = 1 << 3,
+
+  // User configured scheduler event reasons
+  BRK_EVENT_QUEUED = 1 << 4,
+  BRK_EVENT_POPPED = 1 << 5, // Analogous to event handling
+
   // Hardware specified reasons only
-  BRK_STEP_CLOCK_CYCLE = 1 << 4,
-  BRK_STEP_INSTRUCTION = 1 << 5,
-  BRK_STEP_SCANLINE = 1 << 6,
-  BRK_STEP_FRAME = 1 << 7,
+  BRK_STEP_CLOCK_CYCLE = 1 << 6,
+  BRK_STEP_INSTRUCTION = 1 << 7,
+  BRK_STEP_SCANLINE = 1 << 8,
+  BRK_STEP_FRAME = 1 << 9,
 };
 
 constexpr BreakReason operator|(const BreakReason a, const BreakReason b) {
@@ -43,17 +51,27 @@ constexpr bool operator&(const BreakReason a, const BreakReason b) {
  * enough to still come across as seamless to the naked eye. */
 constexpr auto BRK_STOPPED_BY_UI = BRK_STEP_INSTRUCTION;
 
+struct Context {
+  BreakReason reason;
+  time_type time;
+
+  // Additional context depends on breakpoint type
+  std::variant<std::monostate, event, addr_t> data;
+};
+
 class Breakpoint {
 public:
   explicit Breakpoint(BreakReason reason_flags, addr_t watch_addr);
+  explicit Breakpoint(BreakReason reason_flags, event e);
+
   [[nodiscard]] bool eval(BreakReason reason_flags) const;
   [[nodiscard]] bool has_flag(BreakReason flag) const;
 
   [[nodiscard]] std::string to_string() const;
 
 private:
+  std::variant<std::monostate, event, addr_t> context;
   BreakReason reasons{};
-  const addr_t addr;
 };
 
 }; // namespace Debug

@@ -8,6 +8,10 @@ from .ppu import (
     RenderedFrame,
     PPUState,
 )
+from .debugger import (
+    Debugger,
+    BreakContext,
+)
 from .utils.mooneye import (
     run_mooneye_test,
     eval_mooneye_cpu_state,
@@ -16,14 +20,21 @@ from .utils.mooneye import (
 # We export some enumerations directly from the core
 from .gbc_py import (
     # Enumerations
+    SchedulerComponent,
     BreakReason,
+    SpecialMbc,
     StatModes,
 )
 
 __all__ = [
     # Core emulator sources
     "GameBoyColor",
+    "Debugger",
+    "BreakContext",
+    # Enumerations
+    "SchedulerComponent",
     "BreakReason",
+    "SpecialMbc",
     "StatModes",
     # Cartridge sources
     "Cartridge",

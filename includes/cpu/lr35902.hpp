@@ -31,6 +31,56 @@ public:
     // before an instruction fetch, hence handle to avoid crash.
     return "";
   };
+
+  /**
+   * Callback is used to synchronize GBC peripherals. I tried, so hard, to
+   * not template this. I will not use `std::function`, C++ is the bain of
+   * my existence.
+   */
+  template <typename F> std::size_t big_step(F &&psync_cb) {
+    switch (state) {
+    case STATE_FETCH: // Break omitted intentionally to emulate fetch/exec overlap
+      do_fetch();
+
+    case STATE_EXECUTE: {
+      const std::size_t total_cycles = timing_info.total_cycles;
+      const std::size_t sync_events = timing_info.sync_events;
+
+      // Handle each sync event
+      for (std::size_t sync_event{0}; sync_event < sync_events; ++sync_event) {
+        const std::size_t sync_cycle = ins_->next_sync_cycle();
+        psync_cb(sync_cycle - cur_ins_clks);
+
+        ins_->exec(); // Handle event, prime next event
+        cur_ins_clks = sync_cycle;
+      }
+
+      // Account for remaining cycles up until next opcode fetch
+      const std::size_t final_sync_cycles = total_cycles - cur_ins_clks;
+      psync_cb(final_sync_cycles);
+
+      // Finally, we still have to perform the state transition as per cycle-stepped impl.
+      // We have to return the total dynamic number of cycles elapsed during this call so
+      // the frontend can synchronize accordingly.
+      do_exec_state_transition();
+      return total_cycles;
+    };
+
+    case STATE_HALTED:
+      do_halt();
+
+      psync_cb(1); // TODO: We can do a lot better here
+      return 1;
+    }
+
+    // Safe since we return instead of breaking
+    __builtin_unreachable();
+  }
+
+  /**
+   * Basically just a more stable version of big_step(), executes a single
+   * clock cycle at a time, regardless of whether its an idle cycle or not.
+   */
   void step();
 
   struct ProcessorState {
@@ -77,20 +127,19 @@ private:
 
   enum CpuStates {
     STATE_FETCH,
-    STATE_DECODE,
     STATE_EXECUTE,
     STATE_HALTED,
   } state;
+  void do_exec_state_transition();
   void do_fetch();
-  void do_decode();
-  void do_execute();
   void do_halt();
+
+  void prime_next_instr(Instruction *const next_ins);
+  InstructionTiming timing_info{};
+  std::size_t cur_ins_clks{};
 
   addr_t ins_base_addr{}; // For debugger reference
   Instruction *ins_{};    // Reference to current ins
-
-  std::optional<std::size_t> total_ins_clks{};
-  std::size_t cur_ins_clks{};
 };
 
 #endif // GBC_LR35902_HPP

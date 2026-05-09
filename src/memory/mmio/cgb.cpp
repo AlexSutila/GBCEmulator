@@ -2,6 +2,7 @@
 #include "emu_types.hpp"
 #include "gbc.hpp"
 #include "memory/dma.hpp"
+#include "memory/mmio/mmio.hpp"
 #include "savestate/codec.hpp"
 
 namespace SYS {
@@ -118,7 +119,7 @@ ObjectPriorityMode OPRI::get_prio_mode() const {
 
 namespace DMA {
 
-void VDMA_ADDR::write(const byte_t value) { state_ = value; }
+void VDMA_ADDR::write(const byte_t value) { state_ = value & bitmask; }
 [[nodiscard]] byte_t VDMA_ADDR::peek() const { return 0xFF; }
 byte_t VDMA_ADDR::read() { return peek(); }
 
@@ -126,6 +127,7 @@ byte_t VDMA_ADDR::read() { return peek(); }
 // we need to be able to see what was written to calculate source/dest addresses
 // for dma transfers.
 [[nodiscard]] byte_t VDMA_ADDR::get_addr_bits() const { return state_; }
+void VDMA_ADDR::put_addr_bits(byte_t value) { state_ = value; }
 
 void VDMA_MODE_LEN::write(const byte_t value) {
   const byte_t mode_bit = (value & 0x80) >> 7;
@@ -136,19 +138,16 @@ void VDMA_MODE_LEN::write(const byte_t value) {
 
   // All logic revolving around HDMA cancel and bizarre behavior is implemented
   // within the VDMA unit itself, so calling this is completely intentional.
-  dma_.enable(mode, blks);
+  dma_.try_start(mode, blks);
 }
 
 byte_t VDMA_MODE_LEN::peek() const {
-  constexpr byte_t complete_mask = 0x80;
-  constexpr byte_t size_mask = 0x7F;
-  if (dma_.complete())
-    return complete_mask | dma_.get_blks_remaining();
-
-  // If the DMA is still in progress, it just shows the size. The seventh
-  // bit indicates that the full data transfer is complete.
-  return dma_.get_blks_remaining() & size_mask;
+  byte_t ret = dma_.blks_remaining();
+  if (!dma_.hdma_active())
+    ret |= 0x80;
+  return ret;
 }
+
 byte_t VDMA_MODE_LEN::read() { return peek(); }
 
 } // namespace DMA
@@ -166,3 +165,21 @@ byte_t WramBank::get_bank() const {
     ++ret;
   return ret;
 }
+
+namespace Undocumented {
+
+void UndocFF74::write(byte_t value) {
+  if (sys_.cgb_mode)
+    MMIORegister::write(value);
+}
+
+byte_t UndocFF74::peek() const {
+  // Usable only in CGB mode, for some reason idk lol
+  return sys_.cgb_mode ? MMIORegister::peek() : 0xFF;
+}
+byte_t UndocFF74::read() { return peek(); }
+
+byte_t UndocFF75::peek() const { return MMIORegister::peek() | 0x8F; }
+byte_t UndocFF75::read() { return MMIORegister::read() | 0x8F; }
+
+} // namespace Undocumented

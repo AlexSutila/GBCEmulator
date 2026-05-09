@@ -347,6 +347,8 @@ class BootROMCtrl final : public MMIORegister {
 public:
   template <typename T> void parse_savestate(T &t);
   void write(byte_t value) override;
+  [[nodiscard]] byte_t peek() const override { return 0xFF; };
+  byte_t read() override { return peek(); };
   BootROMCtrl();
 
   /* Determine if the boot ROM is currently mapped */

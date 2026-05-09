@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Union
 from pathlib import Path
 
+from .gbc_py import SpecialMbc
 from . import gbc_py as core
 
 
@@ -28,6 +29,10 @@ class RomHeader:
     def manufacturer_code(self) -> str:
         return self._header.manufacturer_code()
 
+    @property
+    def cartridge_type_value(self) -> int:
+        return self._header.cartridge_type
+
 
 class Cartridge:
     def __init__(self, cart: core.Cart):
@@ -46,6 +51,10 @@ class Cartridge:
     @property
     def header(self):
         return RomHeader(self._cart.header)
+
+    @property
+    def special_mbc_type(self) -> SpecialMbc:
+        return self._cart.special_mbc
 
     @property
     def _raw(self) -> core.Cart:

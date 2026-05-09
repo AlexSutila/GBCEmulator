@@ -13,6 +13,18 @@
 #include "gbc.hpp"
 #include "memory/boot.hpp"
 
+/**
+ * IroGB's GameBoyColor class exposes two emulation driver methods, one that steps cycle
+ * by cycle and provides better debugging capabilities, and one that is designed to skip
+ * idle CPU cycles and reduce the number of synchronization points while making the same
+ * accuracy guarantees. We will not expose the debugging capability through LibRetro, so
+ * this can be used to toggle between the 'fast' and 'slow' ways of driving the emulator
+ */
+#define USE_BIGSTEP 0
+
+// TODO: In case libretro logging breaks, we might want this to fall back to std::cerr?
+static void fallback_log(enum retro_log_level level, const char *fmt, ...) {}
+
 static Cartridge *const get_cart(void) {
   auto &gbc = LibretroFrontend::get_instance().get();
   if (!gbc)
@@ -186,6 +198,12 @@ void retro_set_environment(retro_environment_t cb) {
   enum retro_pixel_format fmt = RETRO_PIXEL_FORMAT_XRGB8888;
   callbacks.environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &fmt);
   callbacks.environ_cb(RETRO_ENVIRONMENT_SET_CORE_OPTIONS_V2, (void *)&options);
+
+  retro_log_callback log_callback{}; // Configure logging and frontend debugging utilities
+  if (callbacks.environ_cb(RETRO_ENVIRONMENT_GET_LOG_INTERFACE, &log_callback))
+    callbacks.log_printf_cb = log_callback.log;
+  else
+    callbacks.log_printf_cb = fallback_log;
 }
 
 void retro_set_audio_sample(retro_audio_sample_t cb) {
@@ -214,9 +232,15 @@ void retro_set_video_refresh(retro_video_refresh_t cb) {
 }
 
 void retro_reset(void) {
+  auto &instance = LibretroFrontend::get_instance();
+  auto &callbacks = instance.get_callbacks();
+
   Cartridge *cartridge = get_cart();
-  if (cartridge == nullptr)
+  if (cartridge == nullptr) [[unlikely]] {
+    callbacks.log_printf_cb(RETRO_LOG_ERROR, "retro_reset(): Cartridge is nullptr\n");
     return;
+  }
+
   std::vector<byte_t> sram_backup{};
   cart c = cartridge->image();
 
@@ -230,14 +254,15 @@ void retro_reset(void) {
   /* CGB models do not have soft reset buttons, so we resort to hard reset only.
    * To support this, we have to pull the original image back down, recreate the
    * emulator instance, and re-insert the cartridge. */
-  auto &instance = LibretroFrontend::get_instance();
   initialize_gbc_instance(instance);
   instance.load_game(c); // Cart will be valid
 
   // Cartridge was re-allocated, so have to pull down it again
   cartridge = get_cart();
-  if (cartridge == nullptr)
+  if (cartridge == nullptr) [[unlikely]] {
+    callbacks.log_printf_cb(RETRO_LOG_ERROR, "retro_reset(): Cartridge is nullptr\n");
     return;
+  }
 
   /* Finally, restore sram content if it was saved */
   if (!sram_backup.empty()) {
@@ -249,25 +274,40 @@ void retro_reset(void) {
 void retro_run(void) {
   constexpr std::size_t cycles_per_frame = 70224;
   auto &instance = LibretroFrontend::get_instance();
+
+#if (USE_BIGSTEP)
+  std::size_t elapsed_cycles{0};
+  do {
+    elapsed_cycles += instance.get()->big_step();
+  } while (elapsed_cycles < cycles_per_frame);
+#else
   for (std::size_t i{0}; i < cycles_per_frame; i++)
-    instance.get()->step(); // Step one 'frame'
+    instance.get()->step();
+#endif // USE_BIGSTEP
 
   instance.try_show_frame();
   instance.try_poll_input();
+  instance.clean_msg_queue();
 }
 
 bool retro_load_game(const struct retro_game_info *info) {
-  if (!info)
+  auto &instance = LibretroFrontend::get_instance();
+  auto &callbacks = instance.get_callbacks();
+  if (!info) {
+    callbacks.log_printf_cb(RETRO_LOG_ERROR, "retro_load_game(): Info is nullptr\n");
     return false;
+  }
+
   const void *const data = info->data;
   const auto size = info->size;
 
   auto data_ptr = reinterpret_cast<const byte_t *>(data);
-  if (!data_ptr || size == 0)
+  if (!data_ptr || size == 0) {
+    callbacks.log_printf_cb(RETRO_LOG_ERROR, "retro_load_game(): Data_ptr is nullptr\n");
     return false;
+  }
 
   std::vector<byte_t> raw(data_ptr, data_ptr + size);
-  auto &instance = LibretroFrontend::get_instance();
 
   /* Attempt to load a BIOS file, we check two locations. If any of these fail,
    * for any reason, it is equivalent to starting without a BIOS file. */
@@ -276,9 +316,13 @@ bool retro_load_game(const struct retro_game_info *info) {
   try {
     cart c = load_cart_raw(raw);
     instance.load_game(c);
-  } catch (...) {
+  }
+
+  catch (...) {
+    callbacks.log_printf_cb(RETRO_LOG_INFO, "retro_load_game(): Invalid game format\n");
     return false;
   }
+
   return true;
 }
 
@@ -291,6 +335,8 @@ unsigned retro_get_region(void) { return RETRO_REGION_NTSC; }
 
 /* Not applicable */
 bool retro_load_game_special(unsigned type, const struct retro_game_info *info, size_t num) {
+  auto &callbacks = LibretroFrontend::get_instance().get_callbacks();
+  callbacks.log_printf_cb(RETRO_LOG_ERROR, "retro_load_game_special(): Invoked but unused");
   return false;
 }
 
@@ -302,10 +348,11 @@ size_t retro_serialize_size(void) {
 bool retro_serialize(void *data_, size_t size) {
   auto &instance = LibretroFrontend::get_instance();
   const auto snapshot = instance.take_snapshot();
-  if (size < snapshot.size()) [[unlikely]]
+  if (size < snapshot.size()) [[unlikely]] {
+    instance.show_message("Save to slot failed", msg_duration_sec(5), RETRO_LOG_ERROR);
     return false;
+  }
 
-  // std::memcpy(data_, snapshot.data(), snapshot.size()); - lolno
   std::span<byte_t> dst(static_cast<byte_t *>(data_), snapshot.size());
   std::ranges::copy(snapshot, dst.begin());
   return true;
@@ -320,6 +367,7 @@ bool retro_unserialize(const void *data_, size_t size) {
 
     // Could be invalid field/chunk version or save state corruption
   } catch (...) {
+    instance.show_message("Load from slot failed", msg_duration_sec(5), RETRO_LOG_ERROR);
     return false;
   }
 }

@@ -5,6 +5,7 @@
 #include "savestate/codec.hpp"
 
 #include <algorithm>
+#include <array>
 #include <bitset>
 #include <cstring>
 #include <fstream>
@@ -142,13 +143,9 @@ std::string rom_header::title() const {
   return ascii_ztrim(title_area.data(), title_len);
 }
 
-static std::optional<rom_header> parse_header(const std::span<const byte_t> rom,
-                                              const size_t offset) {
-  if (rom.size() < kMinRomSize) {
-    Logger::push(LogLevel::Error, "ROM", "ROM too small",
-                 "The ROM file is too small (< 0x0150 bytes)");
-    return std::nullopt;
-  }
+static rom_header parse_header(const std::span<const byte_t> rom, const size_t offset) {
+  if (rom.size() < kMinRomSize)
+    throw std::runtime_error("The ROM file is too small (< 0x0150 bytes)");
   rom_header h{};
 
   std::copy_n(rom.data() + 0x0100 + offset, 4, h.entry_point.begin());
@@ -171,55 +168,30 @@ static std::optional<rom_header> parse_header(const std::span<const byte_t> rom,
   return h;
 }
 
-bool validate(cart &c) {
-  // Offset 0x00 for typical carts
-  // Offset (rom_size-0x8000) for MMM01
-  short fail_count{};
-  const auto mmm01_offset = c.rom_size() - 0x8000;
-  for (const auto offset : {mmm01_offset, static_cast<size_t>(0x00)}) {
-    if (offset == mmm01_offset && c.rom_size() < 0x8000) {
-      fail_count += 1;
-      continue;
-    }
-    if (auto header = parse_header(c.rom, offset); header != std::nullopt) {
-      c.header = header.value();
-    } else
-      return false;
-    c.declared_rom_bytes = rom_bytes_from_code(c.header.rom_size_code);
-    c.declared_ram_bytes = ram_bytes_from_code(c.header.ram_size_code);
+/* Weird carts detection */
+// Here, we evaluate the possibility of MMM01 by peeking at the last 0x8000 bank of ROM and
+// seeing if it contains a valid ROM header. If so, it is probably a multicart ROM.
+static std::optional<std::tuple<rom_header, std::uint16_t, byte_t>>
+maybe_mmm01(const std::span<const byte_t> rom) {
+  if (rom.size() < 0x8000)
+    return std::nullopt; // Multicarts always bank
 
-    const byte_t computed_hchk = compute_header_checksum(c.rom, offset);
-    c.computed_header_checksum = computed_hchk;
-    c.header_checksum_ok = (computed_hchk == c.header.header_checksum);
+  const auto last_bank_offset = rom.size() - 0x8000; // Check for valid header at end
+  const auto header = parse_header(rom, last_bank_offset);
 
-    const std::uint16_t computed_gchk = compute_global_checksum(c.rom, offset);
-    c.computed_global_checksum = computed_gchk;
-    c.global_checksum_ok = (computed_gchk == c.header.global_checksum);
+  const std::uint16_t global_checksum = compute_global_checksum(rom, last_bank_offset);
+  const byte_t header_checksum = compute_header_checksum(rom, last_bank_offset);
 
-    if (!c.header_checksum_ok || !c.global_checksum_ok) {
-      fail_count += 1;
-    } else {
-      if (offset != 0)
-        c.special_mbc = MMM01_t;
-      // If declared size is known, ensure file is at least that big
-      if (c.declared_rom_bytes != 0 && c.rom.size() < c.declared_rom_bytes) {
-        Logger::push(LogLevel::Warning, "ROM", "ROM too small",
-                     "This ROM file is smaller than header-declared ROM size.");
-      }
-      break;
-    }
-  }
-  if (fail_count == 2) {
-    Logger::push(LogLevel::Warning, "ROM", "ROM validation failed",
-                 "ROM checksum failed. Please make sure the ROM is not corrupted.");
-    return false;
-  }
-  return true;
+  if (global_checksum != header.global_checksum || header_checksum != header.header_checksum)
+    return std::nullopt;
+
+  // TODO: We still miss one MMM01 Mani 4 in 1 cart, could potentially run a heuristic which
+  // evaluates all banks and determines if its multicart based on the number of valid headers
+  return std::make_tuple(header, global_checksum, header_checksum);
 }
 
-/* Weird carts detection */
 // Wisdom Tree detection because it's autistic :(
-bool maybe_wisdom_tree(const std::span<const byte_t> rom) {
+static bool maybe_wisdom_tree(const std::span<const byte_t> rom) {
   if (rom.size() <= 0x8000)
     return false;
 
@@ -264,7 +236,7 @@ bool maybe_wisdom_tree(const std::span<const byte_t> rom) {
 }
 
 // Noooo, not you M161 too :(
-bool maybe_m161(const std::span<const byte_t> rom) {
+static bool maybe_m161(const std::span<const byte_t> rom) {
   // M161 maps 32 KiB banks into 0000-7FFF, bank number is 3 bits (00-07)
   // So if the ROM is bigger than 32 KiB but doesn't have a whole number of 32
   // KiB banks, it's likely not M161 HOWEVER this is still not very foolproof.
@@ -289,14 +261,53 @@ static bool maybe_mbc1m(const std::span<const byte_t> rom) {
   return false;
 }
 
+// They jumble the header on these cartridges, so we have to undo it. If we
+// read off a valid checksum for the nintento logo, we ball c:
+static bool maybe_sachen(const cart &c, const std::span<const byte_t> rom) {
+  std::array<byte_t, 0x14F> unborked_header{};
+  if (c.header_checksum_ok)
+    return false; // Lmao
+
+  // We attempt to first unscramble the header found on the cartridge itself
+  for (std::size_t addr{0}; addr < unborked_header.size(); ++addr) {
+    addr_t unjumbled_addr = sachen_jumble(addr);
+    unborked_header.at(addr) = rom[unjumbled_addr];
+  }
+
+  // Checks if the unjumbled bytes are a valid nintendo logo (this feels wrong)
+  return compute_header_checksum(unborked_header, 0) == unborked_header[0x014D];
+}
+
 SpecialMbc detect_special_mbc(const cart &c) {
+  const auto cart_type = Debug::hex8(c.header.cartridge_type, true);
+
+  // Sachen MMC2 jumbles the cartridge header to avoid getting sued so it is
+  // guaranteed to fail the header checksum basically every single time
+  if (!c.header_checksum_ok) {
+    switch (c.header.cartridge_type) {
+    case 0x00:
+    case 0x01:
+    case 0x31:
+    case 0x40:
+    case 0xC2:
+    case 0xFA:
+    case 0xFF:
+      if (maybe_sachen(c, c.rom_span())) {
+        Logger::push(LogLevel::Info, "ROM", "Mapper override",
+                     IroGB::format("{} fails header checksum but meets criteria"
+                                   "with Sachen MMC2 unscramble; forcing Sachen.",
+                                   cart_type));
+        return Sachen_t;
+      }
+    }
+  }
+
   switch (c.header.cartridge_type) {
   case 0x00: { // ROM ONLY, but some WT/M161 carts lie about this, we
                // investigate further
     if (c.rom_size() <= 0x8000)
       return NotSpecial_t; // If strictly <= 32KiB, it's probably safe
     if (c.header.title() == "WISDOM TREE" || maybe_wisdom_tree(c.rom_span())) {
-      const auto cart_type = Debug::hex8(c.header.cartridge_type, true);
       Logger::push(LogLevel::Info, "ROM", "Mapper override",
                    IroGB::format("{} header type {} looks inconsistent with "
                                  "ROM size {} and appears to be WT; "
@@ -305,7 +316,6 @@ SpecialMbc detect_special_mbc(const cart &c) {
       return WisdomTree_t;
     }
     if (maybe_m161(c.rom_span())) {
-      const auto cart_type = Debug::hex8(c.header.cartridge_type, true);
       Logger::push(LogLevel::Info, "ROM", "Mapper override",
                    IroGB::format("{} header type {} looks inconsistent with "
                                  "ROM size {} and appears to be M161; "
@@ -314,11 +324,11 @@ SpecialMbc detect_special_mbc(const cart &c) {
       return M161_t;
     }
   }
+
   case 0x01:
   case 0x02:
   case 0x03: // MBC1M possibility
     if (maybe_mbc1m(c.rom_span())) {
-      const auto cart_type = Debug::hex8(c.header.cartridge_type, true);
       Logger::push(LogLevel::Info, "ROM", "Mapper override",
                    IroGB::format("{} header type {} looks inconsistent with "
                                  "ROM size {} and appears to be MBC1M; "
@@ -326,35 +336,94 @@ SpecialMbc detect_special_mbc(const cart &c) {
                                  c.header.title(), cart_type, c.rom_span().size()));
       return MBC1M_t;
     }
+
   case 0x0F:
   case 0x10:
   case 0x11:
   case 0x12:
-  case 0x13: // Special MBC3 that has 64 KiB RAM
-    if (c.declared_ram_bytes > 32 * 1024)
+  case 0x13: // Special MBC3 carts that have 64 KiB RAM or 128 KiB ROM
+    if (c.declared_ram_bytes > 32 * 1024 || c.declared_rom_bytes > 128 * 16 * 1024)
       return MBC30_t;
+
   case 0x1B:
     if (c.header.destination_code == 0xE1 || c.header.title() == "EMSMENU" ||
         c.header.title() == "GB16M")
       return EMS_t;
+
   case 0xC0:
     if (c.header.destination_code == 0xD1)
       return WisdomTree_t;
+
   default:
     return NotSpecial_t;
   }
 }
 
+static void apply_checksum_values(cart &c, std::uint16_t g_checksum, byte_t h_checksum) {
+  c.global_checksum_ok = (g_checksum == c.header.global_checksum);
+  c.header_checksum_ok = (h_checksum == c.header.header_checksum);
+  c.computed_global_checksum = g_checksum;
+  c.computed_header_checksum = h_checksum;
+}
+
+void calc_checksums_and_override(cart &c) {
+  c.header = parse_header(c.rom, 0); // This may not be valid
+
+  // We have not computed the checksums yet so have to do that now
+  const std::uint16_t g_checksum = compute_global_checksum(c.rom, 0);
+  const byte_t h_checksum = compute_header_checksum(c.rom, 0);
+  apply_checksum_values(c, g_checksum, h_checksum);
+
+  // If the rom header was not valid, we consider the possibility of MMM01 here
+  // as all steps moving forward rely on a valid header extraction, which you can
+  // get out of MMM01 carts.
+  if (!c.header_checksum_ok || !c.global_checksum_ok) {
+    if (const auto r = maybe_mmm01(c.rom); r.has_value()) {
+      Logger::push(LogLevel::Info, "ROM", "Mapper override",
+                   IroGB::format("Header checksums failed but meets criteria "
+                                 "with MMM01 unscramble; forcing MMM01."));
+      const auto &[header, g_checksum, h_checksum] = r.value();
+      c.header = header;
+
+      // Specifically, it is likely the global checksum that failed, but there is
+      // likely still a valid logo in the very first bank.
+      apply_checksum_values(c, g_checksum, h_checksum);
+      c.special_mbc = MMM01_t; // Skips remaining heuristics
+    }
+  }
+
+  // Pull the ROM and RAM sizes, at this point we just work with what we have
+  c.declared_rom_bytes = rom_bytes_from_code(c.header.rom_size_code);
+  c.declared_ram_bytes = ram_bytes_from_code(c.header.ram_size_code);
+
+  // We neeed to make sure these actually align or it could throw off our banking
+  // modulus calculation to avoid out of bounds memory accesses.
+  if (c.declared_rom_bytes != 0 && c.rom.size() < c.declared_rom_bytes)
+    c.rom.resize(c.declared_rom_bytes, 0);
+
+  // If we haven't already detected a weird mapper type, try again using what ever
+  // we have for the current header. If its still invalid, so be it.
+  if (c.special_mbc == NotSpecial_t)
+    c.special_mbc = detect_special_mbc(c);
+
+  // If they dont match, its tough luck. We have to proceed regardless because some
+  // developers did not follow the cartridge header like they were supposed to.
+  if (!c.header_checksum_ok || !c.global_checksum_ok) {
+    Logger::push(LogLevel::Warning, "ROM", "ROM validation failed",
+                 "ROM checksum failed. Please make sure the ROM is not corrupted.");
+  }
+}
+
 cart load_cart_raw(std::vector<byte_t> rom_bytes) {
-  cart c{};
+  cart c{.special_mbc = NotSpecial_t};
 
 #ifndef NO_CORE_FILESYSTEM
   c.file_path.clear();
 #endif // NO_CORE_FILESYSTEM
-
   c.rom = std::move(rom_bytes);
-  validate(c);
-  c.special_mbc = detect_special_mbc(c);
+
+  // We will load the cart even if it fails; the user should know what they are doing
+  calc_checksums_and_override(c);
   return c;
 }
 
@@ -406,18 +475,15 @@ static std::optional<std::vector<byte_t>> read_all_bytes(const std::filesystem::
 }
 
 cart load_cart_fs(const std::filesystem::path &rom_path) {
-  cart c{};
-  c.file_path = rom_path; // This is wrapped in NO_CORE_FILESYSTEM so we good
+  cart c{.file_path = rom_path, .special_mbc = NotSpecial_t};
   if (const auto rom = read_all_bytes(rom_path); rom != std::nullopt)
     c.rom = rom.value();
   else {
     throw std::runtime_error{"Cannot read cartridge content"};
   }
 
-  // We will load the cart even if it fails; the user should know what they are
-  // doing
-  validate(c);
-  c.special_mbc = detect_special_mbc(c);
+  // We will load the cart even if it fails; the user should know what they are doing
+  calc_checksums_and_override(c);
   return c;
 }
 

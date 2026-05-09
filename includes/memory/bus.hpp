@@ -8,6 +8,7 @@
 #include "memory/mmio/cgb.hpp"
 #include "memory/mmio/dmg.hpp"
 #include "memory/mmio/mmio.hpp"
+#include "schedule.hpp"
 
 #include <array>
 #include <cstdint>
@@ -68,14 +69,12 @@ public:
 
   /* Second constructor is called when skipping BIOS, first constructor may also
    * ignore the BIOS if the initialization fails for some reason. */
-  AddressBus(runtime_sys_info &sys, std::optional<Debug::Debugger> &debugger,
-             std::optional<BootROM> &bios);
+  AddressBus(runtime_sys_info &sys, SystemScheduler &g_sched,
+             std::optional<Debug::Debugger> &debugger, std::optional<BootROM> &bios);
   template <typename T> void parse_savestate(T &t);
 
   void write_byte(addr_t addr, byte_t value) const;
   [[nodiscard]] byte_t read_byte(addr_t addr, bool debug = true) const;
-  ObjAttrDMA &get_oam_dma() { return oam_dma; };
-  VDMA &get_vdma() { return vdma; }
 
   /* To be used by debuggers, more or less reads memory exactly the same as the
    * regular `read_byte()`, but calls `peak()` for memory mapped registers. */
@@ -131,14 +130,16 @@ private:
   SYS::KEY0 key0; // Controls DMG backwards compatability
   SYS::KEY1 key1; // Controls clock speed mode
 
-  /* Direct memory access routine modules */
-  ObjAttrDMA oam_dma;
-  VDMA vdma;
-
   /* MMIO refs maintained for convenience */
   PPU::VramBank vram_bank_ctrl{};
   WramBank wram_bank_ctrl{};
   BootROMCtrl boot_rom_ctrl{};
+
+  /* Undocumented MMIO registers we emulate for the sake of completionism */
+  MMIORegister undocFF72{};
+  MMIORegister undocFF73{};
+  Undocumented::UndocFF74 undocFF74;
+  Undocumented::UndocFF75 undocFF75{};
 
   /* Denotes who is currently holding onto what address ranges. In the case
    * of bus conflicts, one component will end up reading what we are basically

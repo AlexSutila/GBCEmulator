@@ -1,3 +1,4 @@
+#include "debugger/breakpoint.hpp"
 #include "frontend/sdl3/frontend.hpp"
 #include "memory/mmio/mmio.hpp"
 #include <algorithm>
@@ -49,7 +50,8 @@ SDL3Frontend::build_emulator_instance(
       gui.clear_bios_path();
       gbc = std::make_unique<GameBoyColor>(*this);
     }
-  }
+  } else
+    gbc = std::make_unique<GameBoyColor>(*this);
   gbc->insert_cartridge(cart);
 
   auto *const bus_ptr = gbc->get_bus();
@@ -242,8 +244,9 @@ void SDL3Frontend::emulation_thread_fn(
   const auto [bus_ptr, cart_ptr, joyp_ptr] = build_emulator_instance(cart, bios, initial_save_path);
   (void)bus_ptr;
 
-  gbc->configure_debugger(Debug::Debugger(
-      [this, st]() -> Debug::BreakReason { return debugger.on_breakpoint(st, gbc); }));
+  gbc->configure_debugger(Debug::Debugger([this, st](Debug::Context ctx) -> Debug::BreakReason {
+    return debugger.on_breakpoint(st, gbc);
+  }));
   sync_cheats_to_core(cheat_revision_seen);
 
   std::vector<byte_t> last_saved_snapshot = prime_sram_saves(initial_save_path, cart_ptr);

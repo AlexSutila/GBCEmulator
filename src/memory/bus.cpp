@@ -11,8 +11,10 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <optional>
+#include <random>
 #include <stdexcept>
 
 constexpr std::size_t vram_bank_size = 0x2000;
@@ -25,6 +27,14 @@ constexpr std::size_t oam_size = 0xA0;
 constexpr addr_t VRAM_MASK = 0x1FFF;
 constexpr addr_t WRAM_MASK = 0x0FFF;
 constexpr addr_t HRAM_MASK = 0x007F;
+
+template <typename T>
+std::unique_ptr<T[]> make_random(std::uniform_int_distribution<T> &dist, std::mt19937 &rng,
+                                 std::size_t size) {
+  auto p = std::make_unique<T[]>(size);
+  std::generate_n(p.get(), size, [&]() { return dist(rng); });
+  return p;
+}
 
 template <typename T> std::unique_ptr<T[]> make_zeroed(std::size_t size) {
   auto p = std::make_unique<T[]>(size);
@@ -96,10 +106,6 @@ template <typename T> void AddressBus::parse_savestate(T &t) {
   t.field_complex(F_KEY0, [&](T &t) { key0.parse_savestate(t); });
   t.field_complex(F_KEY1, [&](T &t) { key1.parse_savestate(t); });
 
-  // Direct memory access sub-structures
-  t.field_complex(F_OAM_DMA, [&](T &t) { oam_dma.parse_savestate(t); });
-  t.field_complex(F_VDMA, [&](T &t) { vdma.parse_savestate(t); });
-
   // Cartridge sub-structure (mapper handled internally)
   t.field_complex(F_CART, [&](T &t) { cart_->parse_savestate(t); });
   t.eof();
@@ -110,23 +116,25 @@ template void AddressBus::parse_savestate<Savestate::Reader>(Savestate::Reader &
 template void AddressBus::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
 template void AddressBus::parse_savestate<Savestate::Checker>(Savestate::Checker &);
 
-AddressBus::AddressBus(runtime_sys_info &sys, std::optional<Debug::Debugger> &debugger,
-                       std::optional<BootROM> &bios)
+AddressBus::AddressBus(runtime_sys_info &sys, SystemScheduler &g_sched,
+                       std::optional<Debug::Debugger> &debugger, std::optional<BootROM> &bios)
     : Debuggable(debugger), // Bus read/write breakpoints
       key0(sys),            // Controls backwards compatability
       key1(sys),            // Controls clock speed mode
-      oam_dma(*this),       // Performs object attribute DMA (DMG/CGB)
-      vdma(*this, sys),     // Performs GDMA and HDMA (CGB only)
+      undocFF74(sys),       // Undocumented, behaves differently in CGB mode
       bios_(bios),          // Optionally configured by frontend
       sys_(sys)             // Generic system information
 {
+  static thread_local std::mt19937 rng(std::random_device{}());
+  std::uniform_int_distribution<byte_t> dist(std::numeric_limits<byte_t>::min(),
+                                             std::numeric_limits<byte_t>::max());
   using mmio = IORegisterMapping;
   using namespace std::ranges;
 
   /* Initialize banked and non-banked memory */
+  generate(wram, [&] { return make_random<byte_t>(dist, rng, wram_bank_size); });
   generate(vram, [&] { return make_zeroed<byte_t>(vram_bank_size); });
-  generate(wram, [&] { return make_zeroed<byte_t>(wram_bank_size); });
-  hram = make_zeroed<byte_t>(hram_size);
+  hram = make_random<byte_t>(dist, rng, hram_size);
   oam = make_zeroed<byte_t>(oam_size);
   bus_conflicts = BUS_CONFLICT_NONE;
 
@@ -138,13 +146,11 @@ AddressBus::AddressBus(runtime_sys_info &sys, std::optional<Debug::Debugger> &de
   connect_mmio(static_cast<addr_t>(mmio::MMIO_SPD_KEY0), &key0);
   connect_mmio(static_cast<addr_t>(mmio::MMIO_SPD_KEY1), &key1);
 
-  /* Connect memory mapped IO owned by DMA modules */
-  connect_mmio(static_cast<addr_t>(mmio::MMIO_OAM_DMA), oam_dma.get_dma_reg());
-  connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA1), vdma.get_vdma1());
-  connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA2), vdma.get_vdma2());
-  connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA3), vdma.get_vdma3());
-  connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA4), vdma.get_vdma4());
-  connect_mmio(static_cast<addr_t>(mmio::MMIO_VDMA5), vdma.get_vdma5());
+  /* Connect undocumented memory mapped IO owned by ??? */
+  connect_mmio(static_cast<addr_t>(mmio::MMIO_UNDOC_FF72), &undocFF72);
+  connect_mmio(static_cast<addr_t>(mmio::MMIO_UNDOC_FF73), &undocFF73);
+  connect_mmio(static_cast<addr_t>(mmio::MMIO_UNDOC_FF74), &undocFF74);
+  connect_mmio(static_cast<addr_t>(mmio::MMIO_UNDOC_FF75), &undocFF75);
 }
 
 void AddressBus::connect_mmio(const addr_t addr, MMIORegister *const reg) {
@@ -245,7 +251,7 @@ byte_t AddressBus::read_byte_safe(const addr_t addr) const {
 
 byte_t AddressBus::read_byte(const addr_t addr, const bool debug) const {
   if (debug)
-    try_brk(addr, Debug::BRK_ADDRESS_READ);
+    try_brk(sys_.elapsed_clocks, addr, Debug::BRK_ADDRESS_READ);
   if (is_conflicting(addr)) [[unlikely]]
     return open_bus();
 
@@ -298,7 +304,7 @@ void AddressBus::write_byte(const addr_t addr, const byte_t value) const {
 
   /* We intentionally evaluate the breakpoint after the value has been written,
    * as it is less confusing from a UI perspective, seeing the updated value. */
-  try_brk(addr, Debug::BRK_ADDRESS_WRITTEN);
+  try_brk(sys_.elapsed_clocks, addr, Debug::BRK_ADDRESS_WRITTEN);
 }
 
 MMIORegister *AddressBus::get_mmio(IORegisterMapping mapping) const {

@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import Callable
 
+from .debugger import Debugger, BreakContext
 from .ppu import PPUState, RenderedFrame
 from .cpu import ProcessorState
-from .debugger import Debugger
 from .cart import Cartridge
 from . import gbc_py as core
 
@@ -13,7 +13,7 @@ class GameBoyColor:
     def __init__(self, cartridge: Cartridge = None, dbg_callback: Callable = None):
         try:
             self._gbc = (
-                core.GameBoyColor(dbg_callback)
+                core.GameBoyColor(lambda ctx: dbg_callback(self, BreakContext(ctx)))
                 if dbg_callback is not None
                 else core.GameBoyColor()
             )
@@ -81,24 +81,36 @@ class GameBoyColor:
     def insert_cartridge(self, cartridge: Cartridge):
         self._gbc.insert_cartridge(cartridge._raw)
 
-    def read_byte(self, addr: int):
+    def read_byte(self, addr: int, debug=False):
         self._check_bitwidth_addr(addr)
         addr_bus = self._gbc.get_bus()
-        return addr_bus.read_byte(addr)
+        return addr_bus.read_byte(addr, debug=debug)
 
-    def write_byte(self, addr: int, value: int):
+    def write_byte(self, addr: int, value: int, debug=False):
         self._check_bitwidth_addr(addr)
         self._check_bitwidth_byte(value)
         addr_bus = self._gbc.get_bus()
         return addr_bus.write_byte(addr, value)
 
-    def step_frame(self):
+    def step_frame(self, big_step: bool = True):
         cycles = 70224  # One frame worth of t-cycles
-        self.step(cycles=cycles)
+        if big_step:
+            self.big_step(cycles=cycles)
+        else:
+            self.step(cycles=cycles)
 
-    def step_scanline(self):
+    def step_scanline(self, big_step: bool = True):
         cycles = 456  # One scanline worth of t-cycles
-        self.step(cycles=cycles)
+        if big_step:
+            self.big_step(cycles=cycles)
+        else:
+            self.step(cycles=cycles)
+
+    def big_step(self, cycles: int = None) -> int:
+        if cycles is not None:
+            return self._gbc.big_step_cycles(cycles)
+        else:
+            return self._gbc.big_step()
 
     def step(self, cycles: int = None):
         if cycles is not None:

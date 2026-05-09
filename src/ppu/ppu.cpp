@@ -4,6 +4,7 @@
 #include "frontend/frontend.hpp"
 #include "gbc.hpp"
 #include "memory/bus.hpp"
+#include "memory/dma.hpp"
 #include "memory/mmio/dmg.hpp"
 #include "memory/mmio/mmio.hpp"
 #include "ppu/fetcher.hpp"
@@ -140,7 +141,6 @@ PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus, Frontend &fe,
       fe_(fe),                                // To access frame buffer(s)
       vram(bus->get_vram()),                  // Tile data/map/attribute content
       oam(bus->get_oam()),                    // Object (sprite) attribute memory
-      vdma_(bus->get_vdma()),                 // Performs GDMA and HDMA in CGB mode
       obj_cram(std::make_unique<ColorRam>()), // CGB sprite color RAM
       bg_cram(std::make_unique<ColorRam>())   // CGB background color RAM
 {
@@ -212,6 +212,12 @@ PixelProcessingUnit::PPUState PixelProcessingUnit::get_state() const {
   state_.ly = ly_.peek();
   state_.dots = cur_scanline_clks;
   return state_;
+}
+
+void PixelProcessingUnit::connect_vdma(VDMA *vdma) {
+  if (vdma == nullptr) [[unlikely]]
+    throw std::runtime_error("Read nullptr for VDMA connection");
+  vdma_module = vdma;
 }
 
 bool PixelProcessingUnit::should_advance_ly() {
@@ -370,7 +376,6 @@ std::optional<std::uint32_t> PixelProcessingUnit::try_fifo_pop() {
 
 void PixelProcessingUnit::do_disabled() {
   if (flush_on_disable) {
-    fe_.clear(); // This is slow
     reset();
 
     // Disabling the PPU impacts the other PPU related registers
@@ -379,6 +384,22 @@ void PixelProcessingUnit::do_disabled() {
 
     /* Reset PPU state only once when it is disabled. */
     flush_on_disable = false;
+    return;
+  }
+
+  // TODO: Our mechanism for pushing blank frames when the PPU is off is kinda
+  // hacky. Will likely go away, planning on doing a complete PPU re-write that
+  // will use a scheduler based architecture.
+  constexpr auto fb_height = 144, fb_width = 160;
+  constexpr std::uint32_t blank = 0x00FFFFFF;
+  ++cur_mode_clks;
+
+  if (cur_mode_clks >= fb_height * fb_width) {
+    fe_.clear(blank); // Clear the contents of the frame out
+    cur_mode_clks = 0;
+
+    // By writing the last pixel, we signal that the next frame is ready
+    fe_.put_pixel(fb_width - 1, fb_height - 1, blank);
   }
 }
 
@@ -411,7 +432,7 @@ void PixelProcessingUnit::do_oam_scan() {
     const Debug::BreakReason reason = (ly_.peek() == 0)
                                           ? Debug::BRK_STEP_SCANLINE | Debug::BRK_STEP_FRAME
                                           : Debug::BRK_STEP_SCANLINE;
-    try_brk(reason);
+    try_brk(sys_.elapsed_clocks, reason);
 
     /* Keeps track of which sprite we are on being on. If the sprite is visible
      * on the current scanline, we push it into the vector to so all the sprites
@@ -525,9 +546,8 @@ void PixelProcessingUnit::do_draw() {
   else if (fetcher->was_window_visible())
     fetcher->inc_win_ly();
 
-  /* Signal that HDMA can start running if it has been requested or started
-   * previously. If HBLANK is partially complete, it can also be triggered. */
-  vdma_.set_ppu_hblank_signal(true);
+  // Attempt to start HDMA, if it isn't waiting on a block transfer nothing happens
+  vdma_module->try_hdma();
 
   // State transition logic
   state = modes::MODE_HBLANK;
@@ -541,8 +561,7 @@ void PixelProcessingUnit::do_hblank() {
 
   /* Signal that HDMA is no longer allowed to kick in. Note, that it can still
    * start running last minute and bleed into OAM scan. This is intentional. */
-  if (blank())
-    vdma_.set_ppu_hblank_signal(false);
+  blank();
 }
 
 void PixelProcessingUnit::do_vblank() {
@@ -640,7 +659,6 @@ void PixelProcessingUnit::reset() {
 }
 
 void PixelProcessingUnit::step() {
-
   /* When the PPU is disabled, the screen just shows plain white and the state
    * is set to it's initial state until it is re-enabled again. */
   if (!lcdc_.lcd_enabled()) {

@@ -4,7 +4,6 @@
 #include "cpu/interrupts.hpp"
 #include "debugger/debugger.hpp"
 #include "memory/bus.hpp"
-#include "memory/dma.hpp"
 #include "memory/mmio/cgb.hpp"
 #include "memory/mmio/dmg.hpp"
 #include "memory/mmio/mmio.hpp"
@@ -21,6 +20,7 @@
 
 struct runtime_sys_info;
 class Frontend;
+class VDMA;
 
 class PixelProcessingUnit : Debug::Debuggable {
 public:
@@ -42,7 +42,9 @@ public:
     byte_t ly;
     std::size_t dots;
   };
+  [[nodiscard]] PPU::StatModes get_mode() const { return state; }
   [[nodiscard]] PPUState get_state() const;
+  void connect_vdma(VDMA *vdma);
 
 private:
   InterruptBits *if_reg{};
@@ -68,6 +70,9 @@ private:
   MMIORegister scx_{};
   MMIORegister wy_{};
   MMIORegister wx_{};
+
+  /* PPU needs visibility into this to it can schedule DMA transfers during HBLANK */
+  VDMA *vdma_module{};
 
   /* For tracking where we currently are in the rendering process */
   std::size_t row_pixels_rendered{}, sprites_fetched{};
@@ -99,9 +104,6 @@ private:
 
   /* CGB mode object priority resolution */
   PPU::OPRI opri_{};
-
-  /* CGB mode only, VRAM direct memory access */
-  VDMA &vdma_;
 
   /* Pixel Processor operation modes */
   void do_disabled();

@@ -5,6 +5,7 @@
 #include "debugger/debugger.hpp"
 #include "emu_types.hpp"
 #include "frontend/python/frontend.hpp"
+#include "schedule.hpp"
 #include <array>
 #include <functional>
 #include <optional>
@@ -35,7 +36,10 @@ public:
   /**
    * Emulation driver methods
    */
-  void step_cycles(int cycles);
+  std::size_t big_step_cycles(std::size_t cycles);
+  std::size_t big_step();
+
+  void step_cycles(std::size_t cycles);
   void step();
 
   /**
@@ -61,7 +65,7 @@ public:
   void put_joyp_state(std::uint8_t state);
 
 private:
-  std::function<Debug::BreakReason()> cb_;
+  std::function<Debug::BreakReason(Debug::Context)> cb_;
   PyFrontend fe_;
 };
 

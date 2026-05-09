@@ -22,7 +22,7 @@ constexpr std::size_t kHeaderEnd = 0x014F;
 constexpr std::size_t kMinRomSize = 0x0150;
 
 enum SpecialMbc {
-  NotSpecial_t,
+  NotSpecial_t = 0,
   MBC1M_t,
   MBC30_t,
   MMM01_t,
@@ -30,6 +30,7 @@ enum SpecialMbc {
   WisdomTree_t,
   Bung_t,
   EMS_t,
+  Sachen_t,
 };
 
 struct rom_header {
@@ -113,5 +114,9 @@ private:
 [[nodiscard]] std::size_t rom_bytes_from_code(byte_t code);
 [[nodiscard]] std::size_t ram_bytes_from_code(byte_t code);
 [[nodiscard]] bool cgb_enabled(byte_t cgb_flag);
+
+// mapper specific address jumbling used to bypass boot rom lockout
+[[nodiscard]] bool sachen_should_jumble(addr_t addr) noexcept;
+[[nodiscard]] addr_t sachen_jumble(addr_t addr) noexcept;
 
 #endif // GBC_CART_HPP
