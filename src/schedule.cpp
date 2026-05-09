@@ -5,11 +5,12 @@
 #include "gbc.hpp"
 #include "memory/dma.hpp"
 #include "savestate/codec.hpp"
-#include <cstdint>
+#include <algorithm>
 #include <map>
 #include <memory>
 #include <optional>
 #include <ostream>
+#include <queue>
 #include <sstream>
 #include <stdexcept>
 #include <tuple>
@@ -21,6 +22,23 @@ struct event_sequencer {
     if (time_a != time_b) [[likely]]
       return time_a < time_b;
     return ord_a < ord_b;
+  }
+};
+
+// A custom revision of std::priority_queue that supports random removal
+template <typename T> class SchedQueue : public std::priority_queue<T, std::vector<T>> {
+public:
+  bool remove(const T &val) {
+    auto it = std::find(this->c.begin(), this->c.end(), val);
+    if (it == this->c.end())
+      return false;
+    if (it == this->c.begin())
+      this->pop();
+    else {
+      this->erase(it);
+      std::make_heap(this->c.begin(), this->c.end(), this->comp);
+    }
+    return true;
   }
 };
 
@@ -69,28 +87,7 @@ public:
       : Debug::Debuggable(debugger_), sys_(sys) {}
   ~Implementation() = default;
 
-  std::map<event_time, event, event_sequencer> e_queue;
-  std::map<event, event_time> e_index; // Ordering does not matter
-
-  bool try_unqueue(event e) {
-    auto it = e_index.find(e);
-    if (it == e_index.end())
-      return false;
-
-    const event_time t = it->second;
-    LOG_UNQUEUE("event_unqueued", e, t, sys_);
-    auto itq = e_queue.find(t);
-
-    // This should not happen, but clean up just in case
-    if (itq == e_queue.end()) [[unlikely]] {
-      e_index.erase(it);
-      return false;
-    }
-
-    e_queue.erase(itq);
-    e_index.erase(it);
-    return true;
-  }
+  void unqueue(event_time t) { e_queue.erase(t); }
 
   // We want to note the time at which the event was queued, the handling of
   // the event can be observed through `Debug::BreakReason::BRK_EVENT_POPPED`
@@ -113,7 +110,6 @@ public:
     LOG_HANDLE("event_handled", e, t, sys_);
 
     e_queue.erase(it);
-    e_index.erase(e);
     return e;
   }
 
@@ -124,67 +120,10 @@ public:
     return std::get<0>(t);
   }
 
-  /* ======================================================================
-   * Scheduler serialization details: (((nightmare)))
-   * ----------------------------------------------------------------------
-   * There are numerous problems we had to solve here because LIBRETRO does
-   * not like it when the size of your savestates grows during runtime. So,
-   * to do this, we intentionally introduce a limitation that requires that
-   * each event, across all components, is only scheduled once.
-   *
-   * By doing this, we can enforce an upper bound on the amount of memory
-   * needed for serializing the scheduler. We will save and load each event
-   * to and from a vector, since the pairs of componend IDs and event IDs
-   * should all be unique.
-   *
-   * Because of how we wrote our serialization framework, we should be able
-   * to load a dynamic number of fields to and from a vector, and use it to
-   * save and restore the state of the scheduler.
-   * ====================================================================== */
-  struct SavedScheduledEvent {
-    SchedulerComponent comp_id;
-    unsigned event_id;
-    time_type event_time;
-    ord_type event_ord;
-  };
-
-  std::vector<SavedScheduledEvent> as_vec() const {
-    std::vector<SavedScheduledEvent> ret{};
-
-    // The data in `e_queue` and `e_index` is conveniently redundant, so
-    // we only have to iterate one of them for serialization purposes.
-    for (auto [t, e] : e_queue) {
-      ret.push_back({
-          .comp_id = std::get<0>(e),
-          .event_id = std::get<1>(e),
-          .event_time = std::get<0>(t),
-          .event_ord = std::get<1>(t),
-      });
-    }
-    return ret;
-  }
-
-  void from_vec(std::vector<SavedScheduledEvent> &vec) {
-    e_queue.clear();
-    e_index.clear();
-
-    for (auto s : vec) {
-      const event_time t = {s.event_time, s.event_ord};
-      const event e = {s.comp_id, s.event_id};
-
-      // Restoring is more compex because we have to restore the mapping
-      // and the reverse mapping for seamless scheduling and unscheduling.
-      queue(t, e); // This does not need to trigger a breakpoint
-    }
-  }
-
 private:
-  void queue(event_time t, event e) {
-    e_queue.insert({t, e});
-    e_index.insert({e, t});
-  }
+  void queue(event_time t, event e) { e_queue.insert({t, e}); }
 
-  // Mainly just used for logging purposes
+  std::map<event_time, event, event_sequencer> e_queue;
   const runtime_sys_info &sys_;
 };
 
@@ -207,34 +146,8 @@ constexpr std::size_t queue_size_upper_bound() {
 }
 
 template <typename T> void SystemScheduler::parse_savestate(T &t) {
-  using queue_entry = Implementation::SavedScheduledEvent;
   constexpr auto version = 1; // Schema revision
-  enum : std::uint16_t {
-    F_EVENT_QUEUE = 1,
-    F_ORD,
-  };
   t.chunk_header(version, Savestate::C_SCHEDULER);
-
-  constexpr auto max_bytes = sizeof(queue_entry) * queue_size_upper_bound();
-  std::vector<queue_entry> event_vec{};
-
-  // If we are writing, use existing state
-  if (t.op() == Savestate::OP_WRITE)
-    event_vec = impl->as_vec();
-
-  // Serialize event queue under upper bound queue length assumption
-  t.field_vector(F_EVENT_QUEUE, event_vec, max_bytes, [&](T &t, auto &s) {
-    t.field_generic(0, s.comp_id);
-    t.field_generic(1, s.event_id);
-    t.field_generic(2, s.event_time);
-    t.field_generic(3, s.event_ord);
-  });
-
-  // If we are reading, use new state. Make sure stale metadata is cleared.
-  if (t.op() == Savestate::OP_READ)
-    impl->from_vec(event_vec);
-
-  t.field_generic(F_ORD, ord);
   t.eof();
 }
 
@@ -253,37 +166,66 @@ event SystemScheduler::pop_next_event() {
   return e;
 }
 
-void SystemScheduler::schedule_event_in(time_type in_cycles, event e) {
+event_time SystemScheduler::schedule_event_in(time_type in_cycles, event e) {
   const event_time t = std::make_tuple(sys.elapsed_clocks + in_cycles, ord++);
   impl->queue(sys.elapsed_clocks, t, e);
+  return t;
 }
 
-void SystemScheduler::schedule_event_on(time_type cycle, event e) {
+event_time SystemScheduler::schedule_event_on(time_type cycle, event e) {
   const event_time t = std::make_tuple(cycle, ord++);
   impl->queue(sys.elapsed_clocks, t, e);
+  return t;
 }
 
-bool SystemScheduler::unschedule_event(event e) { return impl->try_unqueue(e); }
+void SystemScheduler::unschedule_event(event_time t) { impl->unqueue(t); }
 
 /* ======================================================================
  * Child (per-component) scheduler implementation
  * ====================================================================== */
 
-ChildScheduler::ChildScheduler(SystemScheduler &global_sched, SchedulerComponent component_id)
-    : component_id(component_id), g_sched(global_sched) {}
+struct ChildScheduler::Implementation {
+public:
+  using LookupVal = std::optional<event_time>;
+  Implementation(const std::size_t num_events) : e_index(num_events, std::nullopt) {}
+
+  void put(const unsigned event_id, const event_time t) {
+    e_index.at(static_cast<std::size_t>(event_id)) = t;
+  }
+
+  LookupVal erase(const unsigned event_id) {
+    const std::size_t event_idx = static_cast<std::size_t>(event_id);
+    auto ret = e_index.at(event_idx); // Keep copy to remove at top level
+
+    e_index.at(event_idx) = std::nullopt;
+    return ret;
+  }
+
+private:
+  std::vector<LookupVal> e_index;
+};
+
+ChildScheduler::ChildScheduler(SystemScheduler &global_sched, SchedulerComponent component_id,
+                               const std::size_t num_events)
+    : impl(std::make_unique<Implementation>(num_events)), component_id(component_id),
+      g_sched(global_sched) {}
 ChildScheduler::~ChildScheduler() = default;
 
 void ChildScheduler::schedule_event_in_impl(time_type in_cycles, unsigned event_id) {
-  const event e = std::make_tuple(component_id, event_id);
-  g_sched.schedule_event_in(in_cycles, e);
+  const auto t = g_sched.schedule_event_in(in_cycles, std::make_tuple(component_id, event_id));
+  impl->put(event_id, t);
 }
 
 void ChildScheduler::schedule_event_on_impl(time_type cycle, unsigned event_id) {
-  const event e = std::make_tuple(component_id, event_id);
-  g_sched.schedule_event_on(cycle, e);
+  const auto t = g_sched.schedule_event_on(cycle, std::make_tuple(component_id, event_id));
+  impl->put(event_id, t);
 }
 
 bool ChildScheduler::unschedule_event_impl(unsigned event_id) {
-  const event e = std::make_tuple(component_id, event_id);
-  return g_sched.unschedule_event(e);
+  const auto t = impl->erase(event_id);
+  if (!t.has_value())
+    return false;
+
+  g_sched.unschedule_event(t.value());
+  return true;
 }
