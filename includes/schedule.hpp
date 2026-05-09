@@ -71,7 +71,7 @@ public:
 
   event_time schedule_event_in(time_type in_cycles, event e);
   event_time schedule_event_on(time_type cycle, event e);
-  void unschedule_event(event_time t);
+  bool unschedule_event(event_time t);
 
 private:
   struct Implementation;
