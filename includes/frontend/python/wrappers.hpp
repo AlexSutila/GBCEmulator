@@ -26,6 +26,13 @@ public:
   frame_buf_t get_frame();
 
   /**
+   * Savestate methods, use carefully - savestates can only be generated when ready.
+   */
+  [[nodiscard]] std::vector<byte_t> savestate_serialize();
+  bool savestate_deserialize(std::span<const byte_t> data);
+  [[nodiscard]] bool savestate_ready();
+
+  /**
    * This constructor configures the debugger and allows for python callbacks to
    * be invoked upon being hit.
    */

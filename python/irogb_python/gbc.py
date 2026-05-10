@@ -81,6 +81,15 @@ class GameBoyColor:
     def insert_cartridge(self, cartridge: Cartridge):
         self._gbc.insert_cartridge(cartridge._raw)
 
+    def savestate_ready(self) -> bool:
+        return self._gbc.savestate_ready()
+
+    def savestate_serialize(self) -> bytes:
+        return self._gbc.savestate_serialize()
+
+    def savestate_deserialize(self, data: bytes) -> bool:
+        return self._gbc.savestate_deserialize(data)
+
     def read_byte(self, addr: int, debug=False):
         self._check_bitwidth_addr(addr)
         addr_bus = self._gbc.get_bus()

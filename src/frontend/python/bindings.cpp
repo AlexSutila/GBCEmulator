@@ -188,6 +188,19 @@ static void bind_gbc(const py::module_ &m) {
       .def(py::init<pybind11::function>())
       .def(py::init<>())
       .def("insert_cartridge", &PyGameBoyColor::insert_cartridge)
+      .def("savestate_serialize",
+           [](PyGameBoyColor &self) {
+             const auto data = self.savestate_serialize();
+             return py::bytes(reinterpret_cast<const char *>(data.data()),
+                              static_cast<py::ssize_t>(data.size()));
+           })
+      .def("savestate_deserialize",
+           [](PyGameBoyColor &self, py::bytes bytes) {
+             std::string_view view = bytes;
+             return self.savestate_deserialize(std::span<const byte_t>(
+                 reinterpret_cast<const byte_t *>(view.data()), view.size()));
+           })
+      .def("savestate_ready", &PyGameBoyColor::savestate_ready)
       .def("init_test_bed", &PyGameBoyColor::init_test_bed)
       .def("big_step_cycles", &PyGameBoyColor::big_step_cycles)
       .def("big_step", &PyGameBoyColor::big_step)

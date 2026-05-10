@@ -7,6 +7,7 @@
 #include "memory/mmio/dmg.hpp"
 #include "memory/mmio/mmio.hpp"
 #include <optional>
+#include <span>
 
 PyGameBoyColor::PyGameBoyColor(const pybind11::function &callback) {
   const auto &gbc = fe_.get();
@@ -28,6 +29,32 @@ void PyGameBoyColor::insert_cartridge(cart c) {
 
 using frame_buf_t = std::array<std::uint32_t, 160 * 144>;
 frame_buf_t PyGameBoyColor::get_frame() { return fe_.get_frame(); }
+
+[[nodiscard]] std::vector<byte_t> PyGameBoyColor::savestate_serialize() {
+  const auto &gbc = fe_.get();
+  if (!savestate_ready())
+    return {}; // To avoid throwing an error within the core
+  return gbc->savestate_serialize();
+}
+
+bool PyGameBoyColor::savestate_deserialize(std::span<const byte_t> data) {
+  const auto &gbc = fe_.get();
+  try {
+    gbc->savestate_deserialize(data);
+    return true;
+  }
+
+  // Savestate may fail if the savestate was created on a different architecture
+  // or an older emulator version. TODO: Pass some informative error message?
+  catch (...) {
+    return false;
+  }
+}
+
+[[nodiscard]] bool PyGameBoyColor::savestate_ready() {
+  const auto &gbc = fe_.get();
+  return gbc->savestate_ready();
+}
 
 void PyGameBoyColor::breakpoint_add(const addr_t addr, Debug::BreakReason reason) {
   auto &debugger = fe_.get()->get_debugger();
