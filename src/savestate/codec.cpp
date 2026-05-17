@@ -15,10 +15,8 @@ struct Writer::Implementation {
 public:
   using TreeKey = std::uint16_t;
 
-  Implementation(bool should_build_tree) : build_tree(should_build_tree) {
-    if (build_tree)
-      start_complex_node(C_GBC);
-  }
+  Implementation(bool should_build_tree)
+      : root_node(std::monostate()), build_tree(should_build_tree) {}
 
   // Always present in internal emulator state and consequentially the tree structure.
   void append_value(TreeKey tag, std::uint64_t val) {
@@ -67,6 +65,11 @@ public:
     TreeNode completed = incomplete.top(); // Copy is intentional
     const TreeKey tag = completed.tag;
     incomplete.pop();
+
+    if (incomplete.empty()) {
+      root_node = std::move(completed);
+      return; // No parent, so skip
+    }
 
     // Get the parent node to merge the sub-tree in
     TreeNode &parent = incomplete.top();
@@ -135,7 +138,8 @@ private:
   }
 
   // Enables construction of the tree, if `false` no tree will be constructed to save on compute
-  std::stack<TreeNode> incomplete{};
+  std::variant<TreeNode, std::monostate> root_node{std::monostate()}; // Keep alive
+  std::stack<TreeNode> incomplete{}; // For tracking parsing progression
   const bool build_tree;
 };
 
