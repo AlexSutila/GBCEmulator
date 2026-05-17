@@ -87,6 +87,9 @@ class GameBoyColor:
     def savestate_serialize(self) -> bytes:
         return self._gbc.savestate_serialize()
 
+    def savestate_as_tree(self) -> dict:
+        return self._gbc.savestate_as_tree()
+
     def savestate_deserialize(self, data: bytes) -> bool:
         return self._gbc.savestate_deserialize(data)
 

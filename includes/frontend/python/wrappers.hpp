@@ -5,6 +5,7 @@
 #include "debugger/debugger.hpp"
 #include "emu_types.hpp"
 #include "frontend/python/frontend.hpp"
+#include "savestate/codec.hpp"
 #include "schedule.hpp"
 #include <array>
 #include <functional>
@@ -29,6 +30,7 @@ public:
    * Savestate methods, use carefully - savestates can only be generated when ready.
    */
   [[nodiscard]] std::vector<byte_t> savestate_serialize();
+  [[nodiscard]] Savestate::TreeRoot savestate_as_tree();
   bool savestate_deserialize(std::span<const byte_t> data);
   [[nodiscard]] bool savestate_ready();
 

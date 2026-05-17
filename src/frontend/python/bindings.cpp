@@ -4,14 +4,59 @@
 #include "frontend/python/testing.hpp"
 #include "frontend/python/wrappers.hpp"
 #include "ppu/ppu.hpp"
+#include "savestate/codec.hpp"
 #include "schedule.hpp"
 #include <filesystem>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/stl/filesystem.h>
+#include <variant>
 
 namespace fs = std::filesystem;
 namespace py = pybind11;
+
+template <class T> constexpr bool always_false_v = false;
+static py::object tree_value_to_py(const Savestate::TreeValue &val);
+
+static py::dict tree_root_to_py(const Savestate::TreeRoot &root) {
+  py::dict out;
+
+  for (const auto &[key, node] : root) {
+    out[py::int_(key)] = tree_value_to_py(node->val);
+  }
+  return out;
+}
+
+static py::object tree_value_to_py(const Savestate::TreeValue &val) {
+
+  return std::visit(
+      [](const auto &v) -> py::object {
+        using T = std::decay_t<decltype(v)>;
+
+        if constexpr (std::is_same_v<T, std::uint64_t>)
+          return py::int_(v);
+
+        else if constexpr (std::is_same_v<T, std::vector<std::uint8_t>>) {
+          return py::bytes(reinterpret_cast<const char *>(v.data()), v.size());
+        }
+
+        else if constexpr (std::is_same_v<T, std::vector<std::shared_ptr<Savestate::TreeNode>>>) {
+          py::list l;
+
+          for (const auto &node : v)
+            l.append(tree_value_to_py(node->val));
+          return std::move(l);
+        }
+
+        else if constexpr (std::is_same_v<T, Savestate::TreeRoot>) {
+          return tree_root_to_py(v);
+        }
+
+        else
+          static_assert(always_false_v<T>, "unhandled variant type");
+      },
+      val);
+}
 
 static void bind_cart(py::module_ &m) {
   py::class_<cart>(m, "Cart")
@@ -200,6 +245,8 @@ static void bind_gbc(const py::module_ &m) {
              return self.savestate_deserialize(std::span<const byte_t>(
                  reinterpret_cast<const byte_t *>(view.data()), view.size()));
            })
+      .def("savestate_as_tree",
+           [](PyGameBoyColor &self) { return tree_root_to_py(self.savestate_as_tree()); })
       .def("savestate_ready", &PyGameBoyColor::savestate_ready)
       .def("init_test_bed", &PyGameBoyColor::init_test_bed)
       .def("big_step_cycles", &PyGameBoyColor::big_step_cycles)

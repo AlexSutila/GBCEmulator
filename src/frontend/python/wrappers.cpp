@@ -37,6 +37,13 @@ frame_buf_t PyGameBoyColor::get_frame() { return fe_.get_frame(); }
   return gbc->savestate_serialize();
 }
 
+[[nodiscard]] Savestate::TreeRoot PyGameBoyColor::savestate_as_tree() {
+  const auto &gbc = fe_.get();
+  if (!savestate_ready())
+    return {}; // Yeah... bruh moment
+  return gbc->savestate_as_tree();
+}
+
 bool PyGameBoyColor::savestate_deserialize(std::span<const byte_t> data) {
   const auto &gbc = fe_.get();
   try {
