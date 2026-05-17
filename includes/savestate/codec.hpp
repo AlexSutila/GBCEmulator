@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <cstring>
+#include <memory>
 #include <optional>
 #include <span>
 #include <stdexcept>
@@ -60,11 +61,16 @@ enum ChunkTags : std::uint16_t {
 // Serialize
 class Writer {
 public:
+  Writer(bool should_build_tree);
+  Writer(); // Disables tree construction by default
+  ~Writer();
+
   constexpr SavestateOps op() const { return OP_WRITE; }
 
   template <typename T> void field_generic(const std::uint16_t tag, const T val) {
     write<std::uint16_t>(tag);
     write<T>(val);
+    append_value(tag, static_cast<std::uint64_t>(val));
   }
 
   template <typename T> void field_enum(const std::uint16_t tag, const T val) {
@@ -73,10 +79,13 @@ public:
     // This makes an assumption we don't need >256 enum values lol
     const std::uint8_t as_byte = static_cast<std::uint8_t>(val);
     write<std::uint8_t>(as_byte);
+    append_value(tag, static_cast<std::uint64_t>(val));
   }
 
   template <typename Fn> void field_complex(const std::uint16_t tag, Fn &&fn) {
     write<std::uint16_t>(tag);
+    start_complex_node(tag);
+
     fn(*this);
     eof();
   }
@@ -87,9 +96,13 @@ public:
     write<std::uint16_t>(tag);
     write<std::size_t>(vec.size());
 
-    for (T &e : vec)
-      fn(*this, e); // Should not manipulate, only write out
-
+    // We don't need to consider the size here, just ignore
+    start_vector_node(tag);
+    for (T &e : vec) {
+      start_complex_node(tag); // Tag will be duplicated, its not a big deal
+      fn(*this, e);            // Should not manipulate, only write out
+      eof();
+    }
     eof();
   }
 
@@ -118,11 +131,18 @@ public:
     }
   }
 
-  void eof() { write<std::uint16_t>(C_EOF); }
+  void eof() {
+    write<std::uint16_t>(C_EOF);
+    end_node();
+  }
 
   void chunk_header(const std::uint16_t version, const std::uint16_t tag) {
     write<std::uint16_t>(version);
     write<std::uint16_t>(tag);
+
+    // Chunk headers are written for complex sub-structures that essentially just behave like
+    // complex nodes. The only difference is they have a version which the tree will ignore.
+    start_complex_node(tag);
   }
 
   std::vector<std::uint8_t> get() const { return buf_; }
@@ -134,6 +154,19 @@ private:
     buf_.insert(buf_.end(), ptr, ptr + sizeof(T));
   }
 
+  struct Implementation; // Used specifically for tree-like representation of state
+  std::unique_ptr<Implementation> impl_{};
+
+  // Helpers for tree-representation construction
+  void append_value(std::uint16_t tag, std::uint64_t val);
+  void append_value(std::uint16_t tag, const std::span<std::uint8_t> val);
+  void append_value(std::uint16_t tag, const std::vector<std::uint8_t> &val);
+  void append_value(std::uint16_t tag, const std::optional<std::uint64_t> &val);
+  void start_complex_node(std::uint16_t tag);
+  void start_vector_node(std::uint16_t tag);
+  void end_node();
+
+  // Byte stream buffer for serialized emulator state
   std::vector<std::uint8_t> buf_{};
 };
 

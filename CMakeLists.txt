@@ -67,6 +67,7 @@ set(GBC_CORE_SOURCES
     ${CMAKE_SOURCE_DIR}/src/debugger/breakpoint.cpp
     ${CMAKE_SOURCE_DIR}/src/debugger/debugger.cpp
     ${CMAKE_SOURCE_DIR}/src/debugger/print.cpp
+    ${CMAKE_SOURCE_DIR}/src/savestate/codec.cpp
     ${CMAKE_SOURCE_DIR}/src/schedule.cpp
 )
 
