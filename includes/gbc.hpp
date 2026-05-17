@@ -10,6 +10,7 @@
 #include "memory/dma.hpp"
 #include "memory/mmio/mmio.hpp"
 #include "ppu/ppu.hpp"
+#include "savestate/codec.hpp"
 #include "schedule.hpp"
 #include "serial.hpp"
 #include "timer.hpp"
@@ -80,6 +81,7 @@ public:
 
   template <typename T> void parse_savestate(T &t); // Top level
   [[nodiscard]] std::vector<byte_t> savestate_serialize();
+  [[nodiscard]] Savestate::TreeRoot savestate_as_tree();
   void savestate_deserialize(std::span<const byte_t> data);
   [[nodiscard]] std::size_t savestate_size();
   [[nodiscard]] bool savestate_ready() const;
@@ -123,6 +125,8 @@ private:
   /* For moving emulation state along */
   void step_peripherals(bool fast_cycle);
   CheatStats cheat_stats_{};
+
+  void savestate_serialize_raise(bool check_ready) const;
 
   std::optional<Debug::Debugger> debugger_{};
   std::optional<BootROM> bios_{};

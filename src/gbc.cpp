@@ -665,13 +665,17 @@ template void GameBoyColor::parse_savestate<Savestate::Reader>(Savestate::Reader
 template void GameBoyColor::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
 template void GameBoyColor::parse_savestate<Savestate::Checker>(Savestate::Checker &);
 
-std::vector<byte_t> GameBoyColor::savestate_serialize() {
+void GameBoyColor::savestate_serialize_raise(bool check_ready) const {
   if (!bus || !cpu || !ppu || !timer || !serial || !apu)
-    throw std::runtime_error("GameBoyColor::serialize_savestate() uninitialized");
+    throw std::runtime_error("GameBoyColor::serialize_savestate_raise() uninitialized");
 
   // Align saves to instruction fetches
-  if (!savestate_ready())
-    throw std::runtime_error("GameBoyColor::serialize_savestate() unsafe point");
+  if (check_ready && !savestate_ready())
+    throw std::runtime_error("GameBoyColor::serialize_savestate_raise() unsafe point");
+}
+
+std::vector<byte_t> GameBoyColor::savestate_serialize() {
+  savestate_serialize_raise(true);
 
   // Writer performs deserialization
   Savestate::Writer out{};
@@ -679,9 +683,17 @@ std::vector<byte_t> GameBoyColor::savestate_serialize() {
   return out.get();
 }
 
+Savestate::TreeRoot GameBoyColor::savestate_as_tree() {
+  savestate_serialize_raise(true);
+  constexpr bool opt_in = true;
+
+  Savestate::Writer out = Savestate::Writer(opt_in);
+  parse_savestate(out);
+  return out.get_tree();
+}
+
 void GameBoyColor::savestate_deserialize(const std::span<const byte_t> data) {
-  if (!bus || !cpu || !ppu || !timer || !serial || !apu)
-    throw std::runtime_error("GameBoyColor::serialize_savestate() uninitialized");
+  savestate_serialize_raise(false);
 
   // First pass does a check on the buffer content to make sure the save is in
   // a valid format BEFORE blindly altering system components.
@@ -694,8 +706,7 @@ void GameBoyColor::savestate_deserialize(const std::span<const byte_t> data) {
 }
 
 std::size_t GameBoyColor::savestate_size() {
-  if (!bus || !cpu || !ppu || !timer || !serial || !apu)
-    throw std::runtime_error("GameBoyColor::serialize_savestate() uninitialized");
+  savestate_serialize_raise(false);
 
   // Sizer computes size to estimate space needed for memory allocation. The
   // estimation is generous and should always be large enough to fit a save.
