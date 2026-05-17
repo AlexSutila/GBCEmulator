@@ -1,0 +1,146 @@
+#!/usr/bin/env python3
+'''
+Heads up, this script is heavily vibe coded but the underlying interfaces
+were written by hand, so it should be quite robust - dorce
+'''
+
+from typing import Any, Iterator
+
+import sys
+
+from irogb_python import (
+    Cartridge,
+    GameBoyColor,
+    load_cart_filesystem,
+)
+
+
+def diff_states(lhs: Any, rhs: Any, path: str = "root") -> bool:
+    if type(lhs) is not type(rhs):
+        print(f"{path}: type mismatch")
+        print(f"  lhs: {type(lhs).__name__}")
+        print(f"  rhs: {type(rhs).__name__}")
+        return False
+
+    if isinstance(lhs, dict):
+        lhs_keys = set(lhs.keys())
+        rhs_keys = set(rhs.keys())
+
+        only_lhs = lhs_keys - rhs_keys
+        only_rhs = rhs_keys - lhs_keys
+
+        if only_lhs:
+            for key in sorted(only_lhs):
+                print(f"{path}.{key}: only in lhs")
+            return False
+
+        if only_rhs:
+            for key in sorted(only_rhs):
+                print(f"{path}.{key}: only in rhs")
+            return False
+
+        for key in sorted(lhs_keys):
+            if not diff_states(lhs[key], rhs[key], f"{path}.{key}"):
+                return False
+
+        return True
+
+    if isinstance(lhs, list):
+        if len(lhs) != len(rhs):
+            print(f"{path}: length mismatch")
+            print(f"  lhs: {len(lhs)}")
+            print(f"  rhs: {len(rhs)}")
+            return False
+
+        for i, (a, b) in enumerate(zip(lhs, rhs)):
+            if not diff_states(a, b, f"{path}[{i}]"):
+                return False
+
+        return True
+
+    if isinstance(lhs, (bytes, bytearray)):
+        if lhs != rhs:
+            print(f"{path}: bytes differ")
+
+            min_len = min(len(lhs), len(rhs))
+
+            for i in range(min_len):
+                if lhs[i] != rhs[i]:
+                    print(
+                        f"  first differing byte @ {i}: "
+                        f"{lhs[i]:02x} != {rhs[i]:02x}"
+                    )
+                    break
+
+            if len(lhs) != len(rhs):
+                print(f"  size mismatch: {len(lhs)} != {len(rhs)}")
+
+            return False
+
+        return True
+
+    if lhs != rhs:
+        print(f"{path}: value mismatch")
+        print(f"  lhs: {lhs}")
+        print(f"  rhs: {rhs}")
+        return False
+
+    return True
+
+
+def cycle_stepped_generator(
+    cart: Cartridge,
+) -> Iterator[tuple[int, dict]]:
+    gbc = GameBoyColor(cartridge=cart)
+    elapsed_cycles = 0
+
+    while True:
+        while not gbc.savestate_ready():
+            gbc.step()
+            elapsed_cycles += 1
+
+        yield elapsed_cycles, gbc.savestate_as_tree()
+
+
+def big_step_stepped_generator(
+    cart: Cartridge,
+) -> Iterator[tuple[int, dict]]:
+    gbc = GameBoyColor(cartridge=cart)
+    elapsed_cycles = 0
+
+    while True:
+        while not gbc.savestate_ready():
+            elapsed_cycles += gbc.big_step()
+
+        yield elapsed_cycles, gbc.savestate_as_tree()
+
+
+def main() -> int:
+    cart = load_cart_filesystem(sys.argv[1])
+
+    cycle_gen = cycle_stepped_generator(cart)
+    big_step_gen = big_step_stepped_generator(cart)
+
+    next(cycle_gen)
+    next(big_step_gen)
+
+    for frame_idx, (
+        (cycle_elapsed, cycle_state),
+        (big_elapsed, big_state),
+    ) in enumerate(zip(cycle_gen, big_step_gen), start=1):
+
+        print(
+            f"[{frame_idx}] "
+            f"cycle={cycle_elapsed} "
+            f"big_step={big_elapsed}"
+        )
+
+        if not diff_states(cycle_state, big_state):
+            print("desync detected")
+            return 1
+
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
