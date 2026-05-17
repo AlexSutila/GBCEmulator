@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <cstring>
+#include <memory>
 #include <optional>
 #include <span>
 #include <stack>
@@ -15,7 +16,7 @@ namespace Savestate {
 
 struct TreeNode;
 using TreeKey = std::uint16_t;
-using TreeRoot = std::unordered_map<TreeKey, TreeNode>;
+using TreeRoot = std::unordered_map<TreeKey, std::shared_ptr<TreeNode>>;
 
 enum SavestateOps {
   OP_READ,
@@ -85,14 +86,17 @@ using TreeValue = std::variant<
      * Wraps vectors used for complex types requiring recursive descent:
      *  - `Writer::field_vector`
      */
-    std::vector<TreeNode>,
+    std::vector<std::shared_ptr<TreeNode>>,
 
     /**
      * Wraps raw complex types requiring recursive descent:
      *  - `Writer::field_complex`
      *  - `Writer::field_optional` (if value is present)
+     *
+     * Just because the type is `TreeRoot`, doesn't mean this is always the
+     * main root of the tree. This also accounts for roots of subtrees
      */
-    std::unordered_map<TreeKey, TreeNode>>;
+    TreeRoot>;
 
 struct TreeNode {
   TreeKey tag{};
@@ -132,8 +136,7 @@ public:
   }
 
   template <typename T, typename Fn>
-  void field_vector(const TreeKey tag, std::vector<T> &vec, const std::size_t max_size,
-                    Fn &&fn) {
+  void field_vector(const TreeKey tag, std::vector<T> &vec, const std::size_t max_size, Fn &&fn) {
     write<TreeKey>(tag);
     write<std::size_t>(vec.size());
 
@@ -189,8 +192,8 @@ public:
     start_complex_node(tag);
   }
 
-  std::unordered_map<TreeKey, TreeNode> get_tree() const;
   std::vector<std::uint8_t> get() const { return buf_; }
+  TreeRoot get_tree() const;
 
 private:
   template <typename T> void write(const T val) {
@@ -212,7 +215,7 @@ private:
 
   // Opt-in tree-like structure of emulator state
   std::variant<TreeNode, std::monostate> root_node{std::monostate()};
-  std::stack<TreeNode> incomplete{};
+  std::stack<std::shared_ptr<TreeNode>> incomplete{};
   const bool build_tree;
 };
 
@@ -241,8 +244,7 @@ public:
   }
 
   template <typename T, typename Fn>
-  void field_vector(const TreeKey tag, std::vector<T> &vec, const std::size_t max_size,
-                    Fn &&fn) {
+  void field_vector(const TreeKey tag, std::vector<T> &vec, const std::size_t max_size, Fn &&fn) {
     check_tag(tag);
 
     const std::size_t size = read<std::size_t>();
@@ -350,8 +352,7 @@ public:
   }
 
   template <typename T, typename Fn>
-  void field_vector(const TreeKey tag, std::vector<T> &, const std::size_t max_size,
-                    Fn &&fn) {
+  void field_vector(const TreeKey tag, std::vector<T> &, const std::size_t max_size, Fn &&fn) {
     check_tag(tag);
 
     const std::size_t size = read<std::size_t>();
@@ -454,8 +455,7 @@ public:
   }
 
   template <typename T, typename Fn>
-  void field_vector(const TreeKey tag, std::vector<T> &vec, const std::size_t max_size,
-                    Fn &&fn) {
+  void field_vector(const TreeKey tag, std::vector<T> &vec, const std::size_t max_size, Fn &&fn) {
     const T dummy{}; // Need this to have some object to pass, otherwise unused
     parse<TreeKey>();
     parse<std::size_t>();
