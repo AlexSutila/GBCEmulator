@@ -88,10 +88,23 @@ def diff_states(lhs: Any, rhs: Any, path: str = "root") -> bool:
     return True
 
 
+def make_initial_state(cart: Cartridge) -> bytes:
+    '''
+    In order to make sure we are comparing apples against apples, we make a
+    temporary emulator instance which we use just to get an initial savestate
+    which we can use to prime the other two emulator instances.
+    '''
+    gbc = GameBoyColor(cartridge=cart)  # Will fall out of scope. Totally fine
+    return gbc.savestate_serialize()
+
+
 def cycle_stepped_generator(
+    initial_state: bytes,
     cart: Cartridge,
 ) -> Iterator[tuple[int, dict]]:
     gbc = GameBoyColor(cartridge=cart)
+    gbc.savestate_deserialize(initial_state)
+
     elapsed_cycles = 0
 
     while True:
@@ -101,11 +114,17 @@ def cycle_stepped_generator(
 
         yield elapsed_cycles, gbc.savestate_as_tree()
 
+        gbc.step()
+        elapsed_cycles += 1
+
 
 def big_step_stepped_generator(
+    initial_state: bytes,
     cart: Cartridge,
 ) -> Iterator[tuple[int, dict]]:
     gbc = GameBoyColor(cartridge=cart)
+    gbc.savestate_deserialize(initial_state)
+
     elapsed_cycles = 0
 
     while True:
@@ -113,16 +132,18 @@ def big_step_stepped_generator(
             elapsed_cycles += gbc.big_step()
 
         yield elapsed_cycles, gbc.savestate_as_tree()
+        elapsed_cycles += gbc.big_step()
 
 
 def main() -> int:
     cart = load_cart_filesystem(sys.argv[1])
+    initial_state = make_initial_state(cart)
 
-    cycle_gen = cycle_stepped_generator(cart)
-    big_step_gen = big_step_stepped_generator(cart)
+    big_step_gen = big_step_stepped_generator(initial_state, cart)
+    cycle_gen = cycle_stepped_generator(initial_state, cart)
 
-    next(cycle_gen)
     next(big_step_gen)
+    next(cycle_gen)
 
     for frame_idx, (
         (cycle_elapsed, cycle_state),
