@@ -4,7 +4,7 @@
 
 #include "emu_types.hpp" // For `byte_t`
 
-constexpr std::uint32_t max_cycles = 40000000;
+constexpr std::uint32_t max_cycles = 80000000;
 constexpr byte_t breakpoint_opcode = 0x40; // LD B, B
 
 bool poll_mooneye_regular(PyGameBoyColor &gbc) {
@@ -15,7 +15,7 @@ bool poll_mooneye_regular(PyGameBoyColor &gbc) {
     op = cpu->cur_opcode();
 
     gbc.step(); // Run until 'LD B, B'
-    ++cycles;
+    cycles += 2; // Two to account for double speeds fast cycle
   }
   return op == breakpoint_opcode;
 }

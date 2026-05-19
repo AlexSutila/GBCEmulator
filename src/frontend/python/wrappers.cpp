@@ -77,10 +77,13 @@ std::size_t PyGameBoyColor::big_step_cycles(std::size_t cycles) {
   auto &gbc = fe_.get();
   std::size_t elapsed_cycles{0};
 
+  // Keep in mind that one `cycle` technically emulates one cycle and the fast
+  // cycle of double speed mode if it is active. We do this so the duration of
+  // one call to step is consistent. As a result, we have to use `2 * cycle`
   do {
     std::size_t sync_cycles = gbc->big_step();
     elapsed_cycles = elapsed_cycles + sync_cycles;
-  } while (elapsed_cycles < cycles);
+  } while (elapsed_cycles < cycles * 2);
 
   // We return the number of cycles elapsed here because it is not garunteed to
   // always align perfectly with the number of cycles passed in.
@@ -95,7 +98,7 @@ std::size_t PyGameBoyColor::big_step() {
 void PyGameBoyColor::step_cycles(std::size_t cycles) {
   auto &gbc = fe_.get();
   for (std::size_t i{0}; i < cycles; i++)
-    gbc->step();
+    gbc->step(); // Includes fast cycle for double speed mode
 }
 
 void PyGameBoyColor::step() {
