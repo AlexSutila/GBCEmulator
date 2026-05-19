@@ -561,23 +561,19 @@ void GameBoyColor::sched_pop_until(time_type target_cycle) {
 }
 
 std::size_t GameBoyColor::big_step() {
-
   // CPU is inactive while VDMA runs, so pop events until it completes
   if (sys_.vdma_active) [[unlikely]]
     return sched_pop_until(ScheduledEventOutcome::EVENT_OUTCOME_VDMA_COMPLETE);
 
   // Otherwise, CPU is probably active
   const auto elapsed_cpu_clocks = cpu->big_step([this](std::size_t sync_cycles) {
-    const auto elapsed_clocks = clks_key1_controlled(sys_.double_speed, sync_cycles);
-
-    // TODO: Eventually, this needs to just straight up go
     for (std::size_t sync_cycle{0}; sync_cycle < sync_cycles; ++sync_cycle) {
       const bool fast_cycle = (sys_.double_speed) && (sync_cycle % 2 != 0);
       step_peripherals(fast_cycle);
     }
 
     // TODO: This will be the new synchronization mechanism
-    sys_.elapsed_clocks += elapsed_clocks;
+    sys_.elapsed_clocks += clks_key1_controlled(sys_.double_speed, sync_cycles);
     sched_pop_until(sys_.elapsed_clocks);
   });
   return clks_key1_controlled(sys_.double_speed, elapsed_cpu_clocks);

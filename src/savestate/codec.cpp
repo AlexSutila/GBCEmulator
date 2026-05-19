@@ -28,6 +28,18 @@ void Writer::start_complex_node(TreeKey tag) {
   if (!build_tree)
     return;
 
+  if (!incomplete.empty()) {
+    auto &parent = incomplete.top();
+
+    // Check to make sure we aren't about to overwrite the key if it exists
+    if (std::holds_alternative<TreeRoot>(parent->val)) {
+      auto &parent_ = std::get<TreeRoot>(parent->val);
+      if (parent_.contains(tag)) [[unlikely]]
+        throw std::runtime_error("Writer::start_complex_node() - key already found");
+    }
+  }
+
+  // Should be good to insert
   auto t = std::make_shared<TreeNode>(TreeNode{
       .tag = tag,
       .val = TreeRoot({}),
@@ -65,6 +77,8 @@ void Writer::end_node() {
   // Parent node is a complex type, so insert as a new field
   if (std::holds_alternative<TreeRoot>(parent->val)) {
     auto &parent_ = std::get<TreeRoot>(parent->val);
+    if (parent_.contains(tag))
+      throw std::runtime_error("Writer::end_node() - key already found");
     parent_[tag] = completed;
   }
 
