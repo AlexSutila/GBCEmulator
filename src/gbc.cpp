@@ -636,26 +636,36 @@ bool GameBoyColor::savestate_ready() const {
 }
 
 enum : std::uint16_t {
-  F_ELAPSED_CLOCKS = 1,
-  F_FLAGS,
+  F_SYS = 1,
+
+  F_CPU,
+  F_BUS,
+  F_TIMER,
+  F_SERIAL,
+  F_PPU,
+  F_APU,
+
+  F_SCHED,
 };
 
 template <typename T> void GameBoyColor::parse_savestate(T &t) {
   constexpr auto version = 5; // Schema revision
   t.chunk_header(version, Savestate::C_GBC);
 
-  t.field_generic(F_ELAPSED_CLOCKS, sys_.elapsed_clocks);
-  t.field_generic(F_FLAGS, sys_.flags);
+  t.field_complex(F_SYS, [&](auto &t) {
+    t.field_generic(0, sys_.elapsed_clocks);
+    t.field_generic(1, sys_.flags);
+  });
 
   // Begin recursive descent into each component
-  cpu->parse_savestate(t);
-  bus->parse_savestate(t);
-  timer->parse_savestate(t);
-  serial->parse_savestate(t);
-  ppu->parse_savestate(t);
-  apu->parse_savestate(t);
+  t.field_complex(F_CPU, [&](auto &t) { cpu->parse_savestate(t); });
+  t.field_complex(F_BUS, [&](auto &t) { bus->parse_savestate(t); });
+  t.field_complex(F_TIMER, [&](auto &t) { timer->parse_savestate(t); });
+  t.field_complex(F_SERIAL, [&](auto &t) { serial->parse_savestate(t); });
+  t.field_complex(F_PPU, [&](auto &t) { ppu->parse_savestate(t); });
+  t.field_complex(F_APU, [&](auto &t) { apu->parse_savestate(t); });
 
-  sched_.parse_savestate(t);
+  t.field_complex(F_SCHED, [&](auto &t) { sched_.parse_savestate(t); });
   t.eof();
 }
 

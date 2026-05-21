@@ -1,3 +1,10 @@
+## Wed May 20 05:29:04 PM MST 2026 (+2 components, ~1 component, plus general restructuring)
+- C_SYS added
+- C_CHILD_SCHEDULER added
+- C_SCHEDULER renamed to C_SYS_SCHEDULER
+- Wrapped various structures in `field_complex` and did some re-tagging to support the savestate
+  tree structure better
+
 ## Sun May  3 08:50:06 PM MST 2026 (+1 component)
 - C_MBC_SACHEN added, other enumeration values will have shifted
 

@@ -117,7 +117,7 @@ template <typename T> void SystemScheduler::parse_savestate(T &t) {
     F_EVENT_QUEUE,
     F_ORD,
   };
-  t.chunk_header(version, Savestate::C_SCHEDULER);
+  t.chunk_header(version, Savestate::C_SYS_SCHEDULER);
 
   constexpr auto max_size = queue_size_upper_bound();
   std::vector<SchedNode> event_vec{}; // Temporary queue state representation
@@ -224,7 +224,9 @@ private:
 // We pass in the size so we can garuntee the sizes of the vectors match
 template <typename T> void ChildScheduler::parse_savestate(T &t, std::size_t num_events) {
   std::vector<Implementation::LookupVal> vec(num_events, std::nullopt);
+  constexpr auto version = 1; // Schema revision
   enum : std::uint16_t { F_TIME, F_ORD };
+  t.chunk_header(version, Savestate::C_CHILD_SCHEDULER);
 
   // If we are writing, use existing state
   if (t.op() == Savestate::OP_WRITE) {

@@ -27,6 +27,7 @@ enum SavestateOps {
 
 enum ChunkTags : TreeKey {
   C_GBC = 1,
+  C_SYS,
   C_APU,
   C_CPU,
   C_SERIAL,
@@ -56,10 +57,8 @@ enum ChunkTags : TreeKey {
   C_VDMA,
   C_CRAM,
 
-  /* The child schedulers do not hold any stateful information that is not already
-   * initialized deterministicall by their constructor, so we don't need to worry
-   * about them from a save-state perspective. */
-  C_SCHEDULER,
+  C_CHILD_SCHEDULER,
+  C_SYS_SCHEDULER,
 
   /* Denotes end of chunk */
   C_EOF = 0xFFFF

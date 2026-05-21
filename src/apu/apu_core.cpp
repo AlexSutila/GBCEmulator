@@ -86,12 +86,19 @@ template <typename T> void APU::parse_savestate(T &t) {
   constexpr auto version = 1; // Schema revision
   t.chunk_header(version, Savestate::C_APU);
 
-  for (auto reg : audio_registers)
-    t.field_complex(F_AUDIO_REGISTERS, [&](T &t) { reg.parse_savestate(t); });
-  for (auto reg : audio_unused)
-    t.field_complex(F_AUDIO_UNUSED, [&](T &t) { reg.parse_savestate(t); });
-  for (auto reg : wave_ram)
-    t.field_complex(F_WAVE_RAM, [&](T &t) { reg.parse_savestate(t); });
+  // Careful not to cause duplicate tags here, or it will break the savestate tree
+  t.field_complex(F_AUDIO_REGISTERS, [&](T &t) {
+    for (std::size_t i = 0; auto reg : audio_registers)
+      t.field_complex(i++, [&](T &t) { reg.parse_savestate(t); });
+  });
+  t.field_complex(F_AUDIO_UNUSED, [&](T &t) {
+    for (std::size_t i = 0; auto reg : audio_unused)
+      t.field_complex(i++, [&](T &t) { reg.parse_savestate(t); });
+  });
+  t.field_complex(F_WAVE_RAM, [&](T &t) {
+    for (std::size_t i = 0; auto reg : wave_ram)
+      t.field_complex(i++, [&](T &t) { reg.parse_savestate(t); });
+  });
   t.field_bytes(F_WAVE_RAM_BYTES, {wave_ram_bytes.data(), wave_ram_bytes.size()});
 
   t.field_generic(F_FRAME_SEQ_ACCUM_TCYCLES, frame_seq_accum_tcycles);
