@@ -76,7 +76,7 @@ public:
     t.chunk_header(version, Savestate::C_MBC_5);
     t.field_generic(F_RAM_ENABLED, ram_enabled_);
     t.field_generic(F_ROM_BANK, rom_bank_);
-    t.field_generic(F_RAM_ENABLED, ram_bank_);
+    t.field_generic(F_RAM_BANK, ram_bank_);
     t.field_generic(F_RUMBLE_ON, rumble_on_);
     t.eof();
   }

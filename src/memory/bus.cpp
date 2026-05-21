@@ -88,10 +88,14 @@ template <typename T> void AddressBus::parse_savestate(T &t) {
     throw std::runtime_error("AddressBus::parse_savestate() no cartridge");
 
   // Memory sub-structures
-  for (auto &bank : vram) // Duplicate fields, but should be fine
-    t.field_bytes(F_VRAM, {bank.get(), vram_bank_size});
-  for (auto &bank : wram) // Duplicate fields, but should be fine
-    t.field_bytes(F_WRAM, {bank.get(), wram_bank_size});
+  t.field_complex(F_VRAM, [&](T &t) {
+    for (std::size_t i = 0; auto &bank : vram)
+      t.field_bytes(i++, {bank.get(), vram_bank_size});
+  });
+  t.field_complex(F_WRAM, [&](T &t) {
+    for (std::size_t i = 0; auto &bank : wram)
+      t.field_bytes(i++, {bank.get(), wram_bank_size});
+  });
   t.field_bytes(F_HRAM, {hram.get(), hram_size});
   t.field_bytes(F_OAM, {oam.get(), oam_size});
   t.field_enum(F_BUS_CONFLICTS, bus_conflicts);

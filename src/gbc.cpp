@@ -687,7 +687,7 @@ std::vector<byte_t> GameBoyColor::savestate_serialize() {
   savestate_serialize_raise(true);
 
   // Writer performs deserialization
-  Savestate::Writer out{};
+  Savestate::Writer out = Savestate::Writer(true);
   parse_savestate(out);
   return out.get();
 }

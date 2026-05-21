@@ -133,10 +133,10 @@ template <typename T> void APU::parse_savestate(T &t) {
 
   auto parse_env = [&](T &t, Envelope &e) {
     t.field_generic(1, e.volume);
-    t.field_generic(1, e.period);
-    t.field_generic(1, e.timer);
-    t.field_generic(1, e.increase);
-    t.field_generic(1, e.enabled);
+    t.field_generic(2, e.period);
+    t.field_generic(3, e.timer);
+    t.field_generic(4, e.increase);
+    t.field_generic(5, e.enabled);
   };
 
   auto parse_route = [&](T &t, std::array<float, 4> &arr) {

@@ -95,6 +95,9 @@ void Writer::insert_into_top(TreeKey tag, TreeValue val) {
   auto &top = incomplete.top();
 
   auto &elem = std::get<TreeRoot>(top->val);
+  if (elem.contains(tag))
+    throw std::runtime_error("Trying to insert into non-existent tree node");
+
   elem[tag] = std::make_shared<TreeNode>(TreeNode{
       .tag = tag,
       .val = val,

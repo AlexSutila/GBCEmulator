@@ -6,6 +6,7 @@ were written by hand, so it should be quite robust - dorce
 
 from typing import Any, Iterator
 
+import json
 import sys
 
 from irogb_python import (
@@ -13,6 +14,12 @@ from irogb_python import (
     GameBoyColor,
     load_cart_filesystem,
 )
+
+
+def json_default(obj):
+    if isinstance(obj, bytes):
+        return obj.hex()
+    raise TypeError(f"Type not serializable: {type(obj)}")
 
 
 def diff_states(lhs: Any, rhs: Any, path: str = "root") -> bool:
@@ -151,6 +158,13 @@ def main() -> int:
         (big_elapsed, big_state),
     ) in enumerate(zip(cycle_gen, big_step_gen), start=1):
 
+        if cycle_elapsed > big_elapsed:
+            while cycle_elapsed > big_elapsed:
+                big_elapsed, big_state = next(big_step_gen)
+                if big_elapsed > cycle_elapsed:
+                    print("desync detected (big_elapsed too far ahead)")
+                    return 1
+
         print(
             f"[{frame_idx}] "
             f"cycle={cycle_elapsed} "
@@ -163,6 +177,12 @@ def main() -> int:
 
         if not diff_states(cycle_state, big_state):
             print("desync detected")
+
+            with open("cycle_step.json", "w") as f:
+                json.dump(cycle_state, f, indent=4, default=json_default)
+            with open("big_step.json", "w") as f:
+                json.dump(big_state, f, indent=4, default=json_default)
+
             return 1
 
     return 0

@@ -44,7 +44,7 @@ template <typename T> void Fetcher::parse_savestate(T &t) {
   t.field_generic(F_PIXELS_DISCARDED, pixels_discarded);
   t.field_generic(F_COARSE_SCROLL_X, coarse_scroll_x);
   t.field_generic(F_FINE_SCROLL_X, fine_scroll_x);
-  t.field_generic(F_FINE_SCROLL_X, fine_scroll_y);
+  t.field_generic(F_FINE_SCROLL_Y, fine_scroll_y);
   t.field_generic(F_WIN_INTERNAL_LY, win_internal_ly);
   t.field_generic(F_WIN_ENABLE_SAMPLE, win_enable_sample);
   t.field_generic(F_WIN_STARTED, win_started);
