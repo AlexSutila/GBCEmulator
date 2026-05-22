@@ -11,6 +11,7 @@
 #include "ppu/fifo.hpp"
 #include "ppu/palette.hpp"
 #include "ppu/sprites.hpp"
+#include "schedule.hpp"
 
 #include <array>
 #include <cstddef>
@@ -25,10 +26,25 @@ class VDMA;
 class PixelProcessingUnit : Debug::Debuggable {
 public:
   PixelProcessingUnit(AddressBus *bus, Frontend &fe, std::optional<Debug::Debugger> &debugger,
-                      runtime_sys_info &sys);
+                      runtime_sys_info &sys, SystemScheduler &g_sched);
   template <typename T> void parse_savestate(T &t);
   void reset();
   void step();
+
+  /* TODO: This is going to be very rudimentary until all existing synchronization issues are
+   * fixed. Eventually this will need to actually reflect events representative of what the
+   * PPU does at a more abstract level, not literally every single clock cycle. */
+  enum class SchedulerEvent : unsigned {
+    EVENT_PUSH_BLANK_FRAME = 0,
+    EVENT_STEP_CYCLE,
+
+    /* For scheduler serialization */
+    EVENT_COUNT,
+  };
+
+  ScheduledEventOutcome handle_event(time_type event_time, unsigned event);
+  void disable();
+  void enable();
 
   struct PPUState {
     PPU::StatModes state;
@@ -61,7 +77,7 @@ private:
   bool flush_on_disable{};
 
   /* Convenience references to important PPU mmio registers */
-  PPU::LCDCtrl lcdc_{};
+  PPU::LCDCtrl lcdc_;
   PPU::STAT stat_{};
   MMIORegister lyc_{};
 
@@ -136,6 +152,8 @@ private:
   /* Color RAM adding RGB555 support for CGB models */
   std::unique_ptr<ColorRam> obj_cram;
   std::unique_ptr<ColorRam> bg_cram;
+
+  ChildScheduler sched;
 };
 
 #endif // GBC_PPU_HPP

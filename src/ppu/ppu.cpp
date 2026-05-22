@@ -13,6 +13,7 @@
 #include "ppu/pixel.hpp"
 #include "ppu/sprites.hpp"
 #include "savestate/codec.hpp"
+#include "schedule.hpp"
 
 #include <algorithm>
 #include <cassert>
@@ -135,15 +136,17 @@ template <typename T> T *init_mmio(AddressBus *bus, const IORegisterMapping reg_
 
 PixelProcessingUnit::PixelProcessingUnit(AddressBus *bus, Frontend &fe,
                                          std::optional<Debug::Debugger> &debugger,
-                                         runtime_sys_info &sys)
+                                         runtime_sys_info &sys, SystemScheduler &g_sched)
     : Debuggable(debugger),                   // Scanline/frame breakpoints
       sys_(sys),                              // General operating mode info
       fe_(fe),                                // To access frame buffer(s)
       vram(bus->get_vram()),                  // Tile data/map/attribute content
       oam(bus->get_oam()),                    // Object (sprite) attribute memory
+      lcdc_(*this),                           // Register must schedule enable/disable
       obj_cram(std::make_unique<ColorRam>()), // CGB sprite color RAM
-      bg_cram(std::make_unique<ColorRam>())   // CGB background color RAM
-{
+      bg_cram(std::make_unique<ColorRam>()),  // CGB background color RAM
+      sched(g_sched, SchedulerComponent::SCHED_COMPONENT_PPU,
+            static_cast<std::size_t>(SchedulerEvent::EVENT_COUNT)) {
   using mmio = IORegisterMapping;
   using namespace PPU;
 
@@ -659,14 +662,6 @@ void PixelProcessingUnit::reset() {
 }
 
 void PixelProcessingUnit::step() {
-  /* When the PPU is disabled, the screen just shows plain white and the state
-   * is set to it's initial state until it is re-enabled again. */
-  if (!lcdc_.lcd_enabled()) {
-    do_disabled();
-    return;
-  } else
-    flush_on_disable = true;
-
   /* Rendering is enabled, perform FSM logic */
   switch (state) {
   case PPU::StatModes::MODE_HBLANK:
@@ -687,6 +682,54 @@ void PixelProcessingUnit::step() {
   stat_delay.push(state);
   if (stat_delay.full())
     update_stat(stat_delay.pop());
+}
+
+void PixelProcessingUnit::disable() {
+  constexpr auto frame_duration_cycles = clks_static_timing(70224);
+  reset(); // Clear state
+
+  // Disabling the PPU impacts the other PPU related registers
+  stat_.set_mode(PPU::StatModes::MODE_HBLANK);
+  ly_.write(0); // Start at first scanline
+
+  // Need to maintain framerate even if virtual LCD is off
+  sched.schedule_event_in(frame_duration_cycles, SchedulerEvent::EVENT_PUSH_BLANK_FRAME);
+  sched.unschedule_event(SchedulerEvent::EVENT_STEP_CYCLE);
+}
+
+void PixelProcessingUnit::enable() {
+  constexpr auto ppu_tickrate_aligned = clks_static_timing(1);
+  sched.schedule_event_in(ppu_tickrate_aligned, SchedulerEvent::EVENT_STEP_CYCLE);
+  sched.unschedule_event(SchedulerEvent::EVENT_PUSH_BLANK_FRAME);
+}
+
+ScheduledEventOutcome PixelProcessingUnit::handle_event(time_type event_time, unsigned event) {
+  switch (static_cast<SchedulerEvent>(event)) {
+  case SchedulerEvent::EVENT_PUSH_BLANK_FRAME: {
+    constexpr auto frame_duration_cycles = clks_static_timing(70224);
+    sched.schedule_event_on(event_time + frame_duration_cycles,
+                            SchedulerEvent::EVENT_PUSH_BLANK_FRAME);
+
+    constexpr auto fb_height = 144, fb_width = 160;
+    constexpr std::uint32_t blank = 0x00FFFFFF;
+    fe_.clear(blank); // Clear the contents of the frame out
+
+    // By writing the last pixel, we signal that the next frame is ready
+    fe_.put_pixel(fb_width - 1, fb_height - 1, blank);
+  } break;
+
+  case SchedulerEvent::EVENT_STEP_CYCLE: {
+    constexpr auto ppu_tickrate_aligned = clks_static_timing(1);
+    sched.schedule_event_on(event_time + ppu_tickrate_aligned, SchedulerEvent::EVENT_STEP_CYCLE);
+
+    step(); // TODO: This needs to be heavily optimized
+  } break;
+
+  default:
+    __builtin_unreachable();
+  }
+
+  return ScheduledEventOutcome::EVENT_OUTCOME_NONE;
 }
 
 #undef DMG_COLOR_PRESERVE_HACK

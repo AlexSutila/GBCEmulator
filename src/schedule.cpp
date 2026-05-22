@@ -3,6 +3,7 @@
 #include "debugger/debugger.hpp"
 #include "gbc.hpp"
 #include "memory/dma.hpp"
+#include "ppu/ppu.hpp"
 #include "savestate/codec.hpp"
 #include <algorithm>
 #include <cassert>
@@ -23,7 +24,8 @@
  */
 constexpr std::size_t queue_size_upper_bound() {
   return static_cast<std::size_t>(ObjAttrDMA::SchedulerEvent::EVENT_COUNT) +
-         static_cast<std::size_t>(VDMA::SchedulerEvent::EVENT_COUNT);
+         static_cast<std::size_t>(VDMA::SchedulerEvent::EVENT_COUNT) +
+         static_cast<std::size_t>(PixelProcessingUnit::SchedulerEvent::EVENT_COUNT);
 }
 
 struct SchedNode {

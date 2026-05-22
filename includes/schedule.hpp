@@ -35,6 +35,7 @@ enum class ScheduledEventOutcome {
 enum class SchedulerComponent : unsigned {
   SCHED_COMPONENT_OAM_DMA = 0,
   SCHED_COMPONENT_VRAM_DMA,
+  SCHED_COMPONENT_PPU,
 
   /* For serialization purposes - don't touch */
   SCHED_COMPONENT_COUNT,
