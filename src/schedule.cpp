@@ -32,7 +32,8 @@ struct SchedNode {
   event_time t;
   event e;
 
-  bool operator<(const SchedNode &other) const { return t < other.t; }
+  // Order is flipped intentionally so that sooner events are prioritized.
+  bool operator<(const SchedNode &other) const { return t > other.t; }
   bool operator==(const SchedNode &other) const { return t == other.t; }
 };
 
