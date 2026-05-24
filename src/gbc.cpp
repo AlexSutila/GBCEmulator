@@ -362,7 +362,7 @@ void GameBoyColor::system_init() {
   /* Component initialization */
   bus = std::make_unique<AddressBus>(sys_, sched_, debugger_, bios_);
   cpu = std::make_unique<LR35902>(bus.get(), debugger_, sys_);
-  apu = std::make_unique<APU>(*bus, fe_);
+  apu = std::make_unique<APU>(*bus, fe_, sched_);
   ppu = std::make_unique<PixelProcessingUnit>(bus.get(), fe_, debugger_, sys_, sched_);
   timer = std::make_unique<TimerUnit>(bus.get());
   serial = std::make_unique<SerialUnit>(bus.get());
@@ -499,22 +499,22 @@ void GameBoyColor::init_test_bed() const {
 }
 
 // TODO: This needs to go once these components use the scheduler
-void GameBoyColor::step_peripherals(bool fast_cycle) {
-  timer->step();
-
-  if (!fast_cycle)
-    apu->step();
-}
+void GameBoyColor::step_peripherals(bool fast_cycle) { timer->step(); }
 
 ScheduledEventOutcome GameBoyColor::handle_event(SchedulerComponent c_id, unsigned e_id,
                                                  time_type t) {
   switch (c_id) {
   case SchedulerComponent::SCHED_COMPONENT_OAM_DMA:
     return oam_dma->handle_event(t, e_id);
+
   case SchedulerComponent::SCHED_COMPONENT_VRAM_DMA:
     return vram_dma->handle_event(t, e_id);
+
   case SchedulerComponent::SCHED_COMPONENT_PPU:
     return ppu->handle_event(t, e_id);
+
+  case SchedulerComponent::SCHED_COMPONENT_APU:
+    return apu->handle_event(t, e_id);
 
   default:
     throw std::runtime_error("Event with undefined component ID");

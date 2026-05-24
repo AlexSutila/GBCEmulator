@@ -25,7 +25,8 @@
 constexpr std::size_t queue_size_upper_bound() {
   return static_cast<std::size_t>(ObjAttrDMA::SchedulerEvent::EVENT_COUNT) +
          static_cast<std::size_t>(VDMA::SchedulerEvent::EVENT_COUNT) +
-         static_cast<std::size_t>(PixelProcessingUnit::SchedulerEvent::EVENT_COUNT);
+         static_cast<std::size_t>(PixelProcessingUnit::SchedulerEvent::EVENT_COUNT) +
+         static_cast<std::size_t>(APU::SchedulerEvent::EVENT_COUNT);
 }
 
 struct SchedNode {

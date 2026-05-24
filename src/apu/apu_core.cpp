@@ -1,5 +1,7 @@
+#include "apu/apu.hpp"
 #include "apu/apu_helpers.hpp"
 #include "frontend/frontend.hpp"
+#include "schedule.hpp"
 
 #include <array>
 #include <cstdint>
@@ -195,12 +197,17 @@ template void APU::parse_savestate<Savestate::Reader>(Savestate::Reader &);
 template void APU::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
 template void APU::parse_savestate<Savestate::Checker>(Savestate::Checker &);
 
-APU::APU(AddressBus &bus, Frontend &frontend) : bus_(bus), frontend_(frontend) {
+APU::APU(AddressBus &bus, Frontend &frontend, SystemScheduler &g_sched)
+    : bus_(bus), frontend_(frontend), sched(g_sched, SchedulerComponent::SCHED_COMPONENT_APU,
+                                            static_cast<std::size_t>(SchedulerEvent::EVENT_COUNT)) {
   mix_buffer.resize(frames_per_buffer * 2);
   register_mmio();
 
   // Initialize smoothed mixer state from power-on register values
   sync_mixer_targets_from_regs();
+
+  // Kick off scheduler loop
+  sched.schedule_event_on(0, APU::SchedulerEvent::EVENT_STEP_CYCLE);
 }
 
 void APU::sync_mixer_targets_from_regs() {
@@ -387,4 +394,20 @@ void APU::step() {
   }
 
   generate_sample();
+}
+
+ScheduledEventOutcome APU::handle_event(time_type event_time, unsigned event) {
+  switch (static_cast<SchedulerEvent>(event)) {
+  case SchedulerEvent::EVENT_STEP_CYCLE: {
+    constexpr auto apu_tickrate_aligned = clks_static_timing(1);
+    sched.schedule_event_on(event_time + apu_tickrate_aligned, SchedulerEvent::EVENT_STEP_CYCLE);
+
+    step(); // TODO: This needs to be heavily optimized
+  } break;
+
+  default:
+    __builtin_unreachable();
+  }
+
+  return ScheduledEventOutcome::EVENT_OUTCOME_NONE;
 }
