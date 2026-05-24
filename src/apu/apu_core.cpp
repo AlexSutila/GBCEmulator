@@ -82,10 +82,13 @@ enum : std::uint16_t {
   F_DC_Y1_L,
   F_DC_X1_R,
   F_DC_Y1_R,
+
+  // Event scheduling
+  F_SCHED,
 };
 
 template <typename T> void APU::parse_savestate(T &t) {
-  constexpr auto version = 1; // Schema revision
+  constexpr auto version = 2; // Schema revision
   t.chunk_header(version, Savestate::C_APU);
 
   // Careful not to cause duplicate tags here, or it will break the savestate tree
@@ -189,6 +192,10 @@ template <typename T> void APU::parse_savestate(T &t) {
   t.field_generic(F_DC_Y1_L, dc_y1_l);
   t.field_generic(F_DC_X1_R, dc_x1_r);
   t.field_generic(F_DC_Y1_R, dc_y1_r);
+
+  t.field_complex(F_SCHED, [&](T &t) {
+    sched.parse_savestate(t, static_cast<std::size_t>(SchedulerEvent::EVENT_COUNT));
+  });
   t.eof();
 }
 

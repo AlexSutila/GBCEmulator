@@ -61,6 +61,9 @@ enum : std::uint16_t {
   F_OBP0,
   F_OBP1,
   F_OPRI,
+
+  // Event scheduling
+  F_SCHED,
 };
 
 enum : std::uint16_t {
@@ -72,7 +75,7 @@ enum : std::uint16_t {
 };
 
 template <typename T> void PixelProcessingUnit::parse_savestate(T &t) {
-  constexpr auto version = 1; // Schema revision
+  constexpr auto version = 2; // Schema revision
   t.chunk_header(version, Savestate::C_PPU);
 
   t.field_generic(F_FLUSH_ON_DISABLE, flush_on_disable);
@@ -119,6 +122,9 @@ template <typename T> void PixelProcessingUnit::parse_savestate(T &t) {
   t.field_complex(F_WX, [&](T &t) { wx_.parse_savestate(t); });
   t.field_complex(F_OPRI, [&](T &t) { opri_.parse_savestate(t); });
 
+  t.field_complex(F_SCHED, [&](T &t) {
+    sched.parse_savestate(t, static_cast<std::size_t>(SchedulerEvent::EVENT_COUNT));
+  });
   t.eof();
 }
 

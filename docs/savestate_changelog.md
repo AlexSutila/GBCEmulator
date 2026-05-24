@@ -1,3 +1,7 @@
+## Sun May 24 04:04:14 PM MST 2026 (+2 fields)
+- F_SCHED added for C_APU
+- F_SCHED added for C_PPU
+
 ## Wed May 20 05:29:04 PM MST 2026 (+2 components, ~1 component, plus general restructuring)
 - C_SYS added
 - C_CHILD_SCHEDULER added
