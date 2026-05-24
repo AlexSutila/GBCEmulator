@@ -142,7 +142,8 @@ enum class SpriteHeight : byte_t {
 
 class LCDCtrl final : public MMIORegister {
 public:
-  LCDCtrl() : MMIORegister(0) {}
+  LCDCtrl(PixelProcessingUnit &ppu) : MMIORegister(0), ppu_(ppu) {}
+  void write(byte_t value) override;
 
   /* Helpers */
   [[nodiscard]] bool lcd_enabled() const;
@@ -153,6 +154,9 @@ public:
   [[nodiscard]] bool obj_enable() const;
   [[nodiscard]] bool win_enabled() const;
   [[nodiscard]] bool bg_win_en_priority() const;
+
+private:
+  PixelProcessingUnit &ppu_;
 };
 
 /*

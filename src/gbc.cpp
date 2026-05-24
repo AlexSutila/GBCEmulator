@@ -362,8 +362,8 @@ void GameBoyColor::system_init() {
   /* Component initialization */
   bus = std::make_unique<AddressBus>(sys_, sched_, debugger_, bios_);
   cpu = std::make_unique<LR35902>(bus.get(), debugger_, sys_);
-  apu = std::make_unique<APU>(*bus, fe_);
-  ppu = std::make_unique<PixelProcessingUnit>(bus.get(), fe_, debugger_, sys_);
+  apu = std::make_unique<APU>(*bus, fe_, sched_);
+  ppu = std::make_unique<PixelProcessingUnit>(bus.get(), fe_, debugger_, sys_, sched_);
   timer = std::make_unique<TimerUnit>(bus.get());
   serial = std::make_unique<SerialUnit>(bus.get());
 
@@ -499,22 +499,22 @@ void GameBoyColor::init_test_bed() const {
 }
 
 // TODO: This needs to go once these components use the scheduler
-void GameBoyColor::step_peripherals(bool fast_cycle) {
-  timer->step();
-
-  if (!fast_cycle) {
-    ppu->step();
-    apu->step();
-  }
-}
+void GameBoyColor::step_peripherals() { timer->step(); }
 
 ScheduledEventOutcome GameBoyColor::handle_event(SchedulerComponent c_id, unsigned e_id,
                                                  time_type t) {
   switch (c_id) {
   case SchedulerComponent::SCHED_COMPONENT_OAM_DMA:
     return oam_dma->handle_event(t, e_id);
+
   case SchedulerComponent::SCHED_COMPONENT_VRAM_DMA:
     return vram_dma->handle_event(t, e_id);
+
+  case SchedulerComponent::SCHED_COMPONENT_PPU:
+    return ppu->handle_event(t, e_id);
+
+  case SchedulerComponent::SCHED_COMPONENT_APU:
+    return apu->handle_event(t, e_id);
 
   default:
     throw std::runtime_error("Event with undefined component ID");
@@ -561,23 +561,20 @@ void GameBoyColor::sched_pop_until(time_type target_cycle) {
 }
 
 std::size_t GameBoyColor::big_step() {
-  const auto psync_cb = [this](std::size_t sync_cycles) {
-    const auto elapsed_clocks = clks_key1_controlled(sys_.double_speed, sync_cycles);
-
-    // TODO: Eventually, this needs to just straight up go
-    for (std::size_t sync_cycle{0}; sync_cycle < sync_cycles; ++sync_cycle) {
-      const bool fast_cycle = (sys_.double_speed) && (sync_cycle % 2 != 0);
-      step_peripherals(fast_cycle);
-    }
-
-    // TODO: This will be the new synchronization mechanism
-    sys_.elapsed_clocks += elapsed_clocks;
-    sched_pop_until(sys_.elapsed_clocks);
-  };
-
+  // CPU is inactive while VDMA runs, so pop events until it completes
   if (sys_.vdma_active) [[unlikely]]
     return sched_pop_until(ScheduledEventOutcome::EVENT_OUTCOME_VDMA_COMPLETE);
-  return cpu->big_step(psync_cb);
+
+  // Otherwise, CPU is probably active
+  const auto elapsed_cpu_clocks = cpu->big_step([this](std::size_t sync_cycles) {
+    for (std::size_t sync_cycle{0}; sync_cycle < sync_cycles; ++sync_cycle)
+      step_peripherals();
+
+    // TODO: This will be the new synchronization mechanism
+    sys_.elapsed_clocks += clks_key1_controlled(sys_.double_speed, sync_cycles);
+    sched_pop_until(sys_.elapsed_clocks);
+  });
+  return clks_key1_controlled(sys_.double_speed, elapsed_cpu_clocks);
 }
 
 void GameBoyColor::step() {
@@ -586,17 +583,17 @@ void GameBoyColor::step() {
   // DMG cycle, or the first cycle of double speed in CGB mode (if double speed is enabled)
   if (!sys_.vdma_active)
     cpu->step();
-  step_peripherals(false);
+  step_peripherals();
 
   // If we are in double speed mode, step affected components again
   if (sys_.double_speed) {
     if (!sys_.vdma_active)
       cpu->step();
-    step_peripherals(true);
+    step_peripherals();
   }
 
   // TODO: This will go away once we've fully transitioned to a scheduler
-  sys_.elapsed_clocks += clks_key1_controlled(sys_.double_speed, 1);
+  sys_.elapsed_clocks += clks_static_timing(1);
   sched_pop_until(sys_.elapsed_clocks);
 }
 
@@ -637,26 +634,36 @@ bool GameBoyColor::savestate_ready() const {
 }
 
 enum : std::uint16_t {
-  F_ELAPSED_CLOCKS = 1,
-  F_FLAGS,
+  F_SYS = 1,
+
+  F_CPU,
+  F_BUS,
+  F_TIMER,
+  F_SERIAL,
+  F_PPU,
+  F_APU,
+
+  F_SCHED,
 };
 
 template <typename T> void GameBoyColor::parse_savestate(T &t) {
   constexpr auto version = 5; // Schema revision
   t.chunk_header(version, Savestate::C_GBC);
 
-  t.field_generic(F_ELAPSED_CLOCKS, sys_.elapsed_clocks);
-  t.field_generic(F_FLAGS, sys_.flags);
+  t.field_complex(F_SYS, [&](auto &t) {
+    t.field_generic(0, sys_.elapsed_clocks);
+    t.field_generic(1, sys_.flags);
+  });
 
   // Begin recursive descent into each component
-  cpu->parse_savestate(t);
-  bus->parse_savestate(t);
-  timer->parse_savestate(t);
-  serial->parse_savestate(t);
-  ppu->parse_savestate(t);
-  apu->parse_savestate(t);
+  t.field_complex(F_CPU, [&](auto &t) { cpu->parse_savestate(t); });
+  t.field_complex(F_BUS, [&](auto &t) { bus->parse_savestate(t); });
+  t.field_complex(F_TIMER, [&](auto &t) { timer->parse_savestate(t); });
+  t.field_complex(F_SERIAL, [&](auto &t) { serial->parse_savestate(t); });
+  t.field_complex(F_PPU, [&](auto &t) { ppu->parse_savestate(t); });
+  t.field_complex(F_APU, [&](auto &t) { apu->parse_savestate(t); });
 
-  sched_.parse_savestate(t);
+  t.field_complex(F_SCHED, [&](auto &t) { sched_.parse_savestate(t); });
   t.eof();
 }
 
@@ -678,7 +685,7 @@ std::vector<byte_t> GameBoyColor::savestate_serialize() {
   savestate_serialize_raise(true);
 
   // Writer performs deserialization
-  Savestate::Writer out{};
+  Savestate::Writer out = Savestate::Writer(true);
   parse_savestate(out);
   return out.get();
 }

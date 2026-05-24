@@ -27,6 +27,7 @@ enum SavestateOps {
 
 enum ChunkTags : TreeKey {
   C_GBC = 1,
+  C_SYS,
   C_APU,
   C_CPU,
   C_SERIAL,
@@ -56,10 +57,8 @@ enum ChunkTags : TreeKey {
   C_VDMA,
   C_CRAM,
 
-  /* The child schedulers do not hold any stateful information that is not already
-   * initialized deterministicall by their constructor, so we don't need to worry
-   * about them from a save-state perspective. */
-  C_SCHEDULER,
+  C_CHILD_SCHEDULER,
+  C_SYS_SCHEDULER,
 
   /* Denotes end of chunk */
   C_EOF = 0xFFFF
@@ -172,8 +171,12 @@ public:
     write<TreeKey>(tag);
 
     const bool present = val.has_value();
+    write<bool>(present);
+
+    // If we do not have a value, simply write false and move on
     if (present) {
-      fn(*this, *val);
+      start_complex_node(tag);
+      fn(*this, val.value());
       eof();
     }
   }
@@ -254,9 +257,10 @@ public:
     vec.clear();
     vec.resize(size);
 
-    for (T &e : vec)
+    for (T &e : vec) {
       fn(*this, e); // Should populate this structure
-
+      eof();
+    }
     eof();
   }
 
@@ -360,8 +364,10 @@ public:
       throw std::runtime_error("Savestate: exceeded vector capacity");
 
     T dummy{};
-    for (std::size_t i = 0; i < size; ++i)
+    for (std::size_t i = 0; i < size; ++i) {
       fn(*this, dummy);
+      eof();
+    }
 
     eof();
   }
@@ -460,8 +466,10 @@ public:
     parse<TreeKey>();
     parse<std::size_t>();
 
-    for (std::size_t i{0}; i < max_size; ++i)
+    for (std::size_t i{0}; i < max_size; ++i) {
       fn(*this, dummy); // Manipulate if you want, doesn't matter
+      eof();
+    }
     eof();
   }
 

@@ -3,6 +3,7 @@
 #include "debugger/debugger.hpp"
 #include "gbc.hpp"
 #include "memory/dma.hpp"
+#include "ppu/ppu.hpp"
 #include "savestate/codec.hpp"
 #include <algorithm>
 #include <cassert>
@@ -23,14 +24,17 @@
  */
 constexpr std::size_t queue_size_upper_bound() {
   return static_cast<std::size_t>(ObjAttrDMA::SchedulerEvent::EVENT_COUNT) +
-         static_cast<std::size_t>(VDMA::SchedulerEvent::EVENT_COUNT);
+         static_cast<std::size_t>(VDMA::SchedulerEvent::EVENT_COUNT) +
+         static_cast<std::size_t>(PixelProcessingUnit::SchedulerEvent::EVENT_COUNT) +
+         static_cast<std::size_t>(APU::SchedulerEvent::EVENT_COUNT);
 }
 
 struct SchedNode {
   event_time t;
   event e;
 
-  bool operator<(const SchedNode &other) const { return t < other.t; }
+  // Order is flipped intentionally so that sooner events are prioritized.
+  bool operator<(const SchedNode &other) const { return t > other.t; }
   bool operator==(const SchedNode &other) const { return t == other.t; }
 };
 
@@ -117,7 +121,7 @@ template <typename T> void SystemScheduler::parse_savestate(T &t) {
     F_EVENT_QUEUE,
     F_ORD,
   };
-  t.chunk_header(version, Savestate::C_SCHEDULER);
+  t.chunk_header(version, Savestate::C_SYS_SCHEDULER);
 
   constexpr auto max_size = queue_size_upper_bound();
   std::vector<SchedNode> event_vec{}; // Temporary queue state representation
@@ -128,8 +132,9 @@ template <typename T> void SystemScheduler::parse_savestate(T &t) {
 
   // Serialize event queue under upper bound queue length assumption
   t.field_vector(F_EVENT_QUEUE, event_vec, max_size, [&](T &t, auto &s) {
-    auto [comp_id, event_id] = s.e;
-    auto [time, ord] = s.t;
+    // Careful, use refs here so that the state is properly restored during load state.
+    auto &[comp_id, event_id] = s.e;
+    auto &[time, ord] = s.t;
 
     // Write fields directly rather than serializing a struct so we dont deal with wasted
     // bytes caused by padding. Be careful, this must lie with `max_bytes`.
@@ -224,7 +229,9 @@ private:
 // We pass in the size so we can garuntee the sizes of the vectors match
 template <typename T> void ChildScheduler::parse_savestate(T &t, std::size_t num_events) {
   std::vector<Implementation::LookupVal> vec(num_events, std::nullopt);
+  constexpr auto version = 1; // Schema revision
   enum : std::uint16_t { F_TIME, F_ORD };
+  t.chunk_header(version, Savestate::C_CHILD_SCHEDULER);
 
   // If we are writing, use existing state
   if (t.op() == Savestate::OP_WRITE) {

@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-'''
+"""
 Heads up, this script is heavily vibe coded but the underlying interfaces
 were written by hand, so it should be quite robust - dorce
-'''
+"""
 
 from typing import Any, Iterator
 
+import json
 import sys
 
 from irogb_python import (
@@ -13,6 +14,12 @@ from irogb_python import (
     GameBoyColor,
     load_cart_filesystem,
 )
+
+
+def json_default(obj):
+    if isinstance(obj, bytes):
+        return obj.hex()
+    raise TypeError(f"Type not serializable: {type(obj)}")
 
 
 def diff_states(lhs: Any, rhs: Any, path: str = "root") -> bool:
@@ -89,11 +96,11 @@ def diff_states(lhs: Any, rhs: Any, path: str = "root") -> bool:
 
 
 def make_initial_state(cart: Cartridge) -> bytes:
-    '''
+    """
     In order to make sure we are comparing apples against apples, we make a
     temporary emulator instance which we use just to get an initial savestate
     which we can use to prime the other two emulator instances.
-    '''
+    """
     gbc = GameBoyColor(cartridge=cart)  # Will fall out of scope. Totally fine
     return gbc.savestate_serialize()
 
@@ -105,17 +112,20 @@ def cycle_stepped_generator(
     gbc = GameBoyColor(cartridge=cart)
     gbc.savestate_deserialize(initial_state)
 
+    increment = (
+        2  # We use 2 because of how we interlace the fast cycle for double speed
+    )
     elapsed_cycles = 0
 
     while True:
         while not gbc.savestate_ready():
             gbc.step()
-            elapsed_cycles += 1
+            elapsed_cycles += increment
 
         yield elapsed_cycles, gbc.savestate_as_tree()
 
         gbc.step()
-        elapsed_cycles += 1
+        elapsed_cycles += increment
 
 
 def big_step_stepped_generator(
@@ -150,14 +160,27 @@ def main() -> int:
         (big_elapsed, big_state),
     ) in enumerate(zip(cycle_gen, big_step_gen), start=1):
 
-        print(
-            f"[{frame_idx}] "
-            f"cycle={cycle_elapsed} "
-            f"big_step={big_elapsed}"
-        )
+        if cycle_elapsed > big_elapsed:
+            while cycle_elapsed > big_elapsed:
+                big_elapsed, big_state = next(big_step_gen)
+                if big_elapsed > cycle_elapsed:
+                    print("desync detected (big_elapsed too far ahead)")
+                    return 1
+
+        print(f"[{frame_idx}] " f"cycle={cycle_elapsed} " f"big_step={big_elapsed}")
+
+        if cycle_elapsed != big_elapsed:
+            print("desync detected")
+            return 1
 
         if not diff_states(cycle_state, big_state):
             print("desync detected")
+
+            with open("cycle_step.json", "w") as f:
+                json.dump(cycle_state, f, indent=4, default=json_default)
+            with open("big_step.json", "w") as f:
+                json.dump(big_state, f, indent=4, default=json_default)
+
             return 1
 
     return 0

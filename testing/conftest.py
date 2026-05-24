@@ -59,10 +59,8 @@ def pytest_generate_tests(metafunc):
         if not info:
             continue
 
-        cases.append(RomCase(
-            path=rom_file,
-            u1_kind=info["u1_kind"],
-            u2_kind=info["u2_kind"])
+        cases.append(
+            RomCase(path=rom_file, u1_kind=info["u1_kind"], u2_kind=info["u2_kind"])
         )
 
     metafunc.parametrize("case", cases)

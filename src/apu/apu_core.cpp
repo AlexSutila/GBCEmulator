@@ -1,5 +1,7 @@
+#include "apu/apu.hpp"
 #include "apu/apu_helpers.hpp"
 #include "frontend/frontend.hpp"
+#include "schedule.hpp"
 
 #include <array>
 #include <cstdint>
@@ -80,18 +82,28 @@ enum : std::uint16_t {
   F_DC_Y1_L,
   F_DC_X1_R,
   F_DC_Y1_R,
+
+  // Event scheduling
+  F_SCHED,
 };
 
 template <typename T> void APU::parse_savestate(T &t) {
-  constexpr auto version = 1; // Schema revision
+  constexpr auto version = 2; // Schema revision
   t.chunk_header(version, Savestate::C_APU);
 
-  for (auto reg : audio_registers)
-    t.field_complex(F_AUDIO_REGISTERS, [&](T &t) { reg.parse_savestate(t); });
-  for (auto reg : audio_unused)
-    t.field_complex(F_AUDIO_UNUSED, [&](T &t) { reg.parse_savestate(t); });
-  for (auto reg : wave_ram)
-    t.field_complex(F_WAVE_RAM, [&](T &t) { reg.parse_savestate(t); });
+  // Careful not to cause duplicate tags here, or it will break the savestate tree
+  t.field_complex(F_AUDIO_REGISTERS, [&](T &t) {
+    for (std::size_t i = 0; auto reg : audio_registers)
+      t.field_complex(i++, [&](T &t) { reg.parse_savestate(t); });
+  });
+  t.field_complex(F_AUDIO_UNUSED, [&](T &t) {
+    for (std::size_t i = 0; auto reg : audio_unused)
+      t.field_complex(i++, [&](T &t) { reg.parse_savestate(t); });
+  });
+  t.field_complex(F_WAVE_RAM, [&](T &t) {
+    for (std::size_t i = 0; auto reg : wave_ram)
+      t.field_complex(i++, [&](T &t) { reg.parse_savestate(t); });
+  });
   t.field_bytes(F_WAVE_RAM_BYTES, {wave_ram_bytes.data(), wave_ram_bytes.size()});
 
   t.field_generic(F_FRAME_SEQ_ACCUM_TCYCLES, frame_seq_accum_tcycles);
@@ -126,10 +138,10 @@ template <typename T> void APU::parse_savestate(T &t) {
 
   auto parse_env = [&](T &t, Envelope &e) {
     t.field_generic(1, e.volume);
-    t.field_generic(1, e.period);
-    t.field_generic(1, e.timer);
-    t.field_generic(1, e.increase);
-    t.field_generic(1, e.enabled);
+    t.field_generic(2, e.period);
+    t.field_generic(3, e.timer);
+    t.field_generic(4, e.increase);
+    t.field_generic(5, e.enabled);
   };
 
   auto parse_route = [&](T &t, std::array<float, 4> &arr) {
@@ -180,6 +192,10 @@ template <typename T> void APU::parse_savestate(T &t) {
   t.field_generic(F_DC_Y1_L, dc_y1_l);
   t.field_generic(F_DC_X1_R, dc_x1_r);
   t.field_generic(F_DC_Y1_R, dc_y1_r);
+
+  t.field_complex(F_SCHED, [&](T &t) {
+    sched.parse_savestate(t, static_cast<std::size_t>(SchedulerEvent::EVENT_COUNT));
+  });
   t.eof();
 }
 
@@ -188,12 +204,17 @@ template void APU::parse_savestate<Savestate::Reader>(Savestate::Reader &);
 template void APU::parse_savestate<Savestate::Sizer>(Savestate::Sizer &);
 template void APU::parse_savestate<Savestate::Checker>(Savestate::Checker &);
 
-APU::APU(AddressBus &bus, Frontend &frontend) : bus_(bus), frontend_(frontend) {
+APU::APU(AddressBus &bus, Frontend &frontend, SystemScheduler &g_sched)
+    : bus_(bus), frontend_(frontend), sched(g_sched, SchedulerComponent::SCHED_COMPONENT_APU,
+                                            static_cast<std::size_t>(SchedulerEvent::EVENT_COUNT)) {
   mix_buffer.resize(frames_per_buffer * 2);
   register_mmio();
 
   // Initialize smoothed mixer state from power-on register values
   sync_mixer_targets_from_regs();
+
+  // Kick off scheduler loop
+  sched.schedule_event_on(0, APU::SchedulerEvent::EVENT_STEP_CYCLE);
 }
 
 void APU::sync_mixer_targets_from_regs() {
@@ -380,4 +401,20 @@ void APU::step() {
   }
 
   generate_sample();
+}
+
+ScheduledEventOutcome APU::handle_event(time_type event_time, unsigned event) {
+  switch (static_cast<SchedulerEvent>(event)) {
+  case SchedulerEvent::EVENT_STEP_CYCLE: {
+    constexpr auto apu_tickrate_aligned = clks_static_timing(1);
+    sched.schedule_event_on(event_time + apu_tickrate_aligned, SchedulerEvent::EVENT_STEP_CYCLE);
+
+    step(); // TODO: This needs to be heavily optimized
+  } break;
+
+  default:
+    __builtin_unreachable();
+  }
+
+  return ScheduledEventOutcome::EVENT_OUTCOME_NONE;
 }

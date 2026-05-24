@@ -1,6 +1,7 @@
 #include "memory/mmio/dmg.hpp"
 #include "cpu/interrupts.hpp"
 #include "emu_types.hpp"
+#include "ppu/ppu.hpp"
 #include "savestate/codec.hpp"
 #include "timer.hpp"
 #include <cassert>
@@ -28,6 +29,17 @@ byte_t SerialCtrl::read() { return peek(); }
 namespace PPU {
 
 /* LCD Control helpers */
+void LCDCtrl::write(byte_t value) {
+  const bool was_enabled = lcd_enabled();
+  MMIORegister::write(value);
+
+  const bool is_enabled = lcd_enabled();
+  if (is_enabled && !was_enabled)
+    ppu_.enable();
+  else if (was_enabled && !is_enabled)
+    ppu_.disable();
+}
+
 bool LCDCtrl::lcd_enabled() const { return (state_ & 0x80) != 0; }
 TileMapArea LCDCtrl::win_tilemap_base() const {
   return (state_ & 0x40) != 0 ? TileMapArea::HI_TILEMAP_BASE : TileMapArea::LO_TILEMAP_BASE;

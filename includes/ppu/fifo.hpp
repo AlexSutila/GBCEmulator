@@ -31,7 +31,7 @@ public:
     // Important this remains data-type agnostic
     t.field_complex(F_BUF, [&](auto &t) {
       for (std::size_t i{0}; i < cap; ++i)
-        fn(t, buf[i]);
+        t.field_complex(i, [&](auto &t) { fn(t, buf[i]); });
     });
   }
 
