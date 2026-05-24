@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-'''
+"""
 Heads up, this script is heavily vibe coded but the underlying interfaces
 were written by hand, so it should be quite robust - dorce
-'''
+"""
 
 from typing import Any, Iterator
 
@@ -96,11 +96,11 @@ def diff_states(lhs: Any, rhs: Any, path: str = "root") -> bool:
 
 
 def make_initial_state(cart: Cartridge) -> bytes:
-    '''
+    """
     In order to make sure we are comparing apples against apples, we make a
     temporary emulator instance which we use just to get an initial savestate
     which we can use to prime the other two emulator instances.
-    '''
+    """
     gbc = GameBoyColor(cartridge=cart)  # Will fall out of scope. Totally fine
     return gbc.savestate_serialize()
 
@@ -112,7 +112,9 @@ def cycle_stepped_generator(
     gbc = GameBoyColor(cartridge=cart)
     gbc.savestate_deserialize(initial_state)
 
-    increment = 2  # We use 2 because of how we interlace the fast cycle for double speed
+    increment = (
+        2  # We use 2 because of how we interlace the fast cycle for double speed
+    )
     elapsed_cycles = 0
 
     while True:
@@ -165,11 +167,7 @@ def main() -> int:
                     print("desync detected (big_elapsed too far ahead)")
                     return 1
 
-        print(
-            f"[{frame_idx}] "
-            f"cycle={cycle_elapsed} "
-            f"big_step={big_elapsed}"
-        )
+        print(f"[{frame_idx}] " f"cycle={cycle_elapsed} " f"big_step={big_elapsed}")
 
         if cycle_elapsed != big_elapsed:
             print("desync detected")

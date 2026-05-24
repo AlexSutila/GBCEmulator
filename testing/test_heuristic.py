@@ -7,7 +7,6 @@ from irogb_python import (
 from pathlib import Path
 import pytest
 
-
 MANI_MULTICART_TITLES = [
     "Mani 4 in 1 - Bubble Bobble + Elevator Action + Chase H.Q. + Sagaia (China) (En).gb",
     "Mani 4 in 1 - Bubble Bobble + Elevator Action + Chase H.Q. + Sagaia (China) (En).gb",
@@ -51,11 +50,11 @@ WISDOM_TREE_TITLES = [
 
 
 def _get_cart_type_str(cart: Cartridge) -> str:
-    '''
+    """
     We aren't too critical of detail here, the main motivation behind these
     tests is to ensure our heuristics do not break compatability with any
     mainstream roms.
-    '''
+    """
     if cart.special_mbc_type != SpecialMbc.NotSpecial:
         match cart.special_mbc_type:
             case SpecialMbc.MMM01:
@@ -101,20 +100,20 @@ def test_heuristic_mainstream(case):
 
     cart = load_cart_filesystem(rom_path=case.path)
     val = _get_cart_type_str(cart)
-    assert val in case.u2_kind or val in case.u1_kind, f'{case.path} - got {val}'
+    assert val in case.u2_kind or val in case.u1_kind, f"{case.path} - got {val}"
 
 
 def _test_manual(rom_path: Path, expected: str):
     cart = load_cart_filesystem(rom_path=rom_path)
     val = _get_cart_type_str(cart)
-    assert val == expected, f'{rom_path} got {val}'
+    assert val == expected, f"{rom_path} got {val}"
 
 
 @pytest.mark.heuristic
 @pytest.mark.parametrize("rom_name", MANI_MULTICART_TITLES)
 def test_manual_mmm01(rom_name, rom_paths):
     rom_path = next((r for r in rom_paths if r.name == rom_name), None)
-    assert rom_path is not None and rom_path.exists(), f'{rom_name} not found'
+    assert rom_path is not None and rom_path.exists(), f"{rom_name} not found"
     _test_manual(rom_path, "MMM01")
 
 
@@ -122,7 +121,7 @@ def test_manual_mmm01(rom_name, rom_paths):
 @pytest.mark.parametrize("rom_name", SACHEN_MMC2_TITLES)
 def test_manual_sachen(rom_name, rom_paths):
     rom_path = next((r for r in rom_paths if r.name == rom_name), None)
-    assert rom_path is not None and rom_path.exists(), f'{rom_name} not found'
+    assert rom_path is not None and rom_path.exists(), f"{rom_name} not found"
     _test_manual(rom_path, "Sachen")
 
 
@@ -130,5 +129,5 @@ def test_manual_sachen(rom_name, rom_paths):
 @pytest.mark.parametrize("rom_name", WISDOM_TREE_TITLES)
 def test_manual_wisdom_tree(rom_name, rom_paths):
     rom_path = next((r for r in rom_paths if r.name == rom_name), None)
-    assert rom_path is not None and rom_path.exists(), f'{rom_name} not found'
+    assert rom_path is not None and rom_path.exists(), f"{rom_name} not found"
     _test_manual(rom_path, "WisdomTree")

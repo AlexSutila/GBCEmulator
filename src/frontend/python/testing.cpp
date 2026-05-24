@@ -14,7 +14,7 @@ bool poll_mooneye_regular(PyGameBoyColor &gbc) {
     const auto &cpu = gbc.get_cpu();
     op = cpu->cur_opcode();
 
-    gbc.step(); // Run until 'LD B, B'
+    gbc.step();  // Run until 'LD B, B'
     cycles += 2; // Two to account for double speeds fast cycle
   }
   return op == breakpoint_opcode;
