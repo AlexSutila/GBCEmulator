@@ -171,8 +171,12 @@ public:
     write<TreeKey>(tag);
 
     const bool present = val.has_value();
+    write<bool>(present);
+
+    // If we do not have a value, simply write false and move on
     if (present) {
-      fn(*this, *val);
+      start_complex_node(tag);
+      fn(*this, val.value());
       eof();
     }
   }
@@ -253,9 +257,10 @@ public:
     vec.clear();
     vec.resize(size);
 
-    for (T &e : vec)
+    for (T &e : vec) {
       fn(*this, e); // Should populate this structure
-
+      eof();
+    }
     eof();
   }
 
@@ -359,8 +364,10 @@ public:
       throw std::runtime_error("Savestate: exceeded vector capacity");
 
     T dummy{};
-    for (std::size_t i = 0; i < size; ++i)
+    for (std::size_t i = 0; i < size; ++i) {
       fn(*this, dummy);
+      eof();
+    }
 
     eof();
   }
@@ -459,8 +466,10 @@ public:
     parse<TreeKey>();
     parse<std::size_t>();
 
-    for (std::size_t i{0}; i < max_size; ++i)
+    for (std::size_t i{0}; i < max_size; ++i) {
       fn(*this, dummy); // Manipulate if you want, doesn't matter
+      eof();
+    }
     eof();
   }
 

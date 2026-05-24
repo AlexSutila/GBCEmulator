@@ -130,8 +130,9 @@ template <typename T> void SystemScheduler::parse_savestate(T &t) {
 
   // Serialize event queue under upper bound queue length assumption
   t.field_vector(F_EVENT_QUEUE, event_vec, max_size, [&](T &t, auto &s) {
-    auto [comp_id, event_id] = s.e;
-    auto [time, ord] = s.t;
+    // Careful, use refs here so that the state is properly restored during load state.
+    auto &[comp_id, event_id] = s.e;
+    auto &[time, ord] = s.t;
 
     // Write fields directly rather than serializing a struct so we dont deal with wasted
     // bytes caused by padding. Be careful, this must lie with `max_bytes`.
