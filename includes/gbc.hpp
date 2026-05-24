@@ -123,7 +123,7 @@ private:
   void sched_pop_until(time_type target_cycles);
 
   /* For moving emulation state along */
-  void step_peripherals(bool fast_cycle);
+  void step_peripherals();
   CheatStats cheat_stats_{};
 
   void savestate_serialize_raise(bool check_ready) const;
