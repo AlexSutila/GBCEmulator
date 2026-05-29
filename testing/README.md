@@ -21,3 +21,15 @@ pytest testing/          \
 ```
 
 Again, tests can be run without these dependencies, but the heuristic test cases will be skipped.
+
+## IroGB Test ROMs
+
+These are a collection of test roms which will likely expand over time, which we use to observe specific hardware behavior. All tests we develop here will not be pushed unless they have been verified to pass on real hardware first, but regardless we suggest that anything we present in this directory is still used cautiously.
+
+Compile any given rom using RGBASM, example:
+```bash
+rgbasm -o main.o main.asm
+rgblink -o test.gb main.o
+rgbfix -v -p 0 test.gb
+```
+
