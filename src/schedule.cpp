@@ -40,7 +40,7 @@ struct SchedNode {
 
 // A custom revision of std::priority_queue that supports random removal and avoids heap
 // reallocations and data copies during pushes to the underlying vector data structure
-class SchedQueue : public std::priority_queue<SchedNode, std::vector<SchedNode>> {
+class SchedQueue final : public std::priority_queue<SchedNode, std::vector<SchedNode>> {
 public:
   explicit SchedQueue() {
     constexpr auto total_events = queue_size_upper_bound();
