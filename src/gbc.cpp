@@ -498,9 +498,6 @@ void GameBoyColor::init_test_bed() const {
   bus->init_test_bed();
 }
 
-// TODO: This needs to go once these components use the scheduler
-void GameBoyColor::step_peripherals() { timer->step(); }
-
 ScheduledEventOutcome GameBoyColor::handle_event(SchedulerComponent c_id, unsigned e_id,
                                                  time_type t) {
   switch (c_id) {
@@ -568,9 +565,8 @@ std::size_t GameBoyColor::big_step() {
   // Otherwise, CPU is probably active
   const auto elapsed_cpu_clocks = cpu->big_step([this](std::size_t sync_cycles) {
     for (std::size_t sync_cycle{0}; sync_cycle < sync_cycles; ++sync_cycle)
-      step_peripherals();
+      timer->step();
 
-    // TODO: This will be the new synchronization mechanism
     sys_.elapsed_clocks += clks_key1_controlled(sys_.double_speed, sync_cycles);
     sched_pop_until(sys_.elapsed_clocks);
   });
@@ -583,16 +579,15 @@ void GameBoyColor::step() {
   // DMG cycle, or the first cycle of double speed in CGB mode (if double speed is enabled)
   if (!sys_.vdma_active)
     cpu->step();
-  step_peripherals();
+  timer->step();
 
   // If we are in double speed mode, step affected components again
   if (sys_.double_speed) {
     if (!sys_.vdma_active)
       cpu->step();
-    step_peripherals();
+    timer->step();
   }
 
-  // TODO: This will go away once we've fully transitioned to a scheduler
   sys_.elapsed_clocks += clks_static_timing(1);
   sched_pop_until(sys_.elapsed_clocks);
 }

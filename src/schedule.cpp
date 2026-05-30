@@ -201,41 +201,16 @@ bool SystemScheduler::unschedule_event(event_time t) {
  * Child (per-component) scheduler implementation
  * ====================================================================== */
 
-struct ChildScheduler::Implementation {
-public:
-  using LookupVal = std::optional<event_time>;
-  Implementation(const std::size_t num_events) : e_index(num_events, std::nullopt) {}
-
-  void put(const unsigned event_id, const event_time t) {
-    e_index.at(static_cast<std::size_t>(event_id)) = t;
-  }
-
-  LookupVal erase(const unsigned event_id) {
-    const std::size_t event_idx = static_cast<std::size_t>(event_id);
-    auto ret = e_index.at(event_idx); // Keep copy to remove at top level
-
-    e_index.at(event_idx) = std::nullopt;
-    return ret;
-  }
-
-  // For serialization / deserialization
-  void load_vec(std::vector<LookupVal> &vec) { e_index = std::move(vec); }
-  std::vector<LookupVal> as_vec() const { return e_index; }
-
-private:
-  std::vector<LookupVal> e_index;
-};
-
 // We pass in the size so we can garuntee the sizes of the vectors match
 template <typename T> void ChildScheduler::parse_savestate(T &t, std::size_t num_events) {
-  std::vector<Implementation::LookupVal> vec(num_events, std::nullopt);
+  std::vector<ChildScheduler::LookupVal> vec(num_events, std::nullopt);
   constexpr auto version = 1; // Schema revision
   enum : std::uint16_t { F_TIME, F_ORD };
   t.chunk_header(version, Savestate::C_CHILD_SCHEDULER);
 
   // If we are writing, use existing state
   if (t.op() == Savestate::OP_WRITE) {
-    vec = impl->as_vec(); // Should always match num_events
+    vec = index_as_vec(); // Should always match num_events
     assert(vec.size() == num_events);
   }
 
@@ -251,7 +226,7 @@ template <typename T> void ChildScheduler::parse_savestate(T &t, std::size_t num
   // If we are reading, use new state. Make sure stale metadata is cleared.
   if (t.op() == Savestate::OP_READ) {
     assert(vec.size() == num_events);
-    impl->load_vec(vec);
+    index_load_vec(vec);
   }
 
   t.eof();
@@ -265,22 +240,36 @@ template void ChildScheduler::parse_savestate<Savestate::Checker>(Savestate::Che
 
 ChildScheduler::ChildScheduler(SystemScheduler &global_sched, SchedulerComponent component_id,
                                const std::size_t num_events)
-    : impl(std::make_unique<Implementation>(num_events)), component_id(component_id),
-      g_sched(global_sched) {}
+    : e_index(num_events, std::nullopt), component_id(component_id), g_sched(global_sched) {}
 ChildScheduler::~ChildScheduler() = default;
+
+void ChildScheduler::index_put(const unsigned event_id, const event_time t) {
+  e_index.at(static_cast<std::size_t>(event_id)) = t;
+}
+
+ChildScheduler::LookupVal ChildScheduler::index_del(const unsigned event_id) {
+  const std::size_t event_idx = static_cast<std::size_t>(event_id);
+  auto ret = e_index.at(event_idx); // Keep copy to remove at top level
+
+  e_index.at(event_idx) = std::nullopt;
+  return ret;
+}
+
+void ChildScheduler::index_load_vec(std::vector<LookupVal> &vec) { e_index = std::move(vec); }
+std::vector<ChildScheduler::LookupVal> ChildScheduler::index_as_vec() const { return e_index; }
 
 void ChildScheduler::schedule_event_in_impl(time_type in_cycles, unsigned event_id) {
   const auto t = g_sched.schedule_event_in(in_cycles, std::make_tuple(component_id, event_id));
-  impl->put(event_id, t);
+  index_put(event_id, t);
 }
 
 void ChildScheduler::schedule_event_on_impl(time_type cycle, unsigned event_id) {
   const auto t = g_sched.schedule_event_on(cycle, std::make_tuple(component_id, event_id));
-  impl->put(event_id, t);
+  index_put(event_id, t);
 }
 
 bool ChildScheduler::unschedule_event_impl(unsigned event_id) {
-  const auto t = impl->erase(event_id);
+  const auto t = index_del(event_id);
   if (!t.has_value())
     return false;
   return g_sched.unschedule_event(t.value());

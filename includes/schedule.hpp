@@ -5,6 +5,7 @@
 #include <memory>
 #include <optional>
 #include <tuple>
+#include <vector>
 
 namespace Debug {
 class Debuggable;
@@ -85,6 +86,7 @@ private:
 
 class ChildScheduler {
 public:
+  using LookupVal = std::optional<event_time>;
   ChildScheduler(SystemScheduler &global_sched, SchedulerComponent component_id,
                  const std::size_t num_events);
   ~ChildScheduler();
@@ -108,9 +110,18 @@ public:
   }
 
 private:
-  struct Implementation;
-  std::unique_ptr<Implementation> impl;
+  std::vector<LookupVal> e_index;
 
+  // Helpers for working with the event tracker. The `e_index` member is a mechanism
+  // to know what events have and have not been scheduled for the sake of an efficient
+  // event de-scheduling solution.
+  void index_put(const unsigned event_id, const event_time t);
+  LookupVal index_del(const unsigned event_id);
+  void index_load_vec(std::vector<LookupVal> &vec);
+  std::vector<LookupVal> index_as_vec() const;
+
+  // Implementations behind previously defined templates which abstract away the
+  // original enum type into a generic `unsigned` value.
   void schedule_event_in_impl(time_type in_cycles, unsigned event_id);
   void schedule_event_on_impl(time_type cycle, unsigned event_id);
   bool unschedule_event_impl(unsigned event_id);

@@ -121,9 +121,6 @@ private:
   ScheduledEventOutcome handle_event(SchedulerComponent c_id, unsigned e_id, time_type t);
   time_type sched_pop_until(ScheduledEventOutcome outcome); // Be careful with this!!!!!
   void sched_pop_until(time_type target_cycles);
-
-  /* For moving emulation state along */
-  void step_peripherals();
   CheatStats cheat_stats_{};
 
   void savestate_serialize_raise(bool check_ready) const;
