@@ -87,6 +87,8 @@ void ObjAttrDMA::start(const byte_t addr_high) {
 
 ScheduledEventOutcome ObjAttrDMA::handle_event(time_type event_time, unsigned event) {
   constexpr auto total_bytes_to_transfer = 0xA0;
+  if (sched.is_event_dirty(event_time, event)) [[unlikely]]
+    return ScheduledEventOutcome::EVENT_OUTCOME_NONE;
 
   switch (static_cast<SchedulerEvent>(event)) {
   case SchedulerEvent::EVENT_ACQUIRE_BUS:
@@ -290,6 +292,9 @@ byte_t VDMA::blks_remaining() const {
 bool VDMA::hdma_active() const { return hdma_pending; }
 
 ScheduledEventOutcome VDMA::handle_event(time_type event_time, unsigned event) {
+  if (sched.is_event_dirty(event_time, event)) [[unlikely]]
+    return ScheduledEventOutcome::EVENT_OUTCOME_NONE;
+
   switch (static_cast<SchedulerEvent>(event)) {
   case SchedulerEvent::EVENT_GDMA_COPY_BYTE: {
     if (!sys_.vdma_active) [[unlikely]]

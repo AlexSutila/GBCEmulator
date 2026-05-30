@@ -710,6 +710,9 @@ void PixelProcessingUnit::enable() {
 }
 
 ScheduledEventOutcome PixelProcessingUnit::handle_event(time_type event_time, unsigned event) {
+  if (sched.is_event_dirty(event_time, event)) [[unlikely]]
+    return ScheduledEventOutcome::EVENT_OUTCOME_NONE;
+
   switch (static_cast<SchedulerEvent>(event)) {
   case SchedulerEvent::EVENT_PUSH_BLANK_FRAME: {
     constexpr auto frame_duration_cycles = clks_static_timing(70224);

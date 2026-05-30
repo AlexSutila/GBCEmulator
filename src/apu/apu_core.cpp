@@ -404,6 +404,9 @@ void APU::step() {
 }
 
 ScheduledEventOutcome APU::handle_event(time_type event_time, unsigned event) {
+  if (sched.is_event_dirty(event_time, event)) [[unlikely]]
+    return ScheduledEventOutcome::EVENT_OUTCOME_NONE;
+
   switch (static_cast<SchedulerEvent>(event)) {
   case SchedulerEvent::EVENT_STEP_CYCLE: {
     constexpr auto apu_tickrate_aligned = clks_static_timing(1);

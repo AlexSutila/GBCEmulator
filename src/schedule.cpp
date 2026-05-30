@@ -172,29 +172,17 @@ event SystemScheduler::pop_next_event() {
   return e;
 }
 
-event_time SystemScheduler::schedule_event_in(time_type in_cycles, event e) {
-  const event_time t = std::make_tuple(sys.elapsed_clocks + in_cycles, ord++);
-  impl->queue(sys.elapsed_clocks, t, e);
-  return t;
-}
-
-event_time SystemScheduler::schedule_event_on(time_type cycle, event e) {
+time_type SystemScheduler::schedule_event_in(time_type in_cycles, event e) {
+  const time_type cycle = sys.elapsed_clocks + in_cycles;
   const event_time t = std::make_tuple(cycle, ord++);
   impl->queue(sys.elapsed_clocks, t, e);
-  return t;
+  return cycle;
 }
 
-bool SystemScheduler::unschedule_event(event_time t) {
-  auto [time, ord] = t;
-  if (time < sys.elapsed_clocks) {
-    // It is too late to unschedule this event. We leave the stale entry because its
-    // more efficient to do so, rather than needing a reverse mapping in the system
-    // scheduler to remove it.
-    return false;
-  }
-
-  impl->unqueue(t);
-  return true;
+time_type SystemScheduler::schedule_event_on(time_type cycle, event e) {
+  const event_time t = std::make_tuple(cycle, ord++);
+  impl->queue(sys.elapsed_clocks, t, e);
+  return cycle;
 }
 
 /* ======================================================================
@@ -215,13 +203,8 @@ template <typename T> void ChildScheduler::parse_savestate(T &t, std::size_t num
   }
 
   // The indices should align with the components event ID enum values
-  for (std::size_t event_id{0}; event_id < num_events; ++event_id) {
-    t.field_optional(event_id, vec.at(event_id), [&](T &t, auto &s) {
-      auto &[time, ord] = s;
-      t.field_generic(F_TIME, time);
-      t.field_generic(F_ORD, ord);
-    });
-  }
+  for (std::size_t event_id{0}; event_id < num_events; ++event_id)
+    t.field_optional(event_id, vec.at(event_id));
 
   // If we are reading, use new state. Make sure stale metadata is cleared.
   if (t.op() == Savestate::OP_READ) {
@@ -243,7 +226,7 @@ ChildScheduler::ChildScheduler(SystemScheduler &global_sched, SchedulerComponent
     : e_index(num_events, std::nullopt), component_id(component_id), g_sched(global_sched) {}
 ChildScheduler::~ChildScheduler() = default;
 
-void ChildScheduler::index_put(const unsigned event_id, const event_time t) {
+void ChildScheduler::index_put(const unsigned event_id, const time_type t) {
   e_index.at(static_cast<std::size_t>(event_id)) = t;
 }
 
@@ -270,7 +253,12 @@ void ChildScheduler::schedule_event_on_impl(time_type cycle, unsigned event_id) 
 
 bool ChildScheduler::unschedule_event_impl(unsigned event_id) {
   const auto t = index_del(event_id);
-  if (!t.has_value())
-    return false;
-  return g_sched.unschedule_event(t.value());
+  return t.has_value();
+}
+
+bool ChildScheduler::is_event_dirty(time_type scheduled_cycle, unsigned event_id) const {
+  const auto &t = e_index.at(event_id);
+  // Events are considered dirty if they have been unscheduled or rescheduled for a later
+  // cycle. If this condition below is not met, the event should not be handled.
+  return !t.has_value() || (t.value() != scheduled_cycle);
 }
