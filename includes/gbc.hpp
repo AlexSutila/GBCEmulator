@@ -28,6 +28,7 @@ class Frontend;
  * compatability and current operating mode. */
 struct runtime_sys_info {
   std::uint64_t elapsed_clocks{};
+  std::uint16_t sys_counter{};
 
   union {
     struct {

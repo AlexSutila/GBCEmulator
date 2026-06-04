@@ -9,7 +9,7 @@ struct runtime_sys_info;
 
 class TimerUnit {
 public:
-  explicit TimerUnit(AddressBus *bus);
+  explicit TimerUnit(AddressBus *bus, runtime_sys_info &sys);
   template <typename T> void parse_savestate(T &t);
   void reset() noexcept;
   void step() noexcept;
@@ -39,13 +39,13 @@ private:
   void timer_tick_pulse() noexcept;
 
   InterruptBits *if_reg{};
+  runtime_sys_info &sys_;
 
   Timer::TIMA tima_reg;
   Timer::TMA tma_reg;
   Timer::TAC tac_reg;
   Timer::DIV div_reg;
 
-  std::uint16_t sys_counter_{};
   byte_t tima_{};
   byte_t tma_{};
   byte_t tac_{};
@@ -56,6 +56,7 @@ private:
 
   bool reload_latch_{};
   std::uint8_t reload_delay_{};
+
 };
 
 #endif // GBC_TIMER_HPP

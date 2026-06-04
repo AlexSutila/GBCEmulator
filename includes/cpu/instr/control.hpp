@@ -199,6 +199,10 @@ public:
       sys_.double_speed = !sys_.double_speed;
       sys_.speed_switch_armed = false;
     }
+
+    // Stop instruction resets the system counter, which also has ripple effects
+    // on the state of the timers behavior.
+    sys_.sys_counter = 0;
   }
 
   std::string describe() override { return IroGB::format("STOP"); }

@@ -351,7 +351,7 @@ GameBoyColor::GameBoyColor(Frontend &frontend)
 
 void GameBoyColor::system_init() {
   /* General system operation info */
-  sys_.elapsed_clocks = 0;
+  sys_.elapsed_clocks = sys_.sys_counter = 0;
   sys_.vdma_active = false;
   sys_.halted = false;
   sys_.double_speed = false;
@@ -364,7 +364,7 @@ void GameBoyColor::system_init() {
   cpu = std::make_unique<LR35902>(bus.get(), debugger_, sys_);
   apu = std::make_unique<APU>(*bus, fe_, sched_);
   ppu = std::make_unique<PixelProcessingUnit>(bus.get(), fe_, debugger_, sys_, sched_);
-  timer = std::make_unique<TimerUnit>(bus.get());
+  timer = std::make_unique<TimerUnit>(bus.get(), sys_);
   serial = std::make_unique<SerialUnit>(bus.get());
 
   oam_dma = std::make_unique<ObjAttrDMA>(*bus, sys_, sched_);
@@ -642,12 +642,13 @@ enum : std::uint16_t {
 };
 
 template <typename T> void GameBoyColor::parse_savestate(T &t) {
-  constexpr auto version = 5; // Schema revision
+  constexpr auto version = 6; // Schema revision
   t.chunk_header(version, Savestate::C_GBC);
 
   t.field_complex(F_SYS, [&](auto &t) {
     t.field_generic(0, sys_.elapsed_clocks);
-    t.field_generic(1, sys_.flags);
+    t.field_generic(1, sys_.sys_counter);
+    t.field_generic(2, sys_.flags);
   });
 
   // Begin recursive descent into each component

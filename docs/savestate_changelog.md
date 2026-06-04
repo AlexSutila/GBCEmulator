@@ -1,3 +1,7 @@
+## Wed Jun  3 08:30:58 PM MST 2026 (+1 field, -1 field)
++ Unnamed system counter field added for runtyme_sys_info struct
+- Removed F_SYS_COUNTER for C_TIMER
+
 ## Sun May 24 04:04:14 PM MST 2026 (+2 fields)
 - F_SCHED added for C_APU
 - F_SCHED added for C_PPU

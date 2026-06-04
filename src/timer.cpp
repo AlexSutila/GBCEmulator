@@ -1,12 +1,12 @@
 #include "timer.hpp"
 #include "cpu/interrupts.hpp"
+#include "gbc.hpp"
 #include "memory/bus.hpp"
 #include "memory/mmio/dmg.hpp"
 #include "savestate/codec.hpp"
 
 enum : std::uint16_t {
-  F_SYS_COUNTER = 1,
-  F_TIMA,
+  F_TIMA = 1,
   F_TMA,
   F_TAC,
   F_OVERFLOW_PENDING,
@@ -16,10 +16,9 @@ enum : std::uint16_t {
 };
 
 template <typename T> void TimerUnit::parse_savestate(T &t) {
-  constexpr auto version = 1; // Schema revision
+  constexpr auto version = 2; // Schema revision
   t.chunk_header(version, Savestate::C_TIMER);
 
-  t.field_generic(F_SYS_COUNTER, sys_counter_);
   t.field_generic(F_TIMA, tima_);
   t.field_generic(F_TMA, tma_);
   t.field_generic(F_TAC, tac_);
@@ -43,8 +42,9 @@ template <typename T> T *init_mmio(AddressBus *bus, const IORegisterMapping reg_
   throw std::logic_error(std::string("Failed to configure MMIO (Timer)"));
 }
 
-TimerUnit::TimerUnit(AddressBus *const bus)
-    : tima_reg(*this), // Timer counter register
+TimerUnit::TimerUnit(AddressBus *bus, runtime_sys_info &sys)
+    : sys_(sys),       // For access to system counter
+      tima_reg(*this), // Timer counter register
       tma_reg(*this),  // Timer modulo register
       tac_reg(*this),  // Timer control register
       div_reg(*this)   // Divider register
@@ -64,7 +64,7 @@ TimerUnit::TimerUnit(AddressBus *const bus)
 }
 
 void TimerUnit::reset() noexcept {
-  sys_counter_ = 0;
+  sys_.sys_counter = 0;
 
   overflow_pending_ = false;
   overflow_delay_ = 0;
@@ -76,17 +76,17 @@ void TimerUnit::reset() noexcept {
 byte_t TimerUnit::read_div() const noexcept {
   // DIV increments at 16384 Hz; in double-speed it's 32768 Hz
   // If sys_ increments once per "timer t-cycle", DIV is sys_[15:8].
-  return static_cast<byte_t>((sys_counter_ >> 8) & 0xFF);
+  return static_cast<byte_t>((sys_.sys_counter >> 8) & 0xFF);
 }
 
 void TimerUnit::write_div() noexcept {
   // Writing any value resets DIV (and thus sys counter) and can cause an edge
   // tick
-  const bool prev_in = edge_input(sys_counter_, tac_);
-  sys_counter_ = 0;
+  const bool prev_in = edge_input(sys_.sys_counter, tac_);
+  sys_.sys_counter = 0;
 
   // falling edge -> tick
-  if (const bool next_in = edge_input(sys_counter_, tac_); prev_in && !next_in) {
+  if (const bool next_in = edge_input(sys_.sys_counter, tac_); prev_in && !next_in) {
     timer_tick_pulse();
   }
 }
@@ -120,9 +120,9 @@ void TimerUnit::write_tac(byte_t v) noexcept {
   v &= 0x07;
 
   // "writing to TAC may increase TIMA once"
-  const bool prev_in = edge_input(sys_counter_, tac_);
+  const bool prev_in = edge_input(sys_.sys_counter, tac_);
   tac_ = v;
-  if (const bool next_in = edge_input(sys_counter_, tac_); prev_in && !next_in) {
+  if (const bool next_in = edge_input(sys_.sys_counter, tac_); prev_in && !next_in) {
     timer_tick_pulse();
   }
 }
@@ -191,10 +191,10 @@ void TimerUnit::timer_tick_pulse() noexcept {
 void TimerUnit::step() noexcept {
   service_overflow_pipeline();
 
-  const bool prev = edge_input(sys_counter_, tac_);
-  ++sys_counter_;
+  const bool prev = edge_input(sys_.sys_counter, tac_);
+  ++sys_.sys_counter;
 
-  if (const bool next = edge_input(sys_counter_, tac_); prev && !next) {
+  if (const bool next = edge_input(sys_.sys_counter, tac_); prev && !next) {
     timer_tick_pulse();
   }
 }
