@@ -13,8 +13,24 @@ import hashlib
 import pytest
 
 # ============================================================
+# Passing State
+# ============================================================
+IROGB_CASE_PASSED = "6d4f6a3605a14fab7d6ddd6edb600c97"  # Solid green
+
+
+# ============================================================
 # Test Data
 # ============================================================
+
+
+IROGB_CASES = [
+    (
+        "stop-mode-kills-div",
+        "https://github.com/AlexSutila/IroGB-tests/raw/refs/heads/main/stop_mode_kills_div.gb",
+        IROGB_CASE_PASSED
+    )
+]
+
 
 ACID_CASES = [
     (
@@ -251,6 +267,13 @@ def magen_params():
     )
 
 
+def irogb_params():
+    return pytest.mark.parametrize(
+        "title,url,expected_md5",
+        cases_with_ids(IROGB_CASES)
+    )
+
+
 @acid_params()
 def test_acid_suite(title: str, url: str, expected_md5: str):
     img = run_and_get_frame(url, expected_md5, big_step=False)
@@ -293,7 +316,23 @@ def test_magen_suite_opt(title: str, url: str, expected_md5: str):
     assert digest == expected_md5, f"{title} failed (got {digest})"
 
 
+@irogb_params()
+def test_irogb_suite(title: str, url: str, expected_md5: str):
+    img = run_and_get_frame(url, expected_md5, big_step=False)
+    digest = to_digest(img)
+    assert digest == expected_md5, f"{title} failed (got {digest})"
+
+
+@irogb_params()
+def test_irogb_suite_opt(title: str, url: str, expected_md5: str):
+    img = run_and_get_frame(url, expected_md5, big_step=True)
+    digest = to_digest(img)
+    assert digest == expected_md5, f"{title} failed (got {digest})"
+
+
 if __name__ == "__main__":
+    # We do not use this script to generate PNGs for the IROGB cases, because
+    # doing so would be quite boring. Its just green PNGs, so who cares tbh.
     run_acid_test_suite(big_step=True)
     run_blargg_tests(big_step=True)
     run_magen_tests(big_step=True)
