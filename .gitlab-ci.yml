@@ -82,6 +82,15 @@ libretro-build-linux-x64:
     CC: /usr/bin/gcc-12
     CXX: /usr/bin/g++-12
 
+# Linux ARM 64-bit
+libretro-build-linux-aarch64:
+  extends:
+    - .libretro-linux-cmake-aarch64
+    - .core-defs
+  variables:
+    CC: /usr/bin/gcc-12
+    CXX: /usr/bin/g++-12
+
 # macOS Intel
 libretro-build-osx-x64:
   tags:
